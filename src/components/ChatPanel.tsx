@@ -10,6 +10,7 @@ import { useProjects } from "@/contexts/ProjectContext";
 import { useVirtualFS, parseMultiFileOutput } from "@/contexts/VirtualFSContext";
 import { supabase } from "@/integrations/supabase/client";
 import ChatMessage from "@/components/chat/ChatMessage";
+import BuildPipelineCard from "@/components/chat/BuildPipelineCard";
 import ReactMarkdown from "react-markdown";
 import {
   DropdownMenu,
