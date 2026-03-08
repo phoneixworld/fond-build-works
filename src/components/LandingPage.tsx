@@ -127,6 +127,46 @@ const LandingPage = ({ onStartProject, onOpenProject }: LandingPageProps) => {
               </button>
             ))}
           </div>
+
+          {/* Launchpads (Templates) */}
+          <div className="flex justify-center">
+            <button
+              onClick={() => setShowTemplates(!showTemplates)}
+              className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-primary transition-colors px-3 py-1.5 rounded-full border border-border hover:border-primary/30"
+            >
+              <Rocket className="w-3.5 h-3.5" />
+              {showTemplates ? "Hide" : "Use a"} Launchpad
+            </button>
+          </div>
+
+          {showTemplates && (
+            <motion.div
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: "auto" }}
+              className="overflow-hidden"
+            >
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                {TEMPLATES.map((t) => {
+                  const Icon = t.icon;
+                  return (
+                    <button
+                      key={t.id}
+                      onClick={() => handleUseTemplate(t)}
+                      className="text-left p-3 rounded-xl border border-border hover:border-primary/30 hover:bg-secondary/50 transition-all group"
+                    >
+                      <div className="flex items-center gap-2 mb-1">
+                        <div className="w-7 h-7 rounded-lg bg-primary/10 flex items-center justify-center shrink-0 group-hover:bg-primary/20 transition-colors">
+                          <Icon className="w-3.5 h-3.5 text-primary" />
+                        </div>
+                        <span className="text-sm font-medium text-foreground">{t.name}</span>
+                      </div>
+                      <p className="text-[11px] text-muted-foreground ml-9">{t.description}</p>
+                    </button>
+                  );
+                })}
+              </div>
+            </motion.div>
+          )}
         </motion.div>
 
         {/* Recent projects */}
