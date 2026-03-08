@@ -824,7 +824,8 @@ const ChatPanel = forwardRef<ChatPanelHandle, { initialPrompt?: string; onVersio
           const fileNames = Object.keys(reactResult.files);
           const totalChars = Object.values(reactResult.files).join('').length;
           console.log(`[upsert] ✅ First React parse success: files=${fileNames.join(',')}, chars=${totalChars}`);
-          setBuildStep("Bundling React app...");
+          setBuildStep("📦 Bundling & validating...");
+          setPipelineStep("bundling");
           hasSetBuilding = true;
         }
         streamParseCount++;
