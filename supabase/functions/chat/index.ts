@@ -100,15 +100,94 @@ Write JSX in <script type="text/babel">. Use functional components with hooks. C
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>App Title</title>
-  <!-- Google Fonts -->
+  <!-- ALWAYS include the UI Kit component library -->
+  <link rel="stylesheet" href="${apiBase}/ui-kit">
+  <!-- Google Fonts — always include at least one pair -->
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Plus+Jakarta+Sans:wght@500;600;700;800&display=swap" rel="stylesheet">
   <!-- Framework CDNs -->
-  <!-- Custom styles -->
+  <!-- Custom styles for this specific app -->
 </head>
 <body>
-  <!-- App content -->
+  <!-- App content using ui-* component classes -->
 </body>
 </html>
 \`\`\`
+
+## UI Component Library
+
+ALWAYS include \`<link rel="stylesheet" href="${apiBase}/ui-kit">\` in the <head>. This gives you a production-quality component library with these classes:
+
+### Buttons
+- \`ui-btn ui-btn-primary\` — filled primary button with shadow and hover lift
+- \`ui-btn ui-btn-secondary\` — outlined/white button
+- \`ui-btn ui-btn-ghost\` — transparent button
+- \`ui-btn ui-btn-danger\` — red/destructive button
+- Size modifiers: \`ui-btn-lg\`, \`ui-btn-sm\`, \`ui-btn-icon\`
+- Group: \`<div class="ui-btn-group">\`
+
+### Cards
+- \`ui-card\` — base card with border and padding
+- \`ui-card ui-card-hover\` — card with hover lift effect
+- \`ui-card ui-card-featured\` — highlighted card with primary border glow
+- \`ui-card ui-card-image\` — card with image top (use \`.ui-card-body\` for padded content)
+- \`ui-card ui-card-glass\` — frosted glass effect
+
+### Form Elements
+- \`ui-input\` — text input with focus ring
+- \`ui-textarea\` — textarea
+- \`ui-select\` — styled select dropdown
+- \`ui-label\` — form label
+- \`ui-form-group\` — wrapper with bottom margin
+- \`ui-form-hint\` / \`ui-form-error\` — help/error text
+- \`ui-checkbox\` / \`ui-radio\` — labeled checkbox/radio
+- Error: add \`ui-input-error\` class
+
+### Navigation
+- \`ui-navbar\` — sticky blurred navbar
+- \`ui-navbar-brand\` — logo/name link
+- \`ui-navbar-links\` — flex nav link list
+- \`ui-navbar-link\` / \`ui-navbar-link-active\` — nav links
+
+### Layout
+- \`ui-section\` / \`ui-section-sm\` / \`ui-section-lg\` — page sections with vertical padding
+- \`ui-container\` / \`ui-container-sm\` / \`ui-container-md\` — max-width centered wrappers
+- \`ui-hero\` — centered hero section
+- \`ui-hero-title\` — large bold heading (56px desktop)
+- \`ui-hero-subtitle\` — muted description
+- \`ui-hero-actions\` — centered button group
+
+### Data Display
+- \`ui-table-wrapper\` > \`ui-table\` — styled table with hover rows
+- \`ui-badge ui-badge-primary\` — colored pill badges (also: -success, -warning, -error, -gray)
+- \`ui-avatar ui-avatar-md\` — circular avatars (sm/md/lg/xl)
+- \`ui-avatar-group\` — overlapping avatar stack
+- \`ui-stat\` > \`ui-stat-value\` + \`ui-stat-label\` — big number stats
+- \`ui-progress\` > \`ui-progress-bar\` — progress bar
+- \`ui-tabs\` > \`ui-tab\` / \`ui-tab-active\` — tab navigation
+
+### Feedback
+- \`ui-modal-overlay\` > \`ui-modal\` — centered modal dialog
+- \`ui-toast-container\` > \`ui-toast ui-toast-success\` — toast notifications
+- \`ui-spinner\` / \`ui-spinner-lg\` — loading spinner
+- \`ui-skeleton\` — shimmer loading placeholder
+- \`ui-empty\` > \`ui-empty-icon\` + \`ui-empty-title\` + \`ui-empty-text\` — empty state
+- \`ui-toggle\` / \`ui-toggle-active\` — switch toggle
+
+### Visual
+- \`ui-text-gradient\` — gradient text (primary → pink)
+- \`ui-divider\` / \`ui-divider-gradient\` — horizontal dividers
+
+### Animation
+- \`ui-animate-fade-in\` — fade in
+- \`ui-animate-slide-up\` — slide up with bounce
+- \`ui-animate-bounce-in\` — bounce scale in
+- \`ui-stagger\` — add to parent to stagger children's slide-up animation
+
+### CSS Variables
+You can customize the palette by overriding in a \`<style>\` block:
+\`--ui-primary\`, \`--ui-primary-light\`, \`--ui-primary-dark\`, \`--ui-primary-rgb\` (for rgba), \`--ui-primary-50\` through \`--ui-primary-700\`
+
+IMPORTANT: Combine ui-* classes with Tailwind utility classes for layout (flex, grid, gap, etc.) and customization. The ui-* classes handle the hard parts (shadows, transitions, focus states, animations).
 
 ## Tech Stack
 ${techStackInstructions[techStack] || techStackInstructions["html-tailwind"]}
