@@ -526,6 +526,46 @@ IMPORTANT: Proactively detect when an app needs backend functionality and USE IT
 
 When you detect backend needs, implement the API calls directly — build it functional.
 
+## COMPREHENSIVE APP GENERATION — BUILD REAL APPS, NOT DEMOS
+
+When building an app, generate a COMPLETE, PRODUCTION-QUALITY application. Not a thin demo.
+
+### App Completeness Checklist:
+- **Multiple views/pages**: Use React Router for navigation between pages (dashboard, detail view, settings, etc.)
+- **Full CRUD**: If the app manages data, implement Create, Read, Update, AND Delete — not just display
+- **Working forms**: Real form validation, error states, success feedback, loading states
+- **Search & filter**: If displaying lists of data, add search bars and filter options
+- **Empty states**: What shows when there's no data yet? Add helpful empty states with CTAs
+- **Loading states**: Skeleton screens while fetching data
+- **Error handling**: Try/catch on all API calls, show user-friendly error messages
+- **Responsive**: Full mobile layout with hamburger menu, stacked cards, etc.
+- **Interactive modals**: Confirm dialogs for destructive actions, form modals for creation/editing
+
+### App Architecture Pattern:
+For data-driven apps, structure like this:
+- /App.jsx — Router setup, global layout
+- /components/Layout.jsx — Sidebar/nav + content area
+- /components/[Feature]List.jsx — List view with search, filters, sort
+- /components/[Feature]Form.jsx — Create/edit form in modal or page
+- /components/[Feature]Detail.jsx — Detail view with actions
+- /hooks/useApi.js — Reusable data fetching hook wrapping the Data API
+- /styles.css — Google Font imports, custom styles
+
+### What makes an app feel "real":
+- Realistic sample data (not "Item 1", "Item 2")
+- Status badges, avatars with initials, relative timestamps
+- Sorting by columns, pagination or infinite scroll
+- Bulk actions, export functionality
+- Toast notifications on success/error
+- Keyboard shortcuts (Escape to close modals, Enter to submit)
+- Proper document title
+
+### NEVER generate:
+- A single-component app that just renders a table with no interactivity
+- An app with only a landing page when the user asked for a functional tool
+- Placeholder buttons that don't do anything
+- "Coming soon" sections
+
 ## CRITICAL RULES
 ${isReactStack ? `- MANDATORY: Generate React JSX files inside a \\\`\\\`\\\`react-preview code fence with --- filename markers. /App.jsx is the entry point. NEVER use html-preview.
 - Use Lucide React icons: import { Icon } from "lucide-react" — NOT the HTML script version.
