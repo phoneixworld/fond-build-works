@@ -45,6 +45,7 @@ const SECONDARY_TABS = [
   { id: "brandkit" as PanelId, label: "Brand Kit", icon: Palette },
   { id: "abtesting" as PanelId, label: "A/B Tests", icon: FlaskConical },
   { id: "plugins" as PanelId, label: "Plugins", icon: Puzzle },
+  { id: "whitelabel" as PanelId, label: "White-label", icon: Tag },
   { id: "history" as PanelId, label: "History", icon: Clock },
 ];
 
