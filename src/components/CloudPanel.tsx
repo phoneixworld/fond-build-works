@@ -8,6 +8,7 @@ import {
   Zap,
   Terminal,
   ScrollText,
+  Download,
 } from "lucide-react";
 import SchemaBuilder from "./SchemaBuilder";
 import CloudOverview from "./cloud/CloudOverview";
@@ -17,6 +18,7 @@ import CloudSecrets from "./cloud/CloudSecrets";
 import CloudFunctions from "./cloud/CloudFunctions";
 import CloudSqlEditor from "./cloud/CloudSqlEditor";
 import CloudLogs from "./cloud/CloudLogs";
+import CloudExport from "./cloud/CloudExport";
 
 const CLOUD_SECTIONS = [
   { id: "overview", label: "Overview", icon: LayoutDashboard },
