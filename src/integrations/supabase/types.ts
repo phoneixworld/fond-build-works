@@ -41,6 +41,146 @@ export type Database = {
         }
         Relationships: []
       }
+      project_data: {
+        Row: {
+          collection: string
+          created_at: string
+          data: Json
+          id: string
+          project_id: string
+          updated_at: string
+        }
+        Insert: {
+          collection: string
+          created_at?: string
+          data?: Json
+          id?: string
+          project_id: string
+          updated_at?: string
+        }
+        Update: {
+          collection?: string
+          created_at?: string
+          data?: Json
+          id?: string
+          project_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "project_data_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      project_functions: {
+        Row: {
+          code: string
+          created_at: string
+          id: string
+          name: string
+          project_id: string
+          trigger_type: string
+        }
+        Insert: {
+          code?: string
+          created_at?: string
+          id?: string
+          name: string
+          project_id: string
+          trigger_type?: string
+        }
+        Update: {
+          code?: string
+          created_at?: string
+          id?: string
+          name?: string
+          project_id?: string
+          trigger_type?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "project_functions_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      project_schemas: {
+        Row: {
+          collection_name: string
+          created_at: string
+          id: string
+          project_id: string
+          schema: Json
+        }
+        Insert: {
+          collection_name: string
+          created_at?: string
+          id?: string
+          project_id: string
+          schema?: Json
+        }
+        Update: {
+          collection_name?: string
+          created_at?: string
+          id?: string
+          project_id?: string
+          schema?: Json
+        }
+        Relationships: [
+          {
+            foreignKeyName: "project_schemas_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      project_users: {
+        Row: {
+          created_at: string
+          display_name: string | null
+          email: string
+          id: string
+          metadata: Json
+          password_hash: string
+          project_id: string
+        }
+        Insert: {
+          created_at?: string
+          display_name?: string | null
+          email: string
+          id?: string
+          metadata?: Json
+          password_hash: string
+          project_id: string
+        }
+        Update: {
+          created_at?: string
+          display_name?: string | null
+          email?: string
+          id?: string
+          metadata?: Json
+          password_hash?: string
+          project_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "project_users_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       projects: {
         Row: {
           chat_history: Json
@@ -50,6 +190,7 @@ export type Database = {
           is_published: boolean
           name: string
           published_slug: string | null
+          tech_stack: string
           updated_at: string
           user_id: string
         }
@@ -61,6 +202,7 @@ export type Database = {
           is_published?: boolean
           name?: string
           published_slug?: string | null
+          tech_stack?: string
           updated_at?: string
           user_id: string
         }
@@ -72,6 +214,7 @@ export type Database = {
           is_published?: boolean
           name?: string
           published_slug?: string | null
+          tech_stack?: string
           updated_at?: string
           user_id?: string
         }

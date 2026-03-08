@@ -29,7 +29,6 @@ const ChatPanel = ({ initialPrompt }: { initialPrompt?: string }) => {
   const lastProjectIdRef = useRef<string | null>(null);
   const hasProcessedInitialRef = useRef(false);
 
-  // Set pending prompt from initialPrompt (only once per mount)
   useEffect(() => {
     if (initialPrompt && !hasProcessedInitialRef.current) {
       hasProcessedInitialRef.current = true;
@@ -37,7 +36,6 @@ const ChatPanel = ({ initialPrompt }: { initialPrompt?: string }) => {
     }
   }, [initialPrompt]);
 
-  // Sync messages & preview when project changes
   useEffect(() => {
     if (currentProject && currentProject.id !== lastProjectIdRef.current) {
       lastProjectIdRef.current = currentProject.id;
@@ -93,6 +91,8 @@ const ChatPanel = ({ initialPrompt }: { initialPrompt?: string }) => {
     try {
       await streamChat({
         messages: [...messages, userMsg],
+        projectId: currentProject.id,
+        techStack: currentProject.tech_stack || "html-tailwind",
         onDelta: upsert,
         onDone: () => {
           setIsLoading(false);
@@ -132,7 +132,6 @@ const ChatPanel = ({ initialPrompt }: { initialPrompt?: string }) => {
     }
   }, [isLoading, messages, currentProject, saveProject, setPreviewHtml, setIsBuilding, setBuildStep]);
 
-  // Process pending prompt when ready
   useEffect(() => {
     if (pendingPrompt && currentProject && !isLoading && messages.length === 0) {
       const prompt = pendingPrompt;

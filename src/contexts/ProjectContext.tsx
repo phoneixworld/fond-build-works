@@ -2,12 +2,16 @@ import { createContext, useContext, useState, useEffect, useCallback, ReactNode 
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
+import { TechStackId } from "@/lib/techStacks";
 
 export interface Project {
   id: string;
   name: string;
   html_content: string;
   chat_history: { role: "user" | "assistant"; content: string }[];
+  tech_stack: TechStackId;
+  is_published: boolean;
+  published_slug: string | null;
   updated_at: string;
   created_at: string;
 }
@@ -17,8 +21,8 @@ interface ProjectContextType {
   currentProject: Project | null;
   loading: boolean;
   selectProject: (id: string) => void;
-  createProject: (name?: string) => Promise<Project | null>;
-  saveProject: (updates: Partial<Pick<Project, "name" | "html_content" | "chat_history">>) => Promise<void>;
+  createProject: (name?: string, techStack?: TechStackId) => Promise<Project | null>;
+  saveProject: (updates: Partial<Pick<Project, "name" | "html_content" | "chat_history" | "tech_stack">>) => Promise<void>;
   deleteProject: (id: string) => Promise<void>;
   refreshProjects: () => Promise<void>;
 }
@@ -48,6 +52,9 @@ export const ProjectProvider = ({ children }: { children: ReactNode }) => {
     const mapped = (data ?? []).map((p: any) => ({
       ...p,
       chat_history: Array.isArray(p.chat_history) ? p.chat_history : [],
+      tech_stack: p.tech_stack || "html-tailwind",
+      is_published: p.is_published || false,
+      published_slug: p.published_slug || null,
     })) as Project[];
     setProjects(mapped);
     setLoading(false);
@@ -62,7 +69,6 @@ export const ProjectProvider = ({ children }: { children: ReactNode }) => {
     }
   }, [user, fetchProjects]);
 
-  // Select project: fetch fresh data from DB to ensure we have latest chat_history/html
   const selectProject = useCallback(async (id: string) => {
     const { data, error } = await supabase
       .from("projects")
@@ -78,15 +84,21 @@ export const ProjectProvider = ({ children }: { children: ReactNode }) => {
     const project = {
       ...data,
       chat_history: Array.isArray(data.chat_history) ? data.chat_history : [],
+      tech_stack: (data as any).tech_stack || "html-tailwind",
+      is_published: (data as any).is_published || false,
+      published_slug: (data as any).published_slug || null,
     } as unknown as Project;
     setCurrentProject(project);
   }, []);
 
-  const createProject = useCallback(async (name?: string): Promise<Project | null> => {
+  const createProject = useCallback(async (name?: string, techStack?: TechStackId): Promise<Project | null> => {
     if (!user) return null;
+    const insertData: any = { user_id: user.id, name: name || "Untitled Project" };
+    if (techStack) insertData.tech_stack = techStack;
+    
     const { data, error } = await supabase
       .from("projects")
-      .insert({ user_id: user.id, name: name || "Untitled Project" })
+      .insert(insertData)
       .select()
       .single();
 
@@ -95,17 +107,23 @@ export const ProjectProvider = ({ children }: { children: ReactNode }) => {
       return null;
     }
 
-    const project = { ...data, chat_history: [] } as Project;
+    const project = {
+      ...data,
+      chat_history: [],
+      tech_stack: (data as any).tech_stack || techStack || "html-tailwind",
+      is_published: false,
+      published_slug: null,
+    } as Project;
     setProjects((prev) => [project, ...prev]);
     setCurrentProject(project);
     return project;
   }, [user, toast]);
 
-  const saveProject = useCallback(async (updates: Partial<Pick<Project, "name" | "html_content" | "chat_history">>) => {
+  const saveProject = useCallback(async (updates: Partial<Pick<Project, "name" | "html_content" | "chat_history" | "tech_stack">>) => {
     if (!currentProject) return;
     const { error } = await supabase
       .from("projects")
-      .update({ ...updates, updated_at: new Date().toISOString() })
+      .update({ ...updates, updated_at: new Date().toISOString() } as any)
       .eq("id", currentProject.id);
 
     if (error) {
