@@ -40,7 +40,7 @@ import {
 
 const IDELayout = () => {
   const { user, signOut } = useAuth();
-  const { currentProject, selectProject, createProject, saveProject } = useProjects();
+  const { projects, currentProject, selectProject, createProject, saveProject } = useProjects();
   const [selectedFile, setSelectedFile] = useState("App.tsx");
   const [rightPanel, setRightPanel] = useState<"code" | "preview" | "cloud" | "history">("preview");
   const [inIDE, setInIDE] = useState(false);
