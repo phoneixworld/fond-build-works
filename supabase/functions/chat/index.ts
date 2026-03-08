@@ -85,6 +85,7 @@ export default function Header() {
 - Write standard JSX (not React.createElement) — the bundler compiles it
 - Use .jsx extension for all component files
 - The entry point is /App.jsx — it MUST export a default component
+- File paths must be relative to root: /App.jsx, /components/Header.jsx — NEVER use /src/ prefix
 - Break apps into MULTIPLE component files under /components/
 - Import npm packages normally: import { motion } from "framer-motion"
 - Tailwind CSS is available via CDN — use className with Tailwind classes

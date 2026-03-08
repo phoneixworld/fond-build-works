@@ -68,14 +68,20 @@ function buildSandpackFiles(files: SandpackFileSet | null): Record<string, strin
   // Map user files into sandpack paths
   for (const [path, code] of Object.entries(files)) {
     const normalized = path.startsWith("/") ? path : `/${path}`;
-    // Convert .tsx to .js for sandpack (it handles JSX in .js)
+    // Keep .jsx as-is — Sandpack react template supports both .js and .jsx
+    // Only convert .tsx/.ts to .js
     const sandpackPath = normalized.replace(/\.tsx?$/, ".js");
     base[sandpackPath] = code;
   }
 
-  // Ensure /App.js exists
+  // Ensure entry point exists: /App.js or /App.jsx
   if (!base["/App.js"] && !base["/App.jsx"]) {
     base["/App.js"] = DEFAULT_APP;
+  }
+
+  // If we have /App.jsx but not /App.js, update index.js import
+  if (base["/App.jsx"] && !base["/App.js"]) {
+    base["/index.js"] = INDEX_JS.replace('./App', './App.jsx');
   }
 
   return base;
