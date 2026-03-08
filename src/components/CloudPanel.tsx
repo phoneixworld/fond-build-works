@@ -8,6 +8,7 @@ import {
   Zap,
   Terminal,
   ScrollText,
+  Download,
 } from "lucide-react";
 import SchemaBuilder from "./SchemaBuilder";
 import CloudOverview from "./cloud/CloudOverview";
@@ -17,6 +18,7 @@ import CloudSecrets from "./cloud/CloudSecrets";
 import CloudFunctions from "./cloud/CloudFunctions";
 import CloudSqlEditor from "./cloud/CloudSqlEditor";
 import CloudLogs from "./cloud/CloudLogs";
+import CloudExport from "./cloud/CloudExport";
 
 const CLOUD_SECTIONS = [
   { id: "overview", label: "Overview", icon: LayoutDashboard },
@@ -26,6 +28,7 @@ const CLOUD_SECTIONS = [
   { id: "secrets", label: "Secrets", icon: KeyRound },
   { id: "functions", label: "Edge Functions", icon: Zap },
   { id: "sql", label: "SQL Editor", icon: Terminal },
+  { id: "export", label: "Export & Migrate", icon: Download },
   { id: "logs", label: "Logs", icon: ScrollText },
 ] as const;
 
@@ -50,6 +53,8 @@ const CloudPanel = () => {
         return <CloudFunctions />;
       case "sql":
         return <CloudSqlEditor />;
+      case "export":
+        return <CloudExport />;
       case "logs":
         return <CloudLogs />;
       default:
