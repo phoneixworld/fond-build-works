@@ -244,13 +244,100 @@ const CopyButton = ({ text }: { text: string }) => {
   );
 };
 
+// --- Context awareness badges ---
+
+interface ContextHint {
+  icon: React.ElementType;
+  text: string;
+  type: "memory" | "pattern" | "convention";
+}
+
+function detectContextHints(text: string): ContextHint[] {
+  const hints: ContextHint[] = [];
+  
+  // Detect [CONTEXT: ...] markers injected by the AI
+  const contextPattern = /\[CONTEXT:\s*([^\]]+)\]/gi;
+  let match;
+  while ((match = contextPattern.exec(text)) !== null) {
+    const hint = match[1].trim();
+    if (/prefer|chose|selected|your.*style/i.test(hint)) {
+      hints.push({ icon: Bookmark, text: hint, type: "memory" });
+    } else if (/previous|earlier|last time|reusing/i.test(hint)) {
+      hints.push({ icon: History, text: hint, type: "pattern" });
+    } else {
+      hints.push({ icon: Lightbulb, text: hint, type: "convention" });
+    }
+  }
+
+  // Also detect inline memory references without markers
+  if (hints.length === 0) {
+    const memoryPhrases = [
+      { pattern: /(?:applying|using) your (?:preferred|saved|chosen) (.+?)(?:\.|,|$)/i, type: "memory" as const },
+      { pattern: /(?:based on|matching) your (?:previous|existing) (.+?)(?:\.|,|$)/i, type: "pattern" as const },
+      { pattern: /(?:reusing|following) your (?:existing|established) (.+?)(?:\.|,|$)/i, type: "convention" as const },
+      { pattern: /from your project (?:brain|knowledge|settings)(?::?\s*(.+?))?(?:\.|,|$)/i, type: "memory" as const },
+    ];
+    for (const { pattern, type } of memoryPhrases) {
+      const m = text.match(pattern);
+      if (m) {
+        hints.push({
+          icon: type === "memory" ? Bookmark : type === "pattern" ? History : Lightbulb,
+          text: m[0].replace(/^[,.\s]+|[,.\s]+$/g, ""),
+          type,
+        });
+      }
+    }
+  }
+
+  return hints;
+}
+
+function stripContextMarkers(text: string): string {
+  return text.replace(/\[CONTEXT:\s*[^\]]+\]\s*/gi, "").trim();
+}
+
+const ContextBadges = ({ hints }: { hints: ContextHint[] }) => {
+  if (hints.length === 0) return null;
+  
+  const colorMap = {
+    memory: { bg: "bg-primary/8", text: "text-primary/70", border: "border-primary/15" },
+    pattern: { bg: "bg-accent/8", text: "text-accent/70", border: "border-accent/15" },
+    convention: { bg: "bg-[hsl(var(--ide-success))]/8", text: "text-[hsl(var(--ide-success))]/70", border: "border-[hsl(var(--ide-success))]/15" },
+  };
+
+  return (
+    <div className="flex flex-wrap gap-1.5 mb-2.5">
+      {hints.map((hint, i) => {
+        const Icon = hint.icon;
+        const colors = colorMap[hint.type];
+        return (
+          <motion.div
+            key={i}
+            initial={{ opacity: 0, scale: 0.9, y: -4 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            transition={{ delay: i * 0.08, duration: 0.25 }}
+            className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[10px] font-medium border ${colors.bg} ${colors.text} ${colors.border}`}
+          >
+            <Icon className="w-3 h-3" />
+            <span className="max-w-[200px] truncate">{hint.text}</span>
+          </motion.div>
+        );
+      })}
+    </div>
+  );
+};
+
 // --- Main component ---
 
 const ChatMessage = ({ content, role, timestamp, isLoading, onEdit, onRegenerate, showActions = true }: ChatMessageProps) => {
   const isUser = role === "user";
   const textContent = getTextContent(content);
   const imageUrls = getImageUrls(content);
-  const sections = !isUser ? parseStructuredResponse(textContent) : [];
+  
+  // Detect and strip context hints for assistant messages
+  const contextHints = !isUser ? detectContextHints(textContent) : [];
+  const cleanText = !isUser ? stripContextMarkers(textContent) : textContent;
+  const sections = !isUser ? parseStructuredResponse(cleanText) : [];
 
   return (
     <motion.div
