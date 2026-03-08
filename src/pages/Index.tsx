@@ -93,17 +93,9 @@ const IDELayout = () => {
         {/* Main area */}
         <div className="flex-1 overflow-hidden">
           <ResizablePanelGroup direction="horizontal">
-            {/* Left: Projects + Chat */}
+            {/* Left: Chat only */}
             <ResizablePanel defaultSize={35} minSize={25} maxSize={50}>
-              <ResizablePanelGroup direction="vertical">
-                <ResizablePanel defaultSize={25} minSize={10} maxSize={45}>
-                  <ProjectList />
-                </ResizablePanel>
-                <ResizableHandle className="h-px bg-border hover:bg-primary transition-colors" />
-                <ResizablePanel defaultSize={75}>
-                  <ChatPanel initialPrompt={initialPrompt} />
-                </ResizablePanel>
-              </ResizablePanelGroup>
+              <ChatPanel initialPrompt={initialPrompt} />
             </ResizablePanel>
 
             <ResizableHandle className="w-px bg-border hover:bg-primary transition-colors" />
