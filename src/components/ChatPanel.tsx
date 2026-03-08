@@ -498,6 +498,10 @@ const ChatPanel = forwardRef<ChatPanelHandle, { initialPrompt?: string; onVersio
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [pendingFollowUpPrompt, setPendingFollowUpPrompt] = useState<string>("");
   const [analysisResult, setAnalysisResult] = useState<any>(null);
+  // Agent pipeline state
+  const [currentAgent, setCurrentAgent] = useState<AgentIntent | null>(null);
+  const [pipelineStep, setPipelineStep] = useState<PipelineStep | null>(null);
+  const [pendingBuildPrompt, setPendingBuildPrompt] = useState<string | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
