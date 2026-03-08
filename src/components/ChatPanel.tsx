@@ -279,30 +279,8 @@ const ChatPanel = forwardRef<ChatPanelHandle, { initialPrompt?: string; onVersio
   }, []);
 
   // FIX: Self-healing with proper guards — only trigger once per error batch, never during loading
-  useEffect(() => {
-    if (healTimeoutRef.current) {
-      clearTimeout(healTimeoutRef.current);
-      healTimeoutRef.current = null;
-    }
-    if (
-      previewErrors.length > 0 &&
-      !isLoading &&
-      !isHealing &&
-      !isSendingRef.current &&
-      healAttempts < MAX_HEAL_ATTEMPTS &&
-      messagesRef.current.length > 0
-    ) {
-      healTimeoutRef.current = setTimeout(() => {
-        // Double-check guards at trigger time (not just schedule time)
-        if (!isLoadingRef.current && !isSendingRef.current) {
-          triggerSelfHeal();
-        }
-      }, 5000); // Increased to 5s for more error accumulation
-    }
-    return () => {
-      if (healTimeoutRef.current) clearTimeout(healTimeoutRef.current);
-    };
-  }, [previewErrors.length, isLoading, isHealing, healAttempts]);
+  // Self-healing DISABLED — was causing unwanted auto-fix loops
+  // Users can manually ask the AI to fix issues instead
 
   const triggerSelfHeal = useCallback(() => {
     if (isLoadingRef.current || isHealing || isSendingRef.current || healAttempts >= MAX_HEAL_ATTEMPTS || previewErrors.length === 0) return;
