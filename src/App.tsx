@@ -6,6 +6,7 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider, useAuth } from "@/hooks/useAuth";
 import Index from "./pages/Index";
 import Auth from "./pages/Auth";
+import PublishedApp from "./pages/PublishedApp";
 import NotFound from "./pages/NotFound";
 import { Loader2 } from "lucide-react";
 
