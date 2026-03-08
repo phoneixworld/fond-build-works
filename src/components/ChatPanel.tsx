@@ -1256,7 +1256,7 @@ const ChatPanel = forwardRef<ChatPanelHandle, { initialPrompt?: string; onVersio
     }
   }, [pendingBuildPrompt, sendMessage]);
 
-
+  const handleSmartSend = useCallback(async (text: string, images: string[] = []) => {
     if (!text && images.length === 0) return;
     if (isSendingRef.current || isLoadingRef.current) return;
     const finalText = text || "Replicate this design";
