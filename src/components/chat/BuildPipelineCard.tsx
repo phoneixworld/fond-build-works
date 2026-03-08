@@ -102,6 +102,15 @@ function detectTasks(content: string, isBuilding: boolean, pipelineStep?: Pipeli
         status: hasClosingFence && !isBuilding ? "done" : "in_progress",
       });
     }
+
+    // Show retry step if pipeline is in retry mode
+    if (pipelineStep === "retrying") {
+      tasks.push({
+        id: "retry",
+        label: "Auto-fixing validation errors",
+        status: "in_progress",
+      });
+    }
   }
 
   if (!isBuilding && hasCode && len > 100) {
