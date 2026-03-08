@@ -21,7 +21,7 @@ const IDELayout = () => {
   const { user, signOut } = useAuth();
   const { currentProject, selectProject, createProject, saveProject } = useProjects();
   const [selectedFile, setSelectedFile] = useState("App.tsx");
-  const [rightPanel, setRightPanel] = useState<"code" | "preview">("preview");
+  const [rightPanel, setRightPanel] = useState<"code" | "preview" | "schema">("preview");
   const [inIDE, setInIDE] = useState(false);
   const [initialPrompt, setInitialPrompt] = useState("");
 
