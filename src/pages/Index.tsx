@@ -12,7 +12,6 @@ import ChatPanel from "@/components/ChatPanel";
 import CodeEditor from "@/components/CodeEditor";
 import CloudPanel from "@/components/CloudPanel";
 import PreviewPanel from "@/components/PreviewPanel";
-import PreviewPanel from "@/components/PreviewPanel";
 import PublishExportButtons from "@/components/PublishExportButtons";
 import LandingPage from "@/components/LandingPage";
 import { TechStackId, TECH_STACKS } from "@/lib/techStacks";

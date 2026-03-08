@@ -4,7 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useProjects } from "@/contexts/ProjectContext";
 
 interface CloudOverviewProps {
-  onNavigate: (section: string) => void;
+  onNavigate: (section: "overview" | "database" | "users" | "storage" | "secrets" | "functions" | "sql" | "logs") => void;
 }
 
 const CloudOverview = ({ onNavigate }: CloudOverviewProps) => {
