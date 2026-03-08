@@ -824,6 +824,50 @@ const ChatPanel = forwardRef<ChatPanelHandle, { initialPrompt?: string; onVersio
                     </motion.button>
                   ))}
                 </div>
+
+                {/* Template selector */}
+                <div className="mt-3">
+                  <p className="text-[10px] text-muted-foreground/40 font-medium mb-1.5 text-center">Or start with a template:</p>
+                  <div className="flex flex-wrap gap-1.5 justify-center">
+                    {PAGE_TEMPLATES.slice(0, 6).map((t) => (
+                      <button
+                        key={t.id}
+                        onClick={() => setSelectedTemplate(selectedTemplate?.id === t.id ? null : t)}
+                        className={`inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[11px] font-medium border transition-all ${
+                          selectedTemplate?.id === t.id
+                            ? "border-primary bg-primary/10 text-primary"
+                            : "border-border bg-card text-muted-foreground hover:border-primary/30 hover:text-foreground"
+                        }`}
+                      >
+                        <span>{t.emoji}</span>
+                        <span>{t.name}</span>
+                      </button>
+                    ))}
+                  </div>
+                  {PAGE_TEMPLATES.length > 6 && (
+                    <details className="mt-1.5">
+                      <summary className="text-[10px] text-muted-foreground/30 cursor-pointer hover:text-muted-foreground/50 text-center">
+                        +{PAGE_TEMPLATES.length - 6} more templates
+                      </summary>
+                      <div className="flex flex-wrap gap-1.5 justify-center mt-1.5">
+                        {PAGE_TEMPLATES.slice(6).map((t) => (
+                          <button
+                            key={t.id}
+                            onClick={() => setSelectedTemplate(selectedTemplate?.id === t.id ? null : t)}
+                            className={`inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[11px] font-medium border transition-all ${
+                              selectedTemplate?.id === t.id
+                                ? "border-primary bg-primary/10 text-primary"
+                                : "border-border bg-card text-muted-foreground hover:border-primary/30 hover:text-foreground"
+                            }`}
+                          >
+                            <span>{t.emoji}</span>
+                            <span>{t.name}</span>
+                          </button>
+                        ))}
+                      </div>
+                    </details>
+                  )}
+                </div>
               </motion.div>
 
               {/* Keyboard hint */}
