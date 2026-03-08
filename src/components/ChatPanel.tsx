@@ -3,6 +3,7 @@ import { Version } from "@/components/VersionHistory";
 import { Send, Bot, User, ChevronDown, Sparkles, AlertTriangle, Wand2, ImagePlus, X, Palette, ArrowDown, Clock, Zap, Trash2, ShieldCheck, MessageSquareMore, CheckCircle2, Pencil, RotateCcw, Upload } from "lucide-react";
 import VoiceInput from "@/components/VoiceInput";
 import { streamChat } from "@/lib/streamChat";
+import { classifyIntent, streamChatAgent, streamBuildAgent, validateReactCode, hasBuildConfirmation, stripBuildMarker, type AgentIntent, type PipelineStep } from "@/lib/agentPipeline";
 import { validateAndFixHtml } from "@/lib/htmlValidator";
 import { matchTemplate, PAGE_TEMPLATES, type PageTemplate } from "@/lib/pageTemplates";
 import { COMPONENT_SNIPPETS, getSnippetsPromptContext } from "@/lib/componentSnippets";
@@ -497,6 +498,10 @@ const ChatPanel = forwardRef<ChatPanelHandle, { initialPrompt?: string; onVersio
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [pendingFollowUpPrompt, setPendingFollowUpPrompt] = useState<string>("");
   const [analysisResult, setAnalysisResult] = useState<any>(null);
+  // Agent pipeline state
+  const [currentAgent, setCurrentAgent] = useState<AgentIntent | null>(null);
+  const [pipelineStep, setPipelineStep] = useState<PipelineStep | null>(null);
+  const [pendingBuildPrompt, setPendingBuildPrompt] = useState<string | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -581,39 +586,35 @@ const ChatPanel = forwardRef<ChatPanelHandle, { initialPrompt?: string; onVersio
     });
   }, [isHealing, healAttempts, previewErrors]);
 
-  // Analyze prompt for follow-up questions
-  const analyzePrompt = useCallback(async (prompt: string): Promise<boolean> => {
-    // Skip for very short prompts or auto-fix messages
-    if (prompt.length < 20 || prompt.startsWith("🔧 AUTO-FIX")) return false;
+  // Classify intent using the dedicated classifier agent
+  const classifyUserIntent = useCallback(async (prompt: string): Promise<{ intent: AgentIntent; questions?: any[] } | null> => {
+    if (prompt.length < 15 || prompt.startsWith("🔧 AUTO-FIX") || prompt.startsWith("🔧")) return null;
     
     const hasHistory = messagesRef.current.length > 0;
+    const hasExistingCode = !!(currentSandpackFiles && Object.keys(currentSandpackFiles).length > 0) || !!(currentPreviewHtml && currentPreviewHtml.length > 0);
     
     setIsAnalyzing(true);
+    setPipelineStep("classifying");
     try {
-      const resp = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/analyze-prompt`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
-        },
-        body: JSON.stringify({ prompt, hasHistory }),
-      });
-      if (!resp.ok) { setIsAnalyzing(false); return false; }
-      const result = await resp.json();
+      const result = await classifyIntent(prompt, hasHistory, hasExistingCode);
       setAnalysisResult(result);
-      if (result.action === "ask" && result.questions?.length > 0) {
+      
+      if (result.intent === "clarify" && result.questions?.length) {
         setFollowUpQuestions(result.questions);
         setPendingFollowUpPrompt(prompt);
         setIsAnalyzing(false);
-        return true;
+        setPipelineStep(null);
+        return { intent: "clarify", questions: result.questions };
       }
+      
       setIsAnalyzing(false);
-      return false;
+      return { intent: result.intent };
     } catch {
       setIsAnalyzing(false);
-      return false;
+      setPipelineStep(null);
+      return null;
     }
-  }, []);
+  }, [currentSandpackFiles, currentPreviewHtml]);
 
   const handleFollowUpAnswer = (questionId: string, value: string) => {
     setFollowUpAnswers(prev => ({ ...prev, [questionId]: value }));
@@ -759,6 +760,9 @@ const ChatPanel = forwardRef<ChatPanelHandle, { initialPrompt?: string; onVersio
     setPreviewErrors([]);
     setHealAttempts(0);
     setIsHealing(false);
+    setCurrentAgent(null);
+    setPipelineStep(null);
+    setPendingBuildPrompt(null);
     isSendingRef.current = false;
     saveProject({ chat_history: [], html_content: "" });
   }, [currentProject, isLoading, setPreviewHtml, saveProject]);
@@ -790,7 +794,8 @@ const ChatPanel = forwardRef<ChatPanelHandle, { initialPrompt?: string; onVersio
     setIsLoading(true);
     setBuildStreamContent("");
     setIsBuilding(true);
-    setBuildStep(images.length > 0 ? "Analyzing your image..." : "Understanding your request...");
+    setBuildStep(images.length > 0 ? "🖼️ Analyzing image..." : "🏗️ Build agent generating code...");
+    setPipelineStep("generating");
 
     // FIX: Create abort controller for this request
     const abortController = new AbortController();
@@ -812,7 +817,8 @@ const ChatPanel = forwardRef<ChatPanelHandle, { initialPrompt?: string; onVersio
       const displayChat = reactResult.files ? reactResult.chatText : chatText;
 
       if (!hasSetAnalyzing && fullResponse.length > 20) {
-        setBuildStep("Generating components...");
+        setBuildStep("🔨 Build agent: generating components...");
+        setPipelineStep("generating");
         hasSetAnalyzing = true;
       }
       
@@ -821,7 +827,8 @@ const ChatPanel = forwardRef<ChatPanelHandle, { initialPrompt?: string; onVersio
           const fileNames = Object.keys(reactResult.files);
           const totalChars = Object.values(reactResult.files).join('').length;
           console.log(`[upsert] ✅ First React parse success: files=${fileNames.join(',')}, chars=${totalChars}`);
-          setBuildStep("Bundling React app...");
+          setBuildStep("📦 Bundling & validating...");
+          setPipelineStep("bundling");
           hasSetBuilding = true;
         }
         streamParseCount++;
@@ -960,6 +967,14 @@ const ChatPanel = forwardRef<ChatPanelHandle, { initialPrompt?: string; onVersio
           let finalHtml: string | null = null;
           
           if (reactResult.files) {
+            // Validation step
+            setPipelineStep("validating");
+            setBuildStep("✅ Validating code...");
+            const validation = validateReactCode(reactResult.files);
+            if (!validation.valid) {
+              console.warn("[ChatPanel:onDone] Validation warnings:", validation.errors);
+            }
+            
             // React/Sandpack mode
             const fileNames = Object.keys(reactResult.files);
             console.log(`[ChatPanel:onDone] ✅ React files found:`, fileNames, `Total code: ${Object.values(reactResult.files).join('').length} chars`);
@@ -1009,6 +1024,8 @@ const ChatPanel = forwardRef<ChatPanelHandle, { initialPrompt?: string; onVersio
           setIsLoading(false);
           setIsBuilding(false);
           setBuildStep("");
+          setPipelineStep("complete");
+          setCurrentAgent(null);
           isSendingRef.current = false;
           setTimeout(() => setBuildStreamContent(""), 3000);
 
@@ -1096,6 +1113,8 @@ const ChatPanel = forwardRef<ChatPanelHandle, { initialPrompt?: string; onVersio
           setIsLoading(false);
           setIsBuilding(false);
           setBuildStep("");
+          setPipelineStep("error");
+          setCurrentAgent(null);
           isSendingRef.current = false;
         },
       });
@@ -1156,20 +1175,134 @@ const ChatPanel = forwardRef<ChatPanelHandle, { initialPrompt?: string; onVersio
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
   }, [messages]);
 
+  // Chat-only agent — streams conversational response, no code
+  const sendChatMessage = useCallback(async (text: string, images: string[] = []) => {
+    if (!text || !currentProject) return;
+    if (isSendingRef.current || isLoadingRef.current) return;
+    isSendingRef.current = true;
+
+    const content = buildMessageContent(text, images);
+    const userMsg: Msg = { role: "user", content, timestamp: Date.now() };
+    setInput("");
+    setAttachedImages([]);
+    setMessages((prev) => [...prev, userMsg]);
+    setIsLoading(true);
+    setBuildStep("Thinking...");
+
+    let fullChatResponse = "";
+
+    const currentMessages = messagesRef.current;
+    const apiMessages = [...currentMessages, userMsg].map(m => ({
+      role: m.role,
+      content: m.content,
+    }));
+
+    // Fetch knowledge
+    let knowledge: string[] = [];
+    try {
+      const { data } = await supabase
+        .from("project_knowledge" as any)
+        .select("title, content")
+        .eq("project_id", currentProject.id)
+        .eq("is_active", true);
+      knowledge = (data || []).map((k: any) => `[${k.title}]: ${k.content}`);
+    } catch {}
+
+    await streamChatAgent({
+      messages: apiMessages,
+      projectId: currentProject.id,
+      techStack: currentProject.tech_stack || "react-cdn",
+      knowledge,
+      onDelta: (chunk) => {
+        fullChatResponse += chunk;
+        const displayText = stripBuildMarker(fullChatResponse);
+        setMessages((prev) => {
+          const last = prev[prev.length - 1];
+          if (last?.role === "assistant") {
+            return prev.map((m, i) => (i === prev.length - 1 ? { ...m, content: displayText } : m));
+          }
+          return [...prev, { role: "assistant", content: displayText, timestamp: Date.now() }];
+        });
+      },
+      onDone: (finalText) => {
+        setIsLoading(false);
+        setBuildStep("");
+        setPipelineStep("complete");
+        setCurrentAgent(null);
+        isSendingRef.current = false;
+
+        // Check if chat agent confirmed a build
+        if (hasBuildConfirmation(finalText)) {
+          // Store the original user prompt for the build agent
+          const userText = typeof text === "string" ? text : "";
+          setPendingBuildPrompt(userText);
+        }
+
+        // Persist
+        const displayText = stripBuildMarker(finalText);
+        setMessages((prev) => {
+          const final = prev.map((m, i) =>
+            i === prev.length - 1 && m.role === "assistant" ? { ...m, content: displayText } : m
+          );
+          const persistMessages = final.map(m => ({
+            role: m.role,
+            content: typeof m.content === "string" ? m.content : getTextContent(m.content),
+          }));
+          saveProject({ chat_history: persistMessages });
+          return final;
+        });
+      },
+      onError: (err) => {
+        setMessages((prev) => [...prev, { role: "assistant", content: `⚠️ ${err}`, timestamp: Date.now() }]);
+        setIsLoading(false);
+        setBuildStep("");
+        setPipelineStep(null);
+        setCurrentAgent(null);
+        isSendingRef.current = false;
+      },
+    });
+  }, [currentProject, saveProject, setBuildStep]);
+
+  // Auto-trigger build agent when chat agent confirms a build
+  useEffect(() => {
+    if (pendingBuildPrompt && !isLoadingRef.current && !isSendingRef.current) {
+      const prompt = pendingBuildPrompt;
+      setPendingBuildPrompt(null);
+      setCurrentAgent("build");
+      setPipelineStep("planning");
+      sendMessage(prompt);
+    }
+  }, [pendingBuildPrompt, sendMessage]);
+
   const handleSmartSend = useCallback(async (text: string, images: string[] = []) => {
     if (!text && images.length === 0) return;
     if (isSendingRef.current || isLoadingRef.current) return;
     const finalText = text || "Replicate this design";
     
-    // Analyze prompt for clarifying questions — edge function dynamically decides
-    // Skip for: very short prompts, image-only, or auto-fix messages
-    if (images.length === 0 && finalText.length >= 30 && !finalText.startsWith("🔧")) {
-      const needsQuestions = await analyzePrompt(finalText);
-      if (needsQuestions) return;
+    // Skip classification for: short prompts, image-only, auto-fix, or explicit build confirmations
+    const isAutoFix = finalText.startsWith("🔧");
+    const isShort = finalText.length < 15;
+    const hasImages = images.length > 0;
+    const isConfirmation = /^(yes|go ahead|do it|build it|sounds good|ok|sure)/i.test(finalText.trim());
+    
+    if (!isAutoFix && !isShort && !hasImages && !isConfirmation) {
+      const classification = await classifyUserIntent(finalText);
+      if (classification?.intent === "clarify") return; // Questions shown, wait for answers
+      
+      if (classification?.intent === "chat") {
+        // Route to chat agent — no code generation
+        setCurrentAgent("chat");
+        setPipelineStep("chatting");
+        sendChatMessage(finalText, images);
+        return;
+      }
     }
     
+    // Default: route to build agent
+    setCurrentAgent("build");
+    setPipelineStep("planning");
     sendMessage(finalText, images);
-  }, [analyzePrompt, sendMessage]);
+  }, [classifyUserIntent]);
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === "Enter" && !e.shiftKey) {
@@ -1403,12 +1536,14 @@ const ChatPanel = forwardRef<ChatPanelHandle, { initialPrompt?: string; onVersio
             })}
           </AnimatePresence>
 
-          {/* Build Pipeline Progress Card */}
-          {buildStreamContent.length > 0 && (buildStreamContent.includes("```html") || isLoading) && (
+          {/* Build Pipeline Progress Card — shows for both chat and build agents */}
+          {(buildStreamContent.length > 0 || currentAgent) && (isLoading || pipelineStep === "complete") && (
             <BuildPipelineCard
               isBuilding={isLoading}
               streamContent={buildStreamContent}
               elapsed={elapsedTime}
+              pipelineStep={pipelineStep}
+              currentAgent={currentAgent === "clarify" ? null : currentAgent}
             />
           )}
 
