@@ -6,6 +6,39 @@ import {
 } from "@codesandbox/sandpack-react";
 import { usePreview, SandpackFileSet } from "@/contexts/PreviewContext";
 
+// Duplicate allowlist for second-pass safety net
+const ALLOWED_PACKAGES = new Set([
+  "react", "react-dom", "react/jsx-runtime",
+  "lucide-react", "framer-motion", "date-fns", "recharts",
+  "react-router-dom", "clsx", "tailwind-merge",
+]);
+
+function isAllowedPkg(pkg: string): boolean {
+  if (pkg.startsWith(".") || pkg.startsWith("/")) return true;
+  const base = pkg.startsWith("@") ? pkg.split("/").slice(0, 2).join("/") : pkg.split("/")[0];
+  return ALLOWED_PACKAGES.has(base);
+}
+
+/** Second-pass sanitizer applied right before Sandpack receives code */
+function sanitizeCode(code: string): string {
+  // Strip import/export ... from 'unknown-pkg'
+  code = code.replace(
+    /^\s*(?:import|export)\s+[\s\S]*?\s+from\s+['"]([^'"]+)['"]\s*;?\s*$/gm,
+    (match, pkg) => isAllowedPkg(pkg) ? match : `// [BLOCKED] ${pkg}`
+  );
+  // Strip side-effect imports
+  code = code.replace(
+    /^\s*import\s+['"]([^'"]+)['"]\s*;?\s*$/gm,
+    (match, pkg) => isAllowedPkg(pkg) ? match : `// [BLOCKED] ${pkg}`
+  );
+  // Strip require()
+  code = code.replace(
+    /\brequire\s*\(\s*['"]([^'"]+)['"]\s*\)/g,
+    (match, pkg) => isAllowedPkg(pkg) ? match : `undefined /* BLOCKED: ${pkg} */`
+  );
+  return code;
+}
+
 const DEFAULT_APP = `import React from "react";
 
 export default function App() {
@@ -71,7 +104,8 @@ function buildSandpackFiles(files: SandpackFileSet | null): Record<string, strin
     // Keep .jsx as-is — Sandpack react template supports both .js and .jsx
     // Only convert .tsx/.ts to .js
     const sandpackPath = normalized.replace(/\.tsx?$/, ".js");
-    base[sandpackPath] = code;
+    // Apply second-pass sanitizer on JS/JSX files
+    base[sandpackPath] = sandpackPath.match(/\.(jsx?|js)$/) ? sanitizeCode(code) : code;
   }
 
   // Ensure entry point exists: /App.js or /App.jsx
