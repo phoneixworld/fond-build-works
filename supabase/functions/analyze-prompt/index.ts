@@ -9,7 +9,7 @@ serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
-    const { prompt } = await req.json();
+    const { prompt, hasHistory } = await req.json();
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY not configured");
 
@@ -29,10 +29,11 @@ serve(async (req) => {
 RULES:
 1. If the prompt is clear and specific enough to build immediately, return: {"action": "build", "questions": []}
 2. If the prompt is ambiguous or could benefit from clarification, return 1-3 targeted questions.
-3. Each question should have 2-4 options the user can pick from.
-4. Focus on questions about: data persistence needs, user auth needs, design style, scope clarification.
+3. Each question MUST include: id, header (short label like "Style", "Features", "Layout"), text (the full question), multiSelect (boolean), options with label, value, and description.
+4. Focus on questions about: design style, layout preferences, features scope, data persistence, auth needs.
 5. NEVER ask about tech stack (that's already chosen).
 6. Return ONLY valid JSON, no markdown, no explanation.
+7. ${hasHistory ? "This is a follow-up in an existing conversation. Only ask questions if the request represents a MAJOR new feature or redesign (e.g. 'improve the design', 'add a CMS', 'rebuild the layout'). For small changes like 'fix button', 'change color', always return build." : "This is the first message. Ask questions for any non-trivial prompt."}
 
 Response format:
 {
@@ -44,28 +45,42 @@ Response format:
   },
   "questions": [
     {
-      "id": "q1",
-      "text": "Should users be able to save their data between sessions?",
+      "id": "style",
+      "header": "Design Style",
+      "text": "What visual style are you going for?",
+      "multiSelect": false,
       "options": [
-        {"label": "Yes, with user accounts", "value": "auth_persist"},
-        {"label": "Yes, without accounts", "value": "persist_only"},
-        {"label": "No, just a static page", "value": "static"}
+        {"label": "Minimal & Clean", "value": "minimal", "description": "Lots of whitespace, subtle colors, elegant typography"},
+        {"label": "Bold & Vibrant", "value": "bold", "description": "Strong colors, large headings, eye-catching visuals"},
+        {"label": "Dark & Premium", "value": "dark", "description": "Dark backgrounds, glowing accents, luxury feel"},
+        {"label": "Warm & Organic", "value": "warm", "description": "Earthy tones, serif fonts, artisanal quality"}
+      ]
+    },
+    {
+      "id": "features",
+      "header": "Features",
+      "text": "Which features should be included?",
+      "multiSelect": true,
+      "options": [
+        {"label": "Contact Form", "value": "contact", "description": "Let visitors send you messages"},
+        {"label": "Photo Gallery", "value": "gallery", "description": "Showcase images in a grid or carousel"},
+        {"label": "Online Ordering", "value": "ordering", "description": "Let customers place orders online"}
       ]
     }
   ]
 }
 
-Examples of prompts that need questions:
-- "Build me a todo app" → ask about persistence, auth, design
-- "Create a dashboard" → ask about what data, real-time needs
-- "Make a website for my business" → ask about sections needed, contact form
+Examples that NEED questions:
+- "Build me a restaurant website" → ask about style, sections, features
+- "Improve the overall design" → ask about style direction, what to prioritize
+- "Create a dashboard" → ask about what data, layout preference
+- "Add a CMS" → ask about what content types, editing needs
 
-Examples of prompts that DON'T need questions (build immediately):
-- "Make the button blue" (modification)
-- "Fix the navigation links" (bug fix)
-- "Add a footer with contact info" (specific addition)
-- "Build a landing page for a coffee shop with menu, about, and contact sections" (already detailed)
-- Any prompt that's a follow-up in an existing conversation`
+Examples that DON'T need questions (build immediately):
+- "Make the button blue"
+- "Fix the navigation links"
+- "Add a footer with contact info"
+- "Build a landing page for a coffee shop with menu, about, and contact sections" (already detailed)`
           },
           { role: "user", content: prompt }
         ],
