@@ -295,8 +295,29 @@ const IDELayout = () => {
                   <ChevronDown className="w-3 h-3 opacity-50" />
                 </button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="start" className="min-w-[160px]">
-                {TECH_STACKS.map((stack) => {
+              <DropdownMenuContent align="start" className="min-w-[200px]">
+                <div className="px-2 py-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Frontend</div>
+                {TECH_STACKS.filter(s => s.category === "frontend").map((stack) => {
+                  const Icon = stack.icon;
+                  return (
+                    <DropdownMenuItem
+                      key={stack.id}
+                      onClick={() => handleTechStackChange(stack.id)}
+                      className={`flex items-center gap-2 text-xs ${
+                        currentStack === stack.id ? "text-primary font-medium" : ""
+                      }`}
+                    >
+                      <Icon className="w-3.5 h-3.5" />
+                      <div>
+                        <span>{stack.label}</span>
+                        <span className="text-muted-foreground ml-1.5">{stack.description}</span>
+                      </div>
+                    </DropdownMenuItem>
+                  );
+                })}
+                <div className="my-1 border-t border-border" />
+                <div className="px-2 py-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Full-Stack</div>
+                {TECH_STACKS.filter(s => s.category === "fullstack").map((stack) => {
                   const Icon = stack.icon;
                   return (
                     <DropdownMenuItem
