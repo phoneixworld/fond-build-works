@@ -1533,12 +1533,14 @@ const ChatPanel = forwardRef<ChatPanelHandle, { initialPrompt?: string; onVersio
             })}
           </AnimatePresence>
 
-          {/* Build Pipeline Progress Card */}
-          {buildStreamContent.length > 0 && (buildStreamContent.includes("```html") || isLoading) && (
+          {/* Build Pipeline Progress Card — shows for both chat and build agents */}
+          {(buildStreamContent.length > 0 || currentAgent) && (isLoading || pipelineStep === "complete") && (
             <BuildPipelineCard
               isBuilding={isLoading}
               streamContent={buildStreamContent}
               elapsed={elapsedTime}
+              pipelineStep={pipelineStep}
+              currentAgent={currentAgent}
             />
           )}
 
