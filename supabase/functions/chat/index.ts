@@ -91,9 +91,11 @@ export default function Header() {
 - Tailwind CSS is available via CDN — use className with Tailwind classes
 - For additional npm packages, include a --- dependencies section with a JSON object
 - Available by default: react, react-dom, lucide-react, framer-motion, date-fns, recharts, react-router-dom, clsx, tailwind-merge
+- ONLY import packages from the default list above OR packages you explicitly add to the --- dependencies section. NEVER invent or hallucinate package names.
 - Use Lucide React icons EXTENSIVELY: import { Heart, Star, ArrowRight } from "lucide-react"
 - Use framer-motion for animations: import { motion } from "framer-motion"
 - Use React Router for multi-page apps: import { BrowserRouter, Routes, Route } from "react-router-dom"
+- For data fetching, use plain fetch() or React state — do NOT import custom data libraries
 
 ## REACT DESIGN SYSTEM — Apply to EVERY app
 
