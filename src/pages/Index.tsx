@@ -148,6 +148,8 @@ const IDELayout = () => {
     { id: "pulse", label: "Pulse", icon: Activity },
     { id: "crew", label: "Crew", icon: Users },
     { id: "brandkit", label: "Brand Kit", icon: Palette },
+    { id: "abtesting", label: "A/B Tests", icon: FlaskConical },
+    { id: "plugins", label: "Plugins", icon: Puzzle },
     { id: "history", label: "History", icon: Clock },
   ];
 
