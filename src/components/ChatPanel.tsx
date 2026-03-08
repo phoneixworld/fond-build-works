@@ -677,9 +677,6 @@ const ChatPanel = forwardRef<ChatPanelHandle, { initialPrompt?: string; onVersio
             return final;
           });
         },
-
-          // Auto-sync to Dev environment
-          if (htmlCode && currentProject?.id) {
             supabase
               .from("project_environments" as any)
               .update({
