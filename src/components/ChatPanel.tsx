@@ -540,25 +540,41 @@ const ChatPanel = forwardRef<ChatPanelHandle, { initialPrompt?: string; onVersio
       if (abortController.signal.aborted) return;
       fullResponse += chunk;
       setBuildStreamContent(fullResponse);
-      const [chatText, htmlCode] = parseResponse(fullResponse);
+      
+      // Try React files first, then HTML
+      const reactResult = parseReactFiles(fullResponse);
+      const [chatText, htmlCode] = reactResult.files ? [reactResult.chatText, null] : parseResponse(fullResponse);
+      const displayChat = reactResult.files ? reactResult.chatText : chatText;
 
       if (!hasSetAnalyzing && fullResponse.length > 20) {
         setBuildStep("Generating components...");
         hasSetAnalyzing = true;
       }
-      if (!hasSetBuilding && htmlCode) {
-        setBuildStep("Building your app...");
-        hasSetBuilding = true;
+      
+      if (reactResult.files) {
+        if (!hasSetBuilding) {
+          setBuildStep("Bundling React app...");
+          hasSetBuilding = true;
+        }
+        setSandpackFiles(reactResult.files);
+        if (Object.keys(reactResult.deps).length > 0) setSandpackDeps(reactResult.deps);
+        setPreviewMode("sandpack");
+      } else if (htmlCode) {
+        if (!hasSetBuilding) {
+          setBuildStep("Building your app...");
+          hasSetBuilding = true;
+        }
+        setPreviewHtml(postProcessHtml(htmlCode));
+        setPreviewMode("html");
       }
-      if (htmlCode) setPreviewHtml(postProcessHtml(htmlCode));
 
       setMessages((prev) => {
-        const displayText = chatText || "Building...";
+        const text = displayChat || "Building...";
         const last = prev[prev.length - 1];
         if (last?.role === "assistant") {
-          return prev.map((m, i) => (i === prev.length - 1 ? { ...m, content: displayText } : m));
+          return prev.map((m, i) => (i === prev.length - 1 ? { ...m, content: text } : m));
         }
-        return [...prev, { role: "assistant", content: displayText, timestamp: Date.now() }];
+        return [...prev, { role: "assistant", content: text, timestamp: Date.now() }];
       });
     };
 
