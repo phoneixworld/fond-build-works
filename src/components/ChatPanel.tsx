@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useCallback, forwardRef, useImperativeHandle } from "react";
 import { Version } from "@/components/VersionHistory";
-import { Send, Bot, User, ChevronDown, Sparkles, AlertTriangle, Wand2, ImagePlus, X, Palette, ArrowDown, Clock, Zap, Trash2 } from "lucide-react";
+import { Send, Bot, User, ChevronDown, Sparkles, AlertTriangle, Wand2, ImagePlus, X, Palette, ArrowDown, Clock, Zap, Trash2, ShieldCheck, MessageSquareMore, CheckCircle2 } from "lucide-react";
 import { streamChat } from "@/lib/streamChat";
 import { AI_MODELS, DEFAULT_MODEL, PROMPT_SUGGESTIONS, QUICK_ACTIONS, DESIGN_THEMES, type AIModelId } from "@/lib/aiModels";
 import { motion, AnimatePresence } from "framer-motion";
@@ -118,6 +118,16 @@ const ChatPanel = forwardRef<ChatPanelHandle, { initialPrompt?: string; onVersio
   const [isDragOver, setIsDragOver] = useState(false);
   const [showScrollBtn, setShowScrollBtn] = useState(false);
   const [elapsedTime, setElapsedTime] = useState(0);
+  // Self-healing state
+  const [healAttempts, setHealAttempts] = useState(0);
+  const [isHealing, setIsHealing] = useState(false);
+  const [healingStatus, setHealingStatus] = useState<string>("");
+  // Follow-up questions state
+  const [followUpQuestions, setFollowUpQuestions] = useState<any[]>([]);
+  const [followUpAnswers, setFollowUpAnswers] = useState<Record<string, string>>({});
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [pendingFollowUpPrompt, setPendingFollowUpPrompt] = useState<string>("");
+  const [analysisResult, setAnalysisResult] = useState<any>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -125,6 +135,8 @@ const ChatPanel = forwardRef<ChatPanelHandle, { initialPrompt?: string; onVersio
   const lastProjectIdRef = useRef<string | null>(null);
   const hasProcessedInitialRef = useRef(false);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const healTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const MAX_HEAL_ATTEMPTS = 3;
 
   // Elapsed time timer during loading
   useEffect(() => {
@@ -153,16 +165,110 @@ const ChatPanel = forwardRef<ChatPanelHandle, { initialPrompt?: string; onVersio
   useEffect(() => {
     const handler = (event: MessageEvent) => {
       if (event.data?.type === "preview-error") {
+        const errorType = event.data.errorType || "unknown";
+        const msg = event.data.message || "Unknown error";
+        const enriched = `[${errorType}] ${msg}`;
         setPreviewErrors((prev) => {
-          const msg = event.data.message || "Unknown error";
-          if (prev.includes(msg)) return prev;
-          return [...prev.slice(-4), msg];
+          if (prev.includes(enriched)) return prev;
+          return [...prev.slice(-9), enriched];
         });
       }
     };
     window.addEventListener("message", handler);
     return () => window.removeEventListener("message", handler);
   }, []);
+
+  // Self-healing: auto-trigger fix when errors detected after build
+  useEffect(() => {
+    if (healTimeoutRef.current) {
+      clearTimeout(healTimeoutRef.current);
+      healTimeoutRef.current = null;
+    }
+    if (previewErrors.length > 0 && !isLoading && !isHealing && healAttempts < MAX_HEAL_ATTEMPTS && messages.length > 0) {
+      healTimeoutRef.current = setTimeout(() => {
+        triggerSelfHeal();
+      }, 3000); // Wait 3s for errors to accumulate
+    }
+    return () => {
+      if (healTimeoutRef.current) clearTimeout(healTimeoutRef.current);
+    };
+  }, [previewErrors, isLoading, isHealing, healAttempts, messages.length]);
+
+  const triggerSelfHeal = useCallback(() => {
+    if (isLoading || isHealing || healAttempts >= MAX_HEAL_ATTEMPTS || previewErrors.length === 0) return;
+    setIsHealing(true);
+    setHealAttempts(prev => prev + 1);
+    const attempt = healAttempts + 1;
+    setHealingStatus(`Self-healing attempt ${attempt}/${MAX_HEAL_ATTEMPTS}...`);
+    const errorSummary = previewErrors.join("\n");
+    const healPrompt = `🔧 AUTO-FIX (attempt ${attempt}/${MAX_HEAL_ATTEMPTS}): The preview detected these errors:\n${errorSummary}\n\nPlease fix ALL these errors. Make sure the app works correctly without any console errors or broken functionality.`;
+    setPreviewErrors([]);
+    sendMessage(healPrompt).finally(() => {
+      setIsHealing(false);
+      setHealingStatus("");
+    });
+  }, [isLoading, isHealing, healAttempts, previewErrors]);
+
+  // Analyze prompt for follow-up questions
+  const analyzePrompt = useCallback(async (prompt: string): Promise<boolean> => {
+    // Skip analysis for follow-up messages, modifications, or short prompts
+    if (messages.length > 0 || prompt.length < 20) return false;
+    
+    setIsAnalyzing(true);
+    try {
+      const resp = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/analyze-prompt`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+        },
+        body: JSON.stringify({ prompt }),
+      });
+      if (!resp.ok) return false;
+      const result = await resp.json();
+      setAnalysisResult(result);
+      if (result.action === "ask" && result.questions?.length > 0) {
+        setFollowUpQuestions(result.questions);
+        setPendingFollowUpPrompt(prompt);
+        setIsAnalyzing(false);
+        return true; // Questions need answering
+      }
+      setIsAnalyzing(false);
+      return false; // Build immediately
+    } catch {
+      setIsAnalyzing(false);
+      return false;
+    }
+  }, [messages.length]);
+
+  const handleFollowUpAnswer = (questionId: string, value: string) => {
+    setFollowUpAnswers(prev => ({ ...prev, [questionId]: value }));
+  };
+
+  const submitFollowUpAnswers = useCallback(() => {
+    const answersText = followUpQuestions.map(q => {
+      const answer = followUpAnswers[q.id];
+      const option = q.options.find((o: any) => o.value === answer);
+      return `${q.text} → ${option?.label || answer || "Not specified"}`;
+    }).join("\n");
+    
+    const enrichedPrompt = `${pendingFollowUpPrompt}\n\n--- Additional Requirements ---\n${answersText}`;
+    
+    setFollowUpQuestions([]);
+    setFollowUpAnswers({});
+    setPendingFollowUpPrompt("");
+    setAnalysisResult(null);
+    sendMessage(enrichedPrompt);
+  }, [followUpQuestions, followUpAnswers, pendingFollowUpPrompt]);
+
+  const skipFollowUpQuestions = useCallback(() => {
+    const prompt = pendingFollowUpPrompt;
+    setFollowUpQuestions([]);
+    setFollowUpAnswers({});
+    setPendingFollowUpPrompt("");
+    setAnalysisResult(null);
+    sendMessage(prompt);
+  }, [pendingFollowUpPrompt]);
 
   useEffect(() => {
     if (initialPrompt && !hasProcessedInitialRef.current) {
@@ -260,6 +366,11 @@ const ChatPanel = forwardRef<ChatPanelHandle, { initialPrompt?: string; onVersio
 
   const sendMessage = useCallback(async (text: string, images: string[] = []) => {
     if (!text || isLoading || !currentProject) return;
+
+    // Reset self-healing counter on manual user messages (not auto-fix)
+    if (!text.startsWith("🔧 AUTO-FIX")) {
+      setHealAttempts(0);
+    }
 
     const content = buildMessageContent(text, images);
     const userMsg: Msg = { role: "user", content, timestamp: Date.now() };
@@ -413,11 +524,24 @@ const ChatPanel = forwardRef<ChatPanelHandle, { initialPrompt?: string; onVersio
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
   }, [messages]);
 
+  const handleSmartSend = useCallback(async (text: string, images: string[] = []) => {
+    if (!text && images.length === 0) return;
+    const finalText = text || "Replicate this design";
+    
+    // Only analyze first message in a conversation (for new projects)
+    if (messages.length === 0 && images.length === 0 && finalText.length >= 20) {
+      const needsQuestions = await analyzePrompt(finalText);
+      if (needsQuestions) return; // Questions are now shown, wait for answers
+    }
+    
+    sendMessage(finalText, images);
+  }, [messages.length, analyzePrompt, sendMessage]);
+
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
       if (input.trim() || attachedImages.length > 0) {
-        sendMessage(input.trim() || "Replicate this design", attachedImages);
+        handleSmartSend(input.trim(), attachedImages);
       }
     }
   };
@@ -429,13 +553,14 @@ const ChatPanel = forwardRef<ChatPanelHandle, { initialPrompt?: string; onVersio
   };
 
   const handleAutoFix = () => {
+    setHealAttempts(0); // Manual fix resets counter
     const errorSummary = previewErrors.join("\n");
     sendMessage(`The app preview has these errors, please fix them:\n${errorSummary}`);
   };
 
   const handleSendClick = () => {
     if (input.trim() || attachedImages.length > 0) {
-      sendMessage(input.trim() || "Replicate this design", attachedImages);
+      handleSmartSend(input.trim(), attachedImages);
     }
   };
 
@@ -615,8 +740,104 @@ const ChatPanel = forwardRef<ChatPanelHandle, { initialPrompt?: string; onVersio
             </motion.div>
           )}
 
+          {/* Follow-up questions UI */}
+          <AnimatePresence>
+            {followUpQuestions.length > 0 && (
+              <motion.div
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -10 }}
+                className="space-y-3"
+              >
+                <div className="flex gap-3">
+                  <div className="w-7 h-7 rounded-lg bg-accent/15 ring-1 ring-accent/20 flex items-center justify-center shrink-0 mt-0.5">
+                    <MessageSquareMore className="w-3.5 h-3.5 text-accent" />
+                  </div>
+                  <div className="flex-1 min-w-0 space-y-3">
+                    <p className="text-[13px] text-foreground leading-[1.7]">Before I build this, a few quick questions to make sure I get it right:</p>
+                    
+                    {analysisResult?.analysis && (
+                      <div className="flex gap-2 flex-wrap">
+                        {analysisResult.analysis.needsBackend && (
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-primary/10 text-primary">
+                            <Zap className="w-2.5 h-2.5" /> Backend detected
+                          </span>
+                        )}
+                        {analysisResult.analysis.needsAuth && (
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-accent/10 text-accent">
+                            <ShieldCheck className="w-2.5 h-2.5" /> Auth needed
+                          </span>
+                        )}
+                        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium bg-secondary text-muted-foreground">
+                          {analysisResult.analysis.complexity || "medium"} complexity
+                        </span>
+                      </div>
+                    )}
+
+                    {followUpQuestions.map((q: any) => (
+                      <div key={q.id} className="space-y-2">
+                        <p className="text-[12px] font-medium text-foreground">{q.text}</p>
+                        <div className="flex flex-wrap gap-1.5">
+                          {q.options.map((opt: any) => (
+                            <button
+                              key={opt.value}
+                              onClick={() => handleFollowUpAnswer(q.id, opt.value)}
+                              className={`px-3 py-1.5 rounded-lg text-[11px] font-medium border transition-all ${
+                                followUpAnswers[q.id] === opt.value
+                                  ? "border-primary bg-primary/10 text-primary"
+                                  : "border-border text-muted-foreground hover:text-foreground hover:border-primary/30"
+                              }`}
+                            >
+                              {opt.label}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+
+                    <div className="flex gap-2 pt-1">
+                      <button
+                        onClick={submitFollowUpAnswers}
+                        className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-semibold bg-primary text-primary-foreground hover:bg-primary/90 transition-colors shadow-sm"
+                      >
+                        <CheckCircle2 className="w-3.5 h-3.5" />
+                        Build with these preferences
+                      </button>
+                      <button
+                        onClick={skipFollowUpQuestions}
+                        className="px-3 py-2 rounded-xl text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors"
+                      >
+                        Skip, just build
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+
+          {/* Analyzing prompt indicator */}
+          <AnimatePresence>
+            {isAnalyzing && (
+              <motion.div
+                initial={{ opacity: 0, y: 6 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0 }}
+                className="flex gap-3 items-center"
+              >
+                <div className="w-7 h-7 rounded-lg bg-accent/15 ring-1 ring-accent/20 flex items-center justify-center shrink-0">
+                  <Bot className="w-3.5 h-3.5 text-accent" />
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="w-1.5 h-1.5 rounded-full bg-accent animate-pulse" />
+                  <span className="text-[11px] text-muted-foreground">Analyzing your request...</span>
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+
           {/* Quick actions */}
-          {messages.length > 0 && !isLoading && (
+          {messages.length > 0 && !isLoading && followUpQuestions.length === 0 && (
             <motion.div
               initial={{ opacity: 0, y: 4 }}
               animate={{ opacity: 1, y: 0 }}
@@ -652,9 +873,26 @@ const ChatPanel = forwardRef<ChatPanelHandle, { initialPrompt?: string; onVersio
           )}
         </AnimatePresence>
 
+        {/* Self-healing status */}
+        <AnimatePresence>
+          {isHealing && (
+            <motion.div
+              initial={{ height: 0, opacity: 0 }}
+              animate={{ height: "auto", opacity: 1 }}
+              exit={{ height: 0, opacity: 0 }}
+              className="border-t border-primary/30 bg-primary/5 px-3 py-2"
+            >
+              <div className="flex items-center gap-2">
+                <ShieldCheck className="w-3.5 h-3.5 text-primary animate-pulse shrink-0" />
+                <span className="text-xs text-primary font-medium">{healingStatus}</span>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
         {/* Error banner */}
         <AnimatePresence>
-          {previewErrors.length > 0 && !isLoading && (
+          {previewErrors.length > 0 && !isLoading && !isHealing && (
             <motion.div
               initial={{ height: 0, opacity: 0 }}
               animate={{ height: "auto", opacity: 1 }}
@@ -666,15 +904,32 @@ const ChatPanel = forwardRef<ChatPanelHandle, { initialPrompt?: string; onVersio
                   <AlertTriangle className="w-3.5 h-3.5 text-destructive shrink-0" />
                   <span className="text-xs text-destructive truncate">
                     {previewErrors.length} error{previewErrors.length > 1 ? "s" : ""} detected
+                    {healAttempts > 0 && healAttempts < MAX_HEAL_ATTEMPTS && (
+                      <span className="ml-1 text-muted-foreground">· auto-fixing in 3s ({healAttempts}/{MAX_HEAL_ATTEMPTS} attempts)</span>
+                    )}
+                    {healAttempts >= MAX_HEAL_ATTEMPTS && (
+                      <span className="ml-1 text-muted-foreground">· max retries reached</span>
+                    )}
                   </span>
                 </div>
-                <button
-                  onClick={handleAutoFix}
-                  className="shrink-0 flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-medium bg-destructive text-destructive-foreground hover:bg-destructive/90 transition-colors"
-                >
-                  <Wand2 className="w-3 h-3" />
-                  Auto-fix
-                </button>
+                <div className="flex items-center gap-1.5">
+                  {healAttempts >= MAX_HEAL_ATTEMPTS && (
+                    <button
+                      onClick={() => { setHealAttempts(0); handleAutoFix(); }}
+                      className="shrink-0 flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-medium bg-primary text-primary-foreground hover:bg-primary/90 transition-colors"
+                    >
+                      <ShieldCheck className="w-3 h-3" />
+                      Retry
+                    </button>
+                  )}
+                  <button
+                    onClick={handleAutoFix}
+                    className="shrink-0 flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-medium bg-destructive text-destructive-foreground hover:bg-destructive/90 transition-colors"
+                  >
+                    <Wand2 className="w-3 h-3" />
+                    Fix now
+                  </button>
+                </div>
               </div>
             </motion.div>
           )}

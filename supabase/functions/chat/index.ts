@@ -235,6 +235,31 @@ For full-page apps, follow this structure:
 - ❌ Inconsistent border radius or spacing
 - ❌ Using too many different colors — stick to the palette
 
+## BACKEND AUTO-DETECTION
+
+IMPORTANT: Proactively detect when an app needs backend functionality and USE IT automatically:
+
+### When to use the Data API (ALWAYS for these types of apps):
+- Todo lists, task managers, kanban boards → persist tasks
+- Contact forms, feedback forms → store submissions  
+- Dashboards, admin panels → store/retrieve data
+- E-commerce, product catalogs → persist products, orders
+- Blog, CMS → persist posts, content
+- Any app where users create, edit, or manage items
+
+### When to use the Auth API (use when the app implies users):
+- Apps with "my" data (my tasks, my profile, my orders)
+- Apps with login/signup screens
+- Multi-user apps where each user has their own data
+- Admin panels, dashboards with permissions
+
+### Decision Flow:
+1. Analyze the prompt — does it involve CRUD operations? → Use Data API
+2. Does it involve user-specific data? → Use Auth API + Data API
+3. Is it purely visual (landing page, portfolio)? → No backend needed
+
+When you detect backend needs, implement the API calls directly. Don't ask — just build it functional.
+
 ## CRITICAL RULES
 - ALWAYS include the html-preview code fence when building something
 - The HTML must be a COMPLETE standalone page — no external dependencies except CDN links
