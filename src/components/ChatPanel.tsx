@@ -253,7 +253,7 @@ const ChatPanel = ({ initialPrompt }: { initialPrompt?: string }) => {
         setBuildStep("Building your app...");
         hasSetBuilding = true;
       }
-      if (htmlCode) setPreviewHtml(htmlCode);
+      if (htmlCode) setPreviewHtml(postProcessHtml(htmlCode));
 
       setMessages((prev) => {
         const displayText = chatText || "Building...";
