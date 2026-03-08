@@ -16,7 +16,17 @@ type ViewportId = typeof VIEWPORTS[number]["id"];
 const PreviewPanel = () => {
   const [refreshKey, setRefreshKey] = useState(0);
   const [viewport, setViewport] = useState<ViewportId>("desktop");
+  const [directTouchActive, setDirectTouchActive] = useState(false);
+  const iframeRef = useRef<HTMLIFrameElement>(null);
   const { previewHtml, isBuilding, buildStep } = usePreview();
+
+  const toggleDirectTouch = useCallback(() => {
+    const next = !directTouchActive;
+    setDirectTouchActive(next);
+    if (iframeRef.current?.contentWindow) {
+      iframeRef.current.contentWindow.postMessage({ type: "direct-touch-toggle", active: next }, "*");
+    }
+  }, [directTouchActive]);
 
   const currentViewport = VIEWPORTS.find(v => v.id === viewport)!;
 
