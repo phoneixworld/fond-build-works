@@ -51,6 +51,7 @@ const EnvironmentManager = () => {
   const [showHistory, setShowHistory] = useState(false);
   const [deployNotes, setDeployNotes] = useState("");
   const [confirmPromote, setConfirmPromote] = useState<{ from: string; to: string } | null>(null);
+  const [previewEnv, setPreviewEnv] = useState<{ name: string; label: string; html: string } | null>(null);
 
   useEffect(() => {
     if (currentProject?.id) {
