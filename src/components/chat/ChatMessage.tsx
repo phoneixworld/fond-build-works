@@ -416,6 +416,9 @@ const ChatMessage = ({ content, role, timestamp, isLoading, onEdit, onRegenerate
               )}
             </div>
 
+            {/* Context awareness badges */}
+            <ContextBadges hints={contextHints} />
+
             {/* Content */}
             <div className="space-y-0">
               {sections.map((section, i) => {
