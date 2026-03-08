@@ -873,9 +873,26 @@ const ChatPanel = forwardRef<ChatPanelHandle, { initialPrompt?: string; onVersio
           )}
         </AnimatePresence>
 
+        {/* Self-healing status */}
+        <AnimatePresence>
+          {isHealing && (
+            <motion.div
+              initial={{ height: 0, opacity: 0 }}
+              animate={{ height: "auto", opacity: 1 }}
+              exit={{ height: 0, opacity: 0 }}
+              className="border-t border-primary/30 bg-primary/5 px-3 py-2"
+            >
+              <div className="flex items-center gap-2">
+                <ShieldCheck className="w-3.5 h-3.5 text-primary animate-pulse shrink-0" />
+                <span className="text-xs text-primary font-medium">{healingStatus}</span>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
         {/* Error banner */}
         <AnimatePresence>
-          {previewErrors.length > 0 && !isLoading && (
+          {previewErrors.length > 0 && !isLoading && !isHealing && (
             <motion.div
               initial={{ height: 0, opacity: 0 }}
               animate={{ height: "auto", opacity: 1 }}
@@ -887,15 +904,32 @@ const ChatPanel = forwardRef<ChatPanelHandle, { initialPrompt?: string; onVersio
                   <AlertTriangle className="w-3.5 h-3.5 text-destructive shrink-0" />
                   <span className="text-xs text-destructive truncate">
                     {previewErrors.length} error{previewErrors.length > 1 ? "s" : ""} detected
+                    {healAttempts > 0 && healAttempts < MAX_HEAL_ATTEMPTS && (
+                      <span className="ml-1 text-muted-foreground">· auto-fixing in 3s ({healAttempts}/{MAX_HEAL_ATTEMPTS} attempts)</span>
+                    )}
+                    {healAttempts >= MAX_HEAL_ATTEMPTS && (
+                      <span className="ml-1 text-muted-foreground">· max retries reached</span>
+                    )}
                   </span>
                 </div>
-                <button
-                  onClick={handleAutoFix}
-                  className="shrink-0 flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-medium bg-destructive text-destructive-foreground hover:bg-destructive/90 transition-colors"
-                >
-                  <Wand2 className="w-3 h-3" />
-                  Auto-fix
-                </button>
+                <div className="flex items-center gap-1.5">
+                  {healAttempts >= MAX_HEAL_ATTEMPTS && (
+                    <button
+                      onClick={() => { setHealAttempts(0); handleAutoFix(); }}
+                      className="shrink-0 flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-medium bg-primary text-primary-foreground hover:bg-primary/90 transition-colors"
+                    >
+                      <ShieldCheck className="w-3 h-3" />
+                      Retry
+                    </button>
+                  )}
+                  <button
+                    onClick={handleAutoFix}
+                    className="shrink-0 flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-medium bg-destructive text-destructive-foreground hover:bg-destructive/90 transition-colors"
+                  >
+                    <Wand2 className="w-3 h-3" />
+                    Fix now
+                  </button>
+                </div>
               </div>
             </motion.div>
           )}
