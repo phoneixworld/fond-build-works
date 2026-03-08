@@ -376,6 +376,8 @@ const IDELayout = () => {
                 <CodeEditor selectedFile={selectedFile} />
               ) : rightPanel === "cloud" ? (
                 <CloudPanel />
+              ) : rightPanel === "brain" ? (
+                <ProjectBrain />
               ) : rightPanel === "history" ? (
                 <VersionHistory
                   versions={versions}
