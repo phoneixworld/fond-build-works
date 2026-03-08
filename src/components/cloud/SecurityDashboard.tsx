@@ -425,10 +425,13 @@ const SecurityDashboard = () => {
     toast.success(`Security scan complete — ${results.length} checks run`);
   };
 
-  // Calculate score
-  const passCount = checks.filter(c => c.status === "pass").length;
-  const warnCount = checks.filter(c => c.status === "warn").length;
-  const failCount = checks.filter(c => c.status === "fail").length;
+  // Filter out ignored for scoring, but keep them visible
+  const visibleChecks = checks;
+  const activeChecks = checks.filter(c => !ignoredChecks.has(c.id));
+  const passCount = activeChecks.filter(c => c.status === "pass").length;
+  const warnCount = activeChecks.filter(c => c.status === "warn").length;
+  const failCount = activeChecks.filter(c => c.status === "fail").length;
+  const ignoredCount = checks.filter(c => ignoredChecks.has(c.id) && (c.status === "warn" || c.status === "fail")).length;
   const totalScored = passCount + warnCount + failCount;
   const score = totalScored > 0 ? Math.round((passCount / totalScored) * 100) : 0;
 
@@ -436,7 +439,7 @@ const SecurityDashboard = () => {
   const ScoreIcon = score >= 80 ? ShieldCheck : score >= 50 ? ShieldAlert : ShieldX;
 
   // Group by category
-  const categories = [...new Set(checks.map(c => c.category))];
+  const categories = [...new Set(visibleChecks.map(c => c.category))];
 
   return (
     <div className="h-full overflow-y-auto p-4 space-y-4">
