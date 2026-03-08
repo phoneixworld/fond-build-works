@@ -104,7 +104,7 @@ const CodeEditor = ({ selectedFile }: { selectedFile: string }) => {
               {i + 1}
             </span>
             <pre className="text-foreground">
-              <code>{colorize(line)}</code>
+              <code dangerouslySetInnerHTML={{ __html: colorize(line) }} />
             </pre>
           </div>
         ))}
