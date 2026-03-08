@@ -367,6 +367,11 @@ const ChatPanel = forwardRef<ChatPanelHandle, { initialPrompt?: string; onVersio
   const sendMessage = useCallback(async (text: string, images: string[] = []) => {
     if (!text || isLoading || !currentProject) return;
 
+    // Reset self-healing counter on manual user messages (not auto-fix)
+    if (!text.startsWith("🔧 AUTO-FIX")) {
+      setHealAttempts(0);
+    }
+
     const content = buildMessageContent(text, images);
     const userMsg: Msg = { role: "user", content, timestamp: Date.now() };
     setInput("");
