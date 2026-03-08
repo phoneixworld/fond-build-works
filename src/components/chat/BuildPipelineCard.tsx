@@ -35,7 +35,7 @@ function detectEditingFiles(content: string): string[] {
 /** Heuristic task detection from stream content */
 function detectTasks(content: string, isBuilding: boolean): TaskItem[] {
   const len = content.length;
-  const hasCode = content.includes("```react-preview") || content.includes("```jsx") || content.includes("```html");
+  const hasCode = content.includes("```react-preview") || content.includes("```jsx") || content.includes("```html") || content.includes("```react");
   const hasClosingFence = hasCode && (() => {
     const start = content.indexOf("```");
     const afterStart = content.indexOf("\n", start) + 1;
@@ -44,17 +44,17 @@ function detectTasks(content: string, isBuilding: boolean): TaskItem[] {
 
   const tasks: TaskItem[] = [];
 
-  // Task 1: Analyze request
-  if (len > 0) {
+  // If building but no code detected yet, show analyzing
+  if (isBuilding && len > 0) {
     tasks.push({
       id: "analyze",
       label: "Analyzing request",
-      status: len > 80 ? "done" : "in_progress",
+      status: hasCode ? "done" : (len > 80 ? "done" : "in_progress"),
     });
   }
 
-  // Task 2: Generate components
-  if (len > 80) {
+  // Only show generation task if we're still building OR code was found
+  if (isBuilding && len > 80) {
     tasks.push({
       id: "generate",
       label: "Generating components",
@@ -62,7 +62,7 @@ function detectTasks(content: string, isBuilding: boolean): TaskItem[] {
     });
   }
 
-  // Task 3: Build UI
+  // Only show build/finalize tasks if actual code fences were found
   if (hasCode) {
     const codeStart = content.indexOf("```");
     const codeContent = content.slice(codeStart);
@@ -71,12 +71,7 @@ function detectTasks(content: string, isBuilding: boolean): TaskItem[] {
       label: "Building UI & styling",
       status: codeContent.length > 3000 ? "done" : "in_progress",
     });
-  }
 
-  // Task 4: Finalize
-  if (hasCode) {
-    const codeStart = content.indexOf("```");
-    const codeContent = content.slice(codeStart);
     if (codeContent.length > 2000) {
       tasks.push({
         id: "finalize",
@@ -86,9 +81,14 @@ function detectTasks(content: string, isBuilding: boolean): TaskItem[] {
     }
   }
 
-  // If build is done, mark all as done
-  if (!isBuilding && len > 100) {
+  // Only mark all done if code was actually generated
+  if (!isBuilding && hasCode && len > 100) {
     return tasks.map(t => ({ ...t, status: "done" as const }));
+  }
+
+  // If build finished with NO code, return empty — don't show misleading progress
+  if (!isBuilding && !hasCode) {
+    return [];
   }
 
   return tasks;
