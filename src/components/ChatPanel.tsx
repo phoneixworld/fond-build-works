@@ -563,13 +563,120 @@ const ChatPanel = forwardRef<ChatPanelHandle, { initialPrompt?: string; onVersio
         knowledge,
         templateContext: templateCtx || undefined,
         onDelta: upsert,
-        onDone: () => {
+        onDone: async () => {
+          // Use multi-file parser
+          const { files: parsedFiles, html: htmlCode, chatText } = parseMultiFileOutput(fullResponse);
+          
+          // Populate virtual file system
+          if (Object.keys(parsedFiles).length > 0) {
+            setVirtualFiles(parsedFiles);
+          }
+          
+          if (htmlCode) setPreviewHtml(postProcessHtml(htmlCode));
+
+          // Phase 3: Self-review pass for first-time generations with HTML
+          let finalHtml = htmlCode;
+          if (htmlCode && htmlCode.length > 200 && messages.length === 0) {
+            setBuildStep("Reviewing & polishing...");
+            try {
+              const reviewResp = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/review-code`, {
+                method: "POST",
+                headers: {
+                  "Content-Type": "application/json",
+                  Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+                },
+                body: JSON.stringify({ html: htmlCode }),
+              });
+              if (reviewResp.ok) {
+                const reviewData = await reviewResp.json();
+                if (reviewData.reviewed && reviewData.html && reviewData.html.length > 200) {
+                  finalHtml = reviewData.html;
+                  setPreviewHtml(postProcessHtml(finalHtml));
+                  console.log("[Phase 3] Self-review pass applied improvements");
+                }
+              }
+            } catch (e) {
+              console.warn("[Phase 3] Review pass skipped:", e);
+            }
+          }
+
           setIsLoading(false);
           setIsBuilding(false);
           setBuildStep("");
-          // Reset stream content after a short delay so "Build complete" shows briefly
           setTimeout(() => setBuildStreamContent(""), 3000);
 
+          const processedHtml = finalHtml ? postProcessHtml(finalHtml) : null;
+
+          // Auto-sync to Dev environment
+          if (processedHtml && currentProject?.id) {
+            supabase
+              .from("project_environments" as any)
+              .update({
+                html_snapshot: processedHtml,
+                status: "active",
+                updated_at: new Date().toISOString(),
+              } as any)
+              .eq("project_id", currentProject.id)
+              .eq("name", "development")
+              .then(() => {});
+          }
+
+          // Create version snapshot
+          if (processedHtml && onVersionCreated) {
+            const userPrompt = getTextContent(userMsg.content);
+            onVersionCreated({
+              id: crypto.randomUUID(),
+              timestamp: Date.now(),
+              label: userPrompt.slice(0, 60) || "Build update",
+              html: processedHtml,
+              messageIndex: messages.length,
+            });
+          }
+
+          setMessages((prev) => {
+            const final = chatText
+              ? prev.map((m, i) => (i === prev.length - 1 && m.role === "assistant" ? { ...m, content: chatText } : m))
+              : prev;
+
+            const persistMessages = final.map(m => ({
+              role: m.role,
+              content: typeof m.content === "string" ? m.content : getTextContent(m.content),
+            }));
+
+            const isFirstMessage = persistMessages.filter(m => m.role === "user").length === 1;
+            
+            if (isFirstMessage && currentProject.name === "Untitled Project") {
+              const userPromptText = persistMessages[0]?.content || "";
+              fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/project-name`, {
+                method: "POST",
+                headers: {
+                  "Content-Type": "application/json",
+                  Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+                },
+                body: JSON.stringify({ prompt: userPromptText }),
+              })
+                .then(r => r.json())
+                .then(({ name, emoji }) => {
+                  const fullName = emoji ? `${emoji} ${name}` : name;
+                  supabase
+                    .from("projects")
+                    .update({ name: fullName, updated_at: new Date().toISOString() } as any)
+                    .eq("id", currentProject.id)
+                    .then(() => {
+                      saveProject({ name: fullName } as any);
+                    });
+                })
+                .catch(() => {});
+            }
+
+            saveProject({
+              chat_history: persistMessages,
+              html_content: finalHtml || currentProject.html_content || "",
+            });
+
+            return final;
+          });
+        },
           // Use multi-file parser
           const { files: parsedFiles, html: htmlCode, chatText } = parseMultiFileOutput(fullResponse);
           
