@@ -563,13 +563,7 @@ const ChatPanel = forwardRef<ChatPanelHandle, { initialPrompt?: string; onVersio
         knowledge,
         templateContext: templateCtx || undefined,
         onDelta: upsert,
-        onDone: () => {
-          setIsLoading(false);
-          setIsBuilding(false);
-          setBuildStep("");
-          // Reset stream content after a short delay so "Build complete" shows briefly
-          setTimeout(() => setBuildStreamContent(""), 3000);
-
+        onDone: async () => {
           // Use multi-file parser
           const { files: parsedFiles, html: htmlCode, chatText } = parseMultiFileOutput(fullResponse);
           
@@ -580,12 +574,45 @@ const ChatPanel = forwardRef<ChatPanelHandle, { initialPrompt?: string; onVersio
           
           if (htmlCode) setPreviewHtml(postProcessHtml(htmlCode));
 
+          // Phase 3: Self-review pass for first-time generations with HTML
+          let finalHtml = htmlCode;
+          if (htmlCode && htmlCode.length > 200 && messages.length === 0) {
+            setBuildStep("Reviewing & polishing...");
+            try {
+              const reviewResp = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/review-code`, {
+                method: "POST",
+                headers: {
+                  "Content-Type": "application/json",
+                  Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+                },
+                body: JSON.stringify({ html: htmlCode }),
+              });
+              if (reviewResp.ok) {
+                const reviewData = await reviewResp.json();
+                if (reviewData.reviewed && reviewData.html && reviewData.html.length > 200) {
+                  finalHtml = reviewData.html;
+                  setPreviewHtml(postProcessHtml(finalHtml));
+                  console.log("[Phase 3] Self-review pass applied improvements");
+                }
+              }
+            } catch (e) {
+              console.warn("[Phase 3] Review pass skipped:", e);
+            }
+          }
+
+          setIsLoading(false);
+          setIsBuilding(false);
+          setBuildStep("");
+          setTimeout(() => setBuildStreamContent(""), 3000);
+
+          const processedHtml = finalHtml ? postProcessHtml(finalHtml) : null;
+
           // Auto-sync to Dev environment
-          if (htmlCode && currentProject?.id) {
+          if (processedHtml && currentProject?.id) {
             supabase
               .from("project_environments" as any)
               .update({
-                html_snapshot: postProcessHtml(htmlCode),
+                html_snapshot: processedHtml,
                 status: "active",
                 updated_at: new Date().toISOString(),
               } as any)
@@ -595,13 +622,13 @@ const ChatPanel = forwardRef<ChatPanelHandle, { initialPrompt?: string; onVersio
           }
 
           // Create version snapshot
-          if (htmlCode && onVersionCreated) {
+          if (processedHtml && onVersionCreated) {
             const userPrompt = getTextContent(userMsg.content);
             onVersionCreated({
               id: crypto.randomUUID(),
               timestamp: Date.now(),
               label: userPrompt.slice(0, 60) || "Build update",
-              html: postProcessHtml(htmlCode),
+              html: processedHtml,
               messageIndex: messages.length,
             });
           }
@@ -616,11 +643,9 @@ const ChatPanel = forwardRef<ChatPanelHandle, { initialPrompt?: string; onVersio
               content: typeof m.content === "string" ? m.content : getTextContent(m.content),
             }));
 
-            // AI-generate project name if still "Untitled Project" (fallback)
             const isFirstMessage = persistMessages.filter(m => m.role === "user").length === 1;
             
             if (isFirstMessage && currentProject.name === "Untitled Project") {
-              // Use direct supabase update to avoid stale closure race with saveProject
               const userPromptText = persistMessages[0]?.content || "";
               fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/project-name`, {
                 method: "POST",
@@ -633,13 +658,11 @@ const ChatPanel = forwardRef<ChatPanelHandle, { initialPrompt?: string; onVersio
                 .then(r => r.json())
                 .then(({ name, emoji }) => {
                   const fullName = emoji ? `${emoji} ${name}` : name;
-                  // Direct DB update to avoid race condition with saveProject closure
                   supabase
                     .from("projects")
                     .update({ name: fullName, updated_at: new Date().toISOString() } as any)
                     .eq("id", currentProject.id)
                     .then(() => {
-                      // Force refresh project state
                       saveProject({ name: fullName } as any);
                     });
                 })
@@ -648,7 +671,7 @@ const ChatPanel = forwardRef<ChatPanelHandle, { initialPrompt?: string; onVersio
 
             saveProject({
               chat_history: persistMessages,
-              html_content: htmlCode || currentProject.html_content || "",
+              html_content: finalHtml || currentProject.html_content || "",
             });
 
             return final;
