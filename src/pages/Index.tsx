@@ -9,23 +9,24 @@ import { PreviewProvider } from "@/contexts/PreviewContext";
 import { ProjectProvider, useProjects } from "@/contexts/ProjectContext";
 import { useAuth } from "@/hooks/useAuth";
 import ChatPanel from "@/components/ChatPanel";
-// ProjectList removed — projects accessed from landing page
 import CodeEditor from "@/components/CodeEditor";
 import PreviewPanel from "@/components/PreviewPanel";
 import PublishExportButtons from "@/components/PublishExportButtons";
+import TechStackSelector from "@/components/TechStackSelector";
 import LandingPage from "@/components/LandingPage";
+import { TechStackId, TECH_STACKS } from "@/lib/techStacks";
 
 const IDELayout = () => {
   const { user, signOut } = useAuth();
-  const { currentProject, selectProject, createProject } = useProjects();
+  const { currentProject, selectProject, createProject, saveProject } = useProjects();
   const [selectedFile, setSelectedFile] = useState("App.tsx");
   const [rightPanel, setRightPanel] = useState<"code" | "preview">("preview");
   const [inIDE, setInIDE] = useState(false);
   const [initialPrompt, setInitialPrompt] = useState("");
 
-  const handleStartProject = useCallback(async (prompt: string) => {
+  const handleStartProject = useCallback(async (prompt: string, techStack: TechStackId) => {
     setInitialPrompt(prompt);
-    const project = await createProject(prompt.slice(0, 40));
+    const project = await createProject(prompt.slice(0, 40), techStack);
     if (project) setInIDE(true);
   }, [createProject]);
 
@@ -35,9 +36,17 @@ const IDELayout = () => {
     setInIDE(true);
   }, [selectProject]);
 
+  const handleTechStackChange = (id: TechStackId) => {
+    if (currentProject) {
+      saveProject({ tech_stack: id });
+    }
+  };
+
   if (!inIDE) {
     return <LandingPage onStartProject={handleStartProject} onOpenProject={handleOpenProject} />;
   }
+
+  const currentStack = (currentProject as any)?.tech_stack || "html-tailwind";
 
   return (
     <PreviewProvider>
@@ -65,6 +74,9 @@ const IDELayout = () => {
           </div>
 
           <div className="flex items-center gap-1 ml-auto">
+            {/* Tech stack switcher */}
+            <TechStackSelector value={currentStack} onChange={handleTechStackChange} compact />
+            <div className="w-px h-5 bg-border mx-1" />
             <button
               onClick={() => setRightPanel("code")}
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
@@ -85,6 +97,7 @@ const IDELayout = () => {
             </button>
             <div className="w-px h-5 bg-border mx-2" />
             <PublishExportButtons />
+            <div className="w-px h-5 bg-border mx-2" />
             <span className="text-xs text-muted-foreground truncate max-w-[120px]">{user?.email}</span>
             <button onClick={signOut} className="text-muted-foreground hover:text-foreground transition-colors p-1.5" title="Sign out">
               <LogOut className="w-4 h-4" />
@@ -95,14 +108,12 @@ const IDELayout = () => {
         {/* Main area */}
         <div className="flex-1 overflow-hidden">
           <ResizablePanelGroup direction="horizontal">
-            {/* Left: Chat only */}
             <ResizablePanel defaultSize={35} minSize={25} maxSize={50}>
               <ChatPanel initialPrompt={initialPrompt} />
             </ResizablePanel>
 
             <ResizableHandle className="w-px bg-border hover:bg-primary transition-colors" />
 
-            {/* Right: Code or Preview */}
             <ResizablePanel defaultSize={65}>
               {rightPanel === "code" ? (
                 <CodeEditor selectedFile={selectedFile} />

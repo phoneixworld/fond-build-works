@@ -4,9 +4,11 @@ import { useAuth } from "@/hooks/useAuth";
 import { useProjects, Project } from "@/contexts/ProjectContext";
 import { formatDistanceToNow } from "date-fns";
 import { motion } from "framer-motion";
+import TechStackSelector from "@/components/TechStackSelector";
+import { TechStackId, TECH_STACKS } from "@/lib/techStacks";
 
 interface LandingPageProps {
-  onStartProject: (prompt: string) => void;
+  onStartProject: (prompt: string, techStack: TechStackId) => void;
   onOpenProject: (id: string) => void;
 }
 
@@ -14,11 +16,12 @@ const LandingPage = ({ onStartProject, onOpenProject }: LandingPageProps) => {
   const { user, signOut } = useAuth();
   const { projects, loading, deleteProject } = useProjects();
   const [input, setInput] = useState("");
+  const [techStack, setTechStack] = useState<TechStackId>("html-tailwind");
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
   const handleSubmit = () => {
     if (!input.trim()) return;
-    onStartProject(input.trim());
+    onStartProject(input.trim(), techStack);
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -29,10 +32,10 @@ const LandingPage = ({ onStartProject, onOpenProject }: LandingPageProps) => {
   };
 
   const suggestions = [
-    "A modern portfolio with dark theme",
+    "A todo app with user accounts",
     "A SaaS landing page with pricing",
-    "A restaurant website with menu",
-    "A school management dashboard",
+    "A CRM dashboard with contacts",
+    "A blog with data persistence",
   ];
 
   return (
@@ -62,15 +65,20 @@ const LandingPage = ({ onStartProject, onOpenProject }: LandingPageProps) => {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5 }}
-          className="w-full max-w-2xl space-y-8"
+          className="w-full max-w-2xl space-y-6"
         >
           <div className="text-center space-y-3">
             <h1 className="text-4xl font-bold text-foreground tracking-tight">
               What do you want to <span className="text-primary">build</span>?
             </h1>
             <p className="text-muted-foreground text-base">
-              Describe your idea and watch it come to life instantly.
+              Describe your idea, pick a tech stack, and watch it come to life.
             </p>
+          </div>
+
+          {/* Tech stack selector */}
+          <div className="flex justify-center">
+            <TechStackSelector value={techStack} onChange={setTechStack} />
           </div>
 
           {/* Prompt input */}
@@ -84,7 +92,10 @@ const LandingPage = ({ onStartProject, onOpenProject }: LandingPageProps) => {
               className="w-full bg-transparent text-foreground text-sm placeholder:text-muted-foreground outline-none resize-none p-3 pb-12 min-h-[100px]"
               rows={3}
             />
-            <div className="absolute bottom-3 right-3">
+            <div className="absolute bottom-3 left-3 right-3 flex items-center justify-between">
+              <span className="text-xs text-muted-foreground">
+                {TECH_STACKS.find(s => s.id === techStack)?.label} • Full-stack enabled
+              </span>
               <button
                 onClick={handleSubmit}
                 disabled={!input.trim()}
@@ -120,29 +131,33 @@ const LandingPage = ({ onStartProject, onOpenProject }: LandingPageProps) => {
           >
             <h2 className="text-sm font-semibold text-muted-foreground mb-3">Recent Projects</h2>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-              {projects.slice(0, 6).map((project) => (
-                <div
-                  key={project.id}
-                  onClick={() => onOpenProject(project.id)}
-                  className="group flex items-center gap-3 p-3 rounded-lg border border-border hover:border-primary/30 hover:bg-secondary/50 cursor-pointer transition-all"
-                >
-                  <div className="w-8 h-8 rounded-md bg-secondary flex items-center justify-center shrink-0">
-                    <FolderOpen className="w-4 h-4 text-muted-foreground" />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-foreground truncate">{project.name}</p>
-                    <p className="text-xs text-muted-foreground">
-                      {formatDistanceToNow(new Date(project.updated_at), { addSuffix: true })}
-                    </p>
-                  </div>
-                  <button
-                    onClick={(e) => { e.stopPropagation(); deleteProject(project.id); }}
-                    className="opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-destructive transition-all p-1"
+              {projects.slice(0, 6).map((project) => {
+                const stackInfo = TECH_STACKS.find(s => s.id === project.tech_stack);
+                const StackIcon = stackInfo?.icon || FolderOpen;
+                return (
+                  <div
+                    key={project.id}
+                    onClick={() => onOpenProject(project.id)}
+                    className="group flex items-center gap-3 p-3 rounded-lg border border-border hover:border-primary/30 hover:bg-secondary/50 cursor-pointer transition-all"
                   >
-                    <Trash2 className="w-3.5 h-3.5" />
-                  </button>
-                </div>
-              ))}
+                    <div className="w-8 h-8 rounded-md bg-secondary flex items-center justify-center shrink-0">
+                      <StackIcon className="w-4 h-4 text-muted-foreground" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-foreground truncate">{project.name}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {stackInfo?.label || "HTML"} • {formatDistanceToNow(new Date(project.updated_at), { addSuffix: true })}
+                      </p>
+                    </div>
+                    <button
+                      onClick={(e) => { e.stopPropagation(); deleteProject(project.id); }}
+                      className="opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-destructive transition-all p-1"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                );
+              })}
             </div>
           </motion.div>
         )}
