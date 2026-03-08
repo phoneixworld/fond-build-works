@@ -154,9 +154,9 @@ const PreviewPanel = () => {
         </AnimatePresence>
 
         {/* Preview content */}
-        <div className="flex-1 relative flex items-start justify-center overflow-auto bg-background">
+        <div className="flex-1 relative flex items-stretch justify-center overflow-auto bg-background min-h-0">
           {previewMode === "sandpack" ? (
-            <div className="h-full w-full" key={`sandpack-${refreshKey}`}>
+            <div className="h-full w-full min-h-0" key={`sandpack-${refreshKey}`}>
               {sandpackFiles ? (
                 <SandpackPreview
                   viewport={{ width: currentViewport.width, maxWidth: currentViewport.maxWidth }}
