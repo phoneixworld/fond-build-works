@@ -133,6 +133,7 @@ const ChatPanel = forwardRef<ChatPanelHandle, { initialPrompt?: string; onVersio
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { setPreviewHtml, setIsBuilding, setBuildStep } = usePreview();
+  const { setFiles: setVirtualFiles } = useVirtualFS();
   const lastProjectIdRef = useRef<string | null>(null);
   const hasProcessedInitialRef = useRef(false);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
