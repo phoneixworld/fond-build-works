@@ -16,7 +16,7 @@ import {
 import { LucideIcon } from "lucide-react";
 import { RefObject } from "react";
 
-export type PanelId = "code" | "preview" | "cloud" | "history" | "brain" | "pulse" | "crew" | "brandkit" | "abtesting" | "plugins";
+export type PanelId = "code" | "preview" | "cloud" | "history" | "brain" | "pulse" | "crew" | "brandkit" | "abtesting" | "plugins" | "whitelabel";
 
 interface TabDef {
   id: PanelId;
