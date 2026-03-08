@@ -53,7 +53,7 @@ const IDELayout = () => {
     <PreviewProvider>
       <div className="h-screen w-screen flex flex-col overflow-hidden">
         {/* Top bar */}
-        <header className="h-11 flex items-center px-4 border-b border-border bg-ide-panel-header shrink-0">
+        <header className="h-11 flex items-center px-4 border-b border-border bg-ide-panel-header shrink-0 z-10 relative">
           <div className="flex items-center gap-2">
             <button
               onClick={() => setInIDE(false)}
