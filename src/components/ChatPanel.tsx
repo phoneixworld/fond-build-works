@@ -1679,20 +1679,41 @@ const ChatPanel = forwardRef<ChatPanelHandle, { initialPrompt?: string; onVersio
               disabled={isLoading}
               rows={1}
             />
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <button
-                  onClick={handleSendClick}
-                  disabled={isLoading || (!input.trim() && attachedImages.length === 0)}
-                  className="text-primary hover:text-primary/80 disabled:text-muted-foreground/30 transition-colors pb-0.5"
-                >
-                  <Send className="w-4 h-4" />
-                </button>
-              </TooltipTrigger>
-              <TooltipContent side="top" className="text-xs">
-                Send <kbd className="ml-1 px-1 py-0.5 rounded bg-muted text-[10px] font-mono">Enter</kbd>
-              </TooltipContent>
-            </Tooltip>
+            {isLoading ? (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button
+                    onClick={() => {
+                      abortControllerRef.current?.abort();
+                      abortControllerRef.current = null;
+                      setIsLoading(false);
+                      setIsBuilding(false);
+                      setBuildStep("");
+                      isSendingRef.current = false;
+                    }}
+                    className="text-destructive hover:text-destructive/80 transition-colors pb-0.5 animate-pulse"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent side="top" className="text-xs">Stop generating</TooltipContent>
+              </Tooltip>
+            ) : (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button
+                    onClick={handleSendClick}
+                    disabled={!input.trim() && attachedImages.length === 0}
+                    className="text-primary hover:text-primary/80 disabled:text-muted-foreground/30 transition-colors pb-0.5"
+                  >
+                    <Send className="w-4 h-4" />
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent side="top" className="text-xs">
+                  Send <kbd className="ml-1 px-1 py-0.5 rounded bg-muted text-[10px] font-mono">Enter</kbd>
+                </TooltipContent>
+              </Tooltip>
+            )}
           </div>
 
           {/* Model + Theme + Actions bar */}
