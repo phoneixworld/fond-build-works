@@ -60,6 +60,7 @@ const IDELayout = () => {
   const [renameEmoji, setRenameEmoji] = useState("");
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [renameError, setRenameError] = useState("");
+  const [teamChatOpen, setTeamChatOpen] = useState(false);
   const publishRef = useRef<{ openPublish: () => void; handleExport: () => void } | null>(null);
   const chatRef = useRef<{ clearChat: () => void } | null>(null);
   const { toast } = useToast();
