@@ -23,6 +23,9 @@ function isAllowedPkg(pkg: string): boolean {
 
 /** Second-pass sanitizer applied right before Sandpack receives code */
 function sanitizeCode(code: string): string {
+  // Strip file separator lines like "--- /src/App.jsx ---" that leaked through
+  code = code.replace(/^---\s+\/?\w[\w/.-]*\.\w+\s*-{0,3}\s*$/gm, "");
+  
   // Strip import/export ... from 'unknown-pkg'
   code = code.replace(
     /^\s*(?:import|export)\s+[\s\S]*?\s+from\s+['"]([^'"]+)['"]\s*;?\s*$/gm,

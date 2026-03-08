@@ -240,8 +240,10 @@ function parseReactFiles(text: string): { chatText: string; files: Record<string
   
   if (parsedFiles.fileCount === 0) {
     // No file separators found — treat the whole block as /App.jsx
-    console.log(`[parseReactFiles] Single-file mode: treating block as /App.jsx (${block.length} chars)`);
-    files["/App.jsx"] = sanitizeImports(block.trim());
+    // But first strip any leading separator lines that weren't caught
+    const cleaned = block.replace(/^---\s+\/?\w[\w/.-]*\.\w+\s*-{0,3}\s*\n/gm, "").trim();
+    console.log(`[parseReactFiles] Single-file mode: treating block as /App.jsx (${cleaned.length} chars)`);
+    files["/App.jsx"] = sanitizeImports(cleaned);
     return { chatText, files, deps };
   }
   
