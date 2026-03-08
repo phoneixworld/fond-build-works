@@ -142,7 +142,12 @@ const IDELayout = () => {
           onSwitchPanel={(p) => setRightPanel(p)}
           onClearChat={() => chatRef.current?.clearChat()}
           onRenameProject={() => {
-            setRenameValue(currentProject?.name || "");
+            // Parse existing emoji prefix
+            const name = currentProject?.name || "";
+            const emojiMatch = name.match(/^(\p{Emoji})\s*/u);
+            setRenameEmoji(emojiMatch ? emojiMatch[1] : "");
+            setRenameValue(emojiMatch ? name.slice(emojiMatch[0].length) : name);
+            setRenameError("");
             setRenameOpen(true);
           }}
           onGoBack={() => setInIDE(false)}
