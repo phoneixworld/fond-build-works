@@ -4,11 +4,12 @@ import {
   ResizablePanel,
   ResizablePanelGroup,
 } from "@/components/ui/resizable";
-import { Code, Eye, Zap, LogOut, ArrowLeft, Cloud, ChevronDown, Clock, Command as CommandIcon, Brain, Activity, Users, Palette } from "lucide-react";
+import { Code, Eye, Zap, LogOut, ArrowLeft, Cloud, ChevronDown, Clock, Command as CommandIcon, Brain, Activity, Users, Palette, MessageCircle } from "lucide-react";
 import { PreviewProvider } from "@/contexts/PreviewContext";
 import { VirtualFSProvider } from "@/contexts/VirtualFSContext";
 import { ProjectProvider, useProjects } from "@/contexts/ProjectContext";
 import { useAuth } from "@/hooks/useAuth";
+import { useRealtimePresence } from "@/hooks/useRealtimePresence";
 import ChatPanel from "@/components/ChatPanel";
 import CodeEditor from "@/components/CodeEditor";
 import CloudPanel from "@/components/CloudPanel";
@@ -21,9 +22,12 @@ import PublishExportButtons from "@/components/PublishExportButtons";
 import LandingPage from "@/components/LandingPage";
 import CommandPalette from "@/components/CommandPalette";
 import VersionHistory, { Version } from "@/components/VersionHistory";
+import PresenceAvatars from "@/components/PresenceAvatars";
+import TeamChat from "@/components/TeamChat";
 import { TechStackId, TECH_STACKS } from "@/lib/techStacks";
 import { usePreview } from "@/contexts/PreviewContext";
 import { useToast } from "@/hooks/use-toast";
+import { AnimatePresence } from "framer-motion";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -56,9 +60,11 @@ const IDELayout = () => {
   const [renameEmoji, setRenameEmoji] = useState("");
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [renameError, setRenameError] = useState("");
+  const [teamChatOpen, setTeamChatOpen] = useState(false);
   const publishRef = useRef<{ openPublish: () => void; handleExport: () => void } | null>(null);
   const chatRef = useRef<{ clearChat: () => void } | null>(null);
   const { toast } = useToast();
+  const { onlineUsers, setTyping, myColor } = useRealtimePresence(rightPanel);
 
   const handleStartProject = useCallback(async (prompt: string, techStack: TechStackId) => {
     setInitialPrompt(prompt);
@@ -363,8 +369,27 @@ const IDELayout = () => {
             </div>
           </div>
 
-          {/* Right: Cmd+K hint + Publish + User */}
+          {/* Right: Presence + Cmd+K + Publish + User */}
           <div className="flex items-center gap-1.5 shrink-0">
+            {/* Real-time presence */}
+            <PresenceAvatars
+              onlineUsers={onlineUsers}
+              currentUserEmail={user?.email || ""}
+              myColor={myColor}
+              onToggleChat={() => setTeamChatOpen(!teamChatOpen)}
+            />
+            <div className="w-px h-4 bg-border mx-0.5" />
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  onClick={() => setTeamChatOpen(!teamChatOpen)}
+                  className="p-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors relative"
+                >
+                  <MessageCircle className="w-3.5 h-3.5" />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent side="bottom" className="text-xs">Team Chat</TooltipContent>
+            </Tooltip>
             <Tooltip>
               <TooltipTrigger asChild>
                 <button
@@ -430,6 +455,17 @@ const IDELayout = () => {
               )}
             </ResizablePanel>
           </ResizablePanelGroup>
+
+          {/* Team Chat floating panel */}
+          <AnimatePresence>
+            {teamChatOpen && (
+              <TeamChat
+                onlineUsers={onlineUsers}
+                isOpen={teamChatOpen}
+                onClose={() => setTeamChatOpen(false)}
+              />
+            )}
+          </AnimatePresence>
         </div>
       </div>
     </TooltipProvider>
