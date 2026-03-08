@@ -197,7 +197,7 @@ const IDELayout = () => {
           currentProject={currentProject}
           rightPanel={rightPanel}
           setRightPanel={setRightPanel}
-          onBack={() => setInIDE(false)}
+          onBack={handleBack}
           onRenameClick={() => setRenameOpen(true)}
           onTechStackChange={handleTechStackChange}
           onCmdOpen={() => setCmdOpen(true)}
