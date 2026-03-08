@@ -41,6 +41,44 @@ function parseResponse(text: string): [string, string | null] {
   return [chatPart, htmlCode.trim()];
 }
 
+/** Post-process generated HTML to inject polish enhancements */
+function postProcessHtml(html: string): string {
+  if (!html) return html;
+  
+  const injections: string[] = [];
+  
+  // Smooth scrolling
+  if (!html.includes('scroll-behavior')) {
+    injections.push('<style>html{scroll-behavior:smooth}*{-webkit-tap-highlight-color:transparent}::selection{background:rgba(99,102,241,0.2)}img{max-width:100%;height:auto}</style>');
+  }
+  
+  // Favicon (generic modern favicon)
+  if (!html.includes('favicon') && !html.includes('rel="icon"')) {
+    injections.push('<link rel="icon" href="data:image/svg+xml,<svg xmlns=\'http://www.w3.org/2000/svg\' viewBox=\'0 0 32 32\'><rect width=\'32\' height=\'32\' rx=\'8\' fill=\'%236366f1\'/><text x=\'50%25\' y=\'55%25\' dominant-baseline=\'middle\' text-anchor=\'middle\' font-size=\'18\' fill=\'white\'>⚡</text></svg>" type="image/svg+xml">');
+  }
+  
+  // Font preloading hint
+  if (html.includes('fonts.googleapis.com') && !html.includes('preconnect')) {
+    injections.push('<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>');
+  }
+  
+  // Meta theme color
+  if (!html.includes('theme-color')) {
+    injections.push('<meta name="theme-color" content="#6366f1">');
+  }
+  
+  if (injections.length === 0) return html;
+  
+  // Inject after <head> or after first <meta>
+  const headIdx = html.indexOf('<head>');
+  if (headIdx !== -1) {
+    const insertPos = headIdx + '<head>'.length;
+    return html.slice(0, insertPos) + '\n  ' + injections.join('\n  ') + html.slice(insertPos);
+  }
+  
+  return html;
+}
+
 const TIER_COLORS: Record<string, string> = {
   fast: "text-green-400",
   pro: "text-blue-400",
