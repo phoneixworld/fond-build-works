@@ -197,9 +197,9 @@ function parseReactFiles(text: string): { chatText: string; files: Record<string
     }
   }
   
-  // Fallback: check if any code fence contains --- /App.jsx pattern
+  // Fallback: check if any code fence contains --- /App.jsx pattern (with or without trailing ---)
   if (fenceStart === -1) {
-    const genericFence = text.match(/```\w*\n[\s\S]*?---\s+\/?(App\.jsx|App\.js)/);
+    const genericFence = text.match(/```\w*\n[\s\S]*?---\s+\/?(src\/)?App\.jsx?\s*-{0,3}/);
     if (genericFence) {
       fenceStart = text.indexOf(genericFence[0]);
       matchedPattern = "generic-with-app";
@@ -265,12 +265,14 @@ function parseFileSections(block: string): { files: Record<string, string>; deps
   const files: Record<string, string> = {};
   const deps: Record<string, string> = {};
   
-  // Strategy 1: "--- /filename" on same line (original format)
-  if (/^---\s+\/?\w[\w/.-]*\.(jsx?|tsx?|css)$/m.test(block)) {
+  // Strategy 1: "--- /filename ---" or "--- /filename" on same line
+  // Matches: --- /src/App.jsx ---, --- /App.jsx, --- App.jsx ---
+  if (/^---\s+\/?\w[\w/.-]*\.(jsx?|tsx?|css)\s*-{0,3}\s*$/m.test(block)) {
     const sections = block.split(/^---\s+/m).filter(Boolean);
     for (const section of sections) {
       const lines = section.split("\n");
-      const firstLine = lines[0].trim();
+      // Strip trailing " ---" from filename line
+      const firstLine = lines[0].trim().replace(/\s*-{2,3}\s*$/, "").trim();
       if (firstLine.match(/^\/?\w[\w/.-]*\.(jsx?|tsx?|css)$/)) {
         let filename = firstLine.startsWith("/") ? firstLine : `/${firstLine}`;
         filename = filename.replace(/^\/src\//, "/");
