@@ -76,20 +76,17 @@ function parseStructuredResponse(text: string): ParsedSection[] {
 
   for (const line of lines) {
     const trimmed = line.trim();
+    // Only match EXPLICIT task markers — checkmarks and markdown checkboxes
     const checkDone = trimmed.match(/^(?:✅|☑️?|✓|[✔])\s*(.+)/);
     const checkUndone = trimmed.match(/^(?:⬜|☐|○)\s*(.+)/);
     const mdCheckDone = trimmed.match(/^-\s*\[x\]\s*(.+)/i);
     const mdCheckUndone = trimmed.match(/^-\s*\[\s*\]\s*(.+)/);
-    const numberedAction = trimmed.match(/^(?:\d+[\.\)]\s*)(.+(?:built|created|added|updated|implemented|fixed|configured|set up|deployed|installed|removed|refactored|completed).*)$/i);
-    const bulletAction = trimmed.match(/^(?:[-•]\s+)(\*\*.+\*\*.*)$/);
 
     if (checkDone) { taskLines.push({ label: checkDone[1].trim(), done: true }); inTaskBlock = true; }
     else if (checkUndone) { taskLines.push({ label: checkUndone[1].trim(), done: false }); inTaskBlock = true; }
     else if (mdCheckDone) { taskLines.push({ label: mdCheckDone[1].trim(), done: true }); inTaskBlock = true; }
     else if (mdCheckUndone) { taskLines.push({ label: mdCheckUndone[1].trim(), done: false }); inTaskBlock = true; }
-    else if (inTaskBlock && (numberedAction || bulletAction)) {
-      taskLines.push({ label: (numberedAction || bulletAction)![1].trim(), done: true });
-    } else {
+    else {
       if (inTaskBlock && trimmed === "") inTaskBlock = false;
       nonTaskLines.push(line);
     }
