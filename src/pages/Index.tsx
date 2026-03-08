@@ -129,10 +129,13 @@ const IDELayout = () => {
   const currentStackInfo = TECH_STACKS.find(s => s.id === currentStack);
   const StackIcon = currentStackInfo?.icon;
 
-  const panelTabs: { id: "preview" | "code" | "cloud" | "history" | "brain" | "pulse" | "crew" | "brandkit"; label: string; icon: typeof Eye }[] = [
+  // Primary tabs (always show label) + secondary tabs (icon-only with tooltips)
+  const primaryTabs: { id: typeof rightPanel; label: string; icon: typeof Eye }[] = [
     { id: "preview", label: "Preview", icon: Eye },
     { id: "code", label: "Code", icon: Code },
     { id: "cloud", label: "Cloud", icon: Cloud },
+  ];
+  const secondaryTabs: { id: typeof rightPanel; label: string; icon: typeof Eye }[] = [
     { id: "brain", label: "Brain", icon: Brain },
     { id: "pulse", label: "Pulse", icon: Activity },
     { id: "crew", label: "Crew", icon: Users },
@@ -309,29 +312,55 @@ const IDELayout = () => {
             </DropdownMenu>
           </div>
 
-          {/* Center: Panel tabs */}
-          <div className="flex items-center gap-0.5 mx-auto bg-secondary/50 rounded-lg p-0.5">
-            {panelTabs.map((tab) => {
-              const Icon = tab.icon;
-              const isActive = rightPanel === tab.id;
-              return (
-                <button
-                  key={tab.id}
-                  onClick={() => setRightPanel(tab.id)}
-                  className={`flex items-center gap-1.5 px-3 py-1 rounded-md text-xs font-medium transition-all ${
-                    isActive
-                      ? "bg-background text-foreground shadow-sm"
-                      : "text-muted-foreground hover:text-foreground"
-                  }`}
-                >
-                  <Icon className="w-3.5 h-3.5" />
-                  {tab.label}
-                  {tab.id === "history" && versions.length > 0 && (
-                    <span className="text-[9px] bg-primary/20 text-primary rounded-full px-1.5">{versions.length}</span>
-                  )}
-                </button>
-              );
-            })}
+          {/* Center: Panel tabs — primary with labels, secondary icon-only */}
+          <div className="flex items-center gap-1 mx-auto">
+            <div className="flex items-center gap-0.5 bg-secondary/50 rounded-lg p-0.5">
+              {primaryTabs.map((tab) => {
+                const Icon = tab.icon;
+                const isActive = rightPanel === tab.id;
+                return (
+                  <button
+                    key={tab.id}
+                    onClick={() => setRightPanel(tab.id)}
+                    className={`flex items-center gap-1.5 px-3 py-1 rounded-md text-xs font-medium transition-all ${
+                      isActive
+                        ? "bg-background text-foreground shadow-sm"
+                        : "text-muted-foreground hover:text-foreground"
+                    }`}
+                  >
+                    <Icon className="w-3.5 h-3.5" />
+                    {tab.label}
+                  </button>
+                );
+              })}
+            </div>
+            <div className="w-px h-4 bg-border mx-0.5" />
+            <div className="flex items-center gap-0.5 bg-secondary/50 rounded-lg p-0.5">
+              {secondaryTabs.map((tab) => {
+                const Icon = tab.icon;
+                const isActive = rightPanel === tab.id;
+                return (
+                  <Tooltip key={tab.id}>
+                    <TooltipTrigger asChild>
+                      <button
+                        onClick={() => setRightPanel(tab.id)}
+                        className={`flex items-center justify-center w-7 h-7 rounded-md transition-all ${
+                          isActive
+                            ? "bg-background text-foreground shadow-sm"
+                            : "text-muted-foreground hover:text-foreground"
+                        }`}
+                      >
+                        <Icon className="w-3.5 h-3.5" />
+                        {tab.id === "history" && versions.length > 0 && (
+                          <span className="absolute -top-0.5 -right-0.5 text-[8px] bg-primary text-primary-foreground rounded-full w-3.5 h-3.5 flex items-center justify-center">{versions.length}</span>
+                        )}
+                      </button>
+                    </TooltipTrigger>
+                    <TooltipContent side="bottom" className="text-xs">{tab.label}</TooltipContent>
+                  </Tooltip>
+                );
+              })}
+            </div>
           </div>
 
           {/* Right: Cmd+K hint + Publish + User */}
