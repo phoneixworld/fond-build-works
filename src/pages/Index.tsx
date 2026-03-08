@@ -4,7 +4,7 @@ import {
   ResizablePanel,
   ResizablePanelGroup,
 } from "@/components/ui/resizable";
-import { Code, Eye, Zap, LogOut, ArrowLeft, Cloud, ChevronDown, Clock, Command as CommandIcon, Brain, Activity, Users, Palette, MessageCircle } from "lucide-react";
+import { Code, Eye, Zap, LogOut, ArrowLeft, Cloud, ChevronDown, Clock, Command as CommandIcon, Brain, Activity, Users, Palette, MessageCircle, FlaskConical, Puzzle } from "lucide-react";
 import { PreviewProvider } from "@/contexts/PreviewContext";
 import { VirtualFSProvider } from "@/contexts/VirtualFSContext";
 import { ProjectProvider, useProjects } from "@/contexts/ProjectContext";
