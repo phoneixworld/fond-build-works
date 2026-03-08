@@ -177,7 +177,7 @@ const IDELayout = () => {
           onSwitchPanel={(p) => setRightPanel(p)}
           onClearChat={() => chatRef.current?.clearChat()}
           onRenameProject={() => setRenameOpen(true)}
-          onGoBack={() => setInIDE(false)}
+          onGoBack={handleBack}
           onSignOut={signOut}
           onExport={() => publishRef.current?.handleExport()}
           onPublish={() => publishRef.current?.openPublish()}
