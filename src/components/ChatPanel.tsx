@@ -1108,6 +1108,16 @@ const ChatPanel = forwardRef<ChatPanelHandle, { initialPrompt?: string; onVersio
                 Attach image <kbd className="ml-1 px-1 py-0.5 rounded bg-muted text-[10px] font-mono">Ctrl+V</kbd>
               </TooltipContent>
             </Tooltip>
+            <VoiceInput
+              onTranscript={(text) => {
+                setInput(prev => prev ? prev + " " + text : text);
+                if (inputRef.current) {
+                  inputRef.current.style.height = "auto";
+                  inputRef.current.style.height = inputRef.current.scrollHeight + "px";
+                }
+              }}
+              disabled={isLoading}
+            />
             <input
               ref={fileInputRef}
               type="file"
