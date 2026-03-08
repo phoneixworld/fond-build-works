@@ -14,6 +14,53 @@ export type Database = {
   }
   public: {
     Tables: {
+      deploy_history: {
+        Row: {
+          created_at: string
+          deployed_by: string
+          deployed_by_email: string
+          from_env: string
+          id: string
+          notes: string
+          project_id: string
+          snapshot_id: string | null
+          status: string
+          to_env: string
+        }
+        Insert: {
+          created_at?: string
+          deployed_by: string
+          deployed_by_email?: string
+          from_env?: string
+          id?: string
+          notes?: string
+          project_id: string
+          snapshot_id?: string | null
+          status?: string
+          to_env?: string
+        }
+        Update: {
+          created_at?: string
+          deployed_by?: string
+          deployed_by_email?: string
+          from_env?: string
+          id?: string
+          notes?: string
+          project_id?: string
+          snapshot_id?: string | null
+          status?: string
+          to_env?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "deploy_history_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       installed_plugins: {
         Row: {
           config: Json
@@ -303,6 +350,62 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "project_dependencies_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      project_environments: {
+        Row: {
+          config: Json
+          created_at: string
+          deployed_at: string | null
+          deployed_by: string | null
+          html_snapshot: string
+          id: string
+          is_locked: boolean
+          label: string
+          name: string
+          preview_url: string | null
+          project_id: string
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          config?: Json
+          created_at?: string
+          deployed_at?: string | null
+          deployed_by?: string | null
+          html_snapshot?: string
+          id?: string
+          is_locked?: boolean
+          label?: string
+          name?: string
+          preview_url?: string | null
+          project_id: string
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          config?: Json
+          created_at?: string
+          deployed_at?: string | null
+          deployed_by?: string | null
+          html_snapshot?: string
+          id?: string
+          is_locked?: boolean
+          label?: string
+          name?: string
+          preview_url?: string | null
+          project_id?: string
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "project_environments_project_id_fkey"
             columns: ["project_id"]
             isOneToOne: false
             referencedRelation: "projects"

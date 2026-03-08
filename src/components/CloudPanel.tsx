@@ -12,6 +12,7 @@ import {
   Brain,
   GitBranch,
   ShieldCheck,
+  Rocket,
 } from "lucide-react";
 import SchemaBuilder from "./SchemaBuilder";
 import CloudOverview from "./cloud/CloudOverview";
@@ -25,9 +26,13 @@ import CloudExport from "./cloud/CloudExport";
 import ProjectMemory from "./cloud/ProjectMemory";
 import DependencyGraph from "./cloud/DependencyGraph";
 import GovernanceEngine from "./cloud/GovernanceEngine";
+import EnvironmentManager from "./cloud/EnvironmentManager";
+
+const PREMIUM_SECTIONS = new Set(["environments"]);
 
 const CLOUD_SECTIONS = [
   { id: "overview", label: "Overview", icon: LayoutDashboard },
+  { id: "environments", label: "Environments", icon: Rocket },
   { id: "database", label: "Database", icon: Database },
   { id: "memory", label: "Project Memory", icon: Brain },
   { id: "dependencies", label: "Dependencies", icon: GitBranch },
@@ -52,6 +57,8 @@ const CloudPanel = () => {
         return <CloudOverview onNavigate={setActiveSection} />;
       case "database":
         return <SchemaBuilder />;
+      case "environments":
+        return <EnvironmentManager />;
       case "memory":
         return <ProjectMemory />;
       case "dependencies":
@@ -105,6 +112,9 @@ const CloudPanel = () => {
               >
                 <Icon className={`w-3.5 h-3.5 shrink-0 ${isActive ? "text-sidebar-primary" : ""}`} />
                 {section.label}
+                {PREMIUM_SECTIONS.has(section.id) && (
+                  <span className="text-[8px] bg-amber-500/20 text-amber-400 px-1 rounded font-bold ml-auto">PRO</span>
+                )}
               </button>
             );
           })}
