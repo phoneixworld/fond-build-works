@@ -64,6 +64,7 @@ const IDELayout = () => {
   const publishRef = useRef<{ openPublish: () => void; handleExport: () => void } | null>(null);
   const chatRef = useRef<{ clearChat: () => void } | null>(null);
   const { toast } = useToast();
+  const { onlineUsers, setTyping, myColor } = useRealtimePresence(rightPanel);
 
   const handleStartProject = useCallback(async (prompt: string, techStack: TechStackId) => {
     setInitialPrompt(prompt);
