@@ -33,7 +33,15 @@ RULES:
 4. Focus on questions about: design style, layout preferences, features scope, data persistence, auth needs.
 5. NEVER ask about tech stack (that's already chosen).
 6. Return ONLY valid JSON, no markdown, no explanation.
-7. ${hasHistory ? "This is a follow-up in an existing conversation. Only ask questions if the request represents a MAJOR new feature or redesign (e.g. 'improve the design', 'add a CMS', 'rebuild the layout'). For small changes like 'fix button', 'change color', always return build." : "This is the first message. Ask questions for any non-trivial prompt."}
+
+CONTEXT RULES (CRITICAL):
+${hasHistory
+  ? `This is a FOLLOW-UP message in an existing conversation. Be VERY selective:
+- ONLY ask questions for MAJOR new features or complete redesigns (e.g., "add a blog system", "rebuild the homepage", "add e-commerce functionality", "redesign everything")
+- NEVER ask questions for: tweaks, fixes, small additions, color changes, text changes, layout adjustments, "make it better", "improve X", adding a section, changing fonts, etc.
+- When in doubt, return "build". Users expect follow-ups to execute immediately.
+- Rule of thumb: if the request could reasonably be interpreted without ambiguity, just build it.`
+  : `This is the FIRST message in a new conversation. Ask questions for non-trivial prompts that are vague about style, scope, or features.`}
 
 Response format:
 {
@@ -55,32 +63,31 @@ Response format:
         {"label": "Dark & Premium", "value": "dark", "description": "Dark backgrounds, glowing accents, luxury feel"},
         {"label": "Warm & Organic", "value": "warm", "description": "Earthy tones, serif fonts, artisanal quality"}
       ]
-    },
-    {
-      "id": "features",
-      "header": "Features",
-      "text": "Which features should be included?",
-      "multiSelect": true,
-      "options": [
-        {"label": "Contact Form", "value": "contact", "description": "Let visitors send you messages"},
-        {"label": "Photo Gallery", "value": "gallery", "description": "Showcase images in a grid or carousel"},
-        {"label": "Online Ordering", "value": "ordering", "description": "Let customers place orders online"}
-      ]
     }
   ]
 }
 
-Examples that NEED questions:
+Examples — FIRST message, NEEDS questions:
 - "Build me a restaurant website" → ask about style, sections, features
-- "Improve the overall design" → ask about style direction, what to prioritize
 - "Create a dashboard" → ask about what data, layout preference
-- "Add a CMS" → ask about what content types, editing needs
+- "Make me a portfolio" → ask about style, sections
 
-Examples that DON'T need questions (build immediately):
-- "Make the button blue"
-- "Fix the navigation links"
-- "Add a footer with contact info"
-- "Build a landing page for a coffee shop with menu, about, and contact sections" (already detailed)`
+Examples — FOLLOW-UP, NEEDS questions:
+- "Add a full e-commerce system" → ask about product types, payment, features
+- "Add a blog with CMS" → ask about content types, layout
+- "Completely redesign the site" → ask about new style direction
+
+Examples — FOLLOW-UP, just BUILD (no questions):
+- "Improve the design" → build
+- "Make the hero section bigger" → build
+- "Add a contact form" → build
+- "Change colors to blue" → build
+- "Add a faculty section" → build
+- "Fix the navigation" → build
+- "Add dark mode" → build
+- "Make it more modern" → build
+- "Add animations" → build
+- "Improve spacing and typography" → build`
           },
           { role: "user", content: prompt }
         ],
