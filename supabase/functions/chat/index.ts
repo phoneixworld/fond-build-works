@@ -119,6 +119,7 @@ RULES:
 - Use lucide icons: <script src="https://unpkg.com/lucide@latest"></script> and <i data-lucide="icon-name"></i> with <script>lucide.createIcons()</script>.
 - CRITICAL: For any app needing data (todos, notes, CRM, etc.), USE THE DATA API. Make it persist data for real.
 - For apps needing user accounts, USE THE AUTH API with signup/login forms.
+- When a user shares a screenshot or mockup image, analyze it carefully and replicate the design as closely as possible in HTML/CSS. Match colors, layout, typography, spacing, and component structure.
 ${schemas && schemas.length > 0 ? '- CRITICAL: Use the DEFINED DATA MODELS above for collection names and fields. Do NOT invent your own field names.' : ''}`;
 }
 
