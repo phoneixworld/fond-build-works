@@ -23,6 +23,7 @@ export interface PublishExportHandle {
 const PublishExportButtons = forwardRef<PublishExportHandle>((_, ref) => {
   const { currentProject, saveProject } = useProjects();
   const { previewHtml } = usePreview();
+  const { files } = useVirtualFS();
   const { toast } = useToast();
   const [showPublish, setShowPublish] = useState(false);
   const [publishing, setPublishing] = useState(false);
