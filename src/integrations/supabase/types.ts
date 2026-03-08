@@ -222,6 +222,94 @@ export type Database = {
           },
         ]
       }
+      project_decisions: {
+        Row: {
+          category: string
+          context: Json
+          created_at: string
+          description: string
+          id: string
+          is_active: boolean
+          project_id: string
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          category?: string
+          context?: Json
+          created_at?: string
+          description?: string
+          id?: string
+          is_active?: boolean
+          project_id: string
+          title?: string
+          updated_at?: string
+        }
+        Update: {
+          category?: string
+          context?: Json
+          created_at?: string
+          description?: string
+          id?: string
+          is_active?: boolean
+          project_id?: string
+          title?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "project_decisions_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      project_dependencies: {
+        Row: {
+          created_at: string
+          id: string
+          metadata: Json
+          project_id: string
+          relationship: string
+          source_name: string
+          source_type: string
+          target_name: string
+          target_type: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          metadata?: Json
+          project_id: string
+          relationship?: string
+          source_name?: string
+          source_type?: string
+          target_name?: string
+          target_type?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          metadata?: Json
+          project_id?: string
+          relationship?: string
+          source_name?: string
+          source_type?: string
+          target_name?: string
+          target_type?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "project_dependencies_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       project_functions: {
         Row: {
           code: string
@@ -250,6 +338,53 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "project_functions_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      project_governance_rules: {
+        Row: {
+          category: string
+          created_at: string
+          description: string
+          id: string
+          is_active: boolean
+          name: string
+          project_id: string
+          rule_config: Json
+          severity: string
+          updated_at: string
+        }
+        Insert: {
+          category?: string
+          created_at?: string
+          description?: string
+          id?: string
+          is_active?: boolean
+          name?: string
+          project_id: string
+          rule_config?: Json
+          severity?: string
+          updated_at?: string
+        }
+        Update: {
+          category?: string
+          created_at?: string
+          description?: string
+          id?: string
+          is_active?: boolean
+          name?: string
+          project_id?: string
+          rule_config?: Json
+          severity?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "project_governance_rules_project_id_fkey"
             columns: ["project_id"]
             isOneToOne: false
             referencedRelation: "projects"
