@@ -314,10 +314,11 @@ const EnvironmentManager = () => {
                     {/* Preview */}
                     {hasSnapshot && (
                       <button
+                        onClick={() => setPreviewEnv({ name: envConfig.name, label: envConfig.label, html: envData.html_snapshot })}
                         className="p-1.5 rounded hover:bg-background/50 transition-colors"
-                        title="Preview"
+                        title={`Preview ${envConfig.label}`}
                       >
-                        <Eye className="w-3.5 h-3.5 text-muted-foreground" />
+                        <Eye className="w-3.5 h-3.5 text-primary" />
                       </button>
                     )}
                   </div>
