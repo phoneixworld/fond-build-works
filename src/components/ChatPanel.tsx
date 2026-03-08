@@ -331,6 +331,18 @@ const ChatPanel = forwardRef<ChatPanelHandle, { initialPrompt?: string; onVersio
           const [chatText, htmlCode] = parseResponse(fullResponse);
           if (htmlCode) setPreviewHtml(postProcessHtml(htmlCode));
 
+          // Create version snapshot
+          if (htmlCode && onVersionCreated) {
+            const userPrompt = getTextContent(userMsg.content);
+            onVersionCreated({
+              id: crypto.randomUUID(),
+              timestamp: Date.now(),
+              label: userPrompt.slice(0, 60) || "Build update",
+              html: postProcessHtml(htmlCode),
+              messageIndex: messages.length,
+            });
+          }
+
           setMessages((prev) => {
             const final = chatText
               ? prev.map((m, i) => (i === prev.length - 1 && m.role === "assistant" ? { ...m, content: chatText } : m))
