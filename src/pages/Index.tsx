@@ -18,6 +18,8 @@ import ProjectBrain from "@/components/ProjectBrain";
 import PulseAnalytics from "@/components/PulseAnalytics";
 import CrewSpaces from "@/components/CrewSpaces";
 import BrandKitGenerator from "@/components/BrandKitGenerator";
+import ABTesting from "@/components/ABTesting";
+import PluginMarketplace from "@/components/PluginMarketplace";
 import PublishExportButtons from "@/components/PublishExportButtons";
 import LandingPage from "@/components/LandingPage";
 import CommandPalette from "@/components/CommandPalette";
