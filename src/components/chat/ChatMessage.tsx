@@ -413,7 +413,8 @@ const ChatMessage = ({ content, role, timestamp, isLoading, onEdit, onRegenerate
   
   // Parse suggestion buttons from assistant responses
   const { suggestions, cleanText: textWithoutSuggestions } = !isUser ? parseSuggestions(cleanText) : { suggestions: [], cleanText: cleanText };
-  const sections = !isUser ? parseStructuredResponse(textWithoutSuggestions) : [];
+  // Don't parse structured sections (task cards, summaries) while still loading — prevents premature "Changes complete"
+  const sections = !isUser ? parseStructuredResponse(textWithoutSuggestions, isLoading) : [];
 
   return (
     <motion.div
