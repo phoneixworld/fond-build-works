@@ -273,38 +273,7 @@ const ChatPanel = forwardRef<ChatPanelHandle, { initialPrompt?: string; onVersio
     sendMessage(prompt);
   }, [pendingFollowUpPrompt]);
 
-  // Edit a previous user message and regenerate from that point
-  const handleEditMessage = useCallback((index: number) => {
-    const msg = messages[index];
-    if (msg.role !== "user") return;
-    setEditingIndex(index);
-    setEditText(getTextContent(msg.content));
-  }, [messages]);
 
-  const handleCancelEdit = () => {
-    setEditingIndex(null);
-    setEditText("");
-  };
-
-  const handleSubmitEdit = useCallback(() => {
-    if (editingIndex === null || !editText.trim() || isLoading || !currentProject) return;
-    const truncated = messages.slice(0, editingIndex);
-    setMessages(truncated);
-    setEditingIndex(null);
-    setEditText("");
-    sendMessage(editText.trim());
-  }, [editingIndex, editText, isLoading, currentProject, messages, sendMessage]);
-
-  const handleRegenerate = useCallback((index: number) => {
-    if (isLoading || !currentProject) return;
-    let userMsgIndex = index - 1;
-    while (userMsgIndex >= 0 && messages[userMsgIndex].role !== "user") userMsgIndex--;
-    if (userMsgIndex < 0) return;
-    const userText = getTextContent(messages[userMsgIndex].content);
-    const truncated = messages.slice(0, index);
-    setMessages(truncated);
-    sendMessage(userText);
-  }, [isLoading, currentProject, messages, sendMessage]);
 
   useEffect(() => {
     if (initialPrompt && !hasProcessedInitialRef.current) {
