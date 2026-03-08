@@ -54,6 +54,34 @@ function parseResponse(text: string): [string, string | null] {
   return [chatPart, htmlCode.trim()];
 }
 
+// Allowed packages in Sandpack — anything else gets stripped
+const ALLOWED_PACKAGES = new Set([
+  "react", "react-dom", "react/jsx-runtime",
+  "lucide-react", "framer-motion", "date-fns", "recharts",
+  "react-router-dom", "clsx", "tailwind-merge",
+]);
+
+function isAllowedImport(pkg: string): boolean {
+  if (pkg.startsWith(".") || pkg.startsWith("/")) return true; // relative imports OK
+  // Check exact match or scope match (e.g. "lucide-react/icons/X")
+  const base = pkg.startsWith("@") ? pkg.split("/").slice(0, 2).join("/") : pkg.split("/")[0];
+  return ALLOWED_PACKAGES.has(base);
+}
+
+/** Strip import lines for packages not available in Sandpack */
+function sanitizeImports(code: string): string {
+  return code.split("\n").filter(line => {
+    const m = line.match(/^\s*import\s+.*?\s+from\s+['"]([^'"]+)['"]/);
+    if (!m) return true;
+    const pkg = m[1];
+    if (!isAllowedImport(pkg)) {
+      console.warn(`[Import Sanitizer] Stripped unknown import: ${pkg}`);
+      return false;
+    }
+    return true;
+  }).join("\n");
+}
+
 /** Parse ```react-preview fences into a file map for Sandpack */
 function parseReactFiles(text: string): { chatText: string; files: Record<string, string> | null; deps: Record<string, string> } {
   const files: Record<string, string> = {};
@@ -80,11 +108,21 @@ function parseReactFiles(text: string): { chatText: string; files: Record<string
       let filename = firstLine.startsWith("/") ? firstLine : `/${firstLine}`;
       // Strip /src/ prefix — Sandpack expects files at root (e.g. /App.jsx not /src/App.jsx)
       filename = filename.replace(/^\/src\//, "/");
-      files[filename] = lines.slice(1).join("\n").trim();
+      // Sanitize imports in JS/JSX/TS/TSX files
+      const content = lines.slice(1).join("\n").trim();
+      files[filename] = filename.match(/\.(jsx?|tsx?)$/) ? sanitizeImports(content) : content;
     } else if (firstLine === "dependencies") {
       try {
         const depsJson = lines.slice(1).join("\n").trim();
-        Object.assign(deps, JSON.parse(depsJson));
+        const parsed = JSON.parse(depsJson);
+        // Only keep allowed dependencies
+        for (const [pkg, ver] of Object.entries(parsed)) {
+          if (ALLOWED_PACKAGES.has(pkg)) {
+            deps[pkg] = ver as string;
+          } else {
+            console.warn(`[Dep Sanitizer] Stripped unknown dependency: ${pkg}`);
+          }
+        }
       } catch {}
     }
   }
