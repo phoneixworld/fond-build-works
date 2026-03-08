@@ -6,6 +6,7 @@ export async function streamChat({
   messages,
   projectId,
   techStack,
+  schemas,
   onDelta,
   onDone,
   onError,
@@ -13,6 +14,7 @@ export async function streamChat({
   messages: Msg[];
   projectId?: string;
   techStack?: string;
+  schemas?: any[];
   onDelta: (text: string) => void;
   onDone: () => void;
   onError: (error: string) => void;
