@@ -736,106 +736,63 @@ const ChatPanel = forwardRef<ChatPanelHandle, { initialPrompt?: string; onVersio
 
           <AnimatePresence initial={false}>
             {messages.map((msg, i) => {
-              const textContent = getTextContent(msg.content);
-              const imageUrls = getImageUrls(msg.content);
               const isUser = msg.role === "user";
               const isEditing = editingIndex === i;
-              return (
-                <motion.div
-                  key={i}
-                  initial={{ opacity: 0, y: 8 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.2, ease: "easeOut" }}
-                  className={`flex gap-3 group ${isUser ? "" : ""}`}
-                >
-                  <div className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 mt-0.5 ${
-                    isUser 
-                      ? "bg-primary/15 ring-1 ring-primary/20" 
-                      : "bg-accent/15 ring-1 ring-accent/20"
-                  }`}>
-                    {isUser ? <User className="w-3.5 h-3.5 text-primary" /> : <Bot className="w-3.5 h-3.5 text-accent" />}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 mb-1.5">
-                      <span className="text-[11px] font-semibold tracking-wide uppercase text-muted-foreground">{isUser ? "You" : "Assistant"}</span>
-                      {msg.timestamp && (
-                        <span className="text-[10px] text-muted-foreground/40 font-mono opacity-0 group-hover:opacity-100 transition-opacity">
-                          {formatTime(msg.timestamp)}
-                        </span>
-                      )}
-                      {/* Edit/Regenerate buttons */}
-                      {!isLoading && !isEditing && (
-                        <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity ml-auto">
-                          {isUser && (
-                            <button
-                              onClick={() => handleEditMessage(i)}
-                              className="p-1 rounded-md text-muted-foreground/50 hover:text-foreground hover:bg-secondary transition-all"
-                              title="Edit message"
-                            >
-                              <Pencil className="w-3 h-3" />
-                            </button>
-                          )}
-                          {!isUser && (
-                            <button
-                              onClick={() => handleRegenerate(i)}
-                              className="p-1 rounded-md text-muted-foreground/50 hover:text-foreground hover:bg-secondary transition-all"
-                              title="Regenerate response"
-                            >
-                              <RotateCcw className="w-3 h-3" />
-                            </button>
-                          )}
-                        </div>
-                      )}
+
+              if (isEditing) {
+                const textContent = getTextContent(msg.content);
+                return (
+                  <motion.div
+                    key={i}
+                    initial={{ opacity: 0, y: 8 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="flex gap-3"
+                  >
+                    <div className="w-7 h-7 rounded-lg bg-primary/15 ring-1 ring-primary/20 flex items-center justify-center shrink-0 mt-0.5">
+                      <User className="w-3.5 h-3.5 text-primary" />
                     </div>
-                    {imageUrls.length > 0 && (
-                      <div className="flex gap-2 mb-2 flex-wrap">
-                        {imageUrls.map((url, idx) => (
-                          <img
-                            key={idx}
-                            src={url}
-                            alt="Attached"
-                            className="w-24 h-24 object-cover rounded-xl border border-border shadow-sm"
-                          />
-                        ))}
+                    <div className="flex-1 min-w-0 space-y-2">
+                      <textarea
+                        value={editText}
+                        onChange={(e) => setEditText(e.target.value)}
+                        className="w-full bg-secondary rounded-xl px-3 py-2 text-[13px] text-foreground outline-none ring-1 ring-primary/30 resize-none leading-[1.7]"
+                        rows={Math.min(editText.split("\n").length + 1, 6)}
+                        autoFocus
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSubmitEdit(); }
+                          if (e.key === "Escape") handleCancelEdit();
+                        }}
+                      />
+                      <div className="flex gap-2">
+                        <button
+                          onClick={handleSubmitEdit}
+                          className="px-3 py-1.5 rounded-lg text-[11px] font-semibold bg-primary text-primary-foreground hover:bg-primary/90 transition-colors"
+                        >
+                          Save & Regenerate
+                        </button>
+                        <button
+                          onClick={handleCancelEdit}
+                          className="px-3 py-1.5 rounded-lg text-[11px] font-medium text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors"
+                        >
+                          Cancel
+                        </button>
                       </div>
-                    )}
-                    {isEditing ? (
-                      <div className="space-y-2">
-                        <textarea
-                          value={editText}
-                          onChange={(e) => setEditText(e.target.value)}
-                          className="w-full bg-secondary rounded-xl px-3 py-2 text-[13px] text-foreground outline-none ring-1 ring-primary/30 resize-none leading-[1.7]"
-                          rows={Math.min(editText.split("\n").length + 1, 6)}
-                          autoFocus
-                          onKeyDown={(e) => {
-                            if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSubmitEdit(); }
-                            if (e.key === "Escape") handleCancelEdit();
-                          }}
-                        />
-                        <div className="flex gap-2">
-                          <button
-                            onClick={handleSubmitEdit}
-                            className="px-3 py-1.5 rounded-lg text-[11px] font-semibold bg-primary text-primary-foreground hover:bg-primary/90 transition-colors"
-                          >
-                            Save & Regenerate
-                          </button>
-                          <button
-                            onClick={handleCancelEdit}
-                            className="px-3 py-1.5 rounded-lg text-[11px] font-medium text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors"
-                          >
-                            Cancel
-                          </button>
-                        </div>
-                      </div>
-                    ) : !isUser ? (
-                      <div className="text-[13px] text-foreground leading-[1.7] prose prose-invert prose-sm max-w-none prose-p:my-2 prose-headings:my-3 prose-headings:font-semibold prose-headings:tracking-tight prose-ul:my-1.5 prose-li:my-0.5 prose-code:font-[JetBrains_Mono] prose-code:text-primary prose-code:bg-secondary prose-code:px-1.5 prose-code:py-0.5 prose-code:rounded-md prose-code:text-[12px] prose-pre:bg-secondary prose-pre:rounded-xl prose-pre:p-4 prose-pre:border prose-pre:border-border prose-pre:font-[JetBrains_Mono] prose-pre:text-[12px] prose-pre:leading-relaxed prose-strong:text-foreground prose-a:text-primary prose-a:no-underline hover:prose-a:underline">
-                        <ReactMarkdown>{textContent}</ReactMarkdown>
-                      </div>
-                    ) : (
-                      <p className="text-[13px] text-foreground/90 leading-[1.7]">{textContent}</p>
-                    )}
-                  </div>
-                </motion.div>
+                    </div>
+                  </motion.div>
+                );
+              }
+
+              return (
+                <ChatMessage
+                  key={i}
+                  content={msg.content}
+                  role={msg.role}
+                  timestamp={msg.timestamp}
+                  isLoading={isLoading}
+                  onEdit={isUser ? () => handleEditMessage(i) : undefined}
+                  onRegenerate={!isUser ? () => handleRegenerate(i) : undefined}
+                  showActions={!isLoading}
+                />
               );
             })}
           </AnimatePresence>
