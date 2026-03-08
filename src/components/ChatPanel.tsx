@@ -99,7 +99,11 @@ function formatTime(ts?: number): string {
 
 const MAX_IMAGE_SIZE = 4 * 1024 * 1024;
 
-const ChatPanel = ({ initialPrompt }: { initialPrompt?: string }) => {
+export interface ChatPanelHandle {
+  clearChat: () => void;
+}
+
+const ChatPanel = forwardRef<ChatPanelHandle, { initialPrompt?: string; onVersionCreated?: (version: Version) => void }>(({ initialPrompt, onVersionCreated }, ref) => {
   const { currentProject, saveProject } = useProjects();
   const [messages, setMessages] = useState<Msg[]>([]);
   const [input, setInput] = useState("");
