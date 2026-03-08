@@ -150,8 +150,16 @@ const LandingPage = ({ onStartProject, onOpenProject }: LandingPageProps) => {
                       </p>
                     </div>
                     <button
+                      onClick={(e) => { e.stopPropagation(); cloneProject(project.id); }}
+                      className="opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-primary transition-all p-1"
+                      title="Clone project"
+                    >
+                      <Copy className="w-3.5 h-3.5" />
+                    </button>
+                    <button
                       onClick={(e) => { e.stopPropagation(); deleteProject(project.id); }}
                       className="opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-destructive transition-all p-1"
+                      title="Delete project"
                     >
                       <Trash2 className="w-3.5 h-3.5" />
                     </button>
