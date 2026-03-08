@@ -4,7 +4,7 @@ import {
   ResizablePanel,
   ResizablePanelGroup,
 } from "@/components/ui/resizable";
-import { Code, Eye, Zap, LogOut, ArrowLeft, Cloud, ChevronDown, Clock, Command as CommandIcon, Brain, Activity, Users } from "lucide-react";
+import { Code, Eye, Zap, LogOut, ArrowLeft, Cloud, ChevronDown, Clock, Command as CommandIcon, Brain, Activity, Users, Palette } from "lucide-react";
 import { PreviewProvider } from "@/contexts/PreviewContext";
 import { VirtualFSProvider } from "@/contexts/VirtualFSContext";
 import { ProjectProvider, useProjects } from "@/contexts/ProjectContext";
@@ -16,6 +16,7 @@ import PreviewPanel from "@/components/PreviewPanel";
 import ProjectBrain from "@/components/ProjectBrain";
 import PulseAnalytics from "@/components/PulseAnalytics";
 import CrewSpaces from "@/components/CrewSpaces";
+import BrandKitGenerator from "@/components/BrandKitGenerator";
 import PublishExportButtons from "@/components/PublishExportButtons";
 import LandingPage from "@/components/LandingPage";
 import CommandPalette from "@/components/CommandPalette";
@@ -45,7 +46,7 @@ import {
 const IDELayout = () => {
   const { user, signOut } = useAuth();
   const { projects, currentProject, selectProject, createProject, saveProject } = useProjects();
-  const [rightPanel, setRightPanel] = useState<"code" | "preview" | "cloud" | "history" | "brain" | "pulse" | "crew">("preview");
+  const [rightPanel, setRightPanel] = useState<"code" | "preview" | "cloud" | "history" | "brain" | "pulse" | "crew" | "brandkit">("preview");
   const [inIDE, setInIDE] = useState(false);
   const [initialPrompt, setInitialPrompt] = useState("");
   const [cmdOpen, setCmdOpen] = useState(false);
@@ -128,13 +129,14 @@ const IDELayout = () => {
   const currentStackInfo = TECH_STACKS.find(s => s.id === currentStack);
   const StackIcon = currentStackInfo?.icon;
 
-  const panelTabs: { id: "preview" | "code" | "cloud" | "history" | "brain" | "pulse" | "crew"; label: string; icon: typeof Eye }[] = [
+  const panelTabs: { id: "preview" | "code" | "cloud" | "history" | "brain" | "pulse" | "crew" | "brandkit"; label: string; icon: typeof Eye }[] = [
     { id: "preview", label: "Preview", icon: Eye },
     { id: "code", label: "Code", icon: Code },
     { id: "cloud", label: "Cloud", icon: Cloud },
     { id: "brain", label: "Brain", icon: Brain },
     { id: "pulse", label: "Pulse", icon: Activity },
     { id: "crew", label: "Crew", icon: Users },
+    { id: "brandkit", label: "Brand Kit", icon: Palette },
     { id: "history", label: "History", icon: Clock },
   ];
 
@@ -386,6 +388,8 @@ const IDELayout = () => {
                 <PulseAnalytics />
               ) : rightPanel === "crew" ? (
                 <CrewSpaces />
+              ) : rightPanel === "brandkit" ? (
+                <BrandKitGenerator />
               ) : rightPanel === "history" ? (
                 <VersionHistory
                   versions={versions}
