@@ -31,6 +31,7 @@ const CATEGORY_ICONS: Record<string, any> = {
   "API Security": Globe,
   "Secrets": Key,
   "Code Security": FileCode,
+  "Tenant Isolation": ShieldCheck,
 };
 
 const SecurityDashboard = () => {
