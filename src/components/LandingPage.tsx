@@ -32,12 +32,19 @@ const LandingPage = ({ onStartProject, onOpenProject }: LandingPageProps) => {
     }
   };
 
+  const [showTemplates, setShowTemplates] = useState(false);
+
   const suggestions = [
     "A todo app with user accounts",
     "A SaaS landing page with pricing",
     "A CRM dashboard with contacts",
     "A blog with data persistence",
   ];
+
+  const handleUseTemplate = (template: Template) => {
+    setTechStack(template.techStack);
+    onStartProject(template.prompt, template.techStack);
+  };
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
