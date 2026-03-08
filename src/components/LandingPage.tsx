@@ -1,11 +1,12 @@
 import { useState, useRef } from "react";
-import { Zap, Send, FolderOpen, Trash2, Loader2, ArrowRight, Copy } from "lucide-react";
+import { Zap, Send, FolderOpen, Trash2, Loader2, ArrowRight, Copy, Rocket } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { useProjects, Project } from "@/contexts/ProjectContext";
 import { formatDistanceToNow } from "date-fns";
 import { motion } from "framer-motion";
 import TechStackSelector from "@/components/TechStackSelector";
 import { TechStackId, TECH_STACKS } from "@/lib/techStacks";
+import { TEMPLATES, Template } from "@/lib/templates";
 
 interface LandingPageProps {
   onStartProject: (prompt: string, techStack: TechStackId) => void;
