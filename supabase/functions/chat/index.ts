@@ -166,57 +166,23 @@ Build REAL React apps with hooks, state management, and npm packages. This is NO
 
     "vue-cdn": `Use Vue 3 via CDN with Tailwind. Use Composition API with setup(). You can also import npm packages via esm.sh.`,
     "vanilla-js": `Use plain HTML, CSS, and vanilla JavaScript. No frameworks. Clean, semantic HTML. You can use ES modules via esm.sh for utility libraries.`,
-    "react-node": `Generate a FULL-STACK project with:
-## Frontend (React + Tailwind)
-- Generate files using \`\`\`file:src/App.tsx format
-- Use React with hooks, Tailwind CSS for styling
-- API calls go to http://localhost:3001/api/*
-
-## Backend (Node.js + Express)
-- Generate files in \`\`\`file:server/index.js format
-- Create Express REST API with proper routing
-- Use \`\`\`file:server/routes/*.js for route modules
-- Include proper error handling, CORS, validation
-- Generate server/package.json with dependencies
-
-CRITICAL: Generate BOTH frontend and backend files. Use the multi-file format.`,
-    "react-python": `Generate a FULL-STACK project with:
-## Frontend (React + Tailwind)
-- Generate files using \`\`\`file:src/App.tsx format
-- Use React with hooks, Tailwind CSS
-- API calls go to http://localhost:8000/api/*
-
-## Backend (Python + FastAPI)
-- Generate files in \`\`\`file:server/main.py format
-- Use FastAPI with Pydantic models for validation
-- Include proper type hints, async/await
-- Generate server/requirements.txt
-- Use proper Python conventions (snake_case, docstrings)
-
-CRITICAL: Generate BOTH frontend and backend files. Use the multi-file format.`,
-    "react-go": `Generate a FULL-STACK project with:
-## Frontend (React + Tailwind)
-- Generate files using \`\`\`file:src/App.tsx format
-
-## Backend (Go + Fiber)
-- Generate files in \`\`\`file:server/main.go format
-- Use Fiber web framework
-- Include proper structs, error handling
-- Generate server/go.mod
-- Use proper Go conventions (exported names, error returns)
-
-CRITICAL: Generate BOTH frontend and backend files. Use the multi-file format.`,
-    "nextjs": `Generate a Next.js-style project with:
-## Pages (React components)
-- Generate files using \`\`\`file:pages/index.tsx format
-- Use React with hooks, Tailwind CSS
-
-## API Routes
-- Generate files in \`\`\`file:pages/api/*.ts format
-- Each API route exports a default handler function
-- Use proper request/response typing
-
-CRITICAL: Generate BOTH page files and API route files. Use the multi-file format.`,
+    "react-node": `Use HTML + Tailwind CSS + React via ES modules (same as html-tailwind stack). 
+For backend/data needs, use the Data API and Auth API described above.
+IMPORTANT: Everything runs in a browser preview iframe. Generate a SINGLE complete index.html file. 
+NEVER tell users to run terminal commands, install dependencies, or start servers.
+You can import ANY npm package via esm.sh. Use the same ES modules approach as html-tailwind.`,
+    "react-python": `Use HTML + Tailwind CSS + React via ES modules (same as html-tailwind stack).
+For backend/data needs, use the Data API and Auth API described above.
+IMPORTANT: Everything runs in a browser preview iframe. Generate a SINGLE complete index.html file.
+NEVER tell users to run terminal commands, install dependencies, or start servers.`,
+    "react-go": `Use HTML + Tailwind CSS + React via ES modules (same as html-tailwind stack).
+For backend/data needs, use the Data API and Auth API described above.
+IMPORTANT: Everything runs in a browser preview iframe. Generate a SINGLE complete index.html file.
+NEVER tell users to run terminal commands, install dependencies, or start servers.`,
+    "nextjs": `Use HTML + Tailwind CSS + React via ES modules (same as html-tailwind stack).
+For backend/data needs, use the Data API and Auth API described above.
+IMPORTANT: Everything runs in a browser preview iframe. Generate a SINGLE complete index.html file.
+NEVER tell users to run terminal commands, install dependencies, or start servers.`,
   };
 
   let schemaSection = "";
