@@ -56,6 +56,87 @@ POST JSON with:
 
 IMPORTANT: When building apps that need data persistence (todo lists, forms, dashboards, etc.), ALWAYS use the Data API. When building apps that need user accounts, ALWAYS use the Auth API. Make the app FULLY FUNCTIONAL with real data persistence.`;
 
+  const reactCdnInstructions = `You generate REAL React JSX code that runs in a Sandpack bundler with full npm support.
+
+## OUTPUT FORMAT — CRITICAL
+Instead of \\\`\\\`\\\`html-preview, wrap your output in a \\\`\\\`\\\`react-preview fence.
+Inside, use --- filename markers to define each file:
+
+\\\`\\\`\\\`react-preview
+--- /App.jsx
+import React from "react";
+import Header from "./components/Header";
+export default function App() {
+  return <div className="min-h-screen bg-white"><Header /></div>;
+}
+--- /components/Header.jsx
+import React from "react";
+export default function Header() {
+  return <header className="p-6"><h1>Brand</h1></header>;
+}
+--- dependencies
+{
+  "lucide-react": "^0.400.0",
+  "framer-motion": "^11.0.0"
+}
+\\\`\\\`\\\`
+
+## RULES
+- Write standard JSX (not React.createElement) — the bundler compiles it
+- Use .jsx extension for all component files
+- The entry point is /App.jsx — it MUST export a default component
+- Break apps into MULTIPLE component files under /components/
+- Import npm packages normally: import { motion } from "framer-motion"
+- Tailwind CSS is available via CDN — use className with Tailwind classes
+- For additional npm packages, include a --- dependencies section with a JSON object
+- Available by default: react, react-dom, lucide-react, framer-motion, date-fns, recharts, react-router-dom, clsx, tailwind-merge
+- Use Lucide React icons EXTENSIVELY: import { Heart, Star, ArrowRight } from "lucide-react"
+- Use framer-motion for animations: import { motion } from "framer-motion"
+- Use React Router for multi-page apps: import { BrowserRouter, Routes, Route } from "react-router-dom"
+
+## REACT DESIGN SYSTEM — Apply to EVERY app
+
+### Typography
+- Import a Google Font via a /styles.css file: @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+- Hero headings: text-4xl md:text-5xl lg:text-6xl font-extrabold leading-tight tracking-tight
+- Section headings: text-3xl font-bold
+- Body: text-base text-gray-600 leading-relaxed
+
+### Color Palette
+- Pick a strong primary color that matches the app type (indigo for tech, emerald for edu, rose for creative, amber for food)
+- Primary CTA: bg-{primary}-600 text-white shadow-lg hover:shadow-xl hover:-translate-y-0.5 transition-all
+- Backgrounds: alternate white and gray-50 sections for visual rhythm
+
+### Component Quality
+- **Buttons**: px-6 py-3 rounded-xl font-medium text-sm with shadow, hover lift, focus ring
+- **Cards**: bg-white rounded-2xl border border-gray-100 p-6 hover:shadow-lg hover:-translate-y-1 transition-all duration-300
+- **Navigation**: sticky top-0 backdrop-blur-xl bg-white/80 border-b border-gray-100 with mobile hamburger
+- **Sections**: py-20 md:py-24 with max-w-7xl mx-auto px-6
+
+### Visual Polish
+- Use framer-motion for scroll animations and page transitions
+- Decorative blobs, gradient text, hover states on EVERYTHING interactive
+- Lucide React icons in feature cards
+
+### Layout Patterns
+- Hero: min-h-[80vh] flex items-center, centered text, 2 CTA buttons
+- Features: grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8
+- Footer: 4-column grid with logo, link groups, social icons
+
+### Images — Use CSS/SVG only
+- NEVER use external URLs (Unsplash etc.)
+- Avatars: colored circles with initials. Hero visuals: CSS gradients, inline SVGs. Feature icons: Lucide React icons.
+
+### Responsive
+- ALWAYS mobile-first: grid-cols-1 md:grid-cols-2 lg:grid-cols-3
+- Text sizes: text-3xl md:text-4xl lg:text-5xl
+- Hidden elements: hidden md:flex for desktop nav`;
+
+  const reactBackendSuffix = `
+For backend/data needs, use the Data API and Auth API described above.
+IMPORTANT: Everything runs in a browser preview. Generate React JSX files in react-preview fences.
+NEVER tell users to run terminal commands, install dependencies, or start servers.`;
+
   const techStackInstructions: Record<string, string> = {
     "html-tailwind": `Use HTML + Tailwind CSS + DaisyUI (via CDN). Include BOTH in <head>:
 <link href="https://cdn.jsdelivr.net/npm/daisyui@4/dist/full.min.css" rel="stylesheet" type="text/css" />
@@ -164,142 +245,14 @@ Now you can write: html\`<div className="p-4"><h1>Hello \${name}</h1></div>\`
 This gives you JSX-like syntax without a build step!`,
 
     "html-bootstrap": `Use HTML + Bootstrap 5 (via CDN). Include Bootstrap CSS and JS from CDN. You can also use ES modules via esm.sh for complex functionality.`,
-    "react-cdn": `You generate REAL React JSX code that runs in a Sandpack bundler with full npm support.
-
-## OUTPUT FORMAT — CRITICAL
-Instead of \`\`\`html-preview, wrap your output in a \`\`\`react-preview fence.
-Inside, use --- filename markers to define each file:
-
-\`\`\`react-preview
---- /App.jsx
-import React from "react";
-import Header from "./components/Header";
-import Hero from "./components/Hero";
-import Features from "./components/Features";
-import Footer from "./components/Footer";
-
-export default function App() {
-  return (
-    <div className="min-h-screen bg-white">
-      <Header />
-      <Hero />
-      <Features />
-      <Footer />
-    </div>
-  );
-}
---- /components/Header.jsx
-import React, { useState } from "react";
-import { Menu, X } from "lucide-react";
-
-export default function Header() {
-  const [open, setOpen] = useState(false);
-  return (
-    <header className="sticky top-0 z-50 backdrop-blur-xl bg-white/80 border-b border-gray-100">
-      <nav className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
-        <span className="text-xl font-bold">Brand</span>
-        <div className="hidden md:flex items-center gap-8">
-          <a href="#features" className="text-sm text-gray-600 hover:text-gray-900">Features</a>
-          <a href="#about" className="text-sm text-gray-600 hover:text-gray-900">About</a>
-          <button className="px-5 py-2.5 bg-indigo-600 text-white text-sm font-medium rounded-xl hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-600/25">Get Started</button>
-        </div>
-        <button className="md:hidden" onClick={() => setOpen(!open)}>
-          {open ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
-        </button>
-      </nav>
-    </header>
-  );
-}
---- dependencies
-{
-  "lucide-react": "^0.400.0",
-  "framer-motion": "^11.0.0"
-}
-\`\`\`
-
-## RULES
-- Write standard JSX (not React.createElement) — the bundler compiles it
-- Use .jsx extension for all component files
-- The entry point is /App.jsx — it MUST export a default component
-- Break apps into MULTIPLE component files under /components/ — Header, Hero, Features, Footer, etc.
-- Import npm packages normally: import { motion } from "framer-motion"
-- Tailwind CSS is available via CDN — use className with Tailwind classes
-- For additional npm packages, include a --- dependencies section with a JSON object
-- Available by default: react, react-dom, lucide-react, framer-motion, date-fns, recharts, react-router-dom, clsx, tailwind-merge
-- Use Lucide React icons EXTENSIVELY: import { Heart, Star, ArrowRight, GraduationCap } from "lucide-react"
-- Use framer-motion for animations: import { motion } from "framer-motion" → <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
-- Use React Router for multi-page apps: import { BrowserRouter, Routes, Route } from "react-router-dom"
-
-## REACT DESIGN SYSTEM — Apply to EVERY app
-
-### Typography
-- Import a Google Font via a /styles.css file: @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
-- Apply in body: font-family: 'Inter', sans-serif
-- Hero headings: text-4xl md:text-5xl lg:text-6xl font-extrabold leading-tight tracking-tight
-- Section headings: text-3xl font-bold
-- Body: text-base text-gray-600 leading-relaxed
-
-### Color Palette
-- Pick a strong primary color that matches the app type (indigo for tech, emerald for edu, rose for creative, amber for food)
-- Primary CTA: bg-{primary}-600 text-white shadow-lg shadow-{primary}-600/25 hover:shadow-xl hover:-translate-y-0.5 transition-all
-- Backgrounds: alternate white and gray-50 sections for visual rhythm
-- Text hierarchy: gray-900 for headings, gray-600 for body, gray-400 for secondary
-- Accent colors: use sparingly for badges, highlights, decorative elements
-
-### Component Quality
-- **Buttons**: px-6 py-3 rounded-xl font-medium text-sm with shadow, hover lift, focus ring
-- **Cards**: bg-white rounded-2xl border border-gray-100 p-6 hover:shadow-lg hover:-translate-y-1 transition-all duration-300
-- **Inputs**: w-full px-4 py-3 rounded-xl border border-gray-200 focus:ring-2 focus:ring-{primary}/50 focus:border-{primary} outline-none
-- **Navigation**: sticky top-0 backdrop-blur-xl bg-white/80 border-b border-gray-100 with mobile hamburger
-- **Sections**: py-20 md:py-24 with max-w-7xl mx-auto px-6
-
-### Visual Polish
-- Gradient text: bg-gradient-to-r from-{primary}-600 to-{accent}-500 bg-clip-text text-transparent
-- Decorative blobs: absolute positioned divs with bg-{primary}-500/10 rounded-full blur-3xl
-- Section dividers: subtle border-t border-gray-100
-- Icons in feature cards: w-12 h-12 p-3 bg-{primary}-50 text-{primary}-600 rounded-xl
-- Hover states on EVERYTHING interactive
-- Use framer-motion for scroll animations and page transitions
-
-### Layout Patterns
-- Hero: min-h-[80vh] flex items-center, centered text, 2 CTA buttons, decorative background
-- Features: grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8
-- Testimonials: carousel or grid with avatar, quote, name
-- CTA section: bg-gray-900 text-white rounded-3xl (within max-w container) with compelling copy
-- Footer: 4-column grid with logo, link groups, social icons
-
-### Images — Use CSS/SVG only
-- NEVER use external URLs (Unsplash etc.)
-- Avatars: colored circles with initials
-- Hero visuals: CSS gradient backgrounds, decorative shapes, inline SVGs
-- Feature icons: Lucide React icons in colored boxes
-- Use emoji as decorative elements when appropriate (🎓 📚 🏫 etc.)
-
-### Responsive
-- ALWAYS mobile-first: stack on mobile, side-by-side on desktop
-- grid-cols-1 md:grid-cols-2 lg:grid-cols-3
-- Text sizes: text-3xl md:text-4xl lg:text-5xl
-- Padding: px-4 md:px-6 lg:px-8
-- Hidden elements: hidden md:flex for desktop nav`,
+    "react-cdn": reactCdnInstructions,
 
     "vue-cdn": `Use Vue 3 via CDN with Tailwind. Use Composition API with setup(). You can also import npm packages via esm.sh.`,
     "vanilla-js": `Use plain HTML, CSS, and vanilla JavaScript. No frameworks. Clean, semantic HTML. You can use ES modules via esm.sh for utility libraries.`,
-    "react-node": `Use the \`\`\`react-preview format (same as react-cdn stack) for the frontend.
-For backend/data needs, use the Data API and Auth API described above.
-IMPORTANT: Everything runs in a browser preview. Generate React JSX files in react-preview fences.
-NEVER tell users to run terminal commands, install dependencies, or start servers.`,
-    "react-python": `Use the \`\`\`react-preview format (same as react-cdn stack) for the frontend.
-For backend/data needs, use the Data API and Auth API described above.
-IMPORTANT: Everything runs in a browser preview. Generate React JSX files in react-preview fences.
-NEVER tell users to run terminal commands, install dependencies, or start servers.`,
-    "react-go": `Use the \`\`\`react-preview format (same as react-cdn stack) for the frontend.
-For backend/data needs, use the Data API and Auth API described above.
-IMPORTANT: Everything runs in a browser preview. Generate React JSX files in react-preview fences.
-NEVER tell users to run terminal commands, install dependencies, or start servers.`,
-    "nextjs": `Use the \`\`\`react-preview format (same as react-cdn stack) for the frontend.
-For backend/data needs, use the Data API and Auth API described above.
-IMPORTANT: Everything runs in a browser preview. Generate React JSX files in react-preview fences.
-NEVER tell users to run terminal commands, install dependencies, or start servers.`,
+    "react-node": reactCdnInstructions + reactBackendSuffix,
+    "react-python": reactCdnInstructions + reactBackendSuffix,
+    "react-go": reactCdnInstructions + reactBackendSuffix,
+    "nextjs": reactCdnInstructions + reactBackendSuffix,
   };
 
   let schemaSection = "";
