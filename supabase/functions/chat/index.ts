@@ -344,7 +344,64 @@ For full-page apps, follow this structure:
 - When a user shares a screenshot/mockup, replicate it as closely as possible — match colors, layout, typography, spacing, component structure
 - Use realistic content — real names, real descriptions, real prices, real dates
 - EVERY app should look like it was built by a professional design agency
-${schemas && schemas.length > 0 ? '- Use the DEFINED DATA MODELS above for collection names and fields. Do NOT invent your own field names.' : ''}`;
+${schemas && schemas.length > 0 ? '- Use the DEFINED DATA MODELS above for collection names and fields. Do NOT invent your own field names.' : ''}
+
+${designTheme ? `\n## USER'S CHOSEN DESIGN THEME\n${designTheme}\nFOLLOW THIS THEME STRICTLY for all visual decisions.` : ''}
+
+## QUALITY REFERENCE — Example of the quality bar you must hit
+
+Here is a PARTIAL example of a well-built hero section. Your output must be AT LEAST this quality:
+
+\`\`\`html
+<!-- Example quality reference — DO NOT copy this verbatim, use as quality benchmark -->
+<nav class="ui-navbar">
+  <a href="#" class="ui-navbar-brand">
+    <div style="width:32px;height:32px;border-radius:10px;background:linear-gradient(135deg,#6366f1,#ec4899);display:flex;align-items:center;justify-content:center;">
+      <i data-lucide="zap" style="width:18px;height:18px;color:white;"></i>
+    </div>
+    Acme
+  </a>
+  <div class="ui-navbar-links">
+    <a href="#" class="ui-navbar-link ui-navbar-link-active">Product</a>
+    <a href="#" class="ui-navbar-link">Pricing</a>
+    <a href="#" class="ui-navbar-link">Docs</a>
+  </div>
+  <div class="ui-navbar-actions">
+    <a href="#" class="ui-btn ui-btn-ghost ui-btn-sm">Sign in</a>
+    <a href="#" class="ui-btn ui-btn-primary ui-btn-sm">Get Started</a>
+  </div>
+</nav>
+
+<section class="ui-hero" style="position:relative;overflow:hidden;">
+  <!-- Decorative gradient blob -->
+  <div style="position:absolute;top:-120px;left:50%;transform:translateX(-50%);width:600px;height:600px;background:radial-gradient(circle,rgba(99,102,241,0.15),transparent 70%);pointer-events:none;"></div>
+  
+  <div class="ui-container" style="position:relative;z-index:1;">
+    <div class="ui-animate-slide-up">
+      <span class="ui-badge ui-badge-primary" style="margin-bottom:16px;">✨ Now in public beta</span>
+      <h1 class="ui-hero-title">
+        Build apps <span class="ui-text-gradient">10x faster</span><br>with AI
+      </h1>
+      <p class="ui-hero-subtitle">
+        Ship production-ready web apps in minutes, not months. 
+        Our AI understands your vision and writes clean, maintainable code.
+      </p>
+      <div class="ui-hero-actions">
+        <a href="#" class="ui-btn ui-btn-primary ui-btn-lg">
+          <i data-lucide="play" style="width:18px;height:18px;"></i>
+          Start Building Free
+        </a>
+        <a href="#" class="ui-btn ui-btn-secondary ui-btn-lg">
+          <i data-lucide="github" style="width:18px;height:18px;"></i>
+          View on GitHub
+        </a>
+      </div>
+    </div>
+  </div>
+</section>
+\`\`\`
+
+Notice: semantic HTML, ui-kit classes, decorative elements, gradient text, badge, icons in buttons, staggered animation, realistic content. THIS is the minimum quality bar.`;
 }
 
 serve(async (req) => {
