@@ -20,6 +20,7 @@ interface ProjectContextType {
   createProject: (name?: string) => Promise<Project | null>;
   saveProject: (updates: Partial<Pick<Project, "name" | "html_content" | "chat_history">>) => Promise<void>;
   deleteProject: (id: string) => Promise<void>;
+  refreshProjects: () => Promise<void>;
 }
 
 const ProjectContext = createContext<ProjectContextType | null>(null);
@@ -31,7 +32,6 @@ export const ProjectProvider = ({ children }: { children: ReactNode }) => {
   const [currentProject, setCurrentProject] = useState<Project | null>(null);
   const [loading, setLoading] = useState(true);
 
-  // Fetch projects
   const fetchProjects = useCallback(async () => {
     if (!user) return;
     const { data, error } = await supabase
@@ -41,6 +41,7 @@ export const ProjectProvider = ({ children }: { children: ReactNode }) => {
 
     if (error) {
       console.error("Failed to fetch projects:", error);
+      setLoading(false);
       return;
     }
 
@@ -49,13 +50,8 @@ export const ProjectProvider = ({ children }: { children: ReactNode }) => {
       chat_history: Array.isArray(p.chat_history) ? p.chat_history : [],
     })) as Project[];
     setProjects(mapped);
-
-    // Auto-select first or keep current
-    if (mapped.length > 0 && !currentProject) {
-      setCurrentProject(mapped[0]);
-    }
     setLoading(false);
-  }, [user, currentProject]);
+  }, [user]);
 
   useEffect(() => {
     if (user) fetchProjects();
@@ -66,10 +62,25 @@ export const ProjectProvider = ({ children }: { children: ReactNode }) => {
     }
   }, [user, fetchProjects]);
 
-  const selectProject = useCallback((id: string) => {
-    const p = projects.find((p) => p.id === id);
-    if (p) setCurrentProject(p);
-  }, [projects]);
+  // Select project: fetch fresh data from DB to ensure we have latest chat_history/html
+  const selectProject = useCallback(async (id: string) => {
+    const { data, error } = await supabase
+      .from("projects")
+      .select("*")
+      .eq("id", id)
+      .single();
+
+    if (error || !data) {
+      console.error("Failed to load project:", error);
+      return;
+    }
+
+    const project = {
+      ...data,
+      chat_history: Array.isArray(data.chat_history) ? data.chat_history : [],
+    } as Project;
+    setCurrentProject(project);
+  }, []);
 
   const createProject = useCallback(async (name?: string): Promise<Project | null> => {
     if (!user) return null;
@@ -123,7 +134,7 @@ export const ProjectProvider = ({ children }: { children: ReactNode }) => {
   }, [currentProject, toast]);
 
   return (
-    <ProjectContext.Provider value={{ projects, currentProject, loading, selectProject, createProject, saveProject, deleteProject }}>
+    <ProjectContext.Provider value={{ projects, currentProject, loading, selectProject, createProject, saveProject, deleteProject, refreshProjects: fetchProjects }}>
       {children}
     </ProjectContext.Provider>
   );

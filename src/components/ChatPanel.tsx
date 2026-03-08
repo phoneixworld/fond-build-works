@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from "react";
-import { Send, Sparkles, Bot, User } from "lucide-react";
+import { Send, Bot, User } from "lucide-react";
 import { streamChat } from "@/lib/streamChat";
 import { motion, AnimatePresence } from "framer-motion";
 import { usePreview } from "@/contexts/PreviewContext";
@@ -7,7 +7,6 @@ import { useProjects } from "@/contexts/ProjectContext";
 
 type Msg = { role: "user" | "assistant"; content: string };
 
-/** Extract html-preview fence and return [chatText, htmlCode] */
 function parseResponse(text: string): [string, string | null] {
   const fenceStart = text.indexOf("```html-preview");
   if (fenceStart === -1) return [text, null];
@@ -27,18 +26,21 @@ const ChatPanel = ({ initialPrompt }: { initialPrompt?: string }) => {
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const { setPreviewHtml, setIsBuilding, setBuildStep } = usePreview();
+  const lastProjectIdRef = useRef<string | null>(null);
 
   // Sync messages & preview when project changes
   useEffect(() => {
-    if (currentProject) {
+    if (currentProject && currentProject.id !== lastProjectIdRef.current) {
+      lastProjectIdRef.current = currentProject.id;
       const history = currentProject.chat_history ?? [];
       setMessages(history);
       setPreviewHtml(currentProject.html_content || "");
-    } else {
+    } else if (!currentProject) {
+      lastProjectIdRef.current = null;
       setMessages([]);
       setPreviewHtml("");
     }
-  }, [currentProject?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [currentProject, setPreviewHtml]);
 
   // Auto-send initial prompt from landing page
   const sendRef = useRef<((text: string) => void) | null>(null);
@@ -57,7 +59,6 @@ const ChatPanel = ({ initialPrompt }: { initialPrompt?: string }) => {
     const text = overrideText || input.trim();
     if (!text || isLoading) return;
 
-    // Auto-create project if none selected
     let project = currentProject;
     if (!project) {
       project = await createProject(text.slice(0, 40));
@@ -112,13 +113,11 @@ const ChatPanel = ({ initialPrompt }: { initialPrompt?: string }) => {
           const [chatText, htmlCode] = parseResponse(fullResponse);
           if (htmlCode) setPreviewHtml(htmlCode);
 
-          // Build final messages for saving
           setMessages((prev) => {
             const final = chatText
               ? prev.map((m, i) => (i === prev.length - 1 && m.role === "assistant" ? { ...m, content: chatText } : m))
               : prev;
 
-            // Auto-save to database
             saveProject({
               chat_history: final,
               html_content: htmlCode || project!.html_content || "",
@@ -144,7 +143,6 @@ const ChatPanel = ({ initialPrompt }: { initialPrompt?: string }) => {
     }
   }, [input, isLoading, messages, currentProject, createProject, saveProject, setPreviewHtml, setIsBuilding, setBuildStep]);
 
-  // Keep ref in sync for auto-send
   sendRef.current = send;
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -159,37 +157,12 @@ const ChatPanel = ({ initialPrompt }: { initialPrompt?: string }) => {
 
   return (
     <div className="flex flex-col h-full bg-ide-panel">
-      <div className="flex items-center gap-2 px-4 py-3 border-b border-border bg-ide-panel-header">
-        <Sparkles className="w-4 h-4 text-primary" />
-        <span className="text-sm font-semibold text-foreground">AI Chat</span>
-        {currentProject && (
-          <span className="ml-auto text-xs text-muted-foreground truncate max-w-[140px]">
-            {currentProject.name}
-          </span>
-        )}
-      </div>
-
+      {/* Messages */}
       <div ref={scrollRef} className="flex-1 overflow-y-auto p-4 space-y-5">
         {messages.length === 0 && (
-          <div className="flex flex-col items-center justify-center h-full text-muted-foreground gap-4">
-            <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-primary/20 to-accent/20 flex items-center justify-center">
-              <Bot className="w-6 h-6 text-primary" />
-            </div>
-            <div className="text-center space-y-1">
-              <p className="text-sm font-medium text-foreground">What do you want to build?</p>
-              <p className="text-xs">Describe it and I'll create it for you</p>
-            </div>
-            <div className="flex flex-wrap gap-2 justify-center max-w-[280px]">
-              {["A school website", "A portfolio page", "A restaurant landing page"].map((s) => (
-                <button
-                  key={s}
-                  onClick={() => { setInput(s); inputRef.current?.focus(); }}
-                  className="text-xs px-3 py-1.5 rounded-full border border-border text-muted-foreground hover:text-foreground hover:border-primary/50 transition-colors"
-                >
-                  {s}
-                </button>
-              ))}
-            </div>
+          <div className="flex flex-col items-center justify-center h-full text-muted-foreground gap-3">
+            <Bot className="w-8 h-8 text-muted-foreground/40" />
+            <p className="text-xs">Start a conversation to build your app</p>
           </div>
         )}
         <AnimatePresence initial={false}>
@@ -219,14 +192,15 @@ const ChatPanel = ({ initialPrompt }: { initialPrompt?: string }) => {
         )}
       </div>
 
-      <div className="p-3 border-t border-border bg-ide-panel-header">
+      {/* Input */}
+      <div className="p-3 border-t border-border">
         <div className="flex items-end gap-2 bg-secondary rounded-lg px-3 py-2">
           <textarea
             ref={inputRef}
             value={input}
             onChange={handleInputChange}
             onKeyDown={handleKeyDown}
-            placeholder="Describe what you want to build..."
+            placeholder="Ask me to change or build something..."
             className="flex-1 bg-transparent text-sm text-foreground placeholder:text-muted-foreground outline-none resize-none leading-[1.4]"
             style={{ height: "36px", maxHeight: "120px" }}
             disabled={isLoading}
