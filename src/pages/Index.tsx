@@ -4,8 +4,9 @@ import {
   ResizablePanel,
   ResizablePanelGroup,
 } from "@/components/ui/resizable";
-import { Code, Eye, Settings, Zap } from "lucide-react";
+import { Code, Eye, Settings, Zap, LogOut } from "lucide-react";
 import { PreviewProvider } from "@/contexts/PreviewContext";
+import { useAuth } from "@/hooks/useAuth";
 import ChatPanel from "@/components/ChatPanel";
 import FileTree from "@/components/FileTree";
 import CodeEditor from "@/components/CodeEditor";
