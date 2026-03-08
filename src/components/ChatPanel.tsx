@@ -151,12 +151,12 @@ function sanitizeImports(code: string): string {
   return code;
 }
 
-/** Parse ```react-preview fences (and fallback patterns) into a file map for Sandpack */
+/** Parse react/jsx code fences into a file map for Sandpack */
 function parseReactFiles(text: string): { chatText: string; files: Record<string, string> | null; deps: Record<string, string> } {
   const files: Record<string, string> = {};
   const deps: Record<string, string> = {};
 
-  // Try multiple fence formats the AI might use
+  // Try multiple fence formats the AI might use — order matters (most specific first)
   const fencePatterns = [
     "```react-preview",
     "```jsx-preview", 
@@ -165,10 +165,11 @@ function parseReactFiles(text: string): { chatText: string; files: Record<string
   ];
   
   let fenceStart = -1;
+  let matchedPattern = "";
   for (const pattern of fencePatterns) {
     fenceStart = text.indexOf(pattern);
     if (fenceStart !== -1) {
-      console.log(`[parseReactFiles] Found fence: "${pattern}" at position ${fenceStart}`);
+      matchedPattern = pattern;
       break;
     }
   }
@@ -178,57 +179,66 @@ function parseReactFiles(text: string): { chatText: string; files: Record<string
     const genericFence = text.match(/```\w*\n[\s\S]*?---\s+\/?(App\.jsx|App\.js)/);
     if (genericFence) {
       fenceStart = text.indexOf(genericFence[0]);
-      console.log(`[parseReactFiles] Found App.jsx in generic fence at position ${fenceStart}`);
+      matchedPattern = "generic-with-app";
     }
   }
   
   if (fenceStart === -1) {
-    // Log what fences ARE present for debugging
-    const fencesFound = text.match(/```\w*/g);
-    if (fencesFound && fencesFound.length > 0) {
-      console.log(`[parseReactFiles] No react fence found. Fences present: ${fencesFound.join(", ")}`);
-    }
     return { chatText: text, files: null, deps };
   }
 
   const chatText = text.slice(0, fenceStart).trim();
   const codeStart = text.indexOf("\n", fenceStart) + 1;
   
-  // Find closing fence — if not found yet (streaming), use rest of text
-  const fenceEnd = text.indexOf("\n```", codeStart);
-  const block = fenceEnd === -1 ? text.slice(codeStart) : text.slice(codeStart, fenceEnd);
-  
-  // Parse file sections: --- /App.jsx or --- App.jsx or --- /src/App.jsx
-  const fileSections = block.split(/^---\s+/m).filter(Boolean);
-  
-  // If there are no --- separators, treat the whole block as /App.jsx
-  const hasFileSeparators = /^---\s+/m.test(block);
-  if (!hasFileSeparators && block.trim().length > 0) {
-    console.log(`[parseReactFiles] No file separators found — treating entire block as /App.jsx`);
-    files["/App.jsx"] = sanitizeImports(block.trim());
-    return { chatText, files: Object.keys(files).length > 0 ? files : null, deps };
+  // Find closing fence — must be ``` on its own line (not ```react or ```jsx etc.)
+  // Search for \n``` followed by end-of-string, newline, or whitespace (not more word chars)
+  let fenceEnd = -1;
+  let searchFrom = codeStart;
+  while (searchFrom < text.length) {
+    const candidate = text.indexOf("\n```", searchFrom);
+    if (candidate === -1) break;
+    // Check what follows the ``` — must be end of string, newline, or space (not another fence tag)
+    const afterFence = candidate + 4;
+    if (afterFence >= text.length || text[afterFence] === '\n' || text[afterFence] === '\r' || text[afterFence] === ' ') {
+      fenceEnd = candidate;
+      break;
+    }
+    searchFrom = candidate + 4;
   }
   
+  const block = fenceEnd === -1 ? text.slice(codeStart) : text.slice(codeStart, fenceEnd);
+  
+  if (block.trim().length === 0) {
+    return { chatText: text, files: null, deps };
+  }
+  
+  // Check for --- file separators
+  const hasFileSeparators = /^---\s+\/?\w[\w/.-]*\.(jsx?|tsx?|css)$/m.test(block);
+  
+  if (!hasFileSeparators) {
+    // No file separators — treat the whole block as /App.jsx
+    console.log(`[parseReactFiles] Single-file mode: treating block as /App.jsx (${block.length} chars)`);
+    files["/App.jsx"] = sanitizeImports(block.trim());
+    return { chatText, files, deps };
+  }
+  
+  // Multi-file mode: parse --- /filename sections
+  const fileSections = block.split(/^---\s+/m).filter(Boolean);
   for (const section of fileSections) {
     const lines = section.split("\n");
     const firstLine = lines[0].trim();
     if (firstLine.match(/^\/?\w[\w/.-]*\.(jsx?|tsx?|css)$/)) {
       let filename = firstLine.startsWith("/") ? firstLine : `/${firstLine}`;
-      // Strip /src/ prefix — Sandpack expects files at root (e.g. /App.jsx not /src/App.jsx)
       filename = filename.replace(/^\/src\//, "/");
-      // Sanitize imports in JS/JSX/TS/TSX files
       const content = lines.slice(1).join("\n").trim();
       files[filename] = filename.match(/\.(jsx?|tsx?)$/) ? sanitizeImports(content) : content;
     } else if (firstLine === "dependencies") {
       try {
         const depsJson = lines.slice(1).join("\n").trim();
         const parsed = JSON.parse(depsJson);
-        // Only keep allowed dependencies
         for (const [pkg, ver] of Object.entries(parsed)) {
           if (ALLOWED_PACKAGES.has(pkg)) {
             deps[pkg] = ver as string;
-          } else {
-            console.warn(`[Dep Sanitizer] Stripped unknown dependency: ${pkg}`);
           }
         }
       } catch {}
