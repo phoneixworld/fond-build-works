@@ -2,6 +2,7 @@ import { useState, forwardRef, useImperativeHandle } from "react";
 import { Globe, Download, Check, Copy, Loader2 } from "lucide-react";
 import { useProjects } from "@/contexts/ProjectContext";
 import { usePreview } from "@/contexts/PreviewContext";
+import { useVirtualFS } from "@/contexts/VirtualFSContext";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import {
@@ -22,6 +23,7 @@ export interface PublishExportHandle {
 const PublishExportButtons = forwardRef<PublishExportHandle>((_, ref) => {
   const { currentProject, saveProject } = useProjects();
   const { previewHtml } = usePreview();
+  const { files } = useVirtualFS();
   const { toast } = useToast();
   const [showPublish, setShowPublish] = useState(false);
   const [publishing, setPublishing] = useState(false);
@@ -30,22 +32,30 @@ const PublishExportButtons = forwardRef<PublishExportHandle>((_, ref) => {
 
   const handleExportFn = async () => {
     const html = previewHtml || currentProject?.html_content;
-    if (!html) {
+    if (!html && Object.keys(files).length === 0) {
       toast({ title: "Nothing to export", description: "Build something first!", variant: "destructive" });
       return;
     }
     const zip = new JSZip();
-    // If the HTML already contains <!DOCTYPE or <html>, export as-is
-    const isCompleteHtml = html.trim().toLowerCase().startsWith("<!doctype") || html.trim().toLowerCase().startsWith("<html");
-    if (isCompleteHtml) {
-      zip.file("index.html", html);
-    } else {
-      zip.file("index.html", `<!DOCTYPE html>\n<html lang="en">\n<head>\n  <meta charset="UTF-8">\n  <meta name="viewport" content="width=device-width, initial-scale=1.0">\n  <title>${currentProject?.name || "My App"}</title>\n</head>\n<body>\n${html}\n</body>\n</html>`);
+    
+    // If we have virtual files, export the full project structure
+    if (Object.keys(files).length > 0) {
+      for (const [path, file] of Object.entries(files)) {
+        zip.file(path, file.content);
+      }
+    } else if (html) {
+      const isCompleteHtml = html.trim().toLowerCase().startsWith("<!doctype") || html.trim().toLowerCase().startsWith("<html");
+      if (isCompleteHtml) {
+        zip.file("index.html", html);
+      } else {
+        zip.file("index.html", `<!DOCTYPE html>\n<html lang="en">\n<head>\n  <meta charset="UTF-8">\n  <meta name="viewport" content="width=device-width, initial-scale=1.0">\n  <title>${currentProject?.name || "My App"}</title>\n</head>\n<body>\n${html}\n</body>\n</html>`);
+      }
+      zip.file("README.md", `# ${currentProject?.name || "My App"}\n\nGenerated app. Open \`index.html\` in a browser to view.\n`);
     }
-    zip.file("README.md", `# ${currentProject?.name || "My App"}\n\nGenerated app. Open \`index.html\` in a browser to view.\n`);
+    
     const blob = await zip.generateAsync({ type: "blob" });
     saveAs(blob, `${currentProject?.name || "my-app"}.zip`);
-    toast({ title: "Exported!", description: "ZIP file downloaded." });
+    toast({ title: "Exported!", description: `ZIP with ${Object.keys(files).length || 1} files downloaded.` });
   };
 
   useImperativeHandle(ref, () => ({

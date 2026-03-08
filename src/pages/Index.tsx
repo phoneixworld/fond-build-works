@@ -6,6 +6,7 @@ import {
 } from "@/components/ui/resizable";
 import { Code, Eye, Zap, LogOut, ArrowLeft, Cloud, ChevronDown, Clock, Command as CommandIcon, Brain, Activity, Users } from "lucide-react";
 import { PreviewProvider } from "@/contexts/PreviewContext";
+import { VirtualFSProvider } from "@/contexts/VirtualFSContext";
 import { ProjectProvider, useProjects } from "@/contexts/ProjectContext";
 import { useAuth } from "@/hooks/useAuth";
 import ChatPanel from "@/components/ChatPanel";
@@ -44,7 +45,6 @@ import {
 const IDELayout = () => {
   const { user, signOut } = useAuth();
   const { projects, currentProject, selectProject, createProject, saveProject } = useProjects();
-  const [selectedFile, setSelectedFile] = useState("App.tsx");
   const [rightPanel, setRightPanel] = useState<"code" | "preview" | "cloud" | "history" | "brain" | "pulse" | "crew">("preview");
   const [inIDE, setInIDE] = useState(false);
   const [initialPrompt, setInitialPrompt] = useState("");
@@ -377,7 +377,7 @@ const IDELayout = () => {
 
             <ResizablePanel defaultSize={65}>
               {rightPanel === "code" ? (
-                <CodeEditor selectedFile={selectedFile} />
+                <CodeEditor />
               ) : rightPanel === "cloud" ? (
                 <CloudPanel />
               ) : rightPanel === "brain" ? (
@@ -406,7 +406,9 @@ const IDELayout = () => {
 const Index = () => (
   <ProjectProvider>
     <PreviewProvider>
-      <IDELayout />
+      <VirtualFSProvider>
+        <IDELayout />
+      </VirtualFSProvider>
     </PreviewProvider>
   </ProjectProvider>
 );

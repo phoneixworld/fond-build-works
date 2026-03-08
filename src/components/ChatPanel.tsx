@@ -6,6 +6,7 @@ import { AI_MODELS, DEFAULT_MODEL, PROMPT_SUGGESTIONS, QUICK_ACTIONS, DESIGN_THE
 import { motion, AnimatePresence } from "framer-motion";
 import { usePreview } from "@/contexts/PreviewContext";
 import { useProjects } from "@/contexts/ProjectContext";
+import { useVirtualFS, parseMultiFileOutput } from "@/contexts/VirtualFSContext";
 import { supabase } from "@/integrations/supabase/client";
 import ReactMarkdown from "react-markdown";
 import {
@@ -132,6 +133,7 @@ const ChatPanel = forwardRef<ChatPanelHandle, { initialPrompt?: string; onVersio
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { setPreviewHtml, setIsBuilding, setBuildStep } = usePreview();
+  const { setFiles: setVirtualFiles } = useVirtualFS();
   const lastProjectIdRef = useRef<string | null>(null);
   const hasProcessedInitialRef = useRef(false);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -471,7 +473,14 @@ const ChatPanel = forwardRef<ChatPanelHandle, { initialPrompt?: string; onVersio
           setIsBuilding(false);
           setBuildStep("");
 
-          const [chatText, htmlCode] = parseResponse(fullResponse);
+          // Use multi-file parser
+          const { files: parsedFiles, html: htmlCode, chatText } = parseMultiFileOutput(fullResponse);
+          
+          // Populate virtual file system
+          if (Object.keys(parsedFiles).length > 0) {
+            setVirtualFiles(parsedFiles);
+          }
+          
           if (htmlCode) setPreviewHtml(postProcessHtml(htmlCode));
 
           // Create version snapshot
@@ -500,7 +509,6 @@ const ChatPanel = forwardRef<ChatPanelHandle, { initialPrompt?: string; onVersio
             const isFirstMessage = persistMessages.filter(m => m.role === "user").length === 1;
             
             if (isFirstMessage && currentProject.name === "Untitled Project") {
-              // Fire and forget AI name generation
               fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/project-name`, {
                 method: "POST",
                 headers: {
@@ -515,7 +523,6 @@ const ChatPanel = forwardRef<ChatPanelHandle, { initialPrompt?: string; onVersio
                   saveProject({ name: fullName });
                 })
                 .catch(() => {
-                  // Fallback to truncated prompt
                   saveProject({ name: persistMessages[0].content.slice(0, 40) });
                 });
             }

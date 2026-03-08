@@ -7,125 +7,93 @@ import {
   FileText,
   Folder,
   FolderOpen,
+  FileType,
+  Image,
 } from "lucide-react";
-
-type FileNode = {
-  name: string;
-  type: "file" | "folder";
-  children?: FileNode[];
-};
-
-const mockFiles: FileNode[] = [
-  {
-    name: "src",
-    type: "folder",
-    children: [
-      {
-        name: "components",
-        type: "folder",
-        children: [
-          { name: "App.tsx", type: "file" },
-          { name: "Header.tsx", type: "file" },
-          { name: "ChatPanel.tsx", type: "file" },
-        ],
-      },
-      {
-        name: "pages",
-        type: "folder",
-        children: [
-          { name: "Index.tsx", type: "file" },
-          { name: "Dashboard.tsx", type: "file" },
-        ],
-      },
-      { name: "main.tsx", type: "file" },
-      { name: "index.css", type: "file" },
-    ],
-  },
-  {
-    name: "public",
-    type: "folder",
-    children: [
-      { name: "favicon.ico", type: "file" },
-      { name: "robots.txt", type: "file" },
-    ],
-  },
-  { name: "package.json", type: "file" },
-  { name: "tsconfig.json", type: "file" },
-  { name: "vite.config.ts", type: "file" },
-];
+import { useVirtualFS, FileNode } from "@/contexts/VirtualFSContext";
 
 const getFileIcon = (name: string) => {
-  if (name.endsWith(".tsx") || name.endsWith(".ts")) return <FileCode className="w-4 h-4 text-ide-chat-user" />;
-  if (name.endsWith(".json")) return <FileJson className="w-4 h-4 text-ide-warning" />;
-  if (name.endsWith(".css")) return <FileCode className="w-4 h-4 text-accent" />;
-  return <FileText className="w-4 h-4 text-muted-foreground" />;
+  if (name.endsWith(".tsx") || name.endsWith(".ts")) return <FileCode className="w-3.5 h-3.5 text-[hsl(var(--ide-chat-user))]" />;
+  if (name.endsWith(".jsx") || name.endsWith(".js")) return <FileCode className="w-3.5 h-3.5 text-[hsl(var(--ide-warning))]" />;
+  if (name.endsWith(".json")) return <FileJson className="w-3.5 h-3.5 text-[hsl(var(--ide-warning))]" />;
+  if (name.endsWith(".css")) return <FileCode className="w-3.5 h-3.5 text-accent" />;
+  if (name.endsWith(".html")) return <FileType className="w-3.5 h-3.5 text-[hsl(var(--ide-chat-user))]" />;
+  if (name.endsWith(".md")) return <FileText className="w-3.5 h-3.5 text-muted-foreground" />;
+  if (name.endsWith(".svg") || name.endsWith(".png") || name.endsWith(".jpg")) return <Image className="w-3.5 h-3.5 text-[hsl(var(--ide-success))]" />;
+  return <FileText className="w-3.5 h-3.5 text-muted-foreground" />;
 };
 
 const TreeItem = ({
   node,
   depth,
-  selectedFile,
+  activePath,
   onSelect,
 }: {
   node: FileNode;
   depth: number;
-  selectedFile: string;
-  onSelect: (name: string) => void;
+  activePath: string;
+  onSelect: (path: string) => void;
 }) => {
-  const [open, setOpen] = useState(depth === 0);
+  const [open, setOpen] = useState(depth < 2);
 
   if (node.type === "folder") {
     return (
       <div>
         <button
           onClick={() => setOpen(!open)}
-          className="flex items-center gap-1 w-full px-2 py-1 text-sm text-sidebar-foreground hover:bg-sidebar-accent rounded-sm transition-colors"
+          className="flex items-center gap-1 w-full py-[3px] text-[12px] text-muted-foreground hover:text-foreground hover:bg-secondary/60 rounded-sm transition-colors"
           style={{ paddingLeft: `${depth * 12 + 8}px` }}
         >
-          {open ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
+          {open ? <ChevronDown className="w-3 h-3 shrink-0" /> : <ChevronRight className="w-3 h-3 shrink-0" />}
           {open ? (
-            <FolderOpen className="w-4 h-4 text-ide-warning" />
+            <FolderOpen className="w-3.5 h-3.5 text-[hsl(var(--ide-warning))] shrink-0" />
           ) : (
-            <Folder className="w-4 h-4 text-ide-warning" />
+            <Folder className="w-3.5 h-3.5 text-[hsl(var(--ide-warning))] shrink-0" />
           )}
-          <span className="ml-1">{node.name}</span>
+          <span className="ml-0.5 truncate">{node.name}</span>
         </button>
         {open && node.children?.map((child) => (
-          <TreeItem key={child.name} node={child} depth={depth + 1} selectedFile={selectedFile} onSelect={onSelect} />
+          <TreeItem key={child.path} node={child} depth={depth + 1} activePath={activePath} onSelect={onSelect} />
         ))}
       </div>
     );
   }
 
-  const isSelected = selectedFile === node.name;
+  const isSelected = activePath === node.path;
   return (
     <button
-      onClick={() => onSelect(node.name)}
-      className={`flex items-center gap-1 w-full px-2 py-1 text-sm rounded-sm transition-colors ${
-        isSelected ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground hover:bg-sidebar-accent/50"
+      onClick={() => onSelect(node.path)}
+      className={`flex items-center gap-1 w-full py-[3px] text-[12px] rounded-sm transition-colors ${
+        isSelected ? "bg-primary/15 text-foreground font-medium" : "text-muted-foreground hover:text-foreground hover:bg-secondary/60"
       }`}
       style={{ paddingLeft: `${depth * 12 + 8}px` }}
     >
       {getFileIcon(node.name)}
-      <span className="ml-1">{node.name}</span>
+      <span className="ml-0.5 truncate">{node.name}</span>
     </button>
   );
 };
 
-const FileTree = ({
-  selectedFile,
-  onSelectFile,
-}: {
-  selectedFile: string;
-  onSelectFile: (name: string) => void;
-}) => {
+const FileTree = () => {
+  const { fileTree, activeFile, setActiveFile } = useVirtualFS();
+
+  if (fileTree.length === 0) {
+    return (
+      <div className="h-full bg-[hsl(var(--ide-panel))] flex items-center justify-center p-4">
+        <p className="text-xs text-muted-foreground text-center">
+          Build something to see the file tree
+        </p>
+      </div>
+    );
+  }
+
   return (
-    <div className="h-full bg-sidebar overflow-y-auto py-2">
-      <div className="px-3 py-1 text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1">
+    <div className="h-full bg-[hsl(var(--ide-panel))] overflow-y-auto py-1.5">
+      <div className="px-3 py-1 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-0.5">
         Explorer
       </div>
-      {mockFiles.map((node) => (
-        <TreeItem key={node.name} node={node} depth={0} selectedFile={selectedFile} onSelect={onSelectFile} />
+      {fileTree.map((node) => (
+        <TreeItem key={node.path} node={node} depth={0} activePath={activeFile} onSelect={setActiveFile} />
       ))}
     </div>
   );
