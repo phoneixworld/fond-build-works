@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useCallback, forwardRef, useImperativeHandle } from "react";
 import { Version } from "@/components/VersionHistory";
-import { Send, Bot, User, ChevronDown, Sparkles, AlertTriangle, Wand2, ImagePlus, X, Palette, ArrowDown, Clock, Zap, Trash2, ShieldCheck, MessageSquareMore, CheckCircle2 } from "lucide-react";
+import { Send, Bot, User, ChevronDown, Sparkles, AlertTriangle, Wand2, ImagePlus, X, Palette, ArrowDown, Clock, Zap, Trash2, ShieldCheck, MessageSquareMore, CheckCircle2, Pencil, RotateCcw, Upload } from "lucide-react";
 import { streamChat } from "@/lib/streamChat";
 import { AI_MODELS, DEFAULT_MODEL, PROMPT_SUGGESTIONS, QUICK_ACTIONS, DESIGN_THEMES, type AIModelId } from "@/lib/aiModels";
 import { motion, AnimatePresence } from "framer-motion";
@@ -137,6 +137,9 @@ const ChatPanel = forwardRef<ChatPanelHandle, { initialPrompt?: string; onVersio
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const healTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const MAX_HEAL_ATTEMPTS = 3;
+  // Edit/regenerate state
+  const [editingIndex, setEditingIndex] = useState<number | null>(null);
+  const [editText, setEditText] = useState("");
 
   // Elapsed time timer during loading
   useEffect(() => {
@@ -270,6 +273,8 @@ const ChatPanel = forwardRef<ChatPanelHandle, { initialPrompt?: string; onVersio
     sendMessage(prompt);
   }, [pendingFollowUpPrompt]);
 
+
+
   useEffect(() => {
     if (initialPrompt && !hasProcessedInitialRef.current) {
       hasProcessedInitialRef.current = true;
@@ -316,6 +321,19 @@ const ChatPanel = forwardRef<ChatPanelHandle, { initialPrompt?: string; onVersio
       const dataUrl = await fileToDataUrl(file);
       setAttachedImages((prev) => [...prev.slice(0, 3), dataUrl]);
     } catch {}
+  };
+
+  // Upload image to storage for use in generated apps (returns public URL)
+  const uploadAppAsset = async (file: File): Promise<string | null> => {
+    if (!currentProject) return null;
+    try {
+      const ext = file.name.split(".").pop() || "png";
+      const path = `${currentProject.id}/${Date.now()}.${ext}`;
+      const { error } = await supabase.storage.from("app-assets").upload(path, file, { upsert: true });
+      if (error) { console.error("Upload error:", error); return null; }
+      const { data } = supabase.storage.from("app-assets").getPublicUrl(path);
+      return data?.publicUrl || null;
+    } catch { return null; }
   };
 
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -512,6 +530,39 @@ const ChatPanel = forwardRef<ChatPanelHandle, { initialPrompt?: string; onVersio
     }
   }, [isLoading, messages, currentProject, saveProject, setPreviewHtml, setIsBuilding, setBuildStep, selectedModel, selectedTheme, onVersionCreated]);
 
+  // Edit a previous user message and regenerate from that point
+  const handleEditMessage = useCallback((index: number) => {
+    const msg = messages[index];
+    if (msg.role !== "user") return;
+    setEditingIndex(index);
+    setEditText(getTextContent(msg.content));
+  }, [messages]);
+
+  const handleCancelEdit = () => {
+    setEditingIndex(null);
+    setEditText("");
+  };
+
+  const handleSubmitEdit = useCallback(() => {
+    if (editingIndex === null || !editText.trim() || isLoading || !currentProject) return;
+    const truncated = messages.slice(0, editingIndex);
+    setMessages(truncated);
+    setEditingIndex(null);
+    setEditText("");
+    sendMessage(editText.trim());
+  }, [editingIndex, editText, isLoading, currentProject, messages, sendMessage]);
+
+  const handleRegenerate = useCallback((index: number) => {
+    if (isLoading || !currentProject) return;
+    let userMsgIndex = index - 1;
+    while (userMsgIndex >= 0 && messages[userMsgIndex].role !== "user") userMsgIndex--;
+    if (userMsgIndex < 0) return;
+    const userText = getTextContent(messages[userMsgIndex].content);
+    const truncated = messages.slice(0, index);
+    setMessages(truncated);
+    sendMessage(userText);
+  }, [isLoading, currentProject, messages, sendMessage]);
+
   useEffect(() => {
     if (pendingPrompt && currentProject && !isLoading && messages.length === 0) {
       const prompt = pendingPrompt;
@@ -667,6 +718,7 @@ const ChatPanel = forwardRef<ChatPanelHandle, { initialPrompt?: string; onVersio
               const textContent = getTextContent(msg.content);
               const imageUrls = getImageUrls(msg.content);
               const isUser = msg.role === "user";
+              const isEditing = editingIndex === i;
               return (
                 <motion.div
                   key={i}
@@ -690,6 +742,29 @@ const ChatPanel = forwardRef<ChatPanelHandle, { initialPrompt?: string; onVersio
                           {formatTime(msg.timestamp)}
                         </span>
                       )}
+                      {/* Edit/Regenerate buttons */}
+                      {!isLoading && !isEditing && (
+                        <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity ml-auto">
+                          {isUser && (
+                            <button
+                              onClick={() => handleEditMessage(i)}
+                              className="p-1 rounded-md text-muted-foreground/50 hover:text-foreground hover:bg-secondary transition-all"
+                              title="Edit message"
+                            >
+                              <Pencil className="w-3 h-3" />
+                            </button>
+                          )}
+                          {!isUser && (
+                            <button
+                              onClick={() => handleRegenerate(i)}
+                              className="p-1 rounded-md text-muted-foreground/50 hover:text-foreground hover:bg-secondary transition-all"
+                              title="Regenerate response"
+                            >
+                              <RotateCcw className="w-3 h-3" />
+                            </button>
+                          )}
+                        </div>
+                      )}
                     </div>
                     {imageUrls.length > 0 && (
                       <div className="flex gap-2 mb-2 flex-wrap">
@@ -703,7 +778,35 @@ const ChatPanel = forwardRef<ChatPanelHandle, { initialPrompt?: string; onVersio
                         ))}
                       </div>
                     )}
-                    {!isUser ? (
+                    {isEditing ? (
+                      <div className="space-y-2">
+                        <textarea
+                          value={editText}
+                          onChange={(e) => setEditText(e.target.value)}
+                          className="w-full bg-secondary rounded-xl px-3 py-2 text-[13px] text-foreground outline-none ring-1 ring-primary/30 resize-none leading-[1.7]"
+                          rows={Math.min(editText.split("\n").length + 1, 6)}
+                          autoFocus
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSubmitEdit(); }
+                            if (e.key === "Escape") handleCancelEdit();
+                          }}
+                        />
+                        <div className="flex gap-2">
+                          <button
+                            onClick={handleSubmitEdit}
+                            className="px-3 py-1.5 rounded-lg text-[11px] font-semibold bg-primary text-primary-foreground hover:bg-primary/90 transition-colors"
+                          >
+                            Save & Regenerate
+                          </button>
+                          <button
+                            onClick={handleCancelEdit}
+                            className="px-3 py-1.5 rounded-lg text-[11px] font-medium text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors"
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      </div>
+                    ) : !isUser ? (
                       <div className="text-[13px] text-foreground leading-[1.7] prose prose-invert prose-sm max-w-none prose-p:my-2 prose-headings:my-3 prose-headings:font-semibold prose-headings:tracking-tight prose-ul:my-1.5 prose-li:my-0.5 prose-code:font-[JetBrains_Mono] prose-code:text-primary prose-code:bg-secondary prose-code:px-1.5 prose-code:py-0.5 prose-code:rounded-md prose-code:text-[12px] prose-pre:bg-secondary prose-pre:rounded-xl prose-pre:p-4 prose-pre:border prose-pre:border-border prose-pre:font-[JetBrains_Mono] prose-pre:text-[12px] prose-pre:leading-relaxed prose-strong:text-foreground prose-a:text-primary prose-a:no-underline hover:prose-a:underline">
                         <ReactMarkdown>{textContent}</ReactMarkdown>
                       </div>

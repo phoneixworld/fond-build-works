@@ -35,7 +35,13 @@ const PublishExportButtons = forwardRef<PublishExportHandle>((_, ref) => {
       return;
     }
     const zip = new JSZip();
-    zip.file("index.html", `<!DOCTYPE html>\n<html lang="en">\n<head>\n  <meta charset="UTF-8">\n  <meta name="viewport" content="width=device-width, initial-scale=1.0">\n  <title>${currentProject?.name || "My App"}</title>\n</head>\n<body>\n${html}\n</body>\n</html>`);
+    // If the HTML already contains <!DOCTYPE or <html>, export as-is
+    const isCompleteHtml = html.trim().toLowerCase().startsWith("<!doctype") || html.trim().toLowerCase().startsWith("<html");
+    if (isCompleteHtml) {
+      zip.file("index.html", html);
+    } else {
+      zip.file("index.html", `<!DOCTYPE html>\n<html lang="en">\n<head>\n  <meta charset="UTF-8">\n  <meta name="viewport" content="width=device-width, initial-scale=1.0">\n  <title>${currentProject?.name || "My App"}</title>\n</head>\n<body>\n${html}\n</body>\n</html>`);
+    }
     zip.file("README.md", `# ${currentProject?.name || "My App"}\n\nGenerated app. Open \`index.html\` in a browser to view.\n`);
     const blob = await zip.generateAsync({ type: "blob" });
     saveAs(blob, `${currentProject?.name || "my-app"}.zip`);
