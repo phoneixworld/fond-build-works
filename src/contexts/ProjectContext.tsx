@@ -22,6 +22,7 @@ interface ProjectContextType {
   loading: boolean;
   selectProject: (id: string) => void;
   createProject: (name?: string, techStack?: TechStackId) => Promise<Project | null>;
+  cloneProject: (id: string) => Promise<Project | null>;
   saveProject: (updates: Partial<Pick<Project, "name" | "html_content" | "chat_history" | "tech_stack">>) => Promise<void>;
   deleteProject: (id: string) => Promise<void>;
   refreshProjects: () => Promise<void>;
