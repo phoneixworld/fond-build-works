@@ -11,6 +11,8 @@ const ALLOWED_PACKAGES = new Set([
   "react", "react-dom", "react/jsx-runtime",
   "lucide-react", "framer-motion", "date-fns", "recharts",
   "react-router-dom", "clsx", "tailwind-merge",
+  "react-intersection-observer", "zustand", "zod", "axios",
+  "@tanstack/react-query", "react-hook-form", "sonner",
 ]);
 
 function isAllowedPkg(pkg: string): boolean {
