@@ -30,7 +30,17 @@ function detectLanguage(path: string): string {
   const map: Record<string, string> = {
     tsx: "typescript", ts: "typescript", jsx: "javascript", js: "javascript",
     css: "css", html: "html", json: "json", md: "markdown", svg: "svg",
+    py: "python", go: "go", rs: "rust", rb: "ruby", java: "java",
+    sh: "bash", bash: "bash", yml: "yaml", yaml: "yaml", toml: "toml",
+    sql: "sql", graphql: "graphql", dockerfile: "dockerfile",
+    mod: "go", sum: "text", txt: "text", env: "text",
+    gitignore: "text", dockerignore: "text",
   };
+  // Handle files like "Dockerfile" or "Makefile" with no extension
+  const filename = path.split("/").pop()?.toLowerCase() || "";
+  if (filename === "dockerfile") return "dockerfile";
+  if (filename === "makefile") return "makefile";
+  if (filename.startsWith("requirements")) return "text";
   return map[ext] || "text";
 }
 
