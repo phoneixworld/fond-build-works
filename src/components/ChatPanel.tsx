@@ -281,12 +281,15 @@ const ChatPanel = ({ initialPrompt }: { initialPrompt?: string }) => {
         content: m.content,
       }));
 
+      const themeInfo = DESIGN_THEMES.find(t => t.id === selectedTheme);
+      
       await streamChat({
         messages: apiMessages,
         projectId: currentProject.id,
         techStack: currentProject.tech_stack || "html-tailwind",
         schemas,
         model: selectedModel,
+        designTheme: themeInfo?.prompt,
         onDelta: upsert,
         onDone: () => {
           setIsLoading(false);
@@ -294,7 +297,7 @@ const ChatPanel = ({ initialPrompt }: { initialPrompt?: string }) => {
           setBuildStep("");
 
           const [chatText, htmlCode] = parseResponse(fullResponse);
-          if (htmlCode) setPreviewHtml(htmlCode);
+          if (htmlCode) setPreviewHtml(postProcessHtml(htmlCode));
 
           setMessages((prev) => {
             const final = chatText
