@@ -1,5 +1,5 @@
 import { useState, useRef } from "react";
-import { Zap, Send, FolderOpen, Trash2, Loader2, ArrowRight } from "lucide-react";
+import { Zap, Send, FolderOpen, Trash2, Loader2, ArrowRight, Copy } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { useProjects, Project } from "@/contexts/ProjectContext";
 import { formatDistanceToNow } from "date-fns";
