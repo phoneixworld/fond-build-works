@@ -206,8 +206,8 @@ const IDEHeader = ({
                 onClick={() => setRightPanel(tab.id)}
                 className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-md text-[11px] font-medium transition-all ${
                   isActive
-                    ? "bg-background text-foreground shadow-sm ring-1 ring-border/50"
-                    : "text-muted-foreground hover:text-foreground"
+                    ? "bg-background text-white shadow-sm ring-1 ring-border/50"
+                    : "text-white/70 hover:text-white"
                 }`}
               >
                 <Icon className="w-3.5 h-3.5" />
