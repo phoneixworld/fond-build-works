@@ -407,7 +407,9 @@ const IDELayout = () => {
 const Index = () => (
   <ProjectProvider>
     <PreviewProvider>
-      <IDELayout />
+      <VirtualFSProvider>
+        <IDELayout />
+      </VirtualFSProvider>
     </PreviewProvider>
   </ProjectProvider>
 );
