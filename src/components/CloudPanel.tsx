@@ -28,12 +28,14 @@ import ProjectMemory from "./cloud/ProjectMemory";
 import DependencyGraph from "./cloud/DependencyGraph";
 import GovernanceEngine from "./cloud/GovernanceEngine";
 import EnvironmentManager from "./cloud/EnvironmentManager";
+import SecurityDashboard from "./cloud/SecurityDashboard";
 
 const PREMIUM_SECTIONS = new Set(["environments"]);
 
 const CLOUD_SECTIONS = [
   { id: "overview", label: "Overview", icon: LayoutDashboard },
   { id: "environments", label: "Environments", icon: Rocket },
+  { id: "security", label: "Security", icon: ShieldAlert },
   { id: "database", label: "Database", icon: Database },
   { id: "memory", label: "Project Memory", icon: Brain },
   { id: "dependencies", label: "Dependencies", icon: GitBranch },
