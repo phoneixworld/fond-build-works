@@ -365,6 +365,21 @@ For full-page apps, follow this structure:
 - ❌ Inconsistent border radius or spacing
 - ❌ Using too many different colors — stick to the palette
 - ❌ Using href="#" placeholder links — ALWAYS use real hash anchors!
+- ❌ Using Unsplash or external image URLs — they BREAK in iframe previews!
+- ❌ Accessing DOM elements without null checks — ALWAYS check before using .classList, .style, etc.
+
+### Images — CRITICAL
+- NEVER use Unsplash, Pexels, or any external image URLs. They will fail to load in the preview iframe.
+- Instead, use inline SVG illustrations, CSS gradients, emoji, or placeholder divs with background colors.
+- For avatars: use colored circles with initials (CSS only).
+- For hero images: use CSS gradients, patterns, or inline SVGs.
+- For product images: use colored placeholder boxes with icons.
+- If you MUST show an image, use a data URI or an inline SVG.
+
+### JavaScript Safety — CRITICAL  
+- ALWAYS null-check DOM elements before accessing properties: \`const el = document.querySelector('.x'); if (el) el.classList.add('y');\`
+- NEVER assume querySelector will return a non-null value.
+- Use optional chaining where possible: \`document.querySelector('.x')?.classList.add('y')\`
 
 ### Navigation Links — CRITICAL
 - All navigation links MUST use real hash anchors that scroll to actual sections on the page

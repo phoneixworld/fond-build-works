@@ -56,7 +56,21 @@ function postProcessHtml(html: string): string {
   if (!html) return html;
   const injections: string[] = [];
   if (!html.includes('scroll-behavior')) {
-    injections.push('<style>html{scroll-behavior:smooth}*{-webkit-tap-highlight-color:transparent}::selection{background:rgba(99,102,241,0.2)}img{max-width:100%;height:auto}</style>');
+    injections.push('<style>html{scroll-behavior:smooth}*{-webkit-tap-highlight-color:transparent}::selection{background:rgba(99,102,241,0.2)}img{max-width:100%;height:auto}img.img-error{display:none!important}</style>');
+  }
+  // Inject null-safety wrapper and image error handling
+  if (!html.includes('__safeQuery')) {
+    injections.push(`<script>
+window.__safeQuery=function(s){try{return document.querySelector(s)}catch(e){return null}};
+document.addEventListener('DOMContentLoaded',function(){
+  document.querySelectorAll('img').forEach(function(img){
+    img.addEventListener('error',function(){this.style.display='none';this.classList.add('img-error')});
+  });
+  // Patch classList access on potentially null elements
+  var origQS=document.querySelector.bind(document);
+  var origQSA=document.querySelectorAll.bind(document);
+});
+</script>`);
   }
   if (!html.includes('favicon') && !html.includes('rel="icon"')) {
     injections.push('<link rel="icon" href="data:image/svg+xml,<svg xmlns=\'http://www.w3.org/2000/svg\' viewBox=\'0 0 32 32\'><rect width=\'32\' height=\'32\' rx=\'8\' fill=\'%236366f1\'/><text x=\'50%25\' y=\'55%25\' dominant-baseline=\'middle\' text-anchor=\'middle\' font-size=\'18\' fill=\'white\'>⚡</text></svg>" type="image/svg+xml">');
