@@ -677,13 +677,6 @@ const ChatPanel = forwardRef<ChatPanelHandle, { initialPrompt?: string; onVersio
             return final;
           });
         },
-          // Use multi-file parser
-          const { files: parsedFiles, html: htmlCode, chatText } = parseMultiFileOutput(fullResponse);
-          
-          // Populate virtual file system
-          if (Object.keys(parsedFiles).length > 0) {
-            setVirtualFiles(parsedFiles);
-          }
           
           if (htmlCode) setPreviewHtml(postProcessHtml(htmlCode));
 
