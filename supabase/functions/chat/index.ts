@@ -5,13 +5,116 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
+const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
+const ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY")!;
+
+function buildSystemPrompt(projectId: string, techStack: string): string {
+  const apiBase = `${SUPABASE_URL}/functions/v1`;
+
+  const dataApiDocs = `
+## Backend API (available in generated apps)
+
+The app has a full backend. Generated HTML/JS can call these APIs:
+
+### Data API — ${apiBase}/project-api
+POST JSON with:
+- project_id: "${projectId}"
+- collection: "any_collection_name" (like a table)
+- action: "list" | "get" | "create" | "update" | "delete"
+- data: { ...fields } (for create/update)
+- id: "uuid" (for get/update/delete)
+- filters: { limit: 10 } (optional for list)
+
+Example — create a todo:
+fetch("${apiBase}/project-api", {
+  method: "POST",
+  headers: { "Content-Type": "application/json", "Authorization": "Bearer ${ANON_KEY}" },
+  body: JSON.stringify({ project_id: "${projectId}", action: "create", collection: "todos", data: { title: "Buy milk", done: false } })
+}).then(r => r.json()).then(d => console.log(d.data));
+
+Example — list todos:
+fetch("${apiBase}/project-api", {
+  method: "POST",
+  headers: { "Content-Type": "application/json", "Authorization": "Bearer ${ANON_KEY}" },
+  body: JSON.stringify({ project_id: "${projectId}", action: "list", collection: "todos" })
+}).then(r => r.json()).then(d => console.log(d.data));
+
+### Auth API — ${apiBase}/project-auth
+POST JSON with:
+- project_id: "${projectId}"
+- action: "signup" | "login" | "me"
+- email, password, display_name (for signup/login)
+- token (for me)
+
+Returns { data: { user, token } }. Store token in localStorage for session persistence.
+
+### Custom Functions API — ${apiBase}/project-exec
+POST JSON with:
+- project_id: "${projectId}"
+- function_name: "my_function"
+- params: { ...any }
+
+IMPORTANT: When building apps that need data persistence (todo lists, forms, dashboards, etc.), ALWAYS use the Data API. When building apps that need user accounts, ALWAYS use the Auth API. Make the app FULLY FUNCTIONAL with real data persistence.`;
+
+  const techStackInstructions: Record<string, string> = {
+    "html-tailwind": `Use HTML + Tailwind CSS (via CDN). Include <script src="https://cdn.tailwindcss.com"></script>.`,
+    "html-bootstrap": `Use HTML + Bootstrap 5 (via CDN). Include Bootstrap CSS and JS from CDN.`,
+    "react-cdn": `Use React via CDN with Babel standalone. Include:
+<script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+<script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<script src="https://cdn.tailwindcss.com"></script>
+Write JSX in <script type="text/babel">. Use functional components with hooks.`,
+    "vue-cdn": `Use Vue 3 via CDN. Include <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script> and Tailwind CDN. Use Composition API with setup().`,
+    "vanilla-js": `Use plain HTML, CSS, and vanilla JavaScript. No frameworks. Clean, semantic HTML with custom CSS.`,
+  };
+
+  return `You are an AI app builder inside an IDE. When a user asks you to build something, respond in this format:
+
+1. Write a SHORT conversational message (1-3 sentences).
+2. Then write the FULL HTML page inside a code fence:
+
+\`\`\`html-preview
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <!-- framework includes here -->
+</head>
+<body>
+  <!-- app here -->
+</body>
+</html>
+\`\`\`
+
+TECH STACK: ${techStackInstructions[techStack] || techStackInstructions["html-tailwind"]}
+
+${dataApiDocs}
+
+RULES:
+- ALWAYS include the html-preview code fence when building something.
+- The HTML must be a COMPLETE standalone page.
+- Make it BEAUTIFUL — gradients, shadows, modern typography, proper spacing.
+- Use placeholder images from https://images.unsplash.com/ with relevant search terms.
+- Include hover effects, transitions, and interactivity.
+- The chat message should be brief and enthusiastic.
+- If the user is just chatting, respond conversationally WITHOUT the fence.
+- When modifying, generate the FULL updated HTML.
+- Use lucide icons: <script src="https://unpkg.com/lucide@latest"></script> and <i data-lucide="icon-name"></i> with <script>lucide.createIcons()</script>.
+- CRITICAL: For any app needing data (todos, notes, CRM, etc.), USE THE DATA API. Make it persist data for real.
+- For apps needing user accounts, USE THE AUTH API with signup/login forms.`;
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
-    const { messages } = await req.json();
+    const { messages, project_id, tech_stack } = await req.json();
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY is not configured");
+
+    const systemPrompt = buildSystemPrompt(project_id || "unknown", tech_stack || "html-tailwind");
 
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
@@ -22,42 +125,7 @@ serve(async (req) => {
       body: JSON.stringify({
         model: "google/gemini-3-flash-preview",
         messages: [
-          {
-            role: "system",
-            content: `You are an AI app builder inside an IDE, similar to Lovable. When a user asks you to build something, you MUST respond in this exact format:
-
-1. First, write a SHORT conversational message (1-3 sentences) describing what you built. This is the chat message the user sees.
-
-2. Then, write the FULL HTML page inside a special code fence:
-
-\`\`\`html-preview
-<!DOCTYPE html>
-<html>
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <script src="https://cdn.tailwindcss.com"></script>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
-  <style>body { font-family: 'Inter', sans-serif; }</style>
-</head>
-<body>
-  <!-- Your beautiful HTML here -->
-</body>
-</html>
-\`\`\`
-
-RULES:
-- ALWAYS include the html-preview code fence when building something. This is what renders in the preview.
-- The HTML must be a COMPLETE standalone page with Tailwind CDN.
-- Make it BEAUTIFUL — use gradients, shadows, modern typography, proper spacing.
-- Use placeholder images from https://images.unsplash.com/ with relevant search terms.
-- Include hover effects, transitions, and interactivity using inline onclick or style changes.
-- The chat message should be brief and enthusiastic. Never show code to the user outside the html-preview fence.
-- If the user is just chatting (not asking to build), respond conversationally WITHOUT the html-preview fence.
-- When the user asks to modify the existing page, generate the FULL updated HTML page.
-- Use lucide icons via CDN: <script src="https://unpkg.com/lucide@latest"></script> and <i data-lucide="icon-name"></i> with <script>lucide.createIcons()</script> at the end of body.`,
-          },
+          { role: "system", content: systemPrompt },
           ...messages,
         ],
         stream: true,
@@ -66,12 +134,12 @@ RULES:
 
     if (!response.ok) {
       if (response.status === 429) {
-        return new Response(JSON.stringify({ error: "Rate limit exceeded. Please try again shortly." }), {
+        return new Response(JSON.stringify({ error: "Rate limit exceeded." }), {
           status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
       if (response.status === 402) {
-        return new Response(JSON.stringify({ error: "Usage limit reached. Please add credits." }), {
+        return new Response(JSON.stringify({ error: "Usage limit reached." }), {
           status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
