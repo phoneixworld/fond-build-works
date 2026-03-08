@@ -112,6 +112,9 @@ const CloudPanel = () => {
               >
                 <Icon className={`w-3.5 h-3.5 shrink-0 ${isActive ? "text-sidebar-primary" : ""}`} />
                 {section.label}
+                {PREMIUM_SECTIONS.has(section.id) && (
+                  <span className="text-[8px] bg-amber-500/20 text-amber-400 px-1 rounded font-bold ml-auto">PRO</span>
+                )}
               </button>
             );
           })}
