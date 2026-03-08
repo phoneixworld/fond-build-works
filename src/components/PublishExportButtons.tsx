@@ -14,7 +14,12 @@ import {
 import JSZip from "jszip";
 import { saveAs } from "file-saver";
 
-const PublishExportButtons = () => {
+export interface PublishExportHandle {
+  openPublish: () => void;
+  handleExport: () => void;
+}
+
+const PublishExportButtons = forwardRef<PublishExportHandle>((_, ref) => {
   const { currentProject, saveProject } = useProjects();
   const { previewHtml } = usePreview();
   const { toast } = useToast();
