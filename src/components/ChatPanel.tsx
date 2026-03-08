@@ -16,8 +16,8 @@ const CopyButton = ({ text }: { text: string }) => {
     setTimeout(() => setCopied(false), 2000);
   };
   return (
-    <button onClick={copy} className="absolute top-2 right-2 p-1 rounded bg-border/50 hover:bg-border text-muted-foreground hover:text-foreground transition-colors">
-      {copied ? <Check className="w-3.5 h-3.5 text-ide-success" /> : <Copy className="w-3.5 h-3.5" />}
+    <button onClick={copy} className="p-1 rounded hover:bg-border/80 text-muted-foreground hover:text-foreground transition-colors">
+      {copied ? <Check className="w-3 h-3 text-ide-success" /> : <Copy className="w-3 h-3" />}
     </button>
   );
 };
