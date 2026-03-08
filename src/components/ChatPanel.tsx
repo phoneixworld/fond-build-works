@@ -265,12 +265,14 @@ function parseFileSections(block: string): { files: Record<string, string>; deps
   const files: Record<string, string> = {};
   const deps: Record<string, string> = {};
   
-  // Strategy 1: "--- /filename" on same line (original format)
-  if (/^---\s+\/?\w[\w/.-]*\.(jsx?|tsx?|css)$/m.test(block)) {
+  // Strategy 1: "--- /filename ---" or "--- /filename" on same line
+  // Matches: --- /src/App.jsx ---, --- /App.jsx, --- App.jsx ---
+  if (/^---\s+\/?\w[\w/.-]*\.(jsx?|tsx?|css)\s*-{0,3}\s*$/m.test(block)) {
     const sections = block.split(/^---\s+/m).filter(Boolean);
     for (const section of sections) {
       const lines = section.split("\n");
-      const firstLine = lines[0].trim();
+      // Strip trailing " ---" from filename line
+      const firstLine = lines[0].trim().replace(/\s*-{2,3}\s*$/, "").trim();
       if (firstLine.match(/^\/?\w[\w/.-]*\.(jsx?|tsx?|css)$/)) {
         let filename = firstLine.startsWith("/") ? firstLine : `/${firstLine}`;
         filename = filename.replace(/^\/src\//, "/");
