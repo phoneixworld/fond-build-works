@@ -29,6 +29,8 @@ const PublishExportButtons = forwardRef<PublishExportHandle>((_, ref) => {
   const [publishing, setPublishing] = useState(false);
   const [publishedUrl, setPublishedUrl] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+  const [showDomain, setShowDomain] = useState(false);
+  const [domainInput, setDomainInput] = useState("");
 
   const handleExportFn = async () => {
     const html = previewHtml || currentProject?.html_content;
