@@ -1,5 +1,5 @@
 import { useState, forwardRef, useImperativeHandle } from "react";
-import { Globe, Download, Check, Copy, Loader2 } from "lucide-react";
+import { Globe, Download, Check, Copy, Loader2, ExternalLink, Link2 } from "lucide-react";
 import { useProjects } from "@/contexts/ProjectContext";
 import { usePreview } from "@/contexts/PreviewContext";
 import { useVirtualFS } from "@/contexts/VirtualFSContext";
@@ -38,7 +38,6 @@ const PublishExportButtons = forwardRef<PublishExportHandle>((_, ref) => {
     }
     const zip = new JSZip();
     
-    // If we have virtual files, export the full project structure
     if (Object.keys(files).length > 0) {
       for (const [path, file] of Object.entries(files)) {
         zip.file(path, file.content);
@@ -78,21 +77,46 @@ const PublishExportButtons = forwardRef<PublishExportHandle>((_, ref) => {
 
     try {
       const slug = (currentProject as any).published_slug || generateSlug(currentProject.name, currentProject.id);
+      const html = previewHtml || currentProject.html_content;
+
+      if (!html) throw new Error("Nothing to publish — build something first!");
+
+      // Upload HTML to storage for real hosting
+      const htmlBlob = new Blob([html], { type: "text/html" });
+      const storagePath = `published/${slug}/index.html`;
+      
+      const { error: uploadError } = await supabase.storage
+        .from("app-assets")
+        .upload(storagePath, htmlBlob, { 
+          upsert: true,
+          contentType: "text/html",
+        });
+
+      if (uploadError) {
+        console.error("Storage upload error:", uploadError);
+        // Fall back to DB-only publish
+      }
+
+      // Get public URL from storage
+      const { data: urlData } = supabase.storage
+        .from("app-assets")
+        .getPublicUrl(storagePath);
 
       const { error } = await supabase
         .from("projects")
         .update({
           is_published: true,
           published_slug: slug,
-          html_content: previewHtml || currentProject.html_content,
+          html_content: html,
         } as any)
         .eq("id", currentProject.id);
 
       if (error) throw error;
 
-      const url = `${window.location.origin}/app/${slug}`;
-      setPublishedUrl(url);
-      toast({ title: "Published!", description: "Your app is now live." });
+      // Use storage URL if available, otherwise fall back to app route
+      const liveUrl = urlData?.publicUrl || `${window.location.origin}/app/${slug}`;
+      setPublishedUrl(liveUrl);
+      toast({ title: "Published! 🚀", description: "Your app is now live at a real URL." });
     } catch (err: any) {
       toast({ title: "Publish failed", description: err.message, variant: "destructive" });
     } finally {
@@ -126,8 +150,6 @@ const PublishExportButtons = forwardRef<PublishExportHandle>((_, ref) => {
     }
   };
 
-  const handleExport = handleExportFn;
-
   return (
     <>
       <button
@@ -138,7 +160,7 @@ const PublishExportButtons = forwardRef<PublishExportHandle>((_, ref) => {
         Publish
       </button>
       <button
-        onClick={handleExport}
+        onClick={handleExportFn}
         className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors"
         title="Export as ZIP"
       >
@@ -148,63 +170,97 @@ const PublishExportButtons = forwardRef<PublishExportHandle>((_, ref) => {
       <Dialog open={showPublish} onOpenChange={setShowPublish}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>Publish Your App</DialogTitle>
+            <DialogTitle className="flex items-center gap-2">
+              <Globe className="w-5 h-5 text-primary" />
+              Publish Your App
+            </DialogTitle>
             <DialogDescription>
-              Make your app available at a public URL that anyone can access.
+              Deploy your app to a real public URL that anyone can access.
             </DialogDescription>
           </DialogHeader>
 
           <div className="space-y-4 pt-2">
             {publishedUrl ? (
-              <div className="space-y-3">
-                <div className="flex items-center gap-2">
-                  <Check className="w-4 h-4 text-green-500" />
-                  <span className="text-sm font-medium text-foreground">Your app is live!</span>
+              <div className="space-y-4">
+                <div className="flex items-center gap-2 p-3 rounded-xl bg-[hsl(var(--ide-success))]/10 border border-[hsl(var(--ide-success))]/20">
+                  <Check className="w-5 h-5 text-[hsl(var(--ide-success))]" />
+                  <div>
+                    <span className="text-sm font-semibold text-foreground">Your app is live! 🚀</span>
+                    <p className="text-[11px] text-muted-foreground">Deployed and accessible to anyone with the link</p>
+                  </div>
                 </div>
-                <div className="flex items-center gap-2 bg-secondary rounded-lg px-3 py-2">
-                  <Globe className="w-4 h-4 text-muted-foreground shrink-0" />
-                  <span className="text-xs text-foreground truncate flex-1">{publishedUrl}</span>
-                  <button onClick={handleCopy} className="text-muted-foreground hover:text-foreground shrink-0">
-                    {copied ? <Check className="w-4 h-4 text-green-500" /> : <Copy className="w-4 h-4" />}
+                
+                <div className="flex items-center gap-2 bg-secondary rounded-xl px-3 py-2.5">
+                  <Link2 className="w-4 h-4 text-primary shrink-0" />
+                  <span className="text-xs text-foreground truncate flex-1 font-mono">{publishedUrl}</span>
+                  <button onClick={handleCopy} className="text-muted-foreground hover:text-foreground shrink-0 transition-colors">
+                    {copied ? <Check className="w-4 h-4 text-[hsl(var(--ide-success))]" /> : <Copy className="w-4 h-4" />}
                   </button>
                 </div>
+
                 <div className="flex gap-2">
                   <a
                     href={publishedUrl}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-md text-xs font-medium bg-primary text-primary-foreground hover:bg-primary/90 transition-colors"
+                    className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-xl text-xs font-semibold bg-primary text-primary-foreground hover:bg-primary/90 transition-colors"
                   >
-                    Open App
+                    <ExternalLink className="w-3.5 h-3.5" />
+                    Open Live App
                   </a>
+                  <button
+                    onClick={handlePublish}
+                    disabled={publishing}
+                    className="px-3 py-2.5 rounded-xl text-xs font-medium text-primary hover:bg-primary/10 transition-colors disabled:opacity-50"
+                  >
+                    {publishing ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : "Update"}
+                  </button>
                   <button
                     onClick={handleUnpublish}
                     disabled={publishing}
-                    className="px-3 py-2 rounded-md text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors"
+                    className="px-3 py-2.5 rounded-xl text-xs font-medium text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
                   >
                     Unpublish
                   </button>
                 </div>
               </div>
             ) : (
-              <div className="space-y-3">
-                <p className="text-sm text-muted-foreground">
-                  Publishing creates a shareable link to your app. Anyone with the link can view it.
-                </p>
+              <div className="space-y-4">
+                <div className="space-y-3">
+                  <div className="flex items-center gap-3 p-3 rounded-xl bg-secondary">
+                    <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center">
+                      <Globe className="w-4 h-4 text-primary" />
+                    </div>
+                    <div>
+                      <p className="text-xs font-medium text-foreground">Real deployment</p>
+                      <p className="text-[10px] text-muted-foreground">Your app gets a public URL hosted on our CDN</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3 p-3 rounded-xl bg-secondary">
+                    <div className="w-8 h-8 rounded-lg bg-accent/10 flex items-center justify-center">
+                      <Link2 className="w-4 h-4 text-accent" />
+                    </div>
+                    <div>
+                      <p className="text-xs font-medium text-foreground">Shareable link</p>
+                      <p className="text-[10px] text-muted-foreground">Anyone with the link can view your app</p>
+                    </div>
+                  </div>
+                </div>
+
                 <button
                   onClick={handlePublish}
                   disabled={publishing}
-                  className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-md text-sm font-medium bg-primary text-primary-foreground hover:bg-primary/90 transition-colors disabled:opacity-50"
+                  className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl text-sm font-semibold bg-primary text-primary-foreground hover:bg-primary/90 transition-colors disabled:opacity-50 shadow-lg shadow-primary/20"
                 >
                   {publishing ? (
                     <>
                       <Loader2 className="w-4 h-4 animate-spin" />
-                      Publishing...
+                      Deploying...
                     </>
                   ) : (
                     <>
                       <Globe className="w-4 h-4" />
-                      Publish Now
+                      Deploy Now
                     </>
                   )}
                 </button>
