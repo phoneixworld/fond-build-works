@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, forwardRef, useImperativeHandle } from "react";
 import { Globe, Download, Check, Copy, Loader2 } from "lucide-react";
 import { useProjects } from "@/contexts/ProjectContext";
 import { usePreview } from "@/contexts/PreviewContext";
