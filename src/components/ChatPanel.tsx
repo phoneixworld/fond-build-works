@@ -1,4 +1,5 @@
-import { useState, useRef, useEffect, useCallback } from "react";
+import { useState, useRef, useEffect, useCallback, forwardRef, useImperativeHandle } from "react";
+import { Version } from "@/components/VersionHistory";
 import { Send, Bot, User, ChevronDown, Sparkles, AlertTriangle, Wand2, ImagePlus, X, Palette, ArrowDown, Clock, Zap, Trash2 } from "lucide-react";
 import { streamChat } from "@/lib/streamChat";
 import { AI_MODELS, DEFAULT_MODEL, PROMPT_SUGGESTIONS, QUICK_ACTIONS, DESIGN_THEMES, type AIModelId } from "@/lib/aiModels";
@@ -98,7 +99,11 @@ function formatTime(ts?: number): string {
 
 const MAX_IMAGE_SIZE = 4 * 1024 * 1024;
 
-const ChatPanel = ({ initialPrompt }: { initialPrompt?: string }) => {
+export interface ChatPanelHandle {
+  clearChat: () => void;
+}
+
+const ChatPanel = forwardRef<ChatPanelHandle, { initialPrompt?: string; onVersionCreated?: (version: Version) => void }>(({ initialPrompt, onVersionCreated }, ref) => {
   const { currentProject, saveProject } = useProjects();
   const [messages, setMessages] = useState<Msg[]>([]);
   const [input, setInput] = useState("");
@@ -241,13 +246,15 @@ const ChatPanel = ({ initialPrompt }: { initialPrompt?: string }) => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
   };
 
-  const clearChat = () => {
+  const clearChat = useCallback(() => {
     if (!currentProject || isLoading) return;
     setMessages([]);
     setPreviewHtml("");
     setPreviewErrors([]);
     saveProject({ chat_history: [], html_content: "" });
-  };
+  }, [currentProject, isLoading, setPreviewHtml, saveProject]);
+
+  useImperativeHandle(ref, () => ({ clearChat }), [clearChat]);
 
   const sendMessage = useCallback(async (text: string, images: string[] = []) => {
     if (!text || isLoading || !currentProject) return;
@@ -324,6 +331,18 @@ const ChatPanel = ({ initialPrompt }: { initialPrompt?: string }) => {
           const [chatText, htmlCode] = parseResponse(fullResponse);
           if (htmlCode) setPreviewHtml(postProcessHtml(htmlCode));
 
+          // Create version snapshot
+          if (htmlCode && onVersionCreated) {
+            const userPrompt = getTextContent(userMsg.content);
+            onVersionCreated({
+              id: crypto.randomUUID(),
+              timestamp: Date.now(),
+              label: userPrompt.slice(0, 60) || "Build update",
+              html: postProcessHtml(htmlCode),
+              messageIndex: messages.length,
+            });
+          }
+
           setMessages((prev) => {
             const final = chatText
               ? prev.map((m, i) => (i === prev.length - 1 && m.role === "assistant" ? { ...m, content: chatText } : m))
@@ -357,7 +376,7 @@ const ChatPanel = ({ initialPrompt }: { initialPrompt?: string }) => {
       setIsBuilding(false);
       setBuildStep("");
     }
-  }, [isLoading, messages, currentProject, saveProject, setPreviewHtml, setIsBuilding, setBuildStep, selectedModel, selectedTheme]);
+  }, [isLoading, messages, currentProject, saveProject, setPreviewHtml, setIsBuilding, setBuildStep, selectedModel, selectedTheme, onVersionCreated]);
 
   useEffect(() => {
     if (pendingPrompt && currentProject && !isLoading && messages.length === 0) {
@@ -822,6 +841,8 @@ const ChatPanel = ({ initialPrompt }: { initialPrompt?: string }) => {
       </div>
     </TooltipProvider>
   );
-};
+});
+
+ChatPanel.displayName = "ChatPanel";
 
 export default ChatPanel;

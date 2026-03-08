@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, forwardRef, useImperativeHandle } from "react";
 import { Globe, Download, Check, Copy, Loader2 } from "lucide-react";
 import { useProjects } from "@/contexts/ProjectContext";
 import { usePreview } from "@/contexts/PreviewContext";
@@ -14,7 +14,12 @@ import {
 import JSZip from "jszip";
 import { saveAs } from "file-saver";
 
-const PublishExportButtons = () => {
+export interface PublishExportHandle {
+  openPublish: () => void;
+  handleExport: () => void;
+}
+
+const PublishExportButtons = forwardRef<PublishExportHandle>((_, ref) => {
   const { currentProject, saveProject } = useProjects();
   const { previewHtml } = usePreview();
   const { toast } = useToast();
@@ -22,6 +27,25 @@ const PublishExportButtons = () => {
   const [publishing, setPublishing] = useState(false);
   const [publishedUrl, setPublishedUrl] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+
+  const handleExportFn = async () => {
+    const html = previewHtml || currentProject?.html_content;
+    if (!html) {
+      toast({ title: "Nothing to export", description: "Build something first!", variant: "destructive" });
+      return;
+    }
+    const zip = new JSZip();
+    zip.file("index.html", `<!DOCTYPE html>\n<html lang="en">\n<head>\n  <meta charset="UTF-8">\n  <meta name="viewport" content="width=device-width, initial-scale=1.0">\n  <title>${currentProject?.name || "My App"}</title>\n</head>\n<body>\n${html}\n</body>\n</html>`);
+    zip.file("README.md", `# ${currentProject?.name || "My App"}\n\nGenerated app. Open \`index.html\` in a browser to view.\n`);
+    const blob = await zip.generateAsync({ type: "blob" });
+    saveAs(blob, `${currentProject?.name || "my-app"}.zip`);
+    toast({ title: "Exported!", description: "ZIP file downloaded." });
+  };
+
+  useImperativeHandle(ref, () => ({
+    openPublish: () => setShowPublish(true),
+    handleExport: handleExportFn,
+  }));
 
   const generateSlug = (name: string, id: string) => {
     const base = name
@@ -86,21 +110,7 @@ const PublishExportButtons = () => {
     }
   };
 
-  const handleExport = async () => {
-    const html = previewHtml || currentProject?.html_content;
-    if (!html) {
-      toast({ title: "Nothing to export", description: "Build something first!", variant: "destructive" });
-      return;
-    }
-
-    const zip = new JSZip();
-    zip.file("index.html", `<!DOCTYPE html>\n<html lang="en">\n<head>\n  <meta charset="UTF-8">\n  <meta name="viewport" content="width=device-width, initial-scale=1.0">\n  <title>${currentProject?.name || "My App"}</title>\n</head>\n<body>\n${html}\n</body>\n</html>`);
-    zip.file("README.md", `# ${currentProject?.name || "My App"}\n\nGenerated app. Open \`index.html\` in a browser to view.\n\nTo deploy:\n- Upload to any static hosting (Netlify, Vercel, GitHub Pages)\n- Or simply open index.html locally\n`);
-
-    const blob = await zip.generateAsync({ type: "blob" });
-    saveAs(blob, `${currentProject?.name || "my-app"}.zip`);
-    toast({ title: "Exported!", description: "ZIP file downloaded." });
-  };
+  const handleExport = handleExportFn;
 
   return (
     <>
@@ -189,6 +199,8 @@ const PublishExportButtons = () => {
       </Dialog>
     </>
   );
-};
+});
+
+PublishExportButtons.displayName = "PublishExportButtons";
 
 export default PublishExportButtons;
