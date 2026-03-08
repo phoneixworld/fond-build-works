@@ -92,6 +92,21 @@ TECH STACK: ${techStackInstructions[techStack] || techStackInstructions["html-ta
 
 ${dataApiDocs}
 
+${schemas && schemas.length > 0 ? `
+## DEFINED DATA MODELS
+
+The customer has defined the following data models. You MUST use these exact collection names and fields when building features that involve data:
+
+${schemas.map((s: any) => {
+  const fields = s.schema?.fields || [];
+  const fieldList = fields.map((f: any) => `  - ${f.name} (${f.type}${f.required ? ', required' : ''})`).join('\n');
+  return `### Collection: "${s.collection_name}"
+${fieldList || '  (no fields defined)'}`;
+}).join('\n\n')}
+
+IMPORTANT: When the user asks to build something related to these data models, use the Data API with these exact collection names and field names. Pre-populate forms with these fields. Use the correct field types for input validation.
+` : ''}
+
 RULES:
 - ALWAYS include the html-preview code fence when building something.
 - The HTML must be a COMPLETE standalone page.
@@ -103,7 +118,8 @@ RULES:
 - When modifying, generate the FULL updated HTML.
 - Use lucide icons: <script src="https://unpkg.com/lucide@latest"></script> and <i data-lucide="icon-name"></i> with <script>lucide.createIcons()</script>.
 - CRITICAL: For any app needing data (todos, notes, CRM, etc.), USE THE DATA API. Make it persist data for real.
-- For apps needing user accounts, USE THE AUTH API with signup/login forms.`;
+- For apps needing user accounts, USE THE AUTH API with signup/login forms.
+${schemas && schemas.length > 0 ? '- CRITICAL: Use the DEFINED DATA MODELS above for collection names and fields. Do NOT invent your own field names.' : ''}`;
 }
 
 serve(async (req) => {
