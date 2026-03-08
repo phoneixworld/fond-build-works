@@ -57,10 +57,10 @@ const IDELayout = () => {
   const currentStackInfo = TECH_STACKS.find(s => s.id === currentStack);
   const StackIcon = currentStackInfo?.icon;
 
-  const panelTabs: { id: "preview" | "code" | "schema"; label: string; icon: typeof Eye }[] = [
+  const panelTabs: { id: "preview" | "code" | "cloud"; label: string; icon: typeof Eye }[] = [
     { id: "preview", label: "Preview", icon: Eye },
     { id: "code", label: "Code", icon: Code },
-    { id: "schema", label: "Data", icon: Database },
+    { id: "cloud", label: "Cloud", icon: Cloud },
   ];
 
   return (
