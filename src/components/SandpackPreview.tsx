@@ -104,7 +104,8 @@ function buildSandpackFiles(files: SandpackFileSet | null): Record<string, strin
     // Keep .jsx as-is — Sandpack react template supports both .js and .jsx
     // Only convert .tsx/.ts to .js
     const sandpackPath = normalized.replace(/\.tsx?$/, ".js");
-    base[sandpackPath] = code;
+    // Apply second-pass sanitizer on JS/JSX files
+    base[sandpackPath] = sandpackPath.match(/\.(jsx?|js)$/) ? sanitizeCode(code) : code;
   }
 
   // Ensure entry point exists: /App.js or /App.jsx
