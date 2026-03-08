@@ -3,6 +3,7 @@ import { Version } from "@/components/VersionHistory";
 import { Send, Bot, User, ChevronDown, Sparkles, AlertTriangle, Wand2, ImagePlus, X, Palette, ArrowDown, Clock, Zap, Trash2, ShieldCheck, MessageSquareMore, CheckCircle2, Pencil, RotateCcw, Upload } from "lucide-react";
 import VoiceInput from "@/components/VoiceInput";
 import { streamChat } from "@/lib/streamChat";
+import { classifyIntent, streamChatAgent, streamBuildAgent, validateReactCode, hasBuildConfirmation, stripBuildMarker, type AgentIntent, type PipelineStep } from "@/lib/agentPipeline";
 import { validateAndFixHtml } from "@/lib/htmlValidator";
 import { matchTemplate, PAGE_TEMPLATES, type PageTemplate } from "@/lib/pageTemplates";
 import { COMPONENT_SNIPPETS, getSnippetsPromptContext } from "@/lib/componentSnippets";
