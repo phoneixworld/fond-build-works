@@ -482,6 +482,7 @@ const BrandKitGenerator = () => {
             </motion.div>
           )}
         </AnimatePresence>
+        )}
       </div>
     </div>
   );
