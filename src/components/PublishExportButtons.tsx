@@ -28,6 +28,25 @@ const PublishExportButtons = forwardRef<PublishExportHandle>((_, ref) => {
   const [publishedUrl, setPublishedUrl] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
 
+  const handleExportFn = async () => {
+    const html = previewHtml || currentProject?.html_content;
+    if (!html) {
+      toast({ title: "Nothing to export", description: "Build something first!", variant: "destructive" });
+      return;
+    }
+    const zip = new JSZip();
+    zip.file("index.html", `<!DOCTYPE html>\n<html lang="en">\n<head>\n  <meta charset="UTF-8">\n  <meta name="viewport" content="width=device-width, initial-scale=1.0">\n  <title>${currentProject?.name || "My App"}</title>\n</head>\n<body>\n${html}\n</body>\n</html>`);
+    zip.file("README.md", `# ${currentProject?.name || "My App"}\n\nGenerated app. Open \`index.html\` in a browser to view.\n`);
+    const blob = await zip.generateAsync({ type: "blob" });
+    saveAs(blob, `${currentProject?.name || "my-app"}.zip`);
+    toast({ title: "Exported!", description: "ZIP file downloaded." });
+  };
+
+  useImperativeHandle(ref, () => ({
+    openPublish: () => setShowPublish(true),
+    handleExport: handleExportFn,
+  }));
+
   const generateSlug = (name: string, id: string) => {
     const base = name
       .toLowerCase()
