@@ -18,6 +18,8 @@ interface VirtualFSContextType {
   fileTree: FileNode[];
   setFiles: (files: Record<string, VirtualFile>) => void;
   updateFile: (path: string, content: string) => void;
+  addFile: (path: string, content: string) => void;
+  removeFile: (path: string) => void;
   getFile: (path: string) => VirtualFile | null;
   activeFile: string;
   setActiveFile: (path: string) => void;
