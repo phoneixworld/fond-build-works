@@ -13,6 +13,7 @@ import {
   GitBranch,
   ShieldCheck,
   Rocket,
+  ShieldAlert,
 } from "lucide-react";
 import SchemaBuilder from "./SchemaBuilder";
 import CloudOverview from "./cloud/CloudOverview";
