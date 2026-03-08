@@ -1,11 +1,12 @@
-import { useState, useRef, useCallback } from "react";
+import { useState, useRef, useCallback, useEffect } from "react";
 import {
-  Palette, Upload, Sparkles, Type, Layers, Copy, Check, Wand2,
-  CircleDot, Sun, Moon, Paintbrush, Download, RefreshCw, ImagePlus, X
+  Palette, Sparkles, Type, Layers, Copy, Check, Wand2,
+  CircleDot, Paintbrush, Download, RefreshCw, ImagePlus, X, CheckCircle2, Loader2
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { motion, AnimatePresence } from "framer-motion";
 import { useToast } from "@/hooks/use-toast";
+import { useProjects } from "@/contexts/ProjectContext";
 
 interface BrandColor {
   hsl: string;
@@ -13,7 +14,7 @@ interface BrandColor {
   name: string;
 }
 
-interface BrandKit {
+export interface BrandKit {
   brandName: string;
   tagline: string;
   personality: string[];
@@ -52,13 +53,36 @@ const MOOD_OPTIONS = [
 
 const BrandKitGenerator = () => {
   const { toast } = useToast();
+  const { currentProject } = useProjects();
   const fileRef = useRef<HTMLInputElement>(null);
   const [image, setImage] = useState<string | null>(null);
   const [mood, setMood] = useState<string>("");
   const [description, setDescription] = useState("");
   const [loading, setLoading] = useState(false);
+  const [saving, setSaving] = useState(false);
   const [kit, setKit] = useState<BrandKit | null>(null);
+  const [savedKit, setSavedKit] = useState<BrandKit | null>(null);
   const [copiedField, setCopiedField] = useState<string | null>(null);
+  const [applied, setApplied] = useState(false);
+
+  // Load saved brand kit for current project
+  useEffect(() => {
+    if (!currentProject) return;
+    (async () => {
+      const { data } = await supabase
+        .from("project_data")
+        .select("data")
+        .eq("project_id", currentProject.id)
+        .eq("collection", "brand_kit")
+        .maybeSingle();
+      if (data?.data) {
+        const loaded = data.data as unknown as BrandKit;
+        setSavedKit(loaded);
+        setKit(loaded);
+        setApplied(true);
+      }
+    })();
+  }, [currentProject]);
 
   const handleImageUpload = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -78,6 +102,7 @@ const BrandKitGenerator = () => {
       return;
     }
     setLoading(true);
+    setApplied(false);
     try {
       const { data, error } = await supabase.functions.invoke("generate-brand-kit", {
         body: { image, mood, description },
@@ -92,6 +117,39 @@ const BrandKitGenerator = () => {
       setLoading(false);
     }
   }, [image, mood, description, toast]);
+
+  const applyToProject = useCallback(async () => {
+    if (!kit || !currentProject) return;
+    setSaving(true);
+    try {
+      // Upsert brand kit into project_data
+      const { data: existing } = await supabase
+        .from("project_data")
+        .select("id")
+        .eq("project_id", currentProject.id)
+        .eq("collection", "brand_kit")
+        .maybeSingle();
+
+      if (existing) {
+        await supabase
+          .from("project_data")
+          .update({ data: kit as any, updated_at: new Date().toISOString() })
+          .eq("id", existing.id);
+      } else {
+        await supabase
+          .from("project_data")
+          .insert({ project_id: currentProject.id, collection: "brand_kit", data: kit as any });
+      }
+
+      setSavedKit(kit);
+      setApplied(true);
+      toast({ title: "Brand Kit Applied! 🎨", description: "Your brand tokens are saved and will be used in generated code." });
+    } catch (e: any) {
+      toast({ title: "Save failed", description: e.message, variant: "destructive" });
+    } finally {
+      setSaving(false);
+    }
+  }, [kit, currentProject, toast]);
 
   const copyToClipboard = useCallback((text: string, field: string) => {
     navigator.clipboard.writeText(text);
@@ -127,11 +185,16 @@ const BrandKitGenerator = () => {
       <div className="flex items-center justify-between px-4 py-3 border-b border-border bg-[hsl(var(--ide-panel-header))]">
         <div className="flex items-center gap-2">
           <Palette className="w-4 h-4 text-primary" />
-          <span className="text-sm font-semibold text-foreground">Brand Kit Generator</span>
+          <span className="text-sm font-semibold text-foreground">Brand Kit</span>
+          {applied && savedKit && (
+            <span className="flex items-center gap-1 text-[10px] text-[hsl(var(--ide-success))] bg-[hsl(var(--ide-success))]/10 px-1.5 py-0.5 rounded-full">
+              <CheckCircle2 className="w-3 h-3" /> Active
+            </span>
+          )}
         </div>
         {kit && (
           <button
-            onClick={() => { setKit(null); setImage(null); setDescription(""); setMood(""); }}
+            onClick={() => { setKit(null); setImage(null); setDescription(""); setMood(""); setApplied(!!savedKit); }}
             className="text-[11px] text-muted-foreground hover:text-foreground flex items-center gap-1 transition-colors"
           >
             <RefreshCw className="w-3 h-3" /> New
@@ -201,7 +264,7 @@ const BrandKitGenerator = () => {
                 <textarea
                   value={description}
                   onChange={e => setDescription(e.target.value)}
-                  placeholder="e.g. A modern fintech startup targeting millennials, we want to feel trustworthy but approachable..."
+                  placeholder="e.g. A modern fintech startup targeting millennials..."
                   rows={3}
                   className="w-full bg-background border border-border rounded-lg px-3 py-2 text-xs text-foreground placeholder:text-muted-foreground/50 resize-none focus:border-primary outline-none transition-colors"
                 />
@@ -215,7 +278,7 @@ const BrandKitGenerator = () => {
               >
                 {loading ? (
                   <>
-                    <div className="w-4 h-4 border-2 border-primary-foreground/30 border-t-primary-foreground rounded-full animate-spin" />
+                    <Loader2 className="w-4 h-4 animate-spin" />
                     Generating brand kit...
                   </>
                 ) : (
@@ -252,7 +315,6 @@ const BrandKitGenerator = () => {
                   <CircleDot className="w-3.5 h-3.5 text-muted-foreground" />
                   <span className="text-xs font-medium text-foreground">Color Palette</span>
                 </div>
-                {/* Swatches row */}
                 <div className="flex gap-1 mb-4 rounded-lg overflow-hidden">
                   {Object.entries(kit.colors).map(([key, color]) => (
                     <div
@@ -278,18 +340,16 @@ const BrandKitGenerator = () => {
                   <span className="text-xs font-medium text-foreground">Typography</span>
                 </div>
                 <div className="space-y-3">
-                  <div className="flex items-center justify-between">
-                    <span className="text-[10px] text-muted-foreground uppercase tracking-wider">Heading</span>
-                    <span className="text-sm font-bold text-foreground">{kit.typography.headingFont}</span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-[10px] text-muted-foreground uppercase tracking-wider">Body</span>
-                    <span className="text-sm text-foreground">{kit.typography.bodyFont}</span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-[10px] text-muted-foreground uppercase tracking-wider">Mono</span>
-                    <span className="text-sm font-mono text-foreground">{kit.typography.monoFont}</span>
-                  </div>
+                  {[
+                    { label: "Heading", value: kit.typography.headingFont, cls: "font-bold" },
+                    { label: "Body", value: kit.typography.bodyFont, cls: "" },
+                    { label: "Mono", value: kit.typography.monoFont, cls: "font-mono" },
+                  ].map(item => (
+                    <div key={item.label} className="flex items-center justify-between">
+                      <span className="text-[10px] text-muted-foreground uppercase tracking-wider">{item.label}</span>
+                      <span className={`text-sm text-foreground ${item.cls}`}>{item.value}</span>
+                    </div>
+                  ))}
                   <div className="flex items-center justify-between">
                     <span className="text-[10px] text-muted-foreground uppercase tracking-wider">Scale</span>
                     <span className="text-[11px] px-2 py-0.5 rounded-full bg-secondary text-foreground">{kit.typography.scale}</span>
@@ -318,6 +378,29 @@ const BrandKitGenerator = () => {
                 </div>
               </div>
 
+              {/* Live preview */}
+              <div
+                className="border border-border rounded-xl p-5 overflow-hidden"
+                style={{ backgroundColor: kit.colors.background.hex, color: kit.colors.foreground.hex }}
+              >
+                <div className="flex items-center gap-1.5 mb-3 text-[10px] uppercase tracking-wider opacity-50">
+                  <Sparkles className="w-3 h-3" /> Live Preview
+                </div>
+                <h3 className="text-lg font-bold mb-1">{kit.brandName}</h3>
+                <p className="text-xs opacity-70 mb-3">{kit.tagline}</p>
+                <div className="flex gap-2">
+                  <button className="px-4 py-1.5 rounded-lg text-xs font-medium" style={{ backgroundColor: kit.colors.primary.hex, color: "#fff" }}>
+                    Primary Action
+                  </button>
+                  <button className="px-4 py-1.5 rounded-lg text-xs font-medium border" style={{ borderColor: kit.colors.secondary.hex, color: kit.colors.foreground.hex }}>
+                    Secondary
+                  </button>
+                </div>
+                <div className="mt-3 p-3 rounded-lg" style={{ backgroundColor: kit.colors.muted.hex }}>
+                  <p className="text-[11px] opacity-60">Muted background card preview.</p>
+                </div>
+              </div>
+
               {/* CSS Output */}
               <div className="border border-border rounded-xl p-4 bg-background">
                 <div className="flex items-center justify-between mb-3">
@@ -338,47 +421,33 @@ const BrandKitGenerator = () => {
                 </pre>
               </div>
 
-              {/* Preview card */}
-              <div
-                className="border border-border rounded-xl p-5 overflow-hidden relative"
-                style={{ backgroundColor: kit.colors.background.hex, color: kit.colors.foreground.hex }}
-              >
-                <div className="flex items-center gap-1.5 mb-3 text-[10px] uppercase tracking-wider opacity-50">
-                  <Sparkles className="w-3 h-3" /> Live Preview
-                </div>
-                <h3 className="text-lg font-bold mb-1" style={{ color: kit.colors.foreground.hex }}>
-                  {kit.brandName}
-                </h3>
-                <p className="text-xs opacity-70 mb-3">{kit.tagline}</p>
-                <div className="flex gap-2">
-                  <button
-                    className="px-4 py-1.5 rounded-lg text-xs font-medium"
-                    style={{ backgroundColor: kit.colors.primary.hex, color: "#fff" }}
-                  >
-                    Primary Action
-                  </button>
-                  <button
-                    className="px-4 py-1.5 rounded-lg text-xs font-medium border"
-                    style={{ borderColor: kit.colors.secondary.hex, color: kit.colors.foreground.hex }}
-                  >
-                    Secondary
-                  </button>
-                </div>
-                <div className="mt-3 p-3 rounded-lg" style={{ backgroundColor: kit.colors.muted.hex }}>
-                  <p className="text-[11px] opacity-60">
-                    This is how your muted background will look with content inside a card component.
-                  </p>
-                </div>
+              {/* Actions */}
+              <div className="space-y-2">
+                <button
+                  onClick={applyToProject}
+                  disabled={saving || applied}
+                  className={`w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl font-semibold text-sm transition-all ${
+                    applied
+                      ? "bg-[hsl(var(--ide-success))]/10 text-[hsl(var(--ide-success))] border border-[hsl(var(--ide-success))]/30"
+                      : "bg-gradient-to-r from-primary to-accent text-primary-foreground hover:opacity-90"
+                  } disabled:opacity-60`}
+                >
+                  {saving ? (
+                    <><Loader2 className="w-4 h-4 animate-spin" /> Saving...</>
+                  ) : applied ? (
+                    <><CheckCircle2 className="w-4 h-4" /> Applied to Project</>
+                  ) : (
+                    <><Wand2 className="w-4 h-4" /> Apply to Project</>
+                  )}
+                </button>
+                <button
+                  onClick={() => copyToClipboard(kit.cssVariables, "CSS Variables")}
+                  className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl border border-border text-muted-foreground font-medium text-xs hover:text-foreground hover:bg-secondary/50 transition-all"
+                >
+                  <Download className="w-3.5 h-3.5" />
+                  Copy CSS to Clipboard
+                </button>
               </div>
-
-              {/* Action: Copy full CSS */}
-              <button
-                onClick={() => copyToClipboard(kit.cssVariables, "CSS Variables")}
-                className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl border border-primary text-primary font-semibold text-sm hover:bg-primary/10 transition-all"
-              >
-                <Download className="w-4 h-4" />
-                Copy CSS to Clipboard
-              </button>
             </motion.div>
           )}
         </AnimatePresence>
