@@ -353,12 +353,33 @@ const ChatPanel = forwardRef<ChatPanelHandle, { initialPrompt?: string; onVersio
               content: typeof m.content === "string" ? m.content : getTextContent(m.content),
             }));
 
+            // AI-generate project name on first message
+            const isFirstMessage = persistMessages.filter(m => m.role === "user").length === 1;
+            
+            if (isFirstMessage && currentProject.name === "Untitled Project") {
+              // Fire and forget AI name generation
+              fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/project-name`, {
+                method: "POST",
+                headers: {
+                  "Content-Type": "application/json",
+                  Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+                },
+                body: JSON.stringify({ prompt: persistMessages[0].content }),
+              })
+                .then(r => r.json())
+                .then(({ name, emoji }) => {
+                  const fullName = emoji ? `${emoji} ${name}` : name;
+                  saveProject({ name: fullName });
+                })
+                .catch(() => {
+                  // Fallback to truncated prompt
+                  saveProject({ name: persistMessages[0].content.slice(0, 40) });
+                });
+            }
+
             saveProject({
               chat_history: persistMessages,
               html_content: htmlCode || currentProject.html_content || "",
-              name: currentProject.name === "Untitled Project" && persistMessages.length > 0
-                ? persistMessages[0].content.slice(0, 40)
-                : currentProject.name,
             });
 
             return final;
