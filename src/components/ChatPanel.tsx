@@ -328,7 +328,7 @@ const ChatPanel = forwardRef<ChatPanelHandle, { initialPrompt?: string; onVersio
     if (!currentProject) return null;
     try {
       const ext = file.name.split(".").pop() || "png";
-      const path = `${currentProject.user_id}/${currentProject.id}/${Date.now()}.${ext}`;
+      const path = `${currentProject.id}/${Date.now()}.${ext}`;
       const { error } = await supabase.storage.from("app-assets").upload(path, file, { upsert: true });
       if (error) { console.error("Upload error:", error); return null; }
       const { data } = supabase.storage.from("app-assets").getPublicUrl(path);
