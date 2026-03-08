@@ -510,6 +510,8 @@ const ChatPanel = forwardRef<ChatPanelHandle, { initialPrompt?: string; onVersio
           setIsLoading(false);
           setIsBuilding(false);
           setBuildStep("");
+          // Reset stream content after a short delay so "Build complete" shows briefly
+          setTimeout(() => setBuildStreamContent(""), 3000);
 
           // Use multi-file parser
           const { files: parsedFiles, html: htmlCode, chatText } = parseMultiFileOutput(fullResponse);
