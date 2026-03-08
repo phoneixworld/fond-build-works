@@ -165,8 +165,8 @@ const IDELayout = () => {
             <ResizablePanel defaultSize={65}>
               {rightPanel === "code" ? (
                 <CodeEditor selectedFile={selectedFile} />
-              ) : rightPanel === "schema" ? (
-                <SchemaBuilder />
+              ) : rightPanel === "cloud" ? (
+                <CloudPanel />
               ) : (
                 <PreviewPanel />
               )}
