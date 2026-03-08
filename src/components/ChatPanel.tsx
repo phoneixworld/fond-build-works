@@ -41,20 +41,17 @@ const ChatPanel = ({ initialPrompt }: { initialPrompt?: string }) => {
   }, [currentProject?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Auto-send initial prompt from landing page
+  const sendRef = useRef<((text: string) => void) | null>(null);
   useEffect(() => {
     if (initialPrompt && !hasAutoSent && currentProject && messages.length === 0) {
       setHasAutoSent(true);
-      setInput(initialPrompt);
-      // Trigger send on next tick after input is set
-      setTimeout(() => sendRef.current?.(), 100);
+      setTimeout(() => sendRef.current?.(initialPrompt), 100);
     }
   }, [initialPrompt, hasAutoSent, currentProject, messages.length]);
 
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
   }, [messages]);
-
-  const sendRef = useRef<(() => void) | null>(null);
 
   const send = useCallback(async (overrideText?: string) => {
     const text = overrideText || input.trim();
