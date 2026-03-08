@@ -247,7 +247,7 @@ const CopyButton = ({ text }: { text: string }) => {
   return (
     <button
       onClick={handleCopy}
-      className="p-1 rounded-md text-muted-foreground/30 hover:text-muted-foreground/60 hover:bg-secondary/50 transition-all"
+      className="p-1 rounded-md text-white/60 hover:text-white hover:bg-secondary/50 transition-all"
       title="Copy message"
     >
       {copied ? <Check className="w-3 h-3 text-[hsl(var(--ide-success))]" /> : <Copy className="w-3 h-3" />}
