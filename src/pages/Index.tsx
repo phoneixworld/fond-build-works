@@ -4,13 +4,14 @@ import {
   ResizablePanel,
   ResizablePanelGroup,
 } from "@/components/ui/resizable";
-import { Code, Eye, Zap, LogOut, ArrowLeft, Database, ChevronDown } from "lucide-react";
+import { Code, Eye, Zap, LogOut, ArrowLeft, Cloud, ChevronDown } from "lucide-react";
 import { PreviewProvider } from "@/contexts/PreviewContext";
 import { ProjectProvider, useProjects } from "@/contexts/ProjectContext";
 import { useAuth } from "@/hooks/useAuth";
 import ChatPanel from "@/components/ChatPanel";
 import CodeEditor from "@/components/CodeEditor";
-import SchemaBuilder from "@/components/SchemaBuilder";
+import CloudPanel from "@/components/CloudPanel";
+import PreviewPanel from "@/components/PreviewPanel";
 import PreviewPanel from "@/components/PreviewPanel";
 import PublishExportButtons from "@/components/PublishExportButtons";
 import LandingPage from "@/components/LandingPage";
