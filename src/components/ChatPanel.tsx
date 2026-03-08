@@ -200,6 +200,15 @@ function parseReactFiles(text: string): { chatText: string; files: Record<string
   
   // Parse file sections: --- /App.jsx or --- App.jsx or --- /src/App.jsx
   const fileSections = block.split(/^---\s+/m).filter(Boolean);
+  
+  // If there are no --- separators, treat the whole block as /App.jsx
+  const hasFileSeparators = /^---\s+/m.test(block);
+  if (!hasFileSeparators && block.trim().length > 0) {
+    console.log(`[parseReactFiles] No file separators found — treating entire block as /App.jsx`);
+    files["/App.jsx"] = sanitizeImports(block.trim());
+    return { chatText, files: Object.keys(files).length > 0 ? files : null, deps };
+  }
+  
   for (const section of fileSections) {
     const lines = section.split("\n");
     const firstLine = lines[0].trim();
