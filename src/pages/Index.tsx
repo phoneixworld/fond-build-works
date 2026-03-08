@@ -59,7 +59,7 @@ const IDELayout = () => {
   const handleStartProject = useCallback(async (prompt: string, techStack: TechStackId) => {
     setInitialPrompt(prompt);
     setVersions([]);
-    const project = await createProject(prompt.slice(0, 40), techStack);
+    const project = await createProject("Untitled Project", techStack);
     if (project) setInIDE(true);
   }, [createProject]);
 
