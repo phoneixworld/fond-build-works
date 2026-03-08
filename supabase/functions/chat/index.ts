@@ -60,7 +60,7 @@ IMPORTANT: When building apps that need data persistence (todo lists, forms, das
 
 ## OUTPUT FORMAT — CRITICAL
 Instead of \\\`\\\`\\\`html-preview, wrap your output in a \\\`\\\`\\\`react-preview fence.
-Inside, use --- filename markers to define each file:
+Inside, use "--- /filename" markers ON THE SAME LINE to define each file. The format MUST be exactly:
 
 \\\`\\\`\\\`react-preview
 --- /App.jsx
@@ -80,6 +80,15 @@ export default function Header() {
   "framer-motion": "^11.0.0"
 }
 \\\`\\\`\\\`
+
+⚠️ CRITICAL FORMAT RULES:
+- "--- /filename.jsx" must be on ONE line — the --- and filename on the SAME line
+- Do NOT put --- on its own line then filename on the next line
+- Do NOT use frontmatter-style --- before and after filename
+- WRONG: ---\\n/App.jsx\\n---
+- CORRECT: --- /App.jsx
+- File paths must start with / (e.g. --- /App.jsx, --- /components/Hero.jsx)
+- Do NOT use /src/ prefix — use --- /App.jsx not --- /src/App.jsx
 
 ## RULES
 - Write standard JSX (not React.createElement) — the bundler compiles it
