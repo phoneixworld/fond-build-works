@@ -8,7 +8,7 @@ const corsHeaders = {
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY")!;
 
-function buildSystemPrompt(projectId: string, techStack: string): string {
+function buildSystemPrompt(projectId: string, techStack: string, schemas?: any[]): string {
   const apiBase = `${SUPABASE_URL}/functions/v1`;
 
   const dataApiDocs = `
