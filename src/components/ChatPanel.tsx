@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useCallback, forwardRef, useImperativeHandle } from "react";
 import { Version } from "@/components/VersionHistory";
-import { Send, Bot, User, ChevronDown, Sparkles, AlertTriangle, Wand2, ImagePlus, X, Palette, ArrowDown, Clock, Zap, Trash2, ShieldCheck, MessageSquareMore, CheckCircle2 } from "lucide-react";
+import { Send, Bot, User, ChevronDown, Sparkles, AlertTriangle, Wand2, ImagePlus, X, Palette, ArrowDown, Clock, Zap, Trash2, ShieldCheck, MessageSquareMore, CheckCircle2, Pencil, RotateCcw, Upload } from "lucide-react";
 import { streamChat } from "@/lib/streamChat";
 import { AI_MODELS, DEFAULT_MODEL, PROMPT_SUGGESTIONS, QUICK_ACTIONS, DESIGN_THEMES, type AIModelId } from "@/lib/aiModels";
 import { motion, AnimatePresence } from "framer-motion";
