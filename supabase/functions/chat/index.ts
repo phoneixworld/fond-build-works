@@ -465,11 +465,11 @@ Here is a PARTIAL example of a well-built hero section. Your output must be AT L
         Our AI understands your vision and writes clean, maintainable code.
       </p>
       <div class="ui-hero-actions">
-        <a href="#" class="ui-btn ui-btn-primary ui-btn-lg">
+        <a href="#signup" class="ui-btn ui-btn-primary ui-btn-lg">
           <i data-lucide="play" style="width:18px;height:18px;"></i>
           Start Building Free
         </a>
-        <a href="#" class="ui-btn ui-btn-secondary ui-btn-lg">
+        <a href="#github" class="ui-btn ui-btn-secondary ui-btn-lg">
           <i data-lucide="github" style="width:18px;height:18px;"></i>
           View on GitHub
         </a>
