@@ -376,7 +376,7 @@ const ChatPanel = forwardRef<ChatPanelHandle, { initialPrompt?: string; onVersio
       setIsBuilding(false);
       setBuildStep("");
     }
-  }, [isLoading, messages, currentProject, saveProject, setPreviewHtml, setIsBuilding, setBuildStep, selectedModel, selectedTheme]);
+  }, [isLoading, messages, currentProject, saveProject, setPreviewHtml, setIsBuilding, setBuildStep, selectedModel, selectedTheme, onVersionCreated]);
 
   useEffect(() => {
     if (pendingPrompt && currentProject && !isLoading && messages.length === 0) {
