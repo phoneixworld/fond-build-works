@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { CheckCircle2, Circle, Loader2, ChevronRight, FileCode2 } from "lucide-react";
+import { CheckCircle2, Circle, Loader2, ChevronRight, FileCode2, Bot, Cpu, Shield } from "lucide-react";
+import type { PipelineStep } from "@/lib/agentPipeline";
 
 export interface TaskItem {
   id: string;
@@ -14,26 +15,28 @@ interface BuildPipelineCardProps {
   elapsed: number;
   /** Optional explicit tasks from outside */
   tasks?: TaskItem[];
+  /** Current agent pipeline step */
+  pipelineStep?: PipelineStep | null;
+  /** Which agent is active */
+  currentAgent?: "chat" | "build" | null;
 }
 
 /** Detect which files are being edited from stream content */
 function detectEditingFiles(content: string): string[] {
   const files: string[] = [];
-  // React preview files
   const reactMatches = content.matchAll(/---\s+\/?([^\s]+\.(?:jsx?|tsx?|css))/g);
   for (const m of reactMatches) {
     const name = m[1].split("/").pop() || m[1];
     if (!files.includes(name)) files.push(name);
   }
-  // HTML mode
   if (files.length === 0 && (content.includes("```html") || content.includes("```html-preview"))) {
     files.push("index.html");
   }
-  return files.slice(0, 3); // max 3 badges
+  return files.slice(0, 3);
 }
 
-/** Heuristic task detection from stream content */
-function detectTasks(content: string, isBuilding: boolean): TaskItem[] {
+/** Agent-aware task detection */
+function detectTasks(content: string, isBuilding: boolean, pipelineStep?: PipelineStep | null, currentAgent?: "chat" | "build" | null): TaskItem[] {
   const len = content.length;
   const hasCode = content.includes("```react-preview") || content.includes("```jsx") || content.includes("```html") || content.includes("```react");
   const hasClosingFence = hasCode && (() => {
@@ -44,7 +47,29 @@ function detectTasks(content: string, isBuilding: boolean): TaskItem[] {
 
   const tasks: TaskItem[] = [];
 
-  // If building but no code detected yet, show analyzing
+  // Step 1: Intent Classification
+  if (pipelineStep) {
+    tasks.push({
+      id: "classify",
+      label: "Intent classified",
+      status: pipelineStep === "classifying" ? "in_progress" : "done",
+    });
+  }
+
+  // For chat agent, just show "Responding..."
+  if (currentAgent === "chat") {
+    tasks.push({
+      id: "chat",
+      label: "Chat agent responding",
+      status: isBuilding ? "in_progress" : "done",
+    });
+    if (!isBuilding && len > 0) {
+      return tasks.map(t => ({ ...t, status: "done" as const }));
+    }
+    return tasks;
+  }
+
+  // Build agent pipeline
   if (isBuilding && len > 0) {
     tasks.push({
       id: "analyze",
@@ -53,40 +78,36 @@ function detectTasks(content: string, isBuilding: boolean): TaskItem[] {
     });
   }
 
-  // Only show generation task if we're still building OR code was found
   if (isBuilding && len > 80) {
     tasks.push({
       id: "generate",
-      label: "Generating components",
+      label: "Build agent generating code",
       status: hasCode ? "done" : "in_progress",
     });
   }
 
-  // Only show build/finalize tasks if actual code fences were found
   if (hasCode) {
     const codeStart = content.indexOf("```");
     const codeContent = content.slice(codeStart);
     tasks.push({
       id: "build",
-      label: "Building UI & styling",
+      label: "Assembling UI & components",
       status: codeContent.length > 3000 ? "done" : "in_progress",
     });
 
     if (codeContent.length > 2000) {
       tasks.push({
-        id: "finalize",
-        label: "Finalizing & validating",
+        id: "validate",
+        label: "Validating in Sandpack",
         status: hasClosingFence && !isBuilding ? "done" : "in_progress",
       });
     }
   }
 
-  // Only mark all done if code was actually generated
   if (!isBuilding && hasCode && len > 100) {
     return tasks.map(t => ({ ...t, status: "done" as const }));
   }
 
-  // If build finished with NO code, return empty — don't show misleading progress
   if (!isBuilding && !hasCode) {
     return [];
   }
@@ -109,29 +130,32 @@ const StatusIndicator = ({ status }: { status: TaskItem["status"] }) => {
   }
 };
 
-const BuildPipelineCard = ({ isBuilding, streamContent, elapsed, tasks: externalTasks }: BuildPipelineCardProps) => {
+const BuildPipelineCard = ({ isBuilding, streamContent, elapsed, tasks: externalTasks, pipelineStep, currentAgent }: BuildPipelineCardProps) => {
   const [collapsed, setCollapsed] = useState(false);
 
   const editingFiles = useMemo(() => detectEditingFiles(streamContent), [streamContent]);
-  const tasks = useMemo(() => externalTasks || detectTasks(streamContent, isBuilding), [externalTasks, streamContent, isBuilding]);
+  const tasks = useMemo(() => externalTasks || detectTasks(streamContent, isBuilding, pipelineStep, currentAgent), [externalTasks, streamContent, isBuilding, pipelineStep, currentAgent]);
 
   const doneCount = tasks.filter(t => t.status === "done").length;
   const allDone = doneCount === tasks.length && !isBuilding && tasks.length > 0;
   const activeTask = tasks.find(t => t.status === "in_progress");
 
-  // Build a description line
+  const agentLabel = currentAgent === "chat" ? "💬 Chat Agent" : currentAgent === "build" ? "🏗️ Build Agent" : "";
+
   const description = useMemo(() => {
     if (allDone) return `Completed in ${elapsed}s`;
     if (activeTask) {
       const descs: Record<string, string> = {
-        analyze: "Understanding your requirements",
-        generate: "Streaming contextual code updates underway",
+        classify: "Classifying intent...",
+        chat: "Chat agent processing your question",
+        analyze: "Understanding requirements",
+        generate: "Build agent streaming code",
         build: "Assembling UI components & applying styles",
-        finalize: "Running validation checks",
+        validate: "Validating in Sandpack environment",
       };
       return descs[activeTask.id] || "Processing...";
     }
-    return "Starting build...";
+    return "Starting...";
   }, [allDone, activeTask, elapsed]);
 
   if (tasks.length === 0 && !isBuilding) return null;
@@ -151,9 +175,9 @@ const BuildPipelineCard = ({ isBuilding, streamContent, elapsed, tasks: external
         <div className="flex flex-col items-start gap-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
             <span className="text-[13px] font-semibold text-foreground">
-              {allDone ? "Edited" : "Editing"}
+              {allDone ? "Completed" : agentLabel || "Processing"}
             </span>
-            {editingFiles.map((file) => (
+            {currentAgent === "build" && editingFiles.map((file) => (
               <span
                 key={file}
                 className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-mono font-medium bg-muted/80 text-muted-foreground border border-border/50"
