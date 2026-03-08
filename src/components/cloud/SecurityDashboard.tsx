@@ -40,6 +40,24 @@ const SecurityDashboard = () => {
   const [scanning, setScanning] = useState(false);
   const [lastScan, setLastScan] = useState<Date | null>(null);
   const [expandedCheck, setExpandedCheck] = useState<string | null>(null);
+  const [ignoredChecks, setIgnoredChecks] = useState<Set<string>>(() => {
+    try {
+      const saved = localStorage.getItem(`security-ignored-${currentProject?.id}`);
+      return saved ? new Set(JSON.parse(saved)) : new Set();
+    } catch { return new Set(); }
+  });
+
+  const toggleIgnore = (checkId: string) => {
+    setIgnoredChecks(prev => {
+      const next = new Set(prev);
+      if (next.has(checkId)) next.delete(checkId);
+      else next.add(checkId);
+      try {
+        localStorage.setItem(`security-ignored-${currentProject?.id}`, JSON.stringify([...next]));
+      } catch {}
+      return next;
+    });
+  };
 
   useEffect(() => {
     if (currentProject?.id) runScan();
