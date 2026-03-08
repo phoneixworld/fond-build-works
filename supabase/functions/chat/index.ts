@@ -408,14 +408,14 @@ serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
-    const { messages, project_id, tech_stack, schemas, model } = await req.json();
+    const { messages, project_id, tech_stack, schemas, model, design_theme } = await req.json();
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY is not configured");
 
-    const systemPrompt = buildSystemPrompt(project_id || "unknown", tech_stack || "html-tailwind", schemas);
+    const systemPrompt = buildSystemPrompt(project_id || "unknown", tech_stack || "html-tailwind", schemas, design_theme);
 
-    // Use requested model or default
-    const selectedModel = model || "google/gemini-3-flash-preview";
+    // Use requested model or default (upgraded to Pro)
+    const selectedModel = model || "google/gemini-2.5-pro";
 
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
