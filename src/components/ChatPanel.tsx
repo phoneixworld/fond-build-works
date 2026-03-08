@@ -760,6 +760,9 @@ const ChatPanel = forwardRef<ChatPanelHandle, { initialPrompt?: string; onVersio
     setPreviewErrors([]);
     setHealAttempts(0);
     setIsHealing(false);
+    setCurrentAgent(null);
+    setPipelineStep(null);
+    setPendingBuildPrompt(null);
     isSendingRef.current = false;
     saveProject({ chat_history: [], html_content: "" });
   }, [currentProject, isLoading, setPreviewHtml, saveProject]);
