@@ -43,7 +43,7 @@ const CloudStorage = () => {
       console.error("Storage list error:", error);
       setFiles([]);
     } else {
-      setFiles((data || []).filter(f => f.name !== ".emptyFolderPlaceholder") as StorageFile[]);
+      setFiles((data || []).filter(f => f.name !== ".emptyFolderPlaceholder") as unknown as StorageFile[]);
     }
     setLoading(false);
   }, [currentProject, folderPath]);
