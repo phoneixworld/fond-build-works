@@ -137,6 +137,9 @@ const ChatPanel = forwardRef<ChatPanelHandle, { initialPrompt?: string; onVersio
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const healTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const MAX_HEAL_ATTEMPTS = 3;
+  // Edit/regenerate state
+  const [editingIndex, setEditingIndex] = useState<number | null>(null);
+  const [editText, setEditText] = useState("");
 
   // Elapsed time timer during loading
   useEffect(() => {
