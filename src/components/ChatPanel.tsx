@@ -1540,7 +1540,7 @@ const ChatPanel = forwardRef<ChatPanelHandle, { initialPrompt?: string; onVersio
               streamContent={buildStreamContent}
               elapsed={elapsedTime}
               pipelineStep={pipelineStep}
-              currentAgent={currentAgent}
+              currentAgent={currentAgent === "clarify" ? null : currentAgent}
             />
           )}
 
