@@ -1,19 +1,44 @@
-import { useState } from "react";
-import { Puzzle, Search, Download, Check, Star, Filter, Zap, Palette, Database, Globe, ShieldCheck, BarChart3, Code, MessageCircle, Image, Layout, Clock } from "lucide-react";
+import { useState, useEffect } from "react";
+import { Puzzle, Search, Download, Check, Star, Plus, Zap, Palette, Database, Globe, ShieldCheck, BarChart3, Code, MessageCircle, Image, Layout, Clock, Upload, Bell, Moon, FileText, CreditCard, Columns, Table, Bot, Loader2, ExternalLink, Package } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useToast } from "@/hooks/use-toast";
+import { supabase } from "@/integrations/supabase/client";
+import { useProjects } from "@/contexts/ProjectContext";
+import { useVirtualFS } from "@/contexts/VirtualFSContext";
+import { LucideIcon } from "lucide-react";
 
-interface Plugin {
+// Map icon names from DB to actual Lucide icons
+const ICON_MAP: Record<string, LucideIcon> = {
+  puzzle: Puzzle, bell: Bell, moon: Moon, "file-text": FileText, table: Table,
+  bot: Bot, image: Image, shield: ShieldCheck, "bar-chart-3": BarChart3,
+  columns: Columns, "credit-card": CreditCard, upload: Upload, palette: Palette,
+  zap: Zap, code: Code, globe: Globe, database: Database, layout: Layout,
+  clock: Clock, "message-circle": MessageCircle, package: Package,
+};
+
+interface PluginFile {
+  path: string;
+  content: string;
+}
+
+interface PluginRow {
   id: string;
   name: string;
+  slug: string;
   description: string;
+  long_description: string;
   author: string;
+  category: string;
+  icon: string;
+  tags: string[];
   downloads: number;
   rating: number;
-  category: string;
-  icon: typeof Zap;
-  tags: string[];
-  installed?: boolean;
+  version: string;
+  files: PluginFile[];
+  dependencies: string[];
+  edge_functions: { name: string; description: string }[];
+  required_secrets: string[];
+  is_official: boolean;
 }
 
 const CATEGORIES = [
@@ -26,26 +51,44 @@ const CATEGORIES = [
   { id: "themes", label: "Themes", icon: Palette },
 ];
 
-const SAMPLE_PLUGINS: Plugin[] = [
-  { id: "1", name: "Stripe Payments", description: "Accept payments with Stripe checkout, subscriptions, and invoicing.", author: "Lovable Labs", downloads: 12400, rating: 4.9, category: "api", icon: Zap, tags: ["payments", "stripe", "billing"] },
-  { id: "2", name: "Shadcn Pro Kit", description: "50+ premium components: data tables, kanban boards, calendars, and dashboards.", author: "UI Masters", downloads: 8900, rating: 4.8, category: "ui", icon: Layout, tags: ["components", "premium", "dashboard"] },
-  { id: "3", name: "PostHog Analytics", description: "Product analytics with session recordings, feature flags, and A/B tests.", author: "PostHog", downloads: 6200, rating: 4.7, category: "analytics", icon: BarChart3, tags: ["analytics", "tracking", "heatmaps"] },
-  { id: "4", name: "Clerk Auth", description: "Drop-in authentication with social login, MFA, and user management.", author: "Clerk", downloads: 9800, rating: 4.9, category: "auth", icon: ShieldCheck, tags: ["auth", "social", "sso"] },
-  { id: "5", name: "Cloudinary Media", description: "Image and video optimization, transformations, and AI-powered tagging.", author: "Cloudinary", downloads: 5600, rating: 4.6, category: "media", icon: Image, tags: ["images", "video", "cdn"] },
-  { id: "6", name: "Neon Dark Theme", description: "Cyberpunk-inspired dark theme with neon accents and glassmorphism.", author: "Theme Studio", downloads: 3200, rating: 4.5, category: "themes", icon: Palette, tags: ["dark", "neon", "cyberpunk"] },
-  { id: "7", name: "Resend Email", description: "Transactional emails with React Email templates and delivery tracking.", author: "Resend", downloads: 7100, rating: 4.8, category: "api", icon: MessageCircle, tags: ["email", "transactional", "templates"] },
-  { id: "8", name: "Supabase Realtime", description: "Real-time subscriptions, presence, and broadcast for live apps.", author: "Supabase", downloads: 11200, rating: 4.9, category: "api", icon: Database, tags: ["realtime", "websocket", "live"] },
-  { id: "9", name: "Motion Animations", description: "Pre-built Framer Motion animation presets: page transitions, scroll reveals, hover effects.", author: "Motion Lab", downloads: 4500, rating: 4.7, category: "ui", icon: Zap, tags: ["animations", "motion", "transitions"] },
-  { id: "10", name: "Cron Jobs", description: "Schedule recurring tasks with cron expressions and monitoring dashboard.", author: "Lovable Labs", downloads: 3800, rating: 4.4, category: "api", icon: Clock, tags: ["cron", "schedule", "background"] },
-  { id: "11", name: "Code Blocks", description: "Syntax-highlighted code blocks with 50+ themes, line numbers, and copy button.", author: "Dev Tools", downloads: 2900, rating: 4.6, category: "ui", icon: Code, tags: ["code", "syntax", "highlight"] },
-  { id: "12", name: "Minimal Light Theme", description: "Clean, airy theme with soft shadows, warm tones, and elegant typography.", author: "Theme Studio", downloads: 4100, rating: 4.8, category: "themes", icon: Palette, tags: ["light", "minimal", "clean"] },
-];
-
 const PluginMarketplace = () => {
   const { toast } = useToast();
+  const { currentProject } = useProjects();
+  const { addFile, removeFile, setActiveFile } = useVirtualFS();
   const [search, setSearch] = useState("");
   const [category, setCategory] = useState("all");
-  const [plugins, setPlugins] = useState<Plugin[]>(SAMPLE_PLUGINS);
+  const [plugins, setPlugins] = useState<PluginRow[]>([]);
+  const [installedIds, setInstalledIds] = useState<Set<string>>(new Set());
+  const [loading, setLoading] = useState(true);
+  const [installing, setInstalling] = useState<string | null>(null);
+  const [expandedId, setExpandedId] = useState<string | null>(null);
+
+  // Fetch plugins from DB
+  useEffect(() => {
+    const fetchPlugins = async () => {
+      setLoading(true);
+      const { data, error } = await supabase
+        .from("plugins")
+        .select("*")
+        .order("downloads", { ascending: false });
+
+      if (data) setPlugins(data as unknown as PluginRow[]);
+      if (error) console.error("Failed to fetch plugins:", error);
+      setLoading(false);
+    };
+
+    const fetchInstalled = async () => {
+      if (!currentProject) return;
+      const { data } = await supabase
+        .from("installed_plugins")
+        .select("plugin_id")
+        .eq("project_id", currentProject.id);
+      if (data) setInstalledIds(new Set(data.map(d => d.plugin_id)));
+    };
+
+    fetchPlugins();
+    fetchInstalled();
+  }, [currentProject]);
 
   const filtered = plugins.filter(p => {
     const matchesCategory = category === "all" || p.category === category;
@@ -53,16 +96,92 @@ const PluginMarketplace = () => {
     return matchesCategory && matchesSearch;
   });
 
-  const toggleInstall = (id: string) => {
-    setPlugins(prev => prev.map(p => {
-      if (p.id !== id) return p;
-      const installed = !p.installed;
-      toast({
-        title: installed ? "Installed" : "Uninstalled",
-        description: `${p.name} ${installed ? "installed" : "removed"} successfully.`,
+  const installPlugin = async (plugin: PluginRow) => {
+    if (!currentProject) return;
+    setInstalling(plugin.id);
+
+    try {
+      // 1. Check required secrets
+      if (plugin.required_secrets.length > 0) {
+        toast({
+          title: "Secrets Required",
+          description: `This plugin requires: ${plugin.required_secrets.join(", ")}. Configure them in Cloud → Secrets.`,
+          variant: "default",
+        });
+      }
+
+      // 2. Inject files into virtual FS
+      const files = plugin.files as PluginFile[];
+      for (const file of files) {
+        addFile(file.path, file.content);
+      }
+
+      // 3. Record installation in DB
+      await supabase.from("installed_plugins").insert({
+        project_id: currentProject.id,
+        plugin_id: plugin.id,
       });
-      return { ...p, installed, downloads: installed ? p.downloads + 1 : p.downloads - 1 };
-    }));
+
+      // 4. Increment download count
+      await supabase
+        .from("plugins")
+        .update({ downloads: plugin.downloads + 1 })
+        .eq("id", plugin.id);
+
+      setInstalledIds(prev => new Set([...prev, plugin.id]));
+      setPlugins(prev => prev.map(p => p.id === plugin.id ? { ...p, downloads: p.downloads + 1 } : p));
+
+      // 5. Open the first injected file
+      if (files.length > 0) {
+        setActiveFile(files[0].path);
+      }
+
+      toast({
+        title: `✅ ${plugin.name} installed!`,
+        description: `${files.length} file${files.length !== 1 ? "s" : ""} added to your project.`,
+      });
+    } catch (err) {
+      console.error("Install error:", err);
+      toast({ title: "Install failed", description: String(err), variant: "destructive" });
+    } finally {
+      setInstalling(null);
+    }
+  };
+
+  const uninstallPlugin = async (plugin: PluginRow) => {
+    if (!currentProject) return;
+    setInstalling(plugin.id);
+
+    try {
+      // Remove files from virtual FS
+      const files = plugin.files as PluginFile[];
+      for (const file of files) {
+        removeFile(file.path);
+      }
+
+      // Remove from DB
+      await supabase
+        .from("installed_plugins")
+        .delete()
+        .eq("project_id", currentProject.id)
+        .eq("plugin_id", plugin.id);
+
+      setInstalledIds(prev => {
+        const next = new Set(prev);
+        next.delete(plugin.id);
+        return next;
+      });
+
+      toast({
+        title: `Removed ${plugin.name}`,
+        description: `${files.length} file${files.length !== 1 ? "s" : ""} removed.`,
+      });
+    } catch (err) {
+      console.error("Uninstall error:", err);
+      toast({ title: "Uninstall failed", description: String(err), variant: "destructive" });
+    } finally {
+      setInstalling(null);
+    }
   };
 
   return (
@@ -73,9 +192,10 @@ const PluginMarketplace = () => {
           <Puzzle className="w-4 h-4 text-primary" />
           <span className="text-xs font-semibold">Plugin Marketplace</span>
           <span className="text-[10px] text-muted-foreground bg-secondary px-1.5 py-0.5 rounded-full">
-            {plugins.filter(p => p.installed).length} installed
+            {installedIds.size} installed
           </span>
         </div>
+        <span className="text-[10px] text-muted-foreground">{plugins.length} plugins</span>
       </div>
 
       {/* Search + Filters */}
@@ -110,66 +230,153 @@ const PluginMarketplace = () => {
         </div>
       </div>
 
-      {/* Plugin Grid */}
+      {/* Plugin List */}
       <div className="flex-1 overflow-y-auto p-3">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-          {filtered.map((plugin, i) => {
-            const Icon = plugin.icon;
-            return (
-              <motion.div
-                key={plugin.id}
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: i * 0.03 }}
-                className={`group relative border rounded-xl p-3 transition-all hover:shadow-md ${
-                  plugin.installed
-                    ? "border-primary/30 bg-primary/5"
-                    : "border-border bg-secondary/30 hover:border-primary/20"
-                }`}
-              >
-                <div className="flex gap-3">
-                  <div className={`w-10 h-10 rounded-lg flex items-center justify-center shrink-0 ${
-                    plugin.installed ? "bg-primary/10" : "bg-secondary"
-                  }`}>
-                    <Icon className={`w-5 h-5 ${plugin.installed ? "text-primary" : "text-muted-foreground"}`} />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-1.5">
-                      <h3 className="text-xs font-semibold truncate">{plugin.name}</h3>
-                      {plugin.installed && <Check className="w-3 h-3 text-primary shrink-0" />}
-                    </div>
-                    <p className="text-[11px] text-muted-foreground mt-0.5 line-clamp-2">{plugin.description}</p>
-                    <div className="flex items-center gap-3 mt-2">
-                      <span className="text-[10px] text-muted-foreground flex items-center gap-0.5">
-                        <Download className="w-3 h-3" />{(plugin.downloads / 1000).toFixed(1)}k
-                      </span>
-                      <span className="text-[10px] text-amber-500 flex items-center gap-0.5">
-                        <Star className="w-3 h-3 fill-current" />{plugin.rating}
-                      </span>
-                      <span className="text-[10px] text-muted-foreground">{plugin.author}</span>
-                    </div>
-                  </div>
-                </div>
-                <button
-                  onClick={() => toggleInstall(plugin.id)}
-                  className={`absolute top-3 right-3 px-2.5 py-1 rounded-md text-[10px] font-medium transition-all ${
-                    plugin.installed
-                      ? "bg-secondary text-muted-foreground hover:text-destructive hover:bg-destructive/10"
-                      : "bg-primary text-primary-foreground hover:bg-primary/90"
-                  }`}
-                >
-                  {plugin.installed ? "Remove" : "Install"}
-                </button>
-              </motion.div>
-            );
-          })}
-        </div>
-
-        {filtered.length === 0 && (
+        {loading ? (
+          <div className="flex items-center justify-center py-16">
+            <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+          </div>
+        ) : filtered.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-16 text-center">
             <Search className="w-8 h-8 text-muted-foreground/30 mb-3" />
             <p className="text-sm text-muted-foreground">No plugins found</p>
-            <p className="text-xs text-muted-foreground/60 mt-1">Try a different search or category</p>
+          </div>
+        ) : (
+          <div className="space-y-2">
+            {filtered.map((plugin, i) => {
+              const Icon = ICON_MAP[plugin.icon] || Puzzle;
+              const isInstalled = installedIds.has(plugin.id);
+              const isExpanded = expandedId === plugin.id;
+              const isProcessing = installing === plugin.id;
+              const files = plugin.files as PluginFile[];
+
+              return (
+                <motion.div
+                  key={plugin.id}
+                  initial={{ opacity: 0, y: 8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: i * 0.02 }}
+                  className={`border rounded-xl overflow-hidden transition-all ${
+                    isInstalled
+                      ? "border-primary/30 bg-primary/5"
+                      : "border-border bg-secondary/20 hover:border-primary/20"
+                  }`}
+                >
+                  {/* Main row */}
+                  <div
+                    className="flex items-center gap-3 p-3 cursor-pointer"
+                    onClick={() => setExpandedId(isExpanded ? null : plugin.id)}
+                  >
+                    <div className={`w-10 h-10 rounded-lg flex items-center justify-center shrink-0 ${isInstalled ? "bg-primary/10" : "bg-secondary"}`}>
+                      <Icon className={`w-5 h-5 ${isInstalled ? "text-primary" : "text-muted-foreground"}`} />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-1.5">
+                        <h3 className="text-xs font-semibold truncate">{plugin.name}</h3>
+                        {isInstalled && <Check className="w-3 h-3 text-primary shrink-0" />}
+                        {plugin.is_official && (
+                          <span className="text-[9px] bg-primary/10 text-primary px-1.5 py-0.5 rounded-full font-medium shrink-0">Official</span>
+                        )}
+                        <span className="text-[10px] text-muted-foreground ml-auto shrink-0">v{plugin.version}</span>
+                      </div>
+                      <p className="text-[11px] text-muted-foreground mt-0.5 line-clamp-1">{plugin.description}</p>
+                      <div className="flex items-center gap-3 mt-1">
+                        <span className="text-[10px] text-muted-foreground flex items-center gap-0.5">
+                          <Download className="w-3 h-3" />{(plugin.downloads / 1000).toFixed(1)}k
+                        </span>
+                        <span className="text-[10px] text-amber-500 flex items-center gap-0.5">
+                          <Star className="w-3 h-3 fill-current" />{plugin.rating}
+                        </span>
+                        <span className="text-[10px] text-muted-foreground">{plugin.author}</span>
+                      </div>
+                    </div>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        isInstalled ? uninstallPlugin(plugin) : installPlugin(plugin);
+                      }}
+                      disabled={isProcessing}
+                      className={`px-3 py-1.5 rounded-lg text-[11px] font-medium transition-all shrink-0 ${
+                        isProcessing ? "opacity-50" :
+                        isInstalled
+                          ? "bg-secondary text-muted-foreground hover:text-destructive hover:bg-destructive/10"
+                          : "bg-primary text-primary-foreground hover:bg-primary/90"
+                      }`}
+                    >
+                      {isProcessing ? (
+                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                      ) : isInstalled ? "Remove" : "Install"}
+                    </button>
+                  </div>
+
+                  {/* Expanded details */}
+                  <AnimatePresence>
+                    {isExpanded && (
+                      <motion.div
+                        initial={{ height: 0, opacity: 0 }}
+                        animate={{ height: "auto", opacity: 1 }}
+                        exit={{ height: 0, opacity: 0 }}
+                        className="overflow-hidden"
+                      >
+                        <div className="px-3 pb-3 pt-1 border-t border-border/50 space-y-3">
+                          <p className="text-[11px] text-muted-foreground">{plugin.long_description}</p>
+
+                          {/* Files that will be injected */}
+                          <div>
+                            <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">
+                              Files ({files.length})
+                            </span>
+                            <div className="mt-1 space-y-1">
+                              {files.map(f => (
+                                <div key={f.path} className="flex items-center gap-2 text-[11px]">
+                                  <Code className="w-3 h-3 text-muted-foreground" />
+                                  <span className="font-mono text-foreground">{f.path}</span>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+
+                          {/* Tags */}
+                          <div className="flex flex-wrap gap-1">
+                            {plugin.tags.map(tag => (
+                              <span key={tag} className="text-[10px] bg-secondary px-2 py-0.5 rounded-full text-muted-foreground">
+                                {tag}
+                              </span>
+                            ))}
+                          </div>
+
+                          {/* Required secrets */}
+                          {plugin.required_secrets.length > 0 && (
+                            <div className="flex items-center gap-1.5 text-[11px] text-amber-500 bg-amber-500/10 px-2.5 py-1.5 rounded-lg">
+                              <ShieldCheck className="w-3.5 h-3.5 shrink-0" />
+                              Requires: {plugin.required_secrets.join(", ")}
+                            </div>
+                          )}
+
+                          {/* Edge functions */}
+                          {plugin.edge_functions.length > 0 && (
+                            <div>
+                              <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">
+                                Edge Functions
+                              </span>
+                              <div className="mt-1 space-y-1">
+                                {plugin.edge_functions.map(ef => (
+                                  <div key={ef.name} className="flex items-center gap-2 text-[11px]">
+                                    <Zap className="w-3 h-3 text-primary" />
+                                    <span className="font-mono">{ef.name}</span>
+                                    <span className="text-muted-foreground">— {ef.description}</span>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+                </motion.div>
+              );
+            })}
           </div>
         )}
       </div>

@@ -14,6 +14,111 @@ export type Database = {
   }
   public: {
     Tables: {
+      installed_plugins: {
+        Row: {
+          config: Json
+          id: string
+          installed_at: string
+          plugin_id: string
+          project_id: string
+        }
+        Insert: {
+          config?: Json
+          id?: string
+          installed_at?: string
+          plugin_id: string
+          project_id: string
+        }
+        Update: {
+          config?: Json
+          id?: string
+          installed_at?: string
+          plugin_id?: string
+          project_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "installed_plugins_plugin_id_fkey"
+            columns: ["plugin_id"]
+            isOneToOne: false
+            referencedRelation: "plugins"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "installed_plugins_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      plugins: {
+        Row: {
+          author: string
+          category: string
+          created_at: string
+          dependencies: Json
+          description: string
+          downloads: number
+          edge_functions: Json
+          files: Json
+          icon: string
+          id: string
+          is_official: boolean
+          long_description: string
+          name: string
+          rating: number
+          required_secrets: string[]
+          slug: string
+          tags: string[]
+          updated_at: string
+          version: string
+        }
+        Insert: {
+          author?: string
+          category?: string
+          created_at?: string
+          dependencies?: Json
+          description?: string
+          downloads?: number
+          edge_functions?: Json
+          files?: Json
+          icon?: string
+          id?: string
+          is_official?: boolean
+          long_description?: string
+          name: string
+          rating?: number
+          required_secrets?: string[]
+          slug: string
+          tags?: string[]
+          updated_at?: string
+          version?: string
+        }
+        Update: {
+          author?: string
+          category?: string
+          created_at?: string
+          dependencies?: Json
+          description?: string
+          downloads?: number
+          edge_functions?: Json
+          files?: Json
+          icon?: string
+          id?: string
+          is_official?: boolean
+          long_description?: string
+          name?: string
+          rating?: number
+          required_secrets?: string[]
+          slug?: string
+          tags?: string[]
+          updated_at?: string
+          version?: string
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           avatar_url: string | null
