@@ -494,6 +494,11 @@ const SecurityDashboard = () => {
               <span className="flex items-center gap-1 text-destructive">
                 <XCircle className="w-3 h-3" /> {failCount} failed
               </span>
+              {ignoredCount > 0 && (
+                <span className="flex items-center gap-1 text-muted-foreground">
+                  <Eye className="w-3 h-3" /> {ignoredCount} ignored
+                </span>
+              )}
             </div>
             {lastScan && (
               <p className="text-[10px] text-muted-foreground mt-1">
