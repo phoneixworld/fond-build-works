@@ -841,6 +841,8 @@ const ChatPanel = forwardRef<ChatPanelHandle, { initialPrompt?: string; onVersio
       </div>
     </TooltipProvider>
   );
-};
+});
+
+ChatPanel.displayName = "ChatPanel";
 
 export default ChatPanel;
