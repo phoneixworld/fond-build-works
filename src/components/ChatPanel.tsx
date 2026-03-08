@@ -1161,8 +1161,10 @@ const ChatPanel = forwardRef<ChatPanelHandle, { initialPrompt?: string; onVersio
     if (isSendingRef.current || isLoadingRef.current) return; // FIX: guard
     const finalText = text || "Replicate this design";
     
-    // Always try to analyze prompt for clarifying questions (edge function decides if questions are needed based on context)
-    if (images.length === 0 && finalText.length >= 20) {
+    // Only analyze for clarifying questions on the FIRST message (no history)
+    // Follow-up messages should always go straight to build
+    const hasHistory = messagesRef.current.length > 0;
+    if (!hasHistory && images.length === 0 && finalText.length >= 20) {
       const needsQuestions = await analyzePrompt(finalText);
       if (needsQuestions) return;
     }
