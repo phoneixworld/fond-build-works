@@ -57,6 +57,7 @@ const BrandKitGenerator = () => {
   const { toast } = useToast();
   const { currentProject } = useProjects();
   const fileRef = useRef<HTMLInputElement>(null);
+  const [activeTab, setActiveTab] = useState<"design" | "marketing">("design");
   const [image, setImage] = useState<string | null>(null);
   const [mood, setMood] = useState<string>("");
   const [description, setDescription] = useState("");
