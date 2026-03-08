@@ -744,9 +744,15 @@ const ChatPanel = forwardRef<ChatPanelHandle, { initialPrompt?: string; onVersio
             });
           }
 
+          // Extract final chat text for persistence
+          const finalChatText = reactResult.files ? reactResult.chatText : (() => {
+            const { chatText: ct } = parseMultiFileOutput(fullResponse);
+            return ct;
+          })();
+
           setMessages((prev) => {
-            const final = chatText
-              ? prev.map((m, i) => (i === prev.length - 1 && m.role === "assistant" ? { ...m, content: chatText } : m))
+            const final = finalChatText
+              ? prev.map((m, i) => (i === prev.length - 1 && m.role === "assistant" ? { ...m, content: finalChatText } : m))
               : prev;
 
             const persistMessages = final.map(m => ({
