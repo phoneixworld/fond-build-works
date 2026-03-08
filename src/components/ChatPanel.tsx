@@ -1140,7 +1140,8 @@ const ChatPanel = forwardRef<ChatPanelHandle, { initialPrompt?: string; onVersio
     if (isSendingRef.current || isLoadingRef.current) return; // FIX: guard
     const finalText = text || "Replicate this design";
     
-    if (messagesRef.current.length === 0 && images.length === 0 && finalText.length >= 20) {
+    // Always try to analyze prompt for clarifying questions (edge function decides if questions are needed based on context)
+    if (images.length === 0 && finalText.length >= 20) {
       const needsQuestions = await analyzePrompt(finalText);
       if (needsQuestions) return;
     }
