@@ -58,32 +58,63 @@ IMPORTANT: When building apps that need data persistence (todo lists, forms, das
 
   const techStackInstructions: Record<string, string> = {
     "html-tailwind": `Use HTML + Tailwind CSS (via CDN). Include <script src="https://cdn.tailwindcss.com"></script>.
-Configure a custom Tailwind theme with your chosen color palette:
-<script>
-tailwind.config = {
-  theme: {
-    extend: {
-      colors: {
-        primary: { 50: '...', 100: '...', ..., 900: '...' },
-        accent: { ... },
-      },
-      fontFamily: {
-        sans: ['Inter', 'system-ui', 'sans-serif'],
-        display: ['...chosen display font...', 'sans-serif'],
-      }
-    }
-  }
-}
-</script>`,
-    "html-bootstrap": `Use HTML + Bootstrap 5 (via CDN). Include Bootstrap CSS and JS from CDN. Customize Bootstrap variables with a <style> block overriding --bs-primary, --bs-body-font-family etc.`,
-    "react-cdn": `Use React via CDN with Babel standalone. Include:
-<script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
-<script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
-<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-<script src="https://cdn.tailwindcss.com"></script>
-Write JSX in <script type="text/babel">. Use functional components with hooks. Create small, focused components. Use useState, useEffect, useCallback.`,
-    "vue-cdn": `Use Vue 3 via CDN. Include <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script> and Tailwind CDN. Use Composition API with setup(). Create reactive state with ref() and computed().`,
-    "vanilla-js": `Use plain HTML, CSS, and vanilla JavaScript. No frameworks. Clean, semantic HTML with custom CSS. Use CSS custom properties for theming. Use modern JS (ES6+).`,
+Configure a custom Tailwind theme with your chosen color palette.`,
+    "html-bootstrap": `Use HTML + Bootstrap 5 (via CDN). Include Bootstrap CSS and JS from CDN.`,
+    "react-cdn": `Use React via CDN with Babel standalone. Include React, ReactDOM, Babel, and Tailwind CDN scripts.
+Write JSX in <script type="text/babel">. Use functional components with hooks.`,
+    "vue-cdn": `Use Vue 3 via CDN with Tailwind. Use Composition API with setup().`,
+    "vanilla-js": `Use plain HTML, CSS, and vanilla JavaScript. No frameworks. Clean, semantic HTML.`,
+    "react-node": `Generate a FULL-STACK project with:
+## Frontend (React + Tailwind)
+- Generate files using \`\`\`file:src/App.tsx format
+- Use React with hooks, Tailwind CSS for styling
+- API calls go to http://localhost:3001/api/*
+
+## Backend (Node.js + Express)
+- Generate files in \`\`\`file:server/index.js format
+- Create Express REST API with proper routing
+- Use \`\`\`file:server/routes/*.js for route modules
+- Include proper error handling, CORS, validation
+- Generate server/package.json with dependencies
+
+CRITICAL: Generate BOTH frontend and backend files. Use the multi-file format.`,
+    "react-python": `Generate a FULL-STACK project with:
+## Frontend (React + Tailwind)
+- Generate files using \`\`\`file:src/App.tsx format
+- Use React with hooks, Tailwind CSS
+- API calls go to http://localhost:8000/api/*
+
+## Backend (Python + FastAPI)
+- Generate files in \`\`\`file:server/main.py format
+- Use FastAPI with Pydantic models for validation
+- Include proper type hints, async/await
+- Generate server/requirements.txt
+- Use proper Python conventions (snake_case, docstrings)
+
+CRITICAL: Generate BOTH frontend and backend files. Use the multi-file format.`,
+    "react-go": `Generate a FULL-STACK project with:
+## Frontend (React + Tailwind)
+- Generate files using \`\`\`file:src/App.tsx format
+
+## Backend (Go + Fiber)
+- Generate files in \`\`\`file:server/main.go format
+- Use Fiber web framework
+- Include proper structs, error handling
+- Generate server/go.mod
+- Use proper Go conventions (exported names, error returns)
+
+CRITICAL: Generate BOTH frontend and backend files. Use the multi-file format.`,
+    "nextjs": `Generate a Next.js-style project with:
+## Pages (React components)
+- Generate files using \`\`\`file:pages/index.tsx format
+- Use React with hooks, Tailwind CSS
+
+## API Routes
+- Generate files in \`\`\`file:pages/api/*.ts format
+- Each API route exports a default handler function
+- Use proper request/response typing
+
+CRITICAL: Generate BOTH page files and API route files. Use the multi-file format.`,
   };
 
   let schemaSection = "";
@@ -261,10 +292,10 @@ IMPORTANT: Proactively detect when an app needs backend functionality and USE IT
 When you detect backend needs, implement the API calls directly. Don't ask — just build it functional.
 
 ## CRITICAL RULES
-- ALWAYS include the html-preview code fence when building something
-- The HTML must be a COMPLETE standalone page — no external dependencies except CDN links
+- For FRONTEND-ONLY stacks: ALWAYS include the html-preview code fence when building something. The HTML must be a COMPLETE standalone page.
+- For FULL-STACK stacks (react-node, react-python, react-go, nextjs): Use the multi-file format with \`\`\`file:path/to/file.ext blocks. Generate BOTH frontend and backend files.
 - If the user is just chatting, respond conversationally WITHOUT the code fence
-- When modifying, generate the FULL updated HTML (not partial patches)
+- When modifying, generate the FULL updated code (not partial patches)
 - Use Lucide icons: <script src="https://unpkg.com/lucide@latest"></script> and <i data-lucide="icon-name"></i> with <script>lucide.createIcons()</script>
 - For any app needing data persistence, USE THE DATA API
 - For apps needing user accounts, USE THE AUTH API
