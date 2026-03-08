@@ -555,26 +555,34 @@ const ChatPanel = forwardRef<ChatPanelHandle, { initialPrompt?: string; onVersio
               content: typeof m.content === "string" ? m.content : getTextContent(m.content),
             }));
 
-            // AI-generate project name on first message
+            // AI-generate project name if still "Untitled Project" (fallback)
             const isFirstMessage = persistMessages.filter(m => m.role === "user").length === 1;
             
             if (isFirstMessage && currentProject.name === "Untitled Project") {
+              // Use direct supabase update to avoid stale closure race with saveProject
+              const userPromptText = persistMessages[0]?.content || "";
               fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/project-name`, {
                 method: "POST",
                 headers: {
                   "Content-Type": "application/json",
                   Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
                 },
-                body: JSON.stringify({ prompt: persistMessages[0].content }),
+                body: JSON.stringify({ prompt: userPromptText }),
               })
                 .then(r => r.json())
                 .then(({ name, emoji }) => {
                   const fullName = emoji ? `${emoji} ${name}` : name;
-                  saveProject({ name: fullName });
+                  // Direct DB update to avoid race condition with saveProject closure
+                  supabase
+                    .from("projects")
+                    .update({ name: fullName, updated_at: new Date().toISOString() } as any)
+                    .eq("id", currentProject.id)
+                    .then(() => {
+                      // Force refresh project state
+                      saveProject({ name: fullName } as any);
+                    });
                 })
-                .catch(() => {
-                  saveProject({ name: persistMessages[0].content.slice(0, 40) });
-                });
+                .catch(() => {});
             }
 
             saveProject({
