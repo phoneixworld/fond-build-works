@@ -78,7 +78,7 @@ export const ProjectProvider = ({ children }: { children: ReactNode }) => {
     const project = {
       ...data,
       chat_history: Array.isArray(data.chat_history) ? data.chat_history : [],
-    } as Project;
+    } as unknown as Project;
     setCurrentProject(project);
   }, []);
 
