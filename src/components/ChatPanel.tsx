@@ -151,15 +151,45 @@ function sanitizeImports(code: string): string {
   return code;
 }
 
-/** Parse ```react-preview fences into a file map for Sandpack */
+/** Parse ```react-preview fences (and fallback patterns) into a file map for Sandpack */
 function parseReactFiles(text: string): { chatText: string; files: Record<string, string> | null; deps: Record<string, string> } {
   const files: Record<string, string> = {};
   const deps: Record<string, string> = {};
 
-  // Find the start of react-preview fence
-  let fenceStart = text.indexOf("```react-preview");
-  if (fenceStart === -1) fenceStart = text.indexOf("```jsx-preview");
-  if (fenceStart === -1) return { chatText: text, files: null, deps };
+  // Try multiple fence formats the AI might use
+  const fencePatterns = [
+    "```react-preview",
+    "```jsx-preview", 
+    "```react",
+    "```jsx",
+  ];
+  
+  let fenceStart = -1;
+  for (const pattern of fencePatterns) {
+    fenceStart = text.indexOf(pattern);
+    if (fenceStart !== -1) {
+      console.log(`[parseReactFiles] Found fence: "${pattern}" at position ${fenceStart}`);
+      break;
+    }
+  }
+  
+  // Fallback: check if any code fence contains --- /App.jsx pattern
+  if (fenceStart === -1) {
+    const genericFence = text.match(/```\w*\n[\s\S]*?---\s+\/?(App\.jsx|App\.js)/);
+    if (genericFence) {
+      fenceStart = text.indexOf(genericFence[0]);
+      console.log(`[parseReactFiles] Found App.jsx in generic fence at position ${fenceStart}`);
+    }
+  }
+  
+  if (fenceStart === -1) {
+    // Log what fences ARE present for debugging
+    const fencesFound = text.match(/```\w*/g);
+    if (fencesFound && fencesFound.length > 0) {
+      console.log(`[parseReactFiles] No react fence found. Fences present: ${fencesFound.join(", ")}`);
+    }
+    return { chatText: text, files: null, deps };
+  }
 
   const chatText = text.slice(0, fenceStart).trim();
   const codeStart = text.indexOf("\n", fenceStart) + 1;
