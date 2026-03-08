@@ -677,8 +677,6 @@ const ChatPanel = forwardRef<ChatPanelHandle, { initialPrompt?: string; onVersio
             return final;
           });
         },
-          
-          if (htmlCode) setPreviewHtml(postProcessHtml(htmlCode));
 
           // Auto-sync to Dev environment
           if (htmlCode && currentProject?.id) {
