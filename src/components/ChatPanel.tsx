@@ -583,7 +583,10 @@ const ChatPanel = forwardRef<ChatPanelHandle, { initialPrompt?: string; onVersio
 
   // Analyze prompt for follow-up questions
   const analyzePrompt = useCallback(async (prompt: string): Promise<boolean> => {
-    if (messagesRef.current.length > 0 || prompt.length < 20) return false;
+    // Skip for very short prompts or auto-fix messages
+    if (prompt.length < 20 || prompt.startsWith("🔧 AUTO-FIX")) return false;
+    
+    const hasHistory = messagesRef.current.length > 0;
     
     setIsAnalyzing(true);
     try {
@@ -593,9 +596,9 @@ const ChatPanel = forwardRef<ChatPanelHandle, { initialPrompt?: string; onVersio
           "Content-Type": "application/json",
           Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
         },
-        body: JSON.stringify({ prompt }),
+        body: JSON.stringify({ prompt, hasHistory }),
       });
-      if (!resp.ok) return false;
+      if (!resp.ok) { setIsAnalyzing(false); return false; }
       const result = await resp.json();
       setAnalysisResult(result);
       if (result.action === "ask" && result.questions?.length > 0) {
