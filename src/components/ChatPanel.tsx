@@ -492,6 +492,8 @@ const ChatPanel = forwardRef<ChatPanelHandle, { initialPrompt?: string; onVersio
   const [healAttempts, setHealAttempts] = useState(0);
   const [isHealing, setIsHealing] = useState(false);
   const [healingStatus, setHealingStatus] = useState<string>("");
+  // Build retry state
+  const [buildRetryCount, setBuildRetryCount] = useState(0);
   // Follow-up questions state
   const [followUpQuestions, setFollowUpQuestions] = useState<any[]>([]);
   const [followUpAnswers, setFollowUpAnswers] = useState<Record<string, string>>({});
