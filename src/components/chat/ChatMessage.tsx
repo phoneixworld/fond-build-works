@@ -348,26 +348,37 @@ interface Suggestion {
 
 function parseSuggestions(text: string): { suggestions: Suggestion[]; cleanText: string } {
   const suggestions: Suggestion[] = [];
-  // Match lines like: 🍽️ **Online Ordering** — description text
-  // or: 📸 **Photo Gallery** - description text
-  const suggestionRegex = /^(\p{Emoji_Presentation}|\p{Emoji}\uFE0F?)\s+\*\*(.+?)\*\*\s*[—–\-]\s*(.+)$/gmu;
-  let match;
-  const matchedLines = new Set<string>();
+  const lines = text.split("\n");
+  const cleanLines: string[] = [];
   
-  while ((match = suggestionRegex.exec(text)) !== null) {
-    suggestions.push({
-      emoji: match[1],
-      title: match[2].trim(),
-      description: match[3].trim(),
-      fullText: `${match[2].trim()}: ${match[3].trim()}`,
-    });
-    matchedLines.add(match[0]);
+  for (const line of lines) {
+    const trimmed = line.trim();
+    // Match formats like:
+    // 🚀 **AI Tutor** - An education platform...
+    // boardroom AI Board of Directors — A subscription...
+    // - **Smart Agent**: Does things...
+    const match = trimmed.match(/^(?:-\s*)?(?:([\p{Emoji_Presentation}\p{Emoji}\uFE0F]+|[a-zA-Z0-9_]+)\s+)?(?:\*\*(.+?)\*\*|([^—–\-:*]+?))\s*[—–\-:]\s*(.+)$/u);
+    
+    if (match && match[0].length > 15) {
+      const iconRaw = match[1] || '✨';
+      const title = (match[2] || match[3])?.trim();
+      const description = match[4]?.trim();
+      
+      // Filter out invalid matches (e.g., standard sentences that happen to have a dash)
+      if (title && title.length > 2 && title.length < 60) {
+        suggestions.push({
+          emoji: (iconRaw.length > 2 && !iconRaw.match(/\p{Emoji}/u)) ? '💡' : iconRaw,
+          title,
+          description,
+          fullText: line
+        });
+        continue;
+      }
+    }
+    cleanLines.push(line);
   }
   
   if (suggestions.length < 2) return { suggestions: [], cleanText: text };
-  
-  // Remove suggestion lines from text
-  const cleanLines = text.split("\n").filter(line => !matchedLines.has(line.trim()));
   return { suggestions, cleanText: cleanLines.join("\n").trim() };
 }
 
@@ -375,33 +386,40 @@ const SuggestionButtons = ({ suggestions, onClick }: { suggestions: Suggestion[]
   if (suggestions.length === 0 || !onClick) return null;
   
   return (
-    <div className="grid gap-2 mt-4">
+    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-4">
       {suggestions.map((s, i) => (
-        <Tooltip key={i}>
-          <TooltipTrigger asChild>
-            <motion.button
-              initial={{ opacity: 0, x: -8 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ delay: i * 0.06, duration: 0.25 }}
-              onClick={() => onClick(s.fullText)}
-              className="flex items-center gap-3 w-full px-4 py-3 rounded-xl text-left
-                border border-border/50 bg-card/50 backdrop-blur-sm
-                hover:border-primary/50 hover:bg-primary/5 hover:shadow-lg hover:shadow-primary/5
-                active:scale-[0.98]
-                transition-all duration-200 group"
-            >
-              <span className="text-lg shrink-0">{s.emoji}</span>
-              <div className="flex-1 min-w-0">
-                <span className="text-[13px] font-semibold text-foreground/90 group-hover:text-foreground block">{s.title}</span>
-                <span className="text-[11px] text-muted-foreground/60 group-hover:text-muted-foreground/80 line-clamp-1 block">{s.description}</span>
-              </div>
-              <ArrowRight className="w-4 h-4 text-muted-foreground/20 group-hover:text-primary/60 group-hover:translate-x-0.5 transition-all shrink-0" />
-            </motion.button>
-          </TooltipTrigger>
-          <TooltipContent side="top" className="max-w-[280px] text-xs">
+        <motion.button
+          key={i}
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: i * 0.08, duration: 0.3 }}
+          onClick={() => onClick(s.fullText)}
+          className="relative flex flex-col gap-2.5 p-4 rounded-2xl text-left overflow-hidden
+            border border-border/40 bg-gradient-to-b from-card/80 to-card/30 backdrop-blur-md
+            hover:border-primary/30 hover:shadow-[0_8px_24px_-12px_hsl(var(--primary)/0.2)]
+            active:scale-[0.98] transition-all duration-300 group"
+        >
+          <div className="absolute top-0 right-0 w-32 h-32 bg-primary/5 rounded-full blur-3xl -mr-10 -mt-10 group-hover:bg-primary/10 transition-colors duration-500" />
+          
+          <div className="flex items-center gap-3 z-10">
+            <span className="flex items-center justify-center w-8 h-8 rounded-xl bg-gradient-to-br from-primary/10 to-primary/5 text-lg shadow-sm border border-primary/10 shrink-0 group-hover:scale-110 transition-transform duration-300">
+              {s.emoji}
+            </span>
+            <span className="font-semibold text-[13px] text-foreground/90 group-hover:text-primary transition-colors line-clamp-1">
+              {s.title}
+            </span>
+          </div>
+          
+          <span className="text-[12px] text-muted-foreground/75 leading-relaxed z-10 line-clamp-3">
             {s.description}
-          </TooltipContent>
-        </Tooltip>
+          </span>
+          
+          <div className="absolute bottom-3 right-3 opacity-0 group-hover:opacity-100 transform translate-x-2 group-hover:translate-x-0 transition-all duration-300 z-10">
+            <div className="w-6 h-6 rounded-full bg-primary/10 flex items-center justify-center">
+              <ArrowRight className="w-3 h-3 text-primary" />
+            </div>
+          </div>
+        </motion.button>
       ))}
     </div>
   );
