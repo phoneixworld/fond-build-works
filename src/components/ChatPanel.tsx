@@ -44,7 +44,6 @@ function getImageUrls(content: MsgContent): string[] {
 }
 
 function parseResponse(text: string): [string, string | null] {
-  // Try html-preview first, then fall back to plain html fence
   let fenceStart = text.indexOf("```html-preview");
   if (fenceStart === -1) fenceStart = text.indexOf("```html");
   if (fenceStart === -1) return [text, null];
@@ -58,22 +57,18 @@ function parseResponse(text: string): [string, string | null] {
 function postProcessHtml(html: string): string {
   if (!html) return html;
   
-  // Phase 1: Run the HTML validator and auto-fixer
   const validation = validateAndFixHtml(html);
   html = validation.html;
   
-  // Log validation results for debugging
   if (validation.issues.length > 0) {
     console.log(`[HTML Validator] Score: ${validation.score}/100, Issues: ${validation.issues.length}`, 
       validation.issues.map(i => `${i.fixed ? '✅' : '⚠️'} [${i.category}] ${i.message}`));
   }
   
-  // Phase 2: Inject runtime enhancements
   const injections: string[] = [];
   if (!html.includes('scroll-behavior')) {
     injections.push('<style>html{scroll-behavior:smooth}*{-webkit-tap-highlight-color:transparent}::selection{background:rgba(99,102,241,0.2)}img{max-width:100%;height:auto}img.img-error{display:none!important}</style>');
   }
-  // Inject hash navigation fix and image error handling
   if (!html.includes('__safeQuery')) {
     injections.push(`<script>
 window.__safeQuery=function(s){try{return document.querySelector(s)}catch(e){return null}};
@@ -192,6 +187,16 @@ const ChatPanel = forwardRef<ChatPanelHandle, { initialPrompt?: string; onVersio
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
   const [editText, setEditText] = useState("");
   const [selectedTemplate, setSelectedTemplate] = useState<PageTemplate | null>(null);
+  
+  // FIX: Use refs to avoid stale closures in sendMessage
+  const messagesRef = useRef<Msg[]>([]);
+  messagesRef.current = messages;
+  const isLoadingRef = useRef(false);
+  isLoadingRef.current = isLoading;
+  // FIX: Abort controller for cancelling in-flight requests
+  const abortControllerRef = useRef<AbortController | null>(null);
+  // FIX: Guard against duplicate sends
+  const isSendingRef = useRef(false);
 
   // Elapsed time timer during loading
   useEffect(() => {
@@ -233,24 +238,34 @@ const ChatPanel = forwardRef<ChatPanelHandle, { initialPrompt?: string; onVersio
     return () => window.removeEventListener("message", handler);
   }, []);
 
-  // Self-healing: auto-trigger fix when errors detected after build
+  // FIX: Self-healing with proper guards — only trigger once per error batch, never during loading
   useEffect(() => {
     if (healTimeoutRef.current) {
       clearTimeout(healTimeoutRef.current);
       healTimeoutRef.current = null;
     }
-    if (previewErrors.length > 0 && !isLoading && !isHealing && healAttempts < MAX_HEAL_ATTEMPTS && messages.length > 0) {
+    if (
+      previewErrors.length > 0 &&
+      !isLoading &&
+      !isHealing &&
+      !isSendingRef.current &&
+      healAttempts < MAX_HEAL_ATTEMPTS &&
+      messagesRef.current.length > 0
+    ) {
       healTimeoutRef.current = setTimeout(() => {
-        triggerSelfHeal();
-      }, 3000); // Wait 3s for errors to accumulate
+        // Double-check guards at trigger time (not just schedule time)
+        if (!isLoadingRef.current && !isSendingRef.current) {
+          triggerSelfHeal();
+        }
+      }, 5000); // Increased to 5s for more error accumulation
     }
     return () => {
       if (healTimeoutRef.current) clearTimeout(healTimeoutRef.current);
     };
-  }, [previewErrors, isLoading, isHealing, healAttempts, messages.length]);
+  }, [previewErrors.length, isLoading, isHealing, healAttempts]);
 
   const triggerSelfHeal = useCallback(() => {
-    if (isLoading || isHealing || healAttempts >= MAX_HEAL_ATTEMPTS || previewErrors.length === 0) return;
+    if (isLoadingRef.current || isHealing || isSendingRef.current || healAttempts >= MAX_HEAL_ATTEMPTS || previewErrors.length === 0) return;
     setIsHealing(true);
     setHealAttempts(prev => prev + 1);
     const attempt = healAttempts + 1;
@@ -262,12 +277,11 @@ const ChatPanel = forwardRef<ChatPanelHandle, { initialPrompt?: string; onVersio
       setIsHealing(false);
       setHealingStatus("");
     });
-  }, [isLoading, isHealing, healAttempts, previewErrors]);
+  }, [isHealing, healAttempts, previewErrors]);
 
   // Analyze prompt for follow-up questions
   const analyzePrompt = useCallback(async (prompt: string): Promise<boolean> => {
-    // Skip analysis for follow-up messages, modifications, or short prompts
-    if (messages.length > 0 || prompt.length < 20) return false;
+    if (messagesRef.current.length > 0 || prompt.length < 20) return false;
     
     setIsAnalyzing(true);
     try {
@@ -286,15 +300,15 @@ const ChatPanel = forwardRef<ChatPanelHandle, { initialPrompt?: string; onVersio
         setFollowUpQuestions(result.questions);
         setPendingFollowUpPrompt(prompt);
         setIsAnalyzing(false);
-        return true; // Questions need answering
+        return true;
       }
       setIsAnalyzing(false);
-      return false; // Build immediately
+      return false;
     } catch {
       setIsAnalyzing(false);
       return false;
     }
-  }, [messages.length]);
+  }, []);
 
   const handleFollowUpAnswer = (questionId: string, value: string) => {
     setFollowUpAnswers(prev => ({ ...prev, [questionId]: value }));
@@ -325,8 +339,6 @@ const ChatPanel = forwardRef<ChatPanelHandle, { initialPrompt?: string; onVersio
     sendMessage(prompt);
   }, [pendingFollowUpPrompt]);
 
-
-
   useEffect(() => {
     if (initialPrompt && !hasProcessedInitialRef.current) {
       hasProcessedInitialRef.current = true;
@@ -342,6 +354,9 @@ const ChatPanel = forwardRef<ChatPanelHandle, { initialPrompt?: string; onVersio
       setPreviewHtml(currentProject.html_content || "");
       setPreviewErrors([]);
       setAttachedImages([]);
+      // Reset healing state on project switch
+      setHealAttempts(0);
+      setIsHealing(false);
     } else if (!currentProject) {
       lastProjectIdRef.current = null;
       setMessages([]);
@@ -349,7 +364,6 @@ const ChatPanel = forwardRef<ChatPanelHandle, { initialPrompt?: string; onVersio
       setPreviewErrors([]);
       setAttachedImages([]);
     }
-    // Only react to project ID changes, not every currentProject update
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentProject?.id, setPreviewHtml]);
 
@@ -377,7 +391,6 @@ const ChatPanel = forwardRef<ChatPanelHandle, { initialPrompt?: string; onVersio
     } catch {}
   };
 
-  // Upload image to storage for use in generated apps (returns public URL)
   const uploadAppAsset = async (file: File): Promise<string | null> => {
     if (!currentProject) return null;
     try {
@@ -428,16 +441,31 @@ const ChatPanel = forwardRef<ChatPanelHandle, { initialPrompt?: string; onVersio
 
   const clearChat = useCallback(() => {
     if (!currentProject || isLoading) return;
+    // Abort any in-flight request
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+      abortControllerRef.current = null;
+    }
     setMessages([]);
     setPreviewHtml("");
     setPreviewErrors([]);
+    setHealAttempts(0);
+    setIsHealing(false);
+    isSendingRef.current = false;
     saveProject({ chat_history: [], html_content: "" });
   }, [currentProject, isLoading, setPreviewHtml, saveProject]);
 
   useImperativeHandle(ref, () => ({ clearChat }), [clearChat]);
 
   const sendMessage = useCallback(async (text: string, images: string[] = []) => {
-    if (!text || isLoading || !currentProject) return;
+    if (!text || !currentProject) return;
+    
+    // FIX: Guard against duplicate concurrent sends
+    if (isSendingRef.current || isLoadingRef.current) {
+      console.warn("[ChatPanel] Blocked duplicate send while already sending");
+      return;
+    }
+    isSendingRef.current = true;
 
     // Reset self-healing counter on manual user messages (not auto-fix)
     if (!text.startsWith("🔧 AUTO-FIX")) {
@@ -456,11 +484,16 @@ const ChatPanel = forwardRef<ChatPanelHandle, { initialPrompt?: string; onVersio
     setIsBuilding(true);
     setBuildStep(images.length > 0 ? "Analyzing your image..." : "Understanding your request...");
 
+    // FIX: Create abort controller for this request
+    const abortController = new AbortController();
+    abortControllerRef.current = abortController;
+
     let fullResponse = "";
     let hasSetAnalyzing = false;
     let hasSetBuilding = false;
 
     const upsert = (chunk: string) => {
+      if (abortController.signal.aborted) return;
       fullResponse += chunk;
       setBuildStreamContent(fullResponse);
       const [chatText, htmlCode] = parseResponse(fullResponse);
@@ -536,21 +569,22 @@ const ChatPanel = forwardRef<ChatPanelHandle, { initialPrompt?: string; onVersio
         }
       } catch {}
 
-      const apiMessages = [...messages, userMsg].map(m => ({
+      // FIX: Read messages from ref to avoid stale closures
+      const currentMessages = messagesRef.current;
+      const apiMessages = [...currentMessages, userMsg].map(m => ({
         role: m.role,
         content: m.content,
       }));
 
       const themeInfo = DESIGN_THEMES.find(t => t.id === selectedTheme);
       
-      // Phase 2: Use manually selected template OR auto-detect
       const userText = typeof text === "string" ? text : "";
-      const template = selectedTemplate || (messages.length === 0 ? matchTemplate(userText) : null);
+      const template = selectedTemplate || (currentMessages.length === 0 ? matchTemplate(userText) : null);
       let templateCtx = "";
       if (template) {
         templateCtx = `## MATCHED TEMPLATE: ${template.name}\n\nUse this as your structural blueprint:\n${template.blueprint}\n\nCustomize the content, colors, and details based on the user's specific request. Do NOT copy the blueprint literally — adapt it creatively.`;
         console.log(`[Template Matched] ${template.emoji} ${template.name}`);
-        setSelectedTemplate(null); // Clear after use
+        setSelectedTemplate(null);
       }
       
       await streamChat({
@@ -564,19 +598,19 @@ const ChatPanel = forwardRef<ChatPanelHandle, { initialPrompt?: string; onVersio
         templateContext: templateCtx || undefined,
         onDelta: upsert,
         onDone: async () => {
-          // Use multi-file parser
+          if (abortController.signal.aborted) return;
+          
           const { files: parsedFiles, html: htmlCode, chatText } = parseMultiFileOutput(fullResponse);
           
-          // Populate virtual file system
           if (Object.keys(parsedFiles).length > 0) {
             setVirtualFiles(parsedFiles);
           }
           
           if (htmlCode) setPreviewHtml(postProcessHtml(htmlCode));
 
-          // Phase 3: Self-review pass for first-time generations with HTML
+          // Self-review pass for first-time generations
           let finalHtml = htmlCode;
-          if (htmlCode && htmlCode.length > 200 && messages.length === 0) {
+          if (htmlCode && htmlCode.length > 200 && currentMessages.length === 0) {
             setBuildStep("Reviewing & polishing...");
             try {
               const reviewResp = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/review-code`, {
@@ -603,6 +637,7 @@ const ChatPanel = forwardRef<ChatPanelHandle, { initialPrompt?: string; onVersio
           setIsLoading(false);
           setIsBuilding(false);
           setBuildStep("");
+          isSendingRef.current = false;
           setTimeout(() => setBuildStreamContent(""), 3000);
 
           const processedHtml = finalHtml ? postProcessHtml(finalHtml) : null;
@@ -629,7 +664,7 @@ const ChatPanel = forwardRef<ChatPanelHandle, { initialPrompt?: string; onVersio
               timestamp: Date.now(),
               label: userPrompt.slice(0, 60) || "Build update",
               html: processedHtml,
-              messageIndex: messages.length,
+              messageIndex: currentMessages.length,
             });
           }
 
@@ -678,26 +713,30 @@ const ChatPanel = forwardRef<ChatPanelHandle, { initialPrompt?: string; onVersio
           });
         },
         onError: (err) => {
+          if (abortController.signal.aborted) return;
           setMessages((prev) => [...prev, { role: "assistant", content: `⚠️ ${err}`, timestamp: Date.now() }]);
           setIsLoading(false);
           setIsBuilding(false);
           setBuildStep("");
+          isSendingRef.current = false;
         },
       });
-    } catch {
+    } catch (e) {
+      console.error("[ChatPanel] sendMessage error:", e);
       setIsLoading(false);
       setIsBuilding(false);
       setBuildStep("");
+      isSendingRef.current = false;
     }
-  }, [isLoading, messages, currentProject, saveProject, setPreviewHtml, setIsBuilding, setBuildStep, selectedModel, selectedTheme, onVersionCreated]);
+  }, [currentProject, saveProject, setPreviewHtml, setIsBuilding, setBuildStep, selectedModel, selectedTheme, onVersionCreated, setVirtualFiles]);
 
   // Edit a previous user message and regenerate from that point
   const handleEditMessage = useCallback((index: number) => {
-    const msg = messages[index];
-    if (msg.role !== "user") return;
+    const msg = messagesRef.current[index];
+    if (msg?.role !== "user") return;
     setEditingIndex(index);
     setEditText(getTextContent(msg.content));
-  }, [messages]);
+  }, []);
 
   const handleCancelEdit = () => {
     setEditingIndex(null);
@@ -705,32 +744,35 @@ const ChatPanel = forwardRef<ChatPanelHandle, { initialPrompt?: string; onVersio
   };
 
   const handleSubmitEdit = useCallback(() => {
-    if (editingIndex === null || !editText.trim() || isLoading || !currentProject) return;
-    const truncated = messages.slice(0, editingIndex);
+    if (editingIndex === null || !editText.trim() || isLoadingRef.current || !currentProject) return;
+    const truncated = messagesRef.current.slice(0, editingIndex);
     setMessages(truncated);
     setEditingIndex(null);
     setEditText("");
-    sendMessage(editText.trim());
-  }, [editingIndex, editText, isLoading, currentProject, messages, sendMessage]);
+    // Small delay to let state update before sending
+    setTimeout(() => sendMessage(editText.trim()), 50);
+  }, [editingIndex, editText, currentProject, sendMessage]);
 
   const handleRegenerate = useCallback((index: number) => {
-    if (isLoading || !currentProject) return;
+    if (isLoadingRef.current || !currentProject) return;
+    const msgs = messagesRef.current;
     let userMsgIndex = index - 1;
-    while (userMsgIndex >= 0 && messages[userMsgIndex].role !== "user") userMsgIndex--;
+    while (userMsgIndex >= 0 && msgs[userMsgIndex].role !== "user") userMsgIndex--;
     if (userMsgIndex < 0) return;
-    const userText = getTextContent(messages[userMsgIndex].content);
-    const truncated = messages.slice(0, index);
+    const userText = getTextContent(msgs[userMsgIndex].content);
+    const truncated = msgs.slice(0, index);
     setMessages(truncated);
-    sendMessage(userText);
-  }, [isLoading, currentProject, messages, sendMessage]);
+    setTimeout(() => sendMessage(userText), 50);
+  }, [currentProject, sendMessage]);
 
+  // FIX: pendingPrompt effect — use isSendingRef to prevent double-fire
   useEffect(() => {
-    if (pendingPrompt && currentProject && !isLoading && messages.length === 0) {
+    if (pendingPrompt && currentProject && !isLoadingRef.current && !isSendingRef.current && messagesRef.current.length === 0) {
       const prompt = pendingPrompt;
       setPendingPrompt(null);
       sendMessage(prompt);
     }
-  }, [pendingPrompt, currentProject, isLoading, messages.length, sendMessage]);
+  }, [pendingPrompt, currentProject, sendMessage]);
 
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
@@ -738,16 +780,16 @@ const ChatPanel = forwardRef<ChatPanelHandle, { initialPrompt?: string; onVersio
 
   const handleSmartSend = useCallback(async (text: string, images: string[] = []) => {
     if (!text && images.length === 0) return;
+    if (isSendingRef.current || isLoadingRef.current) return; // FIX: guard
     const finalText = text || "Replicate this design";
     
-    // Only analyze first message in a conversation (for new projects)
-    if (messages.length === 0 && images.length === 0 && finalText.length >= 20) {
+    if (messagesRef.current.length === 0 && images.length === 0 && finalText.length >= 20) {
       const needsQuestions = await analyzePrompt(finalText);
-      if (needsQuestions) return; // Questions are now shown, wait for answers
+      if (needsQuestions) return;
     }
     
     sendMessage(finalText, images);
-  }, [messages.length, analyzePrompt, sendMessage]);
+  }, [analyzePrompt, sendMessage]);
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === "Enter" && !e.shiftKey) {
@@ -765,7 +807,7 @@ const ChatPanel = forwardRef<ChatPanelHandle, { initialPrompt?: string; onVersio
   };
 
   const handleAutoFix = () => {
-    setHealAttempts(0); // Manual fix resets counter
+    setHealAttempts(0);
     const errorSummary = previewErrors.join("\n");
     sendMessage(`The app preview has these errors, please fix them:\n${errorSummary}`);
   };
@@ -840,7 +882,7 @@ const ChatPanel = forwardRef<ChatPanelHandle, { initialPrompt?: string; onVersio
                       initial={{ opacity: 0, y: 8 }}
                       animate={{ opacity: 1, y: 0 }}
                       transition={{ duration: 0.3, delay: 0.2 + i * 0.05 }}
-                      onClick={() => sendMessage(s.prompt)}
+                      onClick={() => handleSmartSend(s.prompt)}
                       className="text-left px-3 py-3 rounded-xl border border-border bg-card hover:border-primary/40 hover:bg-card/80 hover:shadow-md hover:shadow-primary/5 transition-all group"
                     >
                       <span className="text-xs font-medium text-foreground group-hover:text-primary transition-colors">{s.label}</span>
@@ -924,7 +966,6 @@ const ChatPanel = forwardRef<ChatPanelHandle, { initialPrompt?: string; onVersio
               const isEditing = editingIndex === i;
 
               if (isEditing) {
-                const textContent = getTextContent(msg.content);
                 return (
                   <motion.div
                     key={i}
@@ -981,7 +1022,7 @@ const ChatPanel = forwardRef<ChatPanelHandle, { initialPrompt?: string; onVersio
             })}
           </AnimatePresence>
 
-          {/* Build Pipeline Progress Card — only show when HTML is being generated */}
+          {/* Build Pipeline Progress Card */}
           {buildStreamContent.length > 0 && (buildStreamContent.includes("```html") || isLoading) && (
             <BuildPipelineCard
               isBuilding={isLoading}
@@ -1097,7 +1138,7 @@ const ChatPanel = forwardRef<ChatPanelHandle, { initialPrompt?: string; onVersio
               {QUICK_ACTIONS.map((a) => (
                 <button
                   key={a.label}
-                  onClick={() => sendMessage(a.prompt)}
+                  onClick={() => handleSmartSend(a.prompt)}
                   className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-medium border border-border text-muted-foreground hover:text-foreground hover:border-primary/30 hover:bg-secondary/50 transition-all"
                 >
                   <Wand2 className="w-3 h-3" />
@@ -1155,7 +1196,7 @@ const ChatPanel = forwardRef<ChatPanelHandle, { initialPrompt?: string; onVersio
                   <span className="text-xs text-destructive truncate">
                     {previewErrors.length} error{previewErrors.length > 1 ? "s" : ""} detected
                     {healAttempts > 0 && healAttempts < MAX_HEAL_ATTEMPTS && (
-                      <span className="ml-1 text-muted-foreground">· auto-fixing in 3s ({healAttempts}/{MAX_HEAL_ATTEMPTS} attempts)</span>
+                      <span className="ml-1 text-muted-foreground">· auto-fixing in 5s ({healAttempts}/{MAX_HEAL_ATTEMPTS} attempts)</span>
                     )}
                     {healAttempts >= MAX_HEAL_ATTEMPTS && (
                       <span className="ml-1 text-muted-foreground">· max retries reached</span>
