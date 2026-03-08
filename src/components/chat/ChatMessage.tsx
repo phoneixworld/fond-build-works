@@ -1,7 +1,12 @@
 import { useState } from "react";
 import { motion } from "framer-motion";
-import { Bot, User, ChevronDown, ChevronRight, CheckCircle2, Circle, Pencil, RotateCcw, Clock, Brain, Sparkles, Wrench, Copy, Check, Lightbulb, History, Bookmark } from "lucide-react";
+import { Bot, User, ChevronDown, ChevronRight, CheckCircle2, Circle, Pencil, RotateCcw, Clock, Brain, Sparkles, Wrench, Copy, Check, Lightbulb, History, Bookmark, ArrowRight } from "lucide-react";
 import ReactMarkdown from "react-markdown";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 type MsgContent = string | Array<{ type: "text"; text: string } | { type: "image_url"; image_url: { url: string } }>;
 
