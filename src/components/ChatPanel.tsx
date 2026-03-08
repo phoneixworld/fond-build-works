@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import { Send, Bot, User } from "lucide-react";
 import { streamChat } from "@/lib/streamChat";
 import { motion, AnimatePresence } from "framer-motion";
@@ -16,8 +16,6 @@ function parseResponse(text: string): [string, string | null] {
   const htmlCode = fenceEnd === -1 ? text.slice(codeStart) : text.slice(codeStart, fenceEnd);
   return [chatPart, htmlCode.trim()];
 }
-
-import { useState as useStateHook, useRef as useRefHook, useEffect, useCallback } from "react";
 
 const ChatPanel = ({ initialPrompt }: { initialPrompt?: string }) => {
   const { currentProject, saveProject } = useProjects();
@@ -94,7 +92,7 @@ const ChatPanel = ({ initialPrompt }: { initialPrompt?: string }) => {
       await streamChat({
         messages: [...messages, userMsg],
         projectId: currentProject.id,
-        techStack: (currentProject as any).tech_stack || "html-tailwind",
+        techStack: currentProject.tech_stack || "html-tailwind",
         onDelta: upsert,
         onDone: () => {
           setIsLoading(false);
