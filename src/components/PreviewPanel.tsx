@@ -126,8 +126,10 @@ const PreviewPanel = () => {
               }}
             >
               <iframe
+                ref={iframeRef}
                 key={refreshKey}
                 srcDoc={`${previewHtml}
+${DIRECT_TOUCH_SCRIPT}
 <script>
 // === Enhanced Error Intelligence ===
 (function() {
@@ -137,18 +139,12 @@ const PreviewPanel = () => {
     errors.push(msg);
     window.parent.postMessage({ type: 'preview-error', errorType: type, message: msg }, '*');
   };
-
-  // JS runtime errors
   window.onerror = function(msg, url, line, col) {
     sendError('runtime', msg + ' (line ' + line + (col ? ':' + col : '') + ')');
   };
-
-  // Unhandled promise rejections
   window.addEventListener('unhandledrejection', function(e) {
     sendError('promise', 'Unhandled promise: ' + (e.reason?.message || e.reason || 'unknown'));
   });
-
-  // Console.error interception
   var origError = console.error;
   console.error = function() {
     var args = Array.from(arguments).map(function(a) {
@@ -157,21 +153,16 @@ const PreviewPanel = () => {
     sendError('console', args);
     origError.apply(console, arguments);
   };
-
-  // Console.warn interception (for deprecations, etc.)
   var origWarn = console.warn;
   console.warn = function() {
     var args = Array.from(arguments).map(function(a) {
       return typeof a === 'object' ? JSON.stringify(a) : String(a);
     }).join(' ');
-    // Only send warnings that look like errors
     if (args.toLowerCase().indexOf('error') !== -1 || args.toLowerCase().indexOf('failed') !== -1) {
       sendError('warning', args);
     }
     origWarn.apply(console, arguments);
   };
-
-  // Fetch failure interception
   var origFetch = window.fetch;
   window.fetch = function() {
     return origFetch.apply(this, arguments).then(function(resp) {
@@ -184,8 +175,6 @@ const PreviewPanel = () => {
       throw err;
     });
   };
-
-  // Resource load errors (images, scripts, stylesheets)
   window.addEventListener('error', function(e) {
     if (e.target && e.target !== window) {
       var tag = e.target.tagName || '';
@@ -193,13 +182,9 @@ const PreviewPanel = () => {
       if (src) sendError('resource', tag + ' failed to load: ' + src);
     }
   }, true);
-
-  // CSP violations
   document.addEventListener('securitypolicyviolation', function(e) {
     sendError('csp', 'CSP blocked: ' + e.blockedURI + ' (' + e.violatedDirective + ')');
   });
-
-  // Report ready state
   window.parent.postMessage({ type: 'preview-ready' }, '*');
 })();
 </script>`}
