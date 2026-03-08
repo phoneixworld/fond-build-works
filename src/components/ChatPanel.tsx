@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect, useCallback } from "react";
-import { Send, Bot, User, ChevronDown, Sparkles, AlertTriangle, Wand2, ImagePlus, X } from "lucide-react";
+import { Send, Bot, User, ChevronDown, Sparkles, AlertTriangle, Wand2, ImagePlus, X, Palette } from "lucide-react";
 import { streamChat } from "@/lib/streamChat";
-import { AI_MODELS, DEFAULT_MODEL, PROMPT_SUGGESTIONS, QUICK_ACTIONS, type AIModelId } from "@/lib/aiModels";
+import { AI_MODELS, DEFAULT_MODEL, PROMPT_SUGGESTIONS, QUICK_ACTIONS, DESIGN_THEMES, type AIModelId } from "@/lib/aiModels";
 import { motion, AnimatePresence } from "framer-motion";
 import { usePreview } from "@/contexts/PreviewContext";
 import { useProjects } from "@/contexts/ProjectContext";
@@ -41,6 +41,44 @@ function parseResponse(text: string): [string, string | null] {
   return [chatPart, htmlCode.trim()];
 }
 
+/** Post-process generated HTML to inject polish enhancements */
+function postProcessHtml(html: string): string {
+  if (!html) return html;
+  
+  const injections: string[] = [];
+  
+  // Smooth scrolling
+  if (!html.includes('scroll-behavior')) {
+    injections.push('<style>html{scroll-behavior:smooth}*{-webkit-tap-highlight-color:transparent}::selection{background:rgba(99,102,241,0.2)}img{max-width:100%;height:auto}</style>');
+  }
+  
+  // Favicon (generic modern favicon)
+  if (!html.includes('favicon') && !html.includes('rel="icon"')) {
+    injections.push('<link rel="icon" href="data:image/svg+xml,<svg xmlns=\'http://www.w3.org/2000/svg\' viewBox=\'0 0 32 32\'><rect width=\'32\' height=\'32\' rx=\'8\' fill=\'%236366f1\'/><text x=\'50%25\' y=\'55%25\' dominant-baseline=\'middle\' text-anchor=\'middle\' font-size=\'18\' fill=\'white\'>⚡</text></svg>" type="image/svg+xml">');
+  }
+  
+  // Font preloading hint
+  if (html.includes('fonts.googleapis.com') && !html.includes('preconnect')) {
+    injections.push('<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>');
+  }
+  
+  // Meta theme color
+  if (!html.includes('theme-color')) {
+    injections.push('<meta name="theme-color" content="#6366f1">');
+  }
+  
+  if (injections.length === 0) return html;
+  
+  // Inject after <head> or after first <meta>
+  const headIdx = html.indexOf('<head>');
+  if (headIdx !== -1) {
+    const insertPos = headIdx + '<head>'.length;
+    return html.slice(0, insertPos) + '\n  ' + injections.join('\n  ') + html.slice(insertPos);
+  }
+  
+  return html;
+}
+
 const TIER_COLORS: Record<string, string> = {
   fast: "text-green-400",
   pro: "text-blue-400",
@@ -72,6 +110,7 @@ const ChatPanel = ({ initialPrompt }: { initialPrompt?: string }) => {
   const [isLoading, setIsLoading] = useState(false);
   const [pendingPrompt, setPendingPrompt] = useState<string | null>(null);
   const [selectedModel, setSelectedModel] = useState<AIModelId>(DEFAULT_MODEL);
+  const [selectedTheme, setSelectedTheme] = useState<string>("minimal");
   const [previewErrors, setPreviewErrors] = useState<string[]>([]);
   const [attachedImages, setAttachedImages] = useState<string[]>([]); // base64 data URLs
   const [isDragOver, setIsDragOver] = useState(false);
@@ -214,7 +253,7 @@ const ChatPanel = ({ initialPrompt }: { initialPrompt?: string }) => {
         setBuildStep("Building your app...");
         hasSetBuilding = true;
       }
-      if (htmlCode) setPreviewHtml(htmlCode);
+      if (htmlCode) setPreviewHtml(postProcessHtml(htmlCode));
 
       setMessages((prev) => {
         const displayText = chatText || "Building...";
@@ -242,12 +281,15 @@ const ChatPanel = ({ initialPrompt }: { initialPrompt?: string }) => {
         content: m.content,
       }));
 
+      const themeInfo = DESIGN_THEMES.find(t => t.id === selectedTheme);
+      
       await streamChat({
         messages: apiMessages,
         projectId: currentProject.id,
         techStack: currentProject.tech_stack || "html-tailwind",
         schemas,
         model: selectedModel,
+        designTheme: themeInfo?.prompt,
         onDelta: upsert,
         onDone: () => {
           setIsLoading(false);
@@ -255,7 +297,7 @@ const ChatPanel = ({ initialPrompt }: { initialPrompt?: string }) => {
           setBuildStep("");
 
           const [chatText, htmlCode] = parseResponse(fullResponse);
-          if (htmlCode) setPreviewHtml(htmlCode);
+          if (htmlCode) setPreviewHtml(postProcessHtml(htmlCode));
 
           setMessages((prev) => {
             const final = chatText
@@ -291,7 +333,7 @@ const ChatPanel = ({ initialPrompt }: { initialPrompt?: string }) => {
       setIsBuilding(false);
       setBuildStep("");
     }
-  }, [isLoading, messages, currentProject, saveProject, setPreviewHtml, setIsBuilding, setBuildStep, selectedModel]);
+  }, [isLoading, messages, currentProject, saveProject, setPreviewHtml, setIsBuilding, setBuildStep, selectedModel, selectedTheme]);
 
   useEffect(() => {
     if (pendingPrompt && currentProject && !isLoading && messages.length === 0) {
@@ -555,39 +597,70 @@ const ChatPanel = ({ initialPrompt }: { initialPrompt?: string }) => {
           </button>
         </div>
 
-        {/* Model selector bar */}
+        {/* Model + Theme selector bar */}
         <div className="flex items-center justify-between mt-2 px-1">
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <button className="flex items-center gap-1.5 text-[11px] text-muted-foreground hover:text-foreground transition-colors">
-                <Sparkles className={`w-3 h-3 ${TIER_COLORS[currentModelInfo.tier]}`} />
-                <span>{currentModelInfo.label}</span>
-                <ChevronDown className="w-3 h-3 opacity-50" />
-              </button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="start" className="min-w-[220px]">
-              <DropdownMenuLabel className="text-[10px] uppercase tracking-wider text-muted-foreground">AI Model</DropdownMenuLabel>
-              <DropdownMenuSeparator />
-              {AI_MODELS.map((model) => (
-                <DropdownMenuItem
-                  key={model.id}
-                  onClick={() => setSelectedModel(model.id)}
-                  className={`flex items-center justify-between gap-3 ${selectedModel === model.id ? "text-primary font-medium" : ""}`}
-                >
-                  <div className="flex items-center gap-2">
-                    <Sparkles className={`w-3 h-3 ${TIER_COLORS[model.tier]}`} />
-                    <div>
-                      <span className="text-xs">{model.label}</span>
-                      <span className="text-[10px] text-muted-foreground ml-1.5">{model.description}</span>
+          <div className="flex items-center gap-3">
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button className="flex items-center gap-1.5 text-[11px] text-muted-foreground hover:text-foreground transition-colors">
+                  <Sparkles className={`w-3 h-3 ${TIER_COLORS[currentModelInfo.tier]}`} />
+                  <span>{currentModelInfo.label}</span>
+                  <ChevronDown className="w-3 h-3 opacity-50" />
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start" className="min-w-[220px]">
+                <DropdownMenuLabel className="text-[10px] uppercase tracking-wider text-muted-foreground">AI Model</DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                {AI_MODELS.map((model) => (
+                  <DropdownMenuItem
+                    key={model.id}
+                    onClick={() => setSelectedModel(model.id)}
+                    className={`flex items-center justify-between gap-3 ${selectedModel === model.id ? "text-primary font-medium" : ""}`}
+                  >
+                    <div className="flex items-center gap-2">
+                      <Sparkles className={`w-3 h-3 ${TIER_COLORS[model.tier]}`} />
+                      <div>
+                        <span className="text-xs">{model.label}</span>
+                        <span className="text-[10px] text-muted-foreground ml-1.5">{model.description}</span>
+                      </div>
                     </div>
-                  </div>
-                  <span className={`text-[9px] uppercase font-bold tracking-wider ${TIER_COLORS[model.tier]}`}>
-                    {TIER_LABELS[model.tier]}
-                  </span>
-                </DropdownMenuItem>
-              ))}
-            </DropdownMenuContent>
-          </DropdownMenu>
+                    <span className={`text-[9px] uppercase font-bold tracking-wider ${TIER_COLORS[model.tier]}`}>
+                      {TIER_LABELS[model.tier]}
+                    </span>
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
+
+            <div className="w-px h-3 bg-border" />
+
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button className="flex items-center gap-1.5 text-[11px] text-muted-foreground hover:text-foreground transition-colors">
+                  <Palette className="w-3 h-3 text-accent" />
+                  <span>{DESIGN_THEMES.find(t => t.id === selectedTheme)?.emoji} {DESIGN_THEMES.find(t => t.id === selectedTheme)?.label}</span>
+                  <ChevronDown className="w-3 h-3 opacity-50" />
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start" className="min-w-[220px]">
+                <DropdownMenuLabel className="text-[10px] uppercase tracking-wider text-muted-foreground">Design Theme</DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                {DESIGN_THEMES.map((theme) => (
+                  <DropdownMenuItem
+                    key={theme.id}
+                    onClick={() => setSelectedTheme(theme.id)}
+                    className={`flex items-center gap-2 ${selectedTheme === theme.id ? "text-primary font-medium" : ""}`}
+                  >
+                    <span className="text-sm">{theme.emoji}</span>
+                    <div>
+                      <span className="text-xs">{theme.label}</span>
+                      <span className="text-[10px] text-muted-foreground ml-1.5">{theme.description}</span>
+                    </div>
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
           <span className="text-[10px] text-muted-foreground/50">
             {messages.filter(m => m.role === "user").length} messages
           </span>

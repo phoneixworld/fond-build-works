@@ -92,6 +92,7 @@ export async function streamChat({
   techStack,
   schemas,
   model,
+  designTheme,
   onDelta,
   onDone,
   onError,
@@ -101,6 +102,7 @@ export async function streamChat({
   techStack?: string;
   schemas?: any[];
   model?: string;
+  designTheme?: string;
   onDelta: (text: string) => void;
   onDone: () => void;
   onError: (error: string) => void;
@@ -114,7 +116,7 @@ export async function streamChat({
       "Content-Type": "application/json",
       Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
     },
-    body: JSON.stringify({ messages: trimmedMessages, project_id: projectId, tech_stack: techStack, schemas, model }),
+    body: JSON.stringify({ messages: trimmedMessages, project_id: projectId, tech_stack: techStack, schemas, model, design_theme: designTheme }),
   });
 
   if (!resp.ok || !resp.body) {
