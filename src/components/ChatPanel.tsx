@@ -801,40 +801,13 @@ const ChatPanel = forwardRef<ChatPanelHandle, { initialPrompt?: string; onVersio
             })}
           </AnimatePresence>
 
-          {/* Loading indicator */}
-          {isLoading && messages[messages.length - 1]?.role !== "assistant" && (
-            <motion.div
-              initial={{ opacity: 0, y: 6 }}
-              animate={{ opacity: 1, y: 0 }}
-              className="flex gap-3"
-            >
-              <div className="w-7 h-7 rounded-xl bg-gradient-to-br from-accent/20 to-accent/5 ring-1 ring-accent/15 flex items-center justify-center shrink-0">
-                <Bot className="w-3.5 h-3.5 text-accent" />
-              </div>
-              <div className="flex flex-col gap-2 pt-1">
-                <div className="flex gap-1 items-center">
-                  <motion.span
-                    className="w-1.5 h-1.5 rounded-full bg-accent/60"
-                    animate={{ opacity: [0.3, 1, 0.3] }}
-                    transition={{ repeat: Infinity, duration: 1.2, delay: 0 }}
-                  />
-                  <motion.span
-                    className="w-1.5 h-1.5 rounded-full bg-accent/60"
-                    animate={{ opacity: [0.3, 1, 0.3] }}
-                    transition={{ repeat: Infinity, duration: 1.2, delay: 0.2 }}
-                  />
-                  <motion.span
-                    className="w-1.5 h-1.5 rounded-full bg-accent/60"
-                    animate={{ opacity: [0.3, 1, 0.3] }}
-                    transition={{ repeat: Infinity, duration: 1.2, delay: 0.4 }}
-                  />
-                </div>
-                <span className="text-[10px] text-muted-foreground/35 flex items-center gap-1 font-mono">
-                  <Clock className="w-2.5 h-2.5" />
-                  {elapsedTime}s
-                </span>
-              </div>
-            </motion.div>
+          {/* Build Pipeline Progress Card */}
+          {(isLoading || (buildStreamContent.length > 100 && !isLoading)) && (
+            <BuildPipelineCard
+              isBuilding={isLoading}
+              streamContent={buildStreamContent}
+              elapsed={elapsedTime}
+            />
           )}
 
           {/* Follow-up questions UI */}
