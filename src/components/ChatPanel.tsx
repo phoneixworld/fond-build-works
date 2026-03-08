@@ -233,37 +233,22 @@ function parseReactFiles(text: string): { chatText: string; files: Record<string
     return { chatText: text, files: null, deps };
   }
   
-  // Check for --- file separators
-  const hasFileSeparators = /^---\s+\/?\w[\w/.-]*\.(jsx?|tsx?|css)$/m.test(block);
+  // Parse files using multiple format strategies
+  const parsedFiles = parseFileSections(block);
   
-  if (!hasFileSeparators) {
-    // No file separators — treat the whole block as /App.jsx
+  if (parsedFiles.fileCount === 0) {
+    // No file separators found — treat the whole block as /App.jsx
     console.log(`[parseReactFiles] Single-file mode: treating block as /App.jsx (${block.length} chars)`);
     files["/App.jsx"] = sanitizeImports(block.trim());
     return { chatText, files, deps };
   }
   
-  // Multi-file mode: parse --- /filename sections
-  const fileSections = block.split(/^---\s+/m).filter(Boolean);
-  for (const section of fileSections) {
-    const lines = section.split("\n");
-    const firstLine = lines[0].trim();
-    if (firstLine.match(/^\/?\w[\w/.-]*\.(jsx?|tsx?|css)$/)) {
-      let filename = firstLine.startsWith("/") ? firstLine : `/${firstLine}`;
-      filename = filename.replace(/^\/src\//, "/");
-      const content = lines.slice(1).join("\n").trim();
-      files[filename] = filename.match(/\.(jsx?|tsx?)$/) ? sanitizeImports(content) : content;
-    } else if (firstLine === "dependencies") {
-      try {
-        const depsJson = lines.slice(1).join("\n").trim();
-        const parsed = JSON.parse(depsJson);
-        for (const [pkg, ver] of Object.entries(parsed)) {
-          if (ALLOWED_PACKAGES.has(pkg)) {
-            deps[pkg] = ver as string;
-          }
-        }
-      } catch {}
-    }
+  // Copy parsed files
+  for (const [fname, code] of Object.entries(parsedFiles.files)) {
+    files[fname] = fname.match(/\.(jsx?|tsx?)$/) ? sanitizeImports(code) : code;
+  }
+  for (const [pkg, ver] of Object.entries(parsedFiles.deps)) {
+    if (ALLOWED_PACKAGES.has(pkg)) deps[pkg] = ver;
   }
 
   return {
@@ -271,6 +256,104 @@ function parseReactFiles(text: string): { chatText: string; files: Record<string
     files: Object.keys(files).length > 0 ? files : null,
     deps,
   };
+}
+
+/** Parse file sections from a code block, handling multiple separator formats */
+function parseFileSections(block: string): { files: Record<string, string>; deps: Record<string, string>; fileCount: number } {
+  const files: Record<string, string> = {};
+  const deps: Record<string, string> = {};
+  
+  // Strategy 1: "--- /filename" on same line (original format)
+  if (/^---\s+\/?\w[\w/.-]*\.(jsx?|tsx?|css)$/m.test(block)) {
+    const sections = block.split(/^---\s+/m).filter(Boolean);
+    for (const section of sections) {
+      const lines = section.split("\n");
+      const firstLine = lines[0].trim();
+      if (firstLine.match(/^\/?\w[\w/.-]*\.(jsx?|tsx?|css)$/)) {
+        let filename = firstLine.startsWith("/") ? firstLine : `/${firstLine}`;
+        filename = filename.replace(/^\/src\//, "/");
+        files[filename] = lines.slice(1).join("\n").trim();
+      } else if (firstLine === "dependencies") {
+        try { Object.assign(deps, JSON.parse(lines.slice(1).join("\n").trim())); } catch {}
+      }
+    }
+    if (Object.keys(files).length > 0) {
+      return { files, deps, fileCount: Object.keys(files).length };
+    }
+  }
+  
+  // Strategy 2: "---\n/filename\n---\ncode" (frontmatter-style separators)
+  // Pattern: --- on its own line, then filename on next line, then --- on next line, then code until next ---
+  const frontmatterRegex = /^---\s*\n\s*(\/?\w[\w/.-]*\.(?:jsx?|tsx?|css))\s*\n---\s*\n/gm;
+  const matches: { filename: string; start: number }[] = [];
+  let m;
+  while ((m = frontmatterRegex.exec(block)) !== null) {
+    matches.push({ filename: m[1], start: m.index + m[0].length });
+  }
+  
+  if (matches.length > 0) {
+    for (let i = 0; i < matches.length; i++) {
+      const start = matches[i].start;
+      // Find the end: either next --- separator or end of block
+      let end = block.length;
+      if (i + 1 < matches.length) {
+        // Find the --- before the next file's frontmatter
+        const nextMatch = block.lastIndexOf("\n---", matches[i + 1].start - 1);
+        if (nextMatch > start) end = nextMatch;
+      }
+      let filename = matches[i].filename;
+      if (!filename.startsWith("/")) filename = "/" + filename;
+      filename = filename.replace(/^\/src\//, "/");
+      const code = block.slice(start, end).trim();
+      if (code.length > 0) files[filename] = code;
+    }
+    // Check for dependencies section
+    const depsMatch = block.match(/^---\s*\ndependencies\s*\n---\s*\n([\s\S]*?)(?:\n---|\n*$)/m);
+    if (depsMatch) {
+      try { Object.assign(deps, JSON.parse(depsMatch[1].trim())); } catch {}
+    }
+    if (Object.keys(files).length > 0) {
+      return { files, deps, fileCount: Object.keys(files).length };
+    }
+  }
+  
+  // Strategy 3: Just "--- /filename" or "---\n/filename" without closing ---
+  // More lenient: split on lines that look like filenames preceded by ---
+  const lenientRegex = /^---\s*\n?\s*(\/?\w[\w/.-]*\.(?:jsx?|tsx?|css))\s*$/gm;
+  const lenientMatches: { filename: string; endOfHeader: number }[] = [];
+  while ((m = lenientRegex.exec(block)) !== null) {
+    lenientMatches.push({ filename: m[1], endOfHeader: m.index + m[0].length });
+  }
+  
+  if (lenientMatches.length > 0) {
+    for (let i = 0; i < lenientMatches.length; i++) {
+      let start = lenientMatches[i].endOfHeader;
+      // Skip optional --- line after filename
+      const afterHeader = block.slice(start, start + 10);
+      const dashLine = afterHeader.match(/^\s*\n---\s*\n/);
+      if (dashLine) start += dashLine[0].length;
+      else if (afterHeader.startsWith("\n")) start += 1;
+      
+      const end = i + 1 < lenientMatches.length ? lenientMatches[i + 1].endOfHeader - (block.slice(0, lenientMatches[i + 1].endOfHeader).match(/---\s*\n?\s*[\w/][\w/.-]*\.\w+\s*$/)?.[0]?.length || 0) : block.length;
+      
+      let filename = lenientMatches[i].filename;
+      if (!filename.startsWith("/")) filename = "/" + filename;
+      filename = filename.replace(/^\/src\//, "/");
+      
+      // Find the actual end by looking for the next --- line
+      let codeEnd = block.length;
+      if (i + 1 < lenientMatches.length) {
+        const nextSep = block.lastIndexOf("\n---", lenientMatches[i + 1].endOfHeader);
+        if (nextSep > start) codeEnd = nextSep;
+      }
+      
+      const code = block.slice(start, codeEnd).trim();
+      if (code.length > 0) files[filename] = code;
+    }
+    return { files, deps, fileCount: Object.keys(files).length };
+  }
+  
+  return { files, deps, fileCount: 0 };
 }
 
 function postProcessHtml(html: string): string {
