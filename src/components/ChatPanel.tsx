@@ -677,64 +677,6 @@ const ChatPanel = forwardRef<ChatPanelHandle, { initialPrompt?: string; onVersio
             return final;
           });
         },
-            const userPrompt = getTextContent(userMsg.content);
-            onVersionCreated({
-              id: crypto.randomUUID(),
-              timestamp: Date.now(),
-              label: userPrompt.slice(0, 60) || "Build update",
-              html: postProcessHtml(htmlCode),
-              messageIndex: messages.length,
-            });
-          }
-
-          setMessages((prev) => {
-            const final = chatText
-              ? prev.map((m, i) => (i === prev.length - 1 && m.role === "assistant" ? { ...m, content: chatText } : m))
-              : prev;
-
-            const persistMessages = final.map(m => ({
-              role: m.role,
-              content: typeof m.content === "string" ? m.content : getTextContent(m.content),
-            }));
-
-            // AI-generate project name if still "Untitled Project" (fallback)
-            const isFirstMessage = persistMessages.filter(m => m.role === "user").length === 1;
-            
-            if (isFirstMessage && currentProject.name === "Untitled Project") {
-              // Use direct supabase update to avoid stale closure race with saveProject
-              const userPromptText = persistMessages[0]?.content || "";
-              fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/project-name`, {
-                method: "POST",
-                headers: {
-                  "Content-Type": "application/json",
-                  Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
-                },
-                body: JSON.stringify({ prompt: userPromptText }),
-              })
-                .then(r => r.json())
-                .then(({ name, emoji }) => {
-                  const fullName = emoji ? `${emoji} ${name}` : name;
-                  // Direct DB update to avoid race condition with saveProject closure
-                  supabase
-                    .from("projects")
-                    .update({ name: fullName, updated_at: new Date().toISOString() } as any)
-                    .eq("id", currentProject.id)
-                    .then(() => {
-                      // Force refresh project state
-                      saveProject({ name: fullName } as any);
-                    });
-                })
-                .catch(() => {});
-            }
-
-            saveProject({
-              chat_history: persistMessages,
-              html_content: htmlCode || currentProject.html_content || "",
-            });
-
-            return final;
-          });
-        },
         onError: (err) => {
           setMessages((prev) => [...prev, { role: "assistant", content: `⚠️ ${err}`, timestamp: Date.now() }]);
           setIsLoading(false);
