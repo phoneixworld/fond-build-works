@@ -497,7 +497,7 @@ const ChatMessage = ({ content, role, timestamp, isLoading, onEdit, onRegenerate
                 Phoenix
               </span>
               {timestamp && (
-                <span className="text-[10px] text-muted-foreground/25 font-mono opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1">
+                <span className="text-[10px] text-white/60 font-mono opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1">
                   <Clock className="w-2.5 h-2.5" />
                   {formatTime(timestamp)}
                 </span>
@@ -509,7 +509,7 @@ const ChatMessage = ({ content, role, timestamp, isLoading, onEdit, onRegenerate
                   {onRegenerate && (
                     <button
                       onClick={onRegenerate}
-                      className="p-1 rounded-md text-muted-foreground/30 hover:text-foreground hover:bg-secondary/50 transition-all"
+                      className="p-1 rounded-md text-white/60 hover:text-white hover:bg-secondary/50 transition-all"
                       title="Regenerate response"
                     >
                       <RotateCcw className="w-3 h-3" />
