@@ -85,3 +85,23 @@
     background: hsl(var(--muted-foreground));
   }
 }
+
+/* Force Sandpack preview to fill its container */
+.sp-wrapper,
+.sp-layout,
+.sp-stack,
+.sp-preview-container,
+.sp-preview-iframe {
+  height: 100% !important;
+}
+.sp-wrapper {
+  display: flex !important;
+  flex-direction: column !important;
+}
+.sp-preview-container {
+  flex: 1 !important;
+  min-height: 0 !important;
+}
+.sp-preview-iframe {
+  border: none !important;
+}
