@@ -1157,7 +1157,106 @@ const ChatPanel = forwardRef<ChatPanelHandle, { initialPrompt?: string; onVersio
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
   }, [messages]);
 
-  const handleSmartSend = useCallback(async (text: string, images: string[] = []) => {
+  // Chat-only agent — streams conversational response, no code
+  const sendChatMessage = useCallback(async (text: string, images: string[] = []) => {
+    if (!text || !currentProject) return;
+    if (isSendingRef.current || isLoadingRef.current) return;
+    isSendingRef.current = true;
+
+    const content = buildMessageContent(text, images);
+    const userMsg: Msg = { role: "user", content, timestamp: Date.now() };
+    setInput("");
+    setAttachedImages([]);
+    setMessages((prev) => [...prev, userMsg]);
+    setIsLoading(true);
+    setBuildStep("Thinking...");
+
+    let fullChatResponse = "";
+
+    const currentMessages = messagesRef.current;
+    const apiMessages = [...currentMessages, userMsg].map(m => ({
+      role: m.role,
+      content: m.content,
+    }));
+
+    // Fetch knowledge
+    let knowledge: string[] = [];
+    try {
+      const { data } = await supabase
+        .from("project_knowledge" as any)
+        .select("title, content")
+        .eq("project_id", currentProject.id)
+        .eq("is_active", true);
+      knowledge = (data || []).map((k: any) => `[${k.title}]: ${k.content}`);
+    } catch {}
+
+    await streamChatAgent({
+      messages: apiMessages,
+      projectId: currentProject.id,
+      techStack: currentProject.tech_stack || "react-cdn",
+      knowledge,
+      onDelta: (chunk) => {
+        fullChatResponse += chunk;
+        const displayText = stripBuildMarker(fullChatResponse);
+        setMessages((prev) => {
+          const last = prev[prev.length - 1];
+          if (last?.role === "assistant") {
+            return prev.map((m, i) => (i === prev.length - 1 ? { ...m, content: displayText } : m));
+          }
+          return [...prev, { role: "assistant", content: displayText, timestamp: Date.now() }];
+        });
+      },
+      onDone: (finalText) => {
+        setIsLoading(false);
+        setBuildStep("");
+        setPipelineStep("complete");
+        setCurrentAgent(null);
+        isSendingRef.current = false;
+
+        // Check if chat agent confirmed a build
+        if (hasBuildConfirmation(finalText)) {
+          // Store the original user prompt for the build agent
+          const userText = typeof text === "string" ? text : "";
+          setPendingBuildPrompt(userText);
+        }
+
+        // Persist
+        const displayText = stripBuildMarker(finalText);
+        setMessages((prev) => {
+          const final = prev.map((m, i) =>
+            i === prev.length - 1 && m.role === "assistant" ? { ...m, content: displayText } : m
+          );
+          const persistMessages = final.map(m => ({
+            role: m.role,
+            content: typeof m.content === "string" ? m.content : getTextContent(m.content),
+          }));
+          saveProject({ chat_history: persistMessages });
+          return final;
+        });
+      },
+      onError: (err) => {
+        setMessages((prev) => [...prev, { role: "assistant", content: `⚠️ ${err}`, timestamp: Date.now() }]);
+        setIsLoading(false);
+        setBuildStep("");
+        setPipelineStep(null);
+        setCurrentAgent(null);
+        isSendingRef.current = false;
+      },
+    });
+  }, [currentProject, saveProject, setBuildStep]);
+
+  // Auto-trigger build agent when chat agent confirms a build
+  useEffect(() => {
+    if (pendingBuildPrompt && !isLoadingRef.current && !isSendingRef.current) {
+      const prompt = pendingBuildPrompt;
+      setPendingBuildPrompt(null);
+      setCurrentAgent("build");
+      setPipelineStep("planning");
+      sendMessage(prompt);
+    }
+  }, [pendingBuildPrompt, sendMessage]);
+
+
     if (!text && images.length === 0) return;
     if (isSendingRef.current || isLoadingRef.current) return;
     const finalText = text || "Replicate this design";
