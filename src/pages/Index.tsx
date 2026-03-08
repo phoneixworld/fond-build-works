@@ -76,11 +76,31 @@ const IDELayout = () => {
     }
   };
 
+  const PROJECT_NAME_MAX = 50;
+  const PROJECT_NAME_REGEX = /^[\p{Emoji}\w\s\-().!&]+$/u;
+
+  const validateName = (name: string): string => {
+    if (!name.trim()) return "Name cannot be empty";
+    if (name.length > PROJECT_NAME_MAX) return `Max ${PROJECT_NAME_MAX} characters`;
+    // Check uniqueness
+    const isDuplicate = projects.some(
+      p => p.id !== currentProject?.id && p.name.toLowerCase() === name.trim().toLowerCase()
+    );
+    if (isDuplicate) return "A project with this name already exists";
+    return "";
+  };
+
   const handleRename = async () => {
-    if (!renameValue.trim() || !currentProject) return;
-    await saveProject({ name: renameValue.trim() });
+    const fullName = renameEmoji ? `${renameEmoji} ${renameValue.trim()}` : renameValue.trim();
+    const error = validateName(fullName);
+    if (error) {
+      setRenameError(error);
+      return;
+    }
+    await saveProject({ name: fullName });
     setRenameOpen(false);
-    toast({ title: "Renamed", description: `Project renamed to "${renameValue.trim()}"` });
+    setRenameError("");
+    toast({ title: "Renamed", description: `Project renamed to "${fullName}"` });
   };
 
   // Called by ChatPanel when a new version is created
