@@ -129,10 +129,13 @@ const IDELayout = () => {
   const currentStackInfo = TECH_STACKS.find(s => s.id === currentStack);
   const StackIcon = currentStackInfo?.icon;
 
-  const panelTabs: { id: "preview" | "code" | "cloud" | "history" | "brain" | "pulse" | "crew" | "brandkit"; label: string; icon: typeof Eye }[] = [
+  // Primary tabs (always show label) + secondary tabs (icon-only with tooltips)
+  const primaryTabs: { id: typeof rightPanel; label: string; icon: typeof Eye }[] = [
     { id: "preview", label: "Preview", icon: Eye },
     { id: "code", label: "Code", icon: Code },
     { id: "cloud", label: "Cloud", icon: Cloud },
+  ];
+  const secondaryTabs: { id: typeof rightPanel; label: string; icon: typeof Eye }[] = [
     { id: "brain", label: "Brain", icon: Brain },
     { id: "pulse", label: "Pulse", icon: Activity },
     { id: "crew", label: "Crew", icon: Users },
