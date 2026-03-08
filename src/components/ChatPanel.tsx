@@ -414,6 +414,7 @@ const ChatPanel = forwardRef<ChatPanelHandle, { initialPrompt?: string; onVersio
 
     const upsert = (chunk: string) => {
       fullResponse += chunk;
+      setBuildStreamContent(fullResponse);
       const [chatText, htmlCode] = parseResponse(fullResponse);
 
       if (!hasSetAnalyzing && fullResponse.length > 20) {
