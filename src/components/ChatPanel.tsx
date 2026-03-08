@@ -147,19 +147,22 @@ const ChatPanel = () => {
                   <div className="text-sm text-foreground leading-relaxed chat-markdown">
                     <ReactMarkdown
                       components={{
-                        code({ className, children, ...props }) {
+                        code(props) {
+                          const { className, children, node, ref, ...rest } = props as any;
                           const match = /language-(\w+)/.exec(className || "");
                           const codeStr = String(children).replace(/\n$/, "");
-                          if (match) {
+                          const isInline = !match && !String(children).includes("\n");
+                          if (!isInline && (match || String(children).includes("\n"))) {
+                            const lang = match ? match[1] : "text";
                             return (
                               <div className="relative my-3 rounded-lg overflow-hidden border border-border">
                                 <div className="flex items-center justify-between px-3 py-1.5 bg-ide-panel-header border-b border-border">
-                                  <span className="text-[10px] font-mono text-muted-foreground uppercase">{match[1]}</span>
+                                  <span className="text-[10px] font-mono text-muted-foreground uppercase">{lang}</span>
+                                  <CopyButton text={codeStr} />
                                 </div>
-                                <CopyButton text={codeStr} />
                                 <SyntaxHighlighter
                                   style={oneDark}
-                                  language={match[1]}
+                                  language={lang}
                                   PreTag="div"
                                   customStyle={{
                                     margin: 0,
@@ -175,10 +178,11 @@ const ChatPanel = () => {
                             );
                           }
                           return (
-                            <code className="px-1.5 py-0.5 rounded bg-secondary text-primary font-mono text-xs" {...props}>
+                            <code className="px-1.5 py-0.5 rounded bg-secondary text-primary font-mono text-xs" {...rest}>
                               {children}
                             </code>
                           );
+                        },
                         },
                         p({ children }) {
                           return <p className="mb-2 last:mb-0">{children}</p>;
