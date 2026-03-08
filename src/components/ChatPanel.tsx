@@ -795,10 +795,11 @@ const ChatPanel = forwardRef<ChatPanelHandle, { initialPrompt?: string; onVersio
         onDone: async () => {
           if (abortController.signal.aborted) return;
           
-          // Debug: log response length and fence detection
-          console.log(`[ChatPanel] Response length: ${fullResponse.length}, tech_stack: ${currentProject.tech_stack}`);
-          const fencesInResponse = fullResponse.match(/```\w*/g);
-          console.log(`[ChatPanel] Code fences found:`, fencesInResponse || "none");
+          // Debug: log response details
+          console.log(`[ChatPanel:onDone] Response length: ${fullResponse.length}`);
+          console.log(`[ChatPanel:onDone] Has react-preview fence:`, fullResponse.includes('```react-preview'));
+          console.log(`[ChatPanel:onDone] Has react fence:`, fullResponse.includes('```react'));
+          console.log(`[ChatPanel:onDone] First 200 chars of code area:`, fullResponse.slice(fullResponse.indexOf('```'), fullResponse.indexOf('```') + 200));
           
           // Check for React file output first
           const reactResult = parseReactFiles(fullResponse);
@@ -806,12 +807,13 @@ const ChatPanel = forwardRef<ChatPanelHandle, { initialPrompt?: string; onVersio
           
           if (reactResult.files) {
             // React/Sandpack mode
+            const fileNames = Object.keys(reactResult.files);
+            console.log(`[ChatPanel:onDone] ✅ React files found:`, fileNames, `Total code: ${Object.values(reactResult.files).join('').length} chars`);
             setSandpackFiles(reactResult.files);
             if (Object.keys(reactResult.deps).length > 0) setSandpackDeps(reactResult.deps);
             setPreviewMode("sandpack");
-            console.log("[Sandpack] Loaded React files:", Object.keys(reactResult.files));
           } else {
-            console.log("[ChatPanel] No React files parsed — falling back to HTML mode");
+            console.log("[ChatPanel:onDone] ❌ No React files parsed — falling back to HTML mode");
             // Legacy HTML mode
             const { files: parsedFiles, html: htmlCode, chatText } = parseMultiFileOutput(fullResponse);
             
