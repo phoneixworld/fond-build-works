@@ -13,6 +13,7 @@ interface ChatMessageProps {
   onEdit?: () => void;
   onRegenerate?: () => void;
   showActions?: boolean;
+  onSuggestionClick?: (text: string) => void;
 }
 
 function getTextContent(content: MsgContent): string {
