@@ -7,6 +7,7 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { MermaidDiagram } from "./MermaidDiagram";
 
 type MsgContent = string | Array<{ type: "text"; text: string } | { type: "image_url"; image_url: { url: string } }>;
 
@@ -546,7 +547,20 @@ const ChatMessage = ({ content, role, timestamp, isLoading, onEdit, onRegenerate
                           prose-a:text-primary prose-a:no-underline hover:prose-a:underline
                           prose-blockquote:border-l-2 prose-blockquote:border-primary/30 prose-blockquote:pl-4 prose-blockquote:text-muted-foreground prose-blockquote:italic"
                       >
-                        <ReactMarkdown>{section.content}</ReactMarkdown>
+                        <ReactMarkdown
+                          components={{
+                            code(props) {
+                              const { children, className, node, ...rest } = props;
+                              const match = /language-(\w+)/.exec(className || '');
+                              if (match && match[1] === 'mermaid') {
+                                return <MermaidDiagram chart={String(children).replace(/\n$/, '')} />;
+                              }
+                              return <code {...rest} className={className}>{children}</code>;
+                            }
+                          }}
+                        >
+                          {section.content}
+                        </ReactMarkdown>
                       </div>
                     );
                 }
