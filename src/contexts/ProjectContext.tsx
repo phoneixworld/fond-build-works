@@ -182,8 +182,12 @@ export const ProjectProvider = ({ children }: { children: ReactNode }) => {
     });
   }, [currentProject, toast]);
 
+  const clearCurrentProject = useCallback(() => {
+    setCurrentProject(null);
+  }, []);
+
   return (
-    <ProjectContext.Provider value={{ projects, currentProject, loading, selectProject, createProject, cloneProject, saveProject, deleteProject, refreshProjects: fetchProjects }}>
+    <ProjectContext.Provider value={{ projects, currentProject, loading, selectProject, createProject, cloneProject, saveProject, deleteProject, refreshProjects: fetchProjects, clearCurrentProject }}>
       {children}
     </ProjectContext.Provider>
   );
