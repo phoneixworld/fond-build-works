@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import {
   Rocket, GitBranch, ArrowRight, Lock, Unlock, CheckCircle2,
   Clock, Shield, AlertTriangle, Eye, History, Crown, RefreshCw,
-  Globe, Server, Code2, ChevronRight,
+  Globe, Server, Code2, ChevronRight, X, ExternalLink,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useProjects } from "@/contexts/ProjectContext";
@@ -51,6 +51,7 @@ const EnvironmentManager = () => {
   const [showHistory, setShowHistory] = useState(false);
   const [deployNotes, setDeployNotes] = useState("");
   const [confirmPromote, setConfirmPromote] = useState<{ from: string; to: string } | null>(null);
+  const [previewEnv, setPreviewEnv] = useState<{ name: string; label: string; html: string } | null>(null);
 
   useEffect(() => {
     if (currentProject?.id) {
@@ -313,10 +314,11 @@ const EnvironmentManager = () => {
                     {/* Preview */}
                     {hasSnapshot && (
                       <button
+                        onClick={() => setPreviewEnv({ name: envConfig.name, label: envConfig.label, html: envData.html_snapshot })}
                         className="p-1.5 rounded hover:bg-background/50 transition-colors"
-                        title="Preview"
+                        title={`Preview ${envConfig.label}`}
                       >
-                        <Eye className="w-3.5 h-3.5 text-muted-foreground" />
+                        <Eye className="w-3.5 h-3.5 text-primary" />
                       </button>
                     )}
                   </div>
@@ -414,6 +416,50 @@ const EnvironmentManager = () => {
               })}
             </div>
           )}
+        </div>
+      )}
+
+      {/* Environment Preview Modal */}
+      {previewEnv && (
+        <div className="fixed inset-0 z-50 bg-black/70 flex items-center justify-center p-4">
+          <div className="bg-card border border-border rounded-xl w-full max-w-4xl h-[80vh] flex flex-col overflow-hidden shadow-2xl">
+            {/* Modal header */}
+            <div className="flex items-center justify-between px-4 py-3 border-b border-border bg-muted/50">
+              <div className="flex items-center gap-2">
+                <Eye className="w-4 h-4 text-primary" />
+                <span className="text-sm font-semibold text-foreground">{previewEnv.label} Preview</span>
+                <span className="text-[9px] bg-primary/20 text-primary px-1.5 py-0.5 rounded-full font-medium">
+                  {(previewEnv.html.length / 1024).toFixed(1)}KB
+                </span>
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => {
+                    const win = window.open("", "_blank");
+                    if (win) { win.document.write(previewEnv.html); win.document.close(); }
+                  }}
+                  className="flex items-center gap-1 px-2 py-1 rounded text-xs text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+                >
+                  <ExternalLink className="w-3 h-3" /> Open in Tab
+                </button>
+                <button
+                  onClick={() => setPreviewEnv(null)}
+                  className="p-1 rounded hover:bg-muted transition-colors"
+                >
+                  <X className="w-4 h-4 text-muted-foreground" />
+                </button>
+              </div>
+            </div>
+            {/* iframe preview */}
+            <div className="flex-1 bg-white">
+              <iframe
+                srcDoc={previewEnv.html}
+                className="w-full h-full border-0"
+                sandbox="allow-scripts allow-same-origin"
+                title={`${previewEnv.label} preview`}
+              />
+            </div>
+          </div>
         </div>
       )}
     </div>
