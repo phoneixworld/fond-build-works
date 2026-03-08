@@ -55,20 +55,30 @@ function parseResponse(text: string): [string, string | null] {
 
 function postProcessHtml(html: string): string {
   if (!html) return html;
+  
+  // Phase 1: Run the HTML validator and auto-fixer
+  const validation = validateAndFixHtml(html);
+  html = validation.html;
+  
+  // Log validation results for debugging
+  if (validation.issues.length > 0) {
+    console.log(`[HTML Validator] Score: ${validation.score}/100, Issues: ${validation.issues.length}`, 
+      validation.issues.map(i => `${i.fixed ? '✅' : '⚠️'} [${i.category}] ${i.message}`));
+  }
+  
+  // Phase 2: Inject runtime enhancements
   const injections: string[] = [];
   if (!html.includes('scroll-behavior')) {
     injections.push('<style>html{scroll-behavior:smooth}*{-webkit-tap-highlight-color:transparent}::selection{background:rgba(99,102,241,0.2)}img{max-width:100%;height:auto}img.img-error{display:none!important}</style>');
   }
-  // Inject null-safety wrapper, image error handling, and hash navigation fix
+  // Inject hash navigation fix and image error handling
   if (!html.includes('__safeQuery')) {
     injections.push(`<script>
 window.__safeQuery=function(s){try{return document.querySelector(s)}catch(e){return null}};
 document.addEventListener('DOMContentLoaded',function(){
-  // Image error handling
   document.querySelectorAll('img').forEach(function(img){
     img.addEventListener('error',function(){this.style.display='none';this.classList.add('img-error')});
   });
-  // Fix hash navigation in srcdoc iframes
   document.addEventListener('click',function(e){
     var link=e.target.closest('a[href^="#"]');
     if(!link)return;
@@ -80,11 +90,9 @@ document.addEventListener('DOMContentLoaded',function(){
       target.scrollIntoView({behavior:'smooth',block:'start'});
       history.replaceState(null,null,hash);
     }
-    // Close mobile menus if open
     var mobileMenu=document.querySelector('[data-mobile-menu],.mobile-menu,.nav-menu.open,.menu-open');
     if(mobileMenu){mobileMenu.classList.remove('open','active','show','menu-open');mobileMenu.style.display='none';}
   });
-  // Also handle hash links with onclick handlers
   document.querySelectorAll('a[href^="#"]').forEach(function(a){
     var hash=a.getAttribute('href');
     if(!hash||hash==='#')return;
