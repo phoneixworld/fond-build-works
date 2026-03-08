@@ -13,6 +13,7 @@ interface ChatMessageProps {
   onEdit?: () => void;
   onRegenerate?: () => void;
   showActions?: boolean;
+  onSuggestionClick?: (text: string) => void;
 }
 
 function getTextContent(content: MsgContent): string {
@@ -327,9 +328,68 @@ const ContextBadges = ({ hints }: { hints: ContextHint[] }) => {
   );
 };
 
+// --- Suggestion buttons ---
+
+interface Suggestion {
+  emoji: string;
+  title: string;
+  description: string;
+  fullText: string;
+}
+
+function parseSuggestions(text: string): { suggestions: Suggestion[]; cleanText: string } {
+  const suggestions: Suggestion[] = [];
+  // Match lines like: 🍽️ **Online Ordering** — description text
+  // or: 📸 **Photo Gallery** - description text
+  const suggestionRegex = /^(\p{Emoji_Presentation}|\p{Emoji}\uFE0F?)\s+\*\*(.+?)\*\*\s*[—–\-]\s*(.+)$/gmu;
+  let match;
+  const matchedLines = new Set<string>();
+  
+  while ((match = suggestionRegex.exec(text)) !== null) {
+    suggestions.push({
+      emoji: match[1],
+      title: match[2].trim(),
+      description: match[3].trim(),
+      fullText: `${match[2].trim()}: ${match[3].trim()}`,
+    });
+    matchedLines.add(match[0]);
+  }
+  
+  if (suggestions.length < 2) return { suggestions: [], cleanText: text };
+  
+  // Remove suggestion lines from text
+  const cleanLines = text.split("\n").filter(line => !matchedLines.has(line.trim()));
+  return { suggestions, cleanText: cleanLines.join("\n").trim() };
+}
+
+const SuggestionButtons = ({ suggestions, onClick }: { suggestions: Suggestion[]; onClick?: (text: string) => void }) => {
+  if (suggestions.length === 0 || !onClick) return null;
+  
+  return (
+    <div className="flex flex-wrap gap-2 mt-3">
+      {suggestions.map((s, i) => (
+        <motion.button
+          key={i}
+          initial={{ opacity: 0, y: 4 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: i * 0.05 }}
+          onClick={() => onClick(s.fullText)}
+          className="flex items-center gap-2 px-3 py-2 rounded-xl text-[12px] font-medium
+            border border-border/60 bg-card/60 backdrop-blur-sm
+            hover:border-primary/40 hover:bg-primary/5 hover:shadow-md hover:shadow-primary/5
+            transition-all group text-left"
+        >
+          <span className="text-base">{s.emoji}</span>
+          <span className="text-foreground/80 group-hover:text-foreground">{s.title}</span>
+        </motion.button>
+      ))}
+    </div>
+  );
+};
+
 // --- Main component ---
 
-const ChatMessage = ({ content, role, timestamp, isLoading, onEdit, onRegenerate, showActions = true }: ChatMessageProps) => {
+const ChatMessage = ({ content, role, timestamp, isLoading, onEdit, onRegenerate, showActions = true, onSuggestionClick }: ChatMessageProps) => {
   const isUser = role === "user";
   const textContent = getTextContent(content);
   const imageUrls = getImageUrls(content);
@@ -337,7 +397,10 @@ const ChatMessage = ({ content, role, timestamp, isLoading, onEdit, onRegenerate
   // Detect and strip context hints for assistant messages
   const contextHints = !isUser ? detectContextHints(textContent) : [];
   const cleanText = !isUser ? stripContextMarkers(textContent) : textContent;
-  const sections = !isUser ? parseStructuredResponse(cleanText) : [];
+  
+  // Parse suggestion buttons from assistant responses
+  const { suggestions, cleanText: textWithoutSuggestions } = !isUser ? parseSuggestions(cleanText) : { suggestions: [], cleanText: cleanText };
+  const sections = !isUser ? parseStructuredResponse(textWithoutSuggestions) : [];
 
   return (
     <motion.div
@@ -450,6 +513,9 @@ const ChatMessage = ({ content, role, timestamp, isLoading, onEdit, onRegenerate
                 }
               })}
             </div>
+            
+            {/* Suggestion buttons */}
+            <SuggestionButtons suggestions={suggestions} onClick={onSuggestionClick} />
           </div>
         </div>
       )}

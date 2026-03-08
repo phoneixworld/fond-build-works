@@ -1371,6 +1371,7 @@ const ChatPanel = forwardRef<ChatPanelHandle, { initialPrompt?: string; onVersio
                   onEdit={isUser ? () => handleEditMessage(i) : undefined}
                   onRegenerate={!isUser ? () => handleRegenerate(i) : undefined}
                   showActions={!isLoading}
+                  onSuggestionClick={!isUser ? (text) => handleSmartSend(text) : undefined}
                 />
               );
             })}
