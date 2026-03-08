@@ -499,7 +499,7 @@ IMPORTANT: Proactively detect when an app needs backend functionality and USE IT
 2. Does it involve user-specific data? → Use Auth API + Data API
 3. Is it purely visual (landing page, portfolio)? → No backend needed
 
-When you detect backend needs, implement the API calls directly. Don't ask — just build it functional.
+When you detect backend needs, implement the API calls directly — build it functional.
 
 ## CRITICAL RULES
 ${isReactStack ? `- MANDATORY: Generate React JSX files inside a \\\`\\\`\\\`react-preview code fence with --- filename markers. /App.jsx is the entry point. NEVER use html-preview.
