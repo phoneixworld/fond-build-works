@@ -791,7 +791,8 @@ const ChatPanel = forwardRef<ChatPanelHandle, { initialPrompt?: string; onVersio
     setIsLoading(true);
     setBuildStreamContent("");
     setIsBuilding(true);
-    setBuildStep(images.length > 0 ? "Analyzing your image..." : "Understanding your request...");
+    setBuildStep(images.length > 0 ? "🖼️ Analyzing image..." : "🏗️ Build agent generating code...");
+    setPipelineStep("generating");
 
     // FIX: Create abort controller for this request
     const abortController = new AbortController();
