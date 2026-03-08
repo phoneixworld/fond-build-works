@@ -232,7 +232,7 @@ const ChatPanel = ({ initialPrompt }: { initialPrompt?: string }) => {
             disabled={isLoading}
             rows={1}
           />
-          <button onClick={send} disabled={isLoading || !input.trim()} className="text-primary hover:text-primary/80 disabled:text-muted-foreground transition-colors pb-0.5">
+          <button onClick={() => send()} disabled={isLoading || !input.trim()} className="text-primary hover:text-primary/80 disabled:text-muted-foreground transition-colors pb-0.5">
             <Send className="w-4 h-4" />
           </button>
         </div>
