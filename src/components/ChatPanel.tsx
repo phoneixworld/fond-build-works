@@ -550,6 +550,7 @@ const ChatPanel = forwardRef<ChatPanelHandle, { initialPrompt?: string; onVersio
     sendMessage(userText);
   }, [isLoading, currentProject, messages, sendMessage]);
 
+  useEffect(() => {
     if (pendingPrompt && currentProject && !isLoading && messages.length === 0) {
       const prompt = pendingPrompt;
       setPendingPrompt(null);
