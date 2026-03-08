@@ -99,7 +99,7 @@ export default function Header() {
 - Import npm packages normally: import { motion } from "framer-motion"
 - Tailwind CSS is available via CDN — use className with Tailwind classes
 - For additional WELL-KNOWN npm packages (e.g. axios, zustand, zod), include a --- dependencies section with a JSON object
-- Available by default (NO need to add to dependencies): react, react-dom, lucide-react, framer-motion, date-fns, recharts, react-router-dom, clsx, tailwind-merge
+- Available by default (NO need to add to dependencies): react, react-dom, lucide-react, framer-motion, date-fns, recharts, react-router-dom, clsx, tailwind-merge, react-intersection-observer
 - ⚠️ FORBIDDEN: Do NOT import any package that isn't listed above or in your --- dependencies section. Packages like @vivid-web/*, vovk, @data-*, or any unfamiliar SDK DO NOT EXIST. If you're unsure a package exists, DON'T use it.
 - For data fetching and persistence, use plain fetch() to call the Data API described above. Do NOT import any data/ORM/SDK libraries.
 - For state management, use React useState/useReducer/useContext. Do NOT import state management libraries unless explicitly added to dependencies.
