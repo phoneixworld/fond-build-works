@@ -364,6 +364,18 @@ For full-page apps, follow this structure:
 - ❌ Missing loading states when fetching data
 - ❌ Inconsistent border radius or spacing
 - ❌ Using too many different colors — stick to the palette
+- ❌ Using href="#" placeholder links — ALWAYS use real hash anchors!
+
+### Navigation Links — CRITICAL
+- All navigation links MUST use real hash anchors that scroll to actual sections on the page
+- Navbar links: href="#features", href="#pricing", href="#about", href="#contact", etc.
+- Each section MUST have a matching id attribute: <section id="features">, <section id="pricing">, etc.
+- NEVER use href="#" as a placeholder — every link must navigate somewhere
+- CTA buttons: link to relevant sections (e.g., signup form, contact section, pricing)
+- Footer links: link back to page sections or use javascript:void(0) for non-functional items
+- For multi-page concepts in a single-page app, use hash-based navigation with JavaScript to show/hide sections
+- Add scroll-behavior: smooth to html element for smooth scrolling
+- Mobile menu links should close the menu AND scroll to the section
 
 ## BACKEND AUTO-DETECTION
 
