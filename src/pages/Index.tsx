@@ -12,6 +12,7 @@ import ChatPanel from "@/components/ChatPanel";
 import CodeEditor from "@/components/CodeEditor";
 import CloudPanel from "@/components/CloudPanel";
 import PreviewPanel from "@/components/PreviewPanel";
+import ProjectBrain from "@/components/ProjectBrain";
 import PublishExportButtons from "@/components/PublishExportButtons";
 import LandingPage from "@/components/LandingPage";
 import CommandPalette from "@/components/CommandPalette";
