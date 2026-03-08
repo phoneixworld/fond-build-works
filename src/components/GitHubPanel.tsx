@@ -192,7 +192,12 @@ const GitHubPanel = () => {
 
       if (data.files) {
         for (const file of data.files) {
-          writeFile(file.path, file.content);
+          const existing = files[file.path];
+          if (existing) {
+            updateFile(file.path, file.content);
+          } else {
+            addFile(file.path, file.content);
+          }
         }
       }
 
