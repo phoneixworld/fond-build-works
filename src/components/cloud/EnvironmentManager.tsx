@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import {
   Rocket, GitBranch, ArrowRight, Lock, Unlock, CheckCircle2,
   Clock, Shield, AlertTriangle, Eye, History, Crown, RefreshCw,
-  Globe, Server, Code2, ChevronRight,
+  Globe, Server, Code2, ChevronRight, X, ExternalLink,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useProjects } from "@/contexts/ProjectContext";
