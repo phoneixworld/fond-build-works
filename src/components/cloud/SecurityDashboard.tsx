@@ -537,26 +537,59 @@ const SecurityDashboard = () => {
                   const StatusIcon = cfg.icon;
                   const isExpanded = expandedCheck === check.id;
 
+                  const isIgnored = ignoredChecks.has(check.id);
+
                   return (
-                    <div key={check.id} className={`border rounded-lg transition-colors ${cfg.bg}`}>
+                    <div key={check.id} className={`border rounded-lg transition-colors ${isIgnored ? "bg-muted/30 border-border opacity-60" : cfg.bg}`}>
                       <button
                         onClick={() => setExpandedCheck(isExpanded ? null : check.id)}
                         className="w-full flex items-center gap-2 px-3 py-2.5 text-left"
                       >
-                        <StatusIcon className={`w-4 h-4 shrink-0 ${cfg.color}`} />
-                        <span className="text-xs font-medium text-foreground flex-1">{check.name}</span>
+                        <StatusIcon className={`w-4 h-4 shrink-0 ${isIgnored ? "text-muted-foreground" : cfg.color}`} />
+                        <span className={`text-xs font-medium flex-1 ${isIgnored ? "text-muted-foreground line-through" : "text-foreground"}`}>{check.name}</span>
+                        {isIgnored && <span className="text-[9px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground">Ignored</span>}
                         <ChevronRight className={`w-3 h-3 text-muted-foreground transition-transform ${isExpanded ? "rotate-90" : ""}`} />
                       </button>
 
                       {isExpanded && (
                         <div className="px-3 pb-3 space-y-2">
                           <p className="text-[11px] text-muted-foreground pl-6">{check.description}</p>
-                          {check.fix && (
+                          {check.fix && !isIgnored && (
                             <div className="ml-6 p-2 rounded bg-background/50 border border-border">
                               <p className="text-[10px] font-medium text-foreground flex items-center gap-1">
-                                <TrendingUp className="w-3 h-3 text-primary" /> How to fix:
+                                <TrendingUp className="w-3 h-3 text-primary" /> Recommended fix:
                               </p>
                               <p className="text-[10px] text-muted-foreground mt-0.5">{check.fix}</p>
+                            </div>
+                          )}
+                          {/* Action buttons for warn/fail checks */}
+                          {(check.status === "warn" || check.status === "fail") && (
+                            <div className="ml-6 flex items-center gap-2 pt-1">
+                              {check.fix && !isIgnored && (
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    toast.info(`To fix: ${check.fix}`, { duration: 6000 });
+                                  }}
+                                  className="flex items-center gap-1 px-2.5 py-1 rounded-md bg-primary text-primary-foreground text-[10px] font-medium hover:bg-primary/90 transition-colors"
+                                >
+                                  <TrendingUp className="w-3 h-3" /> Show Fix Steps
+                                </button>
+                              )}
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  toggleIgnore(check.id);
+                                  toast(isIgnored ? "Finding restored" : "Finding ignored — won't affect your score", { duration: 3000 });
+                                }}
+                                className={`flex items-center gap-1 px-2.5 py-1 rounded-md text-[10px] font-medium transition-colors ${
+                                  isIgnored
+                                    ? "bg-primary/10 text-primary hover:bg-primary/20"
+                                    : "bg-muted text-muted-foreground hover:bg-muted/80"
+                                }`}
+                              >
+                                <Eye className="w-3 h-3" /> {isIgnored ? "Restore" : "Ignore"}
+                              </button>
                             </div>
                           )}
                         </div>
