@@ -14,6 +14,7 @@ import { useVirtualFS, parseMultiFileOutput } from "@/contexts/VirtualFSContext"
 import { supabase } from "@/integrations/supabase/client";
 import ChatMessage from "@/components/chat/ChatMessage";
 import BuildPipelineCard from "@/components/chat/BuildPipelineCard";
+import ClarifyingQuestions from "@/components/chat/ClarifyingQuestions";
 import ReactMarkdown from "react-markdown";
 import {
   DropdownMenu,
@@ -1389,76 +1390,49 @@ const ChatPanel = forwardRef<ChatPanelHandle, { initialPrompt?: string; onVersio
           {/* Follow-up questions UI */}
           <AnimatePresence>
             {followUpQuestions.length > 0 && (
-              <motion.div
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -10 }}
-                className="space-y-3"
-              >
-                <div className="flex gap-3">
-                  <div className="w-7 h-7 rounded-lg bg-accent/15 ring-1 ring-accent/20 flex items-center justify-center shrink-0 mt-0.5">
-                    <MessageSquareMore className="w-3.5 h-3.5 text-accent" />
-                  </div>
-                  <div className="flex-1 min-w-0 space-y-3">
-                    <p className="text-[13px] text-foreground leading-[1.7]">Before I build this, a few quick questions to make sure I get it right:</p>
-                    
-                    {analysisResult?.analysis && (
-                      <div className="flex gap-2 flex-wrap">
-                        {analysisResult.analysis.needsBackend && (
-                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-primary/10 text-primary">
-                            <Zap className="w-2.5 h-2.5" /> Backend detected
-                          </span>
-                        )}
-                        {analysisResult.analysis.needsAuth && (
-                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-accent/10 text-accent">
-                            <ShieldCheck className="w-2.5 h-2.5" /> Auth needed
-                          </span>
-                        )}
-                        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium bg-secondary text-muted-foreground">
-                          {analysisResult.analysis.complexity || "medium"} complexity
-                        </span>
-                      </div>
-                    )}
-
-                    {followUpQuestions.map((q: any) => (
-                      <div key={q.id} className="space-y-2">
-                        <p className="text-[12px] font-medium text-foreground">{q.text}</p>
-                        <div className="flex flex-wrap gap-1.5">
-                          {q.options.map((opt: any) => (
-                            <button
-                              key={opt.value}
-                              onClick={() => handleFollowUpAnswer(q.id, opt.value)}
-                              className={`px-3 py-1.5 rounded-lg text-[11px] font-medium border transition-all ${
-                                followUpAnswers[q.id] === opt.value
-                                  ? "border-primary bg-primary/10 text-primary"
-                                  : "border-border text-muted-foreground hover:text-foreground hover:border-primary/30"
-                              }`}
-                            >
-                              {opt.label}
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-                    ))}
-
-                    <div className="flex gap-2 pt-1">
-                      <button
-                        onClick={submitFollowUpAnswers}
-                        className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-semibold bg-primary text-primary-foreground hover:bg-primary/90 transition-colors shadow-sm"
-                      >
-                        <CheckCircle2 className="w-3.5 h-3.5" />
-                        Build with these preferences
-                      </button>
-                      <button
-                        onClick={skipFollowUpQuestions}
-                        className="px-3 py-2 rounded-xl text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors"
-                      >
-                        Skip, just build
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              </motion.div>
+              <ClarifyingQuestions
+                questions={followUpQuestions.map((q: any) => ({
+                  id: q.id,
+                  header: q.header || q.id,
+                  text: q.text,
+                  options: q.options.map((o: any) => ({
+                    value: o.value,
+                    label: o.label,
+                    description: o.description || "",
+                  })),
+                  multiSelect: q.multiSelect || false,
+                  allowOther: q.allowOther !== false,
+                }))}
+                badges={analysisResult?.analysis ? {
+                  needsBackend: analysisResult.analysis.needsBackend,
+                  needsAuth: analysisResult.analysis.needsAuth,
+                  complexity: analysisResult.analysis.complexity,
+                } : undefined}
+                onSubmit={(answers) => {
+                  const answersText = followUpQuestions.map((q: any) => {
+                    const answer = answers[q.id];
+                    if (Array.isArray(answer)) {
+                      const labels = answer.map(v => {
+                        if (v === "__other__") return "Other";
+                        const opt = q.options.find((o: any) => o.value === v);
+                        return opt?.label || v;
+                      });
+                      return `${q.text} → ${labels.join(", ")}`;
+                    }
+                    if (answer === "__other__") return `${q.text} → Other`;
+                    const option = q.options.find((o: any) => o.value === answer);
+                    return `${q.text} → ${option?.label || answer || "Not specified"}`;
+                  }).join("\n");
+                  
+                  const enrichedPrompt = `${pendingFollowUpPrompt}\n\n--- Additional Requirements ---\n${answersText}`;
+                  setFollowUpQuestions([]);
+                  setFollowUpAnswers({});
+                  setPendingFollowUpPrompt("");
+                  setAnalysisResult(null);
+                  sendMessage(enrichedPrompt);
+                }}
+                onSkip={skipFollowUpQuestions}
+              />
             )}
           </AnimatePresence>
 
