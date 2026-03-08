@@ -1,240 +1,211 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import {
-  Database, Server, Workflow, Layout, Route, Shield, FileCheck,
-  CheckCircle2, Circle, Loader2, AlertCircle, ChevronDown, ChevronRight
-} from "lucide-react";
+import { CheckCircle2, Circle, Loader2, ChevronRight, FileCode2 } from "lucide-react";
 
-export interface PipelineStep {
+export interface TaskItem {
   id: string;
   label: string;
-  icon: React.ElementType;
-  status: "pending" | "running" | "done" | "error";
-  detail?: string;
+  status: "pending" | "in_progress" | "done";
 }
-
-const DEFAULT_STEPS: Omit<PipelineStep, "status">[] = [
-  { id: "analyze", label: "Analyzing request", icon: FileCheck },
-  { id: "schema", label: "Data schemas", icon: Database },
-  { id: "api", label: "API integration", icon: Server },
-  { id: "ui", label: "UI components", icon: Layout },
-  { id: "routing", label: "Routing & navigation", icon: Route },
-  { id: "styling", label: "Styling & polish", icon: Workflow },
-  { id: "validation", label: "Validation & QA", icon: Shield },
-];
 
 interface BuildPipelineCardProps {
   isBuilding: boolean;
   streamContent: string;
   elapsed: number;
+  /** Optional explicit tasks from outside */
+  tasks?: TaskItem[];
 }
 
-function detectStepStatus(streamContent: string): Record<string, "pending" | "running" | "done"> {
-  const len = streamContent.length;
-  const hasHtml = streamContent.includes("```html") || streamContent.includes("```html-preview");
-  const hasClosingFence = hasHtml && streamContent.indexOf("```", streamContent.indexOf("```html") + 10) > -1;
-  
-  // Heuristic step detection based on content length and markers
-  const statuses: Record<string, "pending" | "running" | "done"> = {};
-  
-  // Analyze
-  if (len > 0) statuses["analyze"] = len > 50 ? "done" : "running";
-  
-  // Schema - detected by data/fetch/api patterns
-  const hasDataPatterns = /fetch\(|collection|data-|database|storage|api/i.test(streamContent);
-  if (len > 100) {
-    statuses["schema"] = hasDataPatterns ? "done" : (len > 200 ? "done" : "running");
+/** Detect which files are being edited from stream content */
+function detectEditingFiles(content: string): string[] {
+  const files: string[] = [];
+  // React preview files
+  const reactMatches = content.matchAll(/---\s+\/?([^\s]+\.(?:jsx?|tsx?|css))/g);
+  for (const m of reactMatches) {
+    const name = m[1].split("/").pop() || m[1];
+    if (!files.includes(name)) files.push(name);
   }
-  
-  // API
-  if (len > 200) {
-    statuses["api"] = hasDataPatterns ? "done" : (len > 400 ? "done" : "running");
+  // HTML mode
+  if (files.length === 0 && (content.includes("```html") || content.includes("```html-preview"))) {
+    files.push("index.html");
   }
-  
-  // UI
-  if (hasHtml) {
-    const htmlStart = streamContent.indexOf("```html");
-    const htmlContent = streamContent.slice(htmlStart);
-    statuses["ui"] = htmlContent.length > 2000 ? "done" : "running";
-  } else if (len > 400) {
-    statuses["ui"] = "running";
-  }
-  
-  // Routing
-  if (hasHtml) {
-    const hasNav = /nav|href=|router|scroll-to|#\w+/i.test(streamContent);
-    statuses["routing"] = hasNav ? "done" : "running";
-  }
-  
-  // Styling
-  if (hasHtml) {
-    const htmlStart = streamContent.indexOf("```html");
-    const htmlContent = streamContent.slice(htmlStart);
-    statuses["styling"] = htmlContent.length > 3000 ? "done" : "running";
-  }
-  
-  // Validation
-  if (hasClosingFence) {
-    statuses["validation"] = "done";
-  } else if (hasHtml) {
-    const htmlContent = streamContent.slice(streamContent.indexOf("```html"));
-    if (htmlContent.length > 4000) statuses["validation"] = "running";
-  }
-  
-  return statuses;
+  return files.slice(0, 3); // max 3 badges
 }
 
-const StatusIcon = ({ status }: { status: PipelineStep["status"] }) => {
+/** Heuristic task detection from stream content */
+function detectTasks(content: string, isBuilding: boolean): TaskItem[] {
+  const len = content.length;
+  const hasCode = content.includes("```react-preview") || content.includes("```jsx") || content.includes("```html");
+  const hasClosingFence = hasCode && (() => {
+    const start = content.indexOf("```");
+    const afterStart = content.indexOf("\n", start) + 1;
+    return content.indexOf("\n```", afterStart) > -1;
+  })();
+
+  const tasks: TaskItem[] = [];
+
+  // Task 1: Analyze request
+  if (len > 0) {
+    tasks.push({
+      id: "analyze",
+      label: "Analyzing request",
+      status: len > 80 ? "done" : "in_progress",
+    });
+  }
+
+  // Task 2: Generate components
+  if (len > 80) {
+    tasks.push({
+      id: "generate",
+      label: "Generating components",
+      status: hasCode ? "done" : "in_progress",
+    });
+  }
+
+  // Task 3: Build UI
+  if (hasCode) {
+    const codeStart = content.indexOf("```");
+    const codeContent = content.slice(codeStart);
+    tasks.push({
+      id: "build",
+      label: "Building UI & styling",
+      status: codeContent.length > 3000 ? "done" : "in_progress",
+    });
+  }
+
+  // Task 4: Finalize
+  if (hasCode) {
+    const codeStart = content.indexOf("```");
+    const codeContent = content.slice(codeStart);
+    if (codeContent.length > 2000) {
+      tasks.push({
+        id: "finalize",
+        label: "Finalizing & validating",
+        status: hasClosingFence && !isBuilding ? "done" : "in_progress",
+      });
+    }
+  }
+
+  // If build is done, mark all as done
+  if (!isBuilding && len > 100) {
+    return tasks.map(t => ({ ...t, status: "done" as const }));
+  }
+
+  return tasks;
+}
+
+const StatusIndicator = ({ status }: { status: TaskItem["status"] }) => {
   switch (status) {
     case "done":
       return (
         <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} transition={{ type: "spring", stiffness: 500, damping: 25 }}>
-          <CheckCircle2 className="w-3.5 h-3.5 text-[hsl(var(--ide-success))]" />
+          <CheckCircle2 className="w-4 h-4 text-[hsl(var(--ide-success))]" />
         </motion.div>
       );
-    case "running":
-      return <Loader2 className="w-3.5 h-3.5 text-primary animate-spin" />;
-    case "error":
-      return <AlertCircle className="w-3.5 h-3.5 text-destructive" />;
+    case "in_progress":
+      return <Loader2 className="w-4 h-4 text-primary animate-spin" />;
     default:
-      return <Circle className="w-3.5 h-3.5 text-muted-foreground/20" />;
+      return <Circle className="w-4 h-4 text-muted-foreground/25" />;
   }
 };
 
-const BuildPipelineCard = ({ isBuilding, streamContent, elapsed }: BuildPipelineCardProps) => {
+const BuildPipelineCard = ({ isBuilding, streamContent, elapsed, tasks: externalTasks }: BuildPipelineCardProps) => {
   const [collapsed, setCollapsed] = useState(false);
-  const [steps, setSteps] = useState<PipelineStep[]>(
-    DEFAULT_STEPS.map(s => ({ ...s, status: "pending" as const }))
-  );
 
-  // Update steps based on stream content
-  useEffect(() => {
-    if (!isBuilding && streamContent.length === 0) {
-      setSteps(DEFAULT_STEPS.map(s => ({ ...s, status: "pending" as const })));
-      return;
+  const editingFiles = useMemo(() => detectEditingFiles(streamContent), [streamContent]);
+  const tasks = useMemo(() => externalTasks || detectTasks(streamContent, isBuilding), [externalTasks, streamContent, isBuilding]);
+
+  const doneCount = tasks.filter(t => t.status === "done").length;
+  const allDone = doneCount === tasks.length && !isBuilding && tasks.length > 0;
+  const activeTask = tasks.find(t => t.status === "in_progress");
+
+  // Build a description line
+  const description = useMemo(() => {
+    if (allDone) return `Completed in ${elapsed}s`;
+    if (activeTask) {
+      const descs: Record<string, string> = {
+        analyze: "Understanding your requirements",
+        generate: "Streaming contextual code updates underway",
+        build: "Assembling UI components & applying styles",
+        finalize: "Running validation checks",
+      };
+      return descs[activeTask.id] || "Processing...";
     }
+    return "Starting build...";
+  }, [allDone, activeTask, elapsed]);
 
-    const detected = detectStepStatus(streamContent);
-    setSteps(prev => prev.map(step => ({
-      ...step,
-      status: detected[step.id] || step.status,
-    })));
-  }, [streamContent, isBuilding]);
-
-  // Mark all done when build completes
-  useEffect(() => {
-    if (!isBuilding && streamContent.length > 100) {
-      setSteps(prev => prev.map(s => ({
-        ...s,
-        status: s.status === "running" || s.status === "pending" ? "done" : s.status,
-      })));
-    }
-  }, [isBuilding]);
-
-  const doneCount = steps.filter(s => s.status === "done").length;
-  const progress = Math.round((doneCount / steps.length) * 100);
-  const allDone = doneCount === steps.length && !isBuilding;
-  const hasStarted = steps.some(s => s.status !== "pending");
-
-  if (!hasStarted && !isBuilding) return null;
+  if (tasks.length === 0 && !isBuilding) return null;
 
   return (
     <motion.div
       initial={{ opacity: 0, y: 8 }}
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, y: -8 }}
-      className="rounded-xl border border-border/50 bg-card/30 backdrop-blur-sm overflow-hidden"
+      className="rounded-xl border border-border/60 bg-card/50 overflow-hidden"
     >
-      {/* Header */}
+      {/* Header row */}
       <button
         onClick={() => setCollapsed(!collapsed)}
-        className="w-full flex items-center justify-between px-4 py-3 hover:bg-secondary/10 transition-colors"
+        className="w-full flex items-center justify-between px-4 py-3 hover:bg-muted/20 transition-colors"
       >
-        <div className="flex items-center gap-3">
-          {allDone ? (
-            <div className="w-6 h-6 rounded-lg bg-[hsl(var(--ide-success))]/10 flex items-center justify-center">
-              <CheckCircle2 className="w-4 h-4 text-[hsl(var(--ide-success))]" />
-            </div>
-          ) : (
-            <div className="w-6 h-6 rounded-lg bg-primary/10 flex items-center justify-center">
-              <Loader2 className="w-3.5 h-3.5 text-primary animate-spin" />
-            </div>
-          )}
-          <div className="flex flex-col items-start">
-            <span className="text-[12px] font-semibold text-foreground tracking-tight">
-              {allDone ? "Build complete" : "Building your app..."}
+        <div className="flex flex-col items-start gap-1 min-w-0">
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="text-[13px] font-semibold text-foreground">
+              {allDone ? "Edited" : "Editing"}
             </span>
-            <span className="text-[10px] text-muted-foreground/50 font-mono">
-              {allDone ? `Completed in ${elapsed}s` : `${elapsed}s · ${progress}%`}
-            </span>
+            {editingFiles.map((file) => (
+              <span
+                key={file}
+                className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-mono font-medium bg-muted/80 text-muted-foreground border border-border/50"
+              >
+                <FileCode2 className="w-3 h-3" />
+                {file}
+              </span>
+            ))}
           </div>
+          <span className="text-[11px] text-muted-foreground/60 leading-tight">
+            {description}
+          </span>
         </div>
-        <div className="flex items-center gap-2">
-          <span className="text-[10px] text-muted-foreground/40 font-mono">{doneCount}/{steps.length}</span>
-          {collapsed ? <ChevronRight className="w-3.5 h-3.5 text-muted-foreground/30" /> : <ChevronDown className="w-3.5 h-3.5 text-muted-foreground/30" />}
-        </div>
+        <ChevronRight
+          className={`w-4 h-4 text-muted-foreground/30 shrink-0 transition-transform duration-200 ${
+            !collapsed ? "rotate-90" : ""
+          }`}
+        />
       </button>
 
-      {/* Progress bar */}
-      <div className="h-[2px] bg-border/20 mx-4">
-        <motion.div
-          className="h-full rounded-full"
-          style={{ backgroundColor: allDone ? "hsl(var(--ide-success))" : "hsl(var(--primary))" }}
-          animate={{ width: `${progress}%` }}
-          transition={{ duration: 0.4, ease: "easeOut" }}
-        />
-      </div>
-
-      {/* Steps */}
+      {/* Task list */}
       <AnimatePresence>
-        {!collapsed && (
+        {!collapsed && tasks.length > 0 && (
           <motion.div
             initial={{ height: 0, opacity: 0 }}
             animate={{ height: "auto", opacity: 1 }}
             exit={{ height: 0, opacity: 0 }}
             transition={{ duration: 0.2 }}
           >
-            <div className="px-4 py-2.5 space-y-0.5">
-              {steps.map((step, i) => {
-                const StepIcon = step.icon;
-                const isActive = step.status === "running";
-                return (
-                  <motion.div
-                    key={step.id}
-                    initial={{ opacity: 0, x: -4 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    transition={{ delay: i * 0.03 }}
-                    className={`flex items-center gap-3 py-1.5 rounded-lg px-2 -mx-2 transition-colors ${
-                      isActive ? "bg-primary/5" : ""
+            <div className="border-t border-border/40 px-4 py-2.5 space-y-0.5">
+              {tasks.map((task, i) => (
+                <motion.div
+                  key={task.id}
+                  initial={{ opacity: 0, x: -4 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ delay: i * 0.04 }}
+                  className="flex items-center gap-3 py-1.5"
+                >
+                  <StatusIndicator status={task.status} />
+                  <span
+                    className={`text-[13px] font-medium ${
+                      task.status === "done"
+                        ? "text-foreground/60"
+                        : task.status === "in_progress"
+                        ? "text-foreground"
+                        : "text-muted-foreground/30"
                     }`}
                   >
-                    <StatusIcon status={step.status} />
-                    <StepIcon className={`w-3 h-3 ${
-                      step.status === "done" ? "text-foreground/50" :
-                      step.status === "running" ? "text-primary" :
-                      "text-muted-foreground/20"
-                    }`} />
-                    <span className={`text-[11px] font-medium tracking-tight ${
-                      step.status === "done" ? "text-foreground/60" :
-                      step.status === "running" ? "text-foreground" :
-                      "text-muted-foreground/30"
-                    }`}>
-                      {step.label}
-                    </span>
-                    {isActive && (
-                      <motion.div
-                        className="ml-auto flex gap-0.5"
-                        initial={{ opacity: 0 }}
-                        animate={{ opacity: 1 }}
-                      >
-                        <motion.span className="w-1 h-1 rounded-full bg-primary" animate={{ opacity: [0.3, 1, 0.3] }} transition={{ repeat: Infinity, duration: 1, delay: 0 }} />
-                        <motion.span className="w-1 h-1 rounded-full bg-primary" animate={{ opacity: [0.3, 1, 0.3] }} transition={{ repeat: Infinity, duration: 1, delay: 0.2 }} />
-                        <motion.span className="w-1 h-1 rounded-full bg-primary" animate={{ opacity: [0.3, 1, 0.3] }} transition={{ repeat: Infinity, duration: 1, delay: 0.4 }} />
-                      </motion.div>
-                    )}
-                  </motion.div>
-                );
-              })}
+                    {task.label}
+                  </span>
+                </motion.div>
+              ))}
             </div>
           </motion.div>
         )}
