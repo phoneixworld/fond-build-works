@@ -4,13 +4,13 @@ import {
   ResizablePanel,
   ResizablePanelGroup,
 } from "@/components/ui/resizable";
-import { Code, Eye, Zap, LogOut, ArrowLeft, Database, ChevronDown } from "lucide-react";
+import { Code, Eye, Zap, LogOut, ArrowLeft, Cloud, ChevronDown } from "lucide-react";
 import { PreviewProvider } from "@/contexts/PreviewContext";
 import { ProjectProvider, useProjects } from "@/contexts/ProjectContext";
 import { useAuth } from "@/hooks/useAuth";
 import ChatPanel from "@/components/ChatPanel";
 import CodeEditor from "@/components/CodeEditor";
-import SchemaBuilder from "@/components/SchemaBuilder";
+import CloudPanel from "@/components/CloudPanel";
 import PreviewPanel from "@/components/PreviewPanel";
 import PublishExportButtons from "@/components/PublishExportButtons";
 import LandingPage from "@/components/LandingPage";
@@ -26,7 +26,7 @@ const IDELayout = () => {
   const { user, signOut } = useAuth();
   const { currentProject, selectProject, createProject, saveProject } = useProjects();
   const [selectedFile, setSelectedFile] = useState("App.tsx");
-  const [rightPanel, setRightPanel] = useState<"code" | "preview" | "schema">("preview");
+  const [rightPanel, setRightPanel] = useState<"code" | "preview" | "cloud">("preview");
   const [inIDE, setInIDE] = useState(false);
   const [initialPrompt, setInitialPrompt] = useState("");
 
@@ -56,10 +56,10 @@ const IDELayout = () => {
   const currentStackInfo = TECH_STACKS.find(s => s.id === currentStack);
   const StackIcon = currentStackInfo?.icon;
 
-  const panelTabs: { id: "preview" | "code" | "schema"; label: string; icon: typeof Eye }[] = [
+  const panelTabs: { id: "preview" | "code" | "cloud"; label: string; icon: typeof Eye }[] = [
     { id: "preview", label: "Preview", icon: Eye },
     { id: "code", label: "Code", icon: Code },
-    { id: "schema", label: "Data", icon: Database },
+    { id: "cloud", label: "Cloud", icon: Cloud },
   ];
 
   return (
@@ -164,8 +164,8 @@ const IDELayout = () => {
             <ResizablePanel defaultSize={65}>
               {rightPanel === "code" ? (
                 <CodeEditor selectedFile={selectedFile} />
-              ) : rightPanel === "schema" ? (
-                <SchemaBuilder />
+              ) : rightPanel === "cloud" ? (
+                <CloudPanel />
               ) : (
                 <PreviewPanel />
               )}
