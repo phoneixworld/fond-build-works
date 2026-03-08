@@ -822,15 +822,14 @@ const ChatPanel = forwardRef<ChatPanelHandle, { initialPrompt?: string; onVersio
           hasSetBuilding = true;
         }
         streamParseCount++;
-        setSandpackFiles(reactResult.files);
-        if (Object.keys(reactResult.deps).length > 0) setSandpackDeps(reactResult.deps);
+        // DON'T push incomplete code to Sandpack during streaming — wait for onDone
         setPreviewMode("sandpack");
       } else if (htmlCode) {
         if (!hasSetBuilding) {
           setBuildStep("Building your app...");
           hasSetBuilding = true;
         }
-        setPreviewHtml(postProcessHtml(htmlCode));
+        // DON'T push incomplete HTML during streaming either
         setPreviewMode("html");
       }
 
