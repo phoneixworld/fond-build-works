@@ -323,7 +323,19 @@ const ChatPanel = forwardRef<ChatPanelHandle, { initialPrompt?: string; onVersio
     } catch {}
   };
 
-  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  // Upload image to storage for use in generated apps (returns public URL)
+  const uploadAppAsset = async (file: File): Promise<string | null> => {
+    if (!currentProject) return null;
+    try {
+      const ext = file.name.split(".").pop() || "png";
+      const path = `${currentProject.user_id}/${currentProject.id}/${Date.now()}.${ext}`;
+      const { error } = await supabase.storage.from("app-assets").upload(path, file, { upsert: true });
+      if (error) { console.error("Upload error:", error); return null; }
+      const { data } = supabase.storage.from("app-assets").getPublicUrl(path);
+      return data?.publicUrl || null;
+    } catch { return null; }
+  };
+
     const files = e.target.files;
     if (!files) return;
     for (const file of Array.from(files)) {
