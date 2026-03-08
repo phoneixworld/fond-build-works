@@ -6,6 +6,7 @@
  * 2. Chat Agent (conversational only, no code) — for questions/discussions
  * 3. Build Agent (code generation only) — for creating/modifying apps
  * 4. Sandpack Validation — validates generated code before showing
+ * 5. Auto-Retry — if validation fails, retries with error context
  */
 
 type MsgContent = string | Array<{ type: "text"; text: string } | { type: "image_url"; image_url: { url: string } }>;
@@ -32,6 +33,7 @@ export type PipelineStep =
   | "generating"
   | "bundling"
   | "validating"
+  | "retrying"
   | "complete"
   | "error";
 
@@ -39,7 +41,10 @@ export interface PipelineEvent {
   step: PipelineStep;
   message: string;
   intent?: AgentIntent;
+  retryCount?: number;
 }
+
+export const MAX_BUILD_RETRIES = 2;
 
 const BASE_URL = import.meta.env.VITE_SUPABASE_URL;
 const AUTH_HEADER = `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`;
@@ -137,6 +142,7 @@ export async function streamBuildAgent({
   templateContext,
   currentCode,
   snippetsContext,
+  retryContext,
   onDelta,
   onDone,
   onError,
@@ -151,6 +157,7 @@ export async function streamBuildAgent({
   templateContext?: string;
   currentCode?: string;
   snippetsContext?: string;
+  retryContext?: string;
   onDelta: (text: string) => void;
   onDone: (fullText: string) => void;
   onError: (error: string) => void;
@@ -175,6 +182,7 @@ export async function streamBuildAgent({
           template_context: templateContext,
           current_code: currentCode,
           snippets_context: snippetsContext,
+          retry_context: retryContext,
         }),
       });
       break;
@@ -245,23 +253,22 @@ async function readSSEStream(
 }
 
 /**
- * Validate generated React code (basic checks before Sandpack)
+ * Validate generated React code with comprehensive checks
  */
 export function validateReactCode(files: Record<string, string>): { valid: boolean; errors: string[] } {
   const errors: string[] = [];
 
   // Check entry point exists
-  if (!files["/App.jsx"] && !files["/App.js"]) {
-    errors.push("Missing entry point: /App.jsx");
+  if (!files["/App.jsx"] && !files["/App.js"] && !files["/App.tsx"]) {
+    errors.push("Missing entry point: /App.jsx — must have a default-exported App component");
   }
 
-  // Check for common syntax issues
   for (const [path, code] of Object.entries(files)) {
     if (!path.match(/\.(jsx?|tsx?)$/)) continue;
 
     // Check for bracket notation in JSX
     if (/<\w+\[/.test(code)) {
-      errors.push(`${path}: Invalid JSX — bracket notation in tags`);
+      errors.push(`${path}: Invalid JSX — bracket notation in tags (e.g. <arr[0].icon />). Assign to a variable first.`);
     }
 
     // Check for unclosed tags (basic heuristic)
@@ -269,12 +276,34 @@ export function validateReactCode(files: Record<string, string>): { valid: boole
     const closeTags = (code.match(/<\/\w+>/g) || []).length;
     const selfClose = (code.match(/\/>/g) || []).length;
     if (openTags > closeTags + selfClose + 5) {
-      errors.push(`${path}: Possible unclosed JSX tags`);
+      errors.push(`${path}: Possible unclosed JSX tags (${openTags} open, ${closeTags} close, ${selfClose} self-closing)`);
     }
 
-    // Check for missing default export in App.jsx
-    if ((path === "/App.jsx" || path === "/App.js") && !code.includes("export default")) {
-      errors.push(`${path}: Missing default export`);
+    // Check for missing default export in App
+    if ((path === "/App.jsx" || path === "/App.js" || path === "/App.tsx") && !code.includes("export default")) {
+      errors.push(`${path}: Missing default export — App component must use 'export default'`);
+    }
+
+    // Check for missing React import (needed for JSX in some environments)
+    if (path.match(/\.jsx$/) && !code.includes("import React") && !code.includes("from 'react'") && !code.includes('from "react"')) {
+      // Soft warning — Sandpack may handle this
+    }
+
+    // Check for require() usage
+    if (/\brequire\s*\(/.test(code)) {
+      errors.push(`${path}: Uses require() — must use ES6 import syntax instead`);
+    }
+
+    // Check for empty component files
+    if (code.trim().length < 20) {
+      errors.push(`${path}: File appears empty or incomplete (${code.trim().length} chars)`);
+    }
+
+    // Check for unmatched curly braces (basic)
+    const openBraces = (code.match(/{/g) || []).length;
+    const closeBraces = (code.match(/}/g) || []).length;
+    if (Math.abs(openBraces - closeBraces) > 2) {
+      errors.push(`${path}: Mismatched curly braces (${openBraces} open, ${closeBraces} close)`);
     }
   }
 
@@ -292,5 +321,12 @@ export function hasBuildConfirmation(text: string): boolean {
  * Extract the chat text without the build marker
  */
 export function stripBuildMarker(text: string): string {
-  return text.replace("[BUILD_CONFIRMED]", "").trim();
+  return text.replace(/\[BUILD_CONFIRMED\]/g, "").trim();
+}
+
+/**
+ * Format validation errors as retry context for the build agent
+ */
+export function formatRetryContext(errors: string[], attemptNumber: number): string {
+  return `Attempt ${attemptNumber} of ${MAX_BUILD_RETRIES + 1} — Previous build had ${errors.length} validation error(s):\n${errors.map((e, i) => `  ${i + 1}. ${e}`).join("\n")}`;
 }
