@@ -32,7 +32,7 @@ const CloudOverview = ({ onNavigate }: CloudOverviewProps) => {
     fetchStats();
   }, [currentProject]);
 
-  const cards = [
+  const cards: { label: string; desc: string; icon: any; section: SectionId; color: string }[] = [
     { label: "Database", desc: `${stats.collections} collections · ${stats.records} records`, icon: Database, section: "database", color: "text-blue-400" },
     { label: "Users", desc: `${stats.users} registered users`, icon: Users, section: "users", color: "text-green-400" },
     { label: "Storage", desc: "File uploads & media", icon: HardDrive, section: "storage", color: "text-orange-400" },
