@@ -18,11 +18,12 @@ function parseResponse(text: string): [string, string | null] {
   return [chatPart, htmlCode.trim()];
 }
 
-const ChatPanel = () => {
+const ChatPanel = ({ initialPrompt }: { initialPrompt?: string }) => {
   const { currentProject, saveProject, createProject } = useProjects();
   const [messages, setMessages] = useState<Msg[]>([]);
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [hasAutoSent, setHasAutoSent] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const { setPreviewHtml, setIsBuilding, setBuildStep } = usePreview();
