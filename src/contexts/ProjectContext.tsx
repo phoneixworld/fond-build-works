@@ -22,6 +22,7 @@ interface ProjectContextType {
   loading: boolean;
   selectProject: (id: string) => void;
   createProject: (name?: string, techStack?: TechStackId) => Promise<Project | null>;
+  cloneProject: (id: string) => Promise<Project | null>;
   saveProject: (updates: Partial<Pick<Project, "name" | "html_content" | "chat_history" | "tech_stack">>) => Promise<void>;
   deleteProject: (id: string) => Promise<void>;
   refreshProjects: () => Promise<void>;
@@ -136,6 +137,35 @@ export const ProjectProvider = ({ children }: { children: ReactNode }) => {
     setProjects((prev) => prev.map((p) => (p.id === updated.id ? updated : p)));
   }, [currentProject]);
 
+  const cloneProject = useCallback(async (id: string): Promise<Project | null> => {
+    if (!user) return null;
+    // Fetch source project
+    const { data: source, error: fetchErr } = await supabase.from("projects").select("*").eq("id", id).single();
+    if (fetchErr || !source) {
+      toast({ title: "Error", description: "Failed to find project to clone", variant: "destructive" });
+      return null;
+    }
+    const { data, error } = await supabase
+      .from("projects")
+      .insert({
+        user_id: user.id,
+        name: `${(source as any).name} (Clone)`,
+        html_content: (source as any).html_content || "",
+        chat_history: [],
+        tech_stack: (source as any).tech_stack || "html-tailwind",
+      } as any)
+      .select()
+      .single();
+    if (error || !data) {
+      toast({ title: "Error", description: "Failed to clone project", variant: "destructive" });
+      return null;
+    }
+    const project = { ...data, chat_history: [], tech_stack: (data as any).tech_stack || "html-tailwind", is_published: false, published_slug: null } as Project;
+    setProjects(prev => [project, ...prev]);
+    toast({ title: "Cloned!", description: `"${(source as any).name}" cloned successfully` });
+    return project;
+  }, [user, toast]);
+
   const deleteProject = useCallback(async (id: string) => {
     const { error } = await supabase.from("projects").delete().eq("id", id);
     if (error) {
@@ -152,7 +182,7 @@ export const ProjectProvider = ({ children }: { children: ReactNode }) => {
   }, [currentProject, toast]);
 
   return (
-    <ProjectContext.Provider value={{ projects, currentProject, loading, selectProject, createProject, saveProject, deleteProject, refreshProjects: fetchProjects }}>
+    <ProjectContext.Provider value={{ projects, currentProject, loading, selectProject, createProject, cloneProject, saveProject, deleteProject, refreshProjects: fetchProjects }}>
       {children}
     </ProjectContext.Provider>
   );

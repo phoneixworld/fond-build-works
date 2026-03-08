@@ -439,6 +439,17 @@ const ChatPanel = forwardRef<ChatPanelHandle, { initialPrompt?: string; onVersio
         schemas = data || [];
       } catch {}
 
+      // Fetch Project Brain knowledge
+      let knowledge: string[] = [];
+      try {
+        const { data } = await supabase
+          .from("project_knowledge" as any)
+          .select("title, content")
+          .eq("project_id", currentProject.id)
+          .eq("is_active", true);
+        knowledge = (data || []).map((k: any) => `[${k.title}]: ${k.content}`);
+      } catch {}
+
       const apiMessages = [...messages, userMsg].map(m => ({
         role: m.role,
         content: m.content,
@@ -453,6 +464,7 @@ const ChatPanel = forwardRef<ChatPanelHandle, { initialPrompt?: string; onVersio
         schemas,
         model: selectedModel,
         designTheme: themeInfo?.prompt,
+        knowledge,
         onDelta: upsert,
         onDone: () => {
           setIsLoading(false);

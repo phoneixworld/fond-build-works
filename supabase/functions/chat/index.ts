@@ -8,7 +8,7 @@ const corsHeaders = {
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY")!;
 
-function buildSystemPrompt(projectId: string, techStack: string, schemas?: any[], designTheme?: string): string {
+function buildSystemPrompt(projectId: string, techStack: string, schemas?: any[], designTheme?: string, knowledge?: string[]): string {
   const apiBase = `${SUPABASE_URL}/functions/v1`;
 
   const dataApiDocs = `
@@ -275,6 +275,8 @@ ${schemas && schemas.length > 0 ? '- Use the DEFINED DATA MODELS above for colle
 
 ${designTheme ? `\n## USER'S CHOSEN DESIGN THEME\n${designTheme}\nFOLLOW THIS THEME STRICTLY for all visual decisions.` : ''}
 
+${knowledge && knowledge.length > 0 ? `\n## PROJECT BRAIN — Custom Knowledge\n\nThe user has saved these persistent instructions for this project. ALWAYS follow them:\n\n${knowledge.join('\n\n')}\n\nCRITICAL: These are standing instructions. Apply them to EVERY response.` : ''}
+
 ## QUALITY REFERENCE — Example of the quality bar you must hit
 
 Here is a PARTIAL example of a well-built hero section. Your output must be AT LEAST this quality:
@@ -335,11 +337,11 @@ serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
-    const { messages, project_id, tech_stack, schemas, model, design_theme } = await req.json();
+    const { messages, project_id, tech_stack, schemas, model, design_theme, knowledge } = await req.json();
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY is not configured");
 
-    const systemPrompt = buildSystemPrompt(project_id || "unknown", tech_stack || "html-tailwind", schemas, design_theme);
+    const systemPrompt = buildSystemPrompt(project_id || "unknown", tech_stack || "html-tailwind", schemas, design_theme, knowledge);
 
     // Use requested model or default (upgraded to Pro)
     const selectedModel = model || "google/gemini-2.5-pro";

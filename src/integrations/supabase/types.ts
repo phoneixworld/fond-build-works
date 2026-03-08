@@ -41,6 +41,47 @@ export type Database = {
         }
         Relationships: []
       }
+      project_analytics: {
+        Row: {
+          country: string | null
+          created_at: string
+          event: string
+          id: string
+          path: string
+          project_id: string
+          referrer: string | null
+          user_agent: string | null
+        }
+        Insert: {
+          country?: string | null
+          created_at?: string
+          event?: string
+          id?: string
+          path?: string
+          project_id: string
+          referrer?: string | null
+          user_agent?: string | null
+        }
+        Update: {
+          country?: string | null
+          created_at?: string
+          event?: string
+          id?: string
+          path?: string
+          project_id?: string
+          referrer?: string | null
+          user_agent?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "project_analytics_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       project_data: {
         Row: {
           collection: string
@@ -104,6 +145,44 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "project_functions_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      project_knowledge: {
+        Row: {
+          content: string
+          created_at: string
+          id: string
+          is_active: boolean
+          project_id: string
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          content?: string
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          project_id: string
+          title?: string
+          updated_at?: string
+        }
+        Update: {
+          content?: string
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          project_id?: string
+          title?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "project_knowledge_project_id_fkey"
             columns: ["project_id"]
             isOneToOne: false
             referencedRelation: "projects"

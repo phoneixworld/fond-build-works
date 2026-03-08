@@ -4,7 +4,7 @@ import {
   ResizablePanel,
   ResizablePanelGroup,
 } from "@/components/ui/resizable";
-import { Code, Eye, Zap, LogOut, ArrowLeft, Cloud, ChevronDown, Clock, Command as CommandIcon } from "lucide-react";
+import { Code, Eye, Zap, LogOut, ArrowLeft, Cloud, ChevronDown, Clock, Command as CommandIcon, Brain, Activity } from "lucide-react";
 import { PreviewProvider } from "@/contexts/PreviewContext";
 import { ProjectProvider, useProjects } from "@/contexts/ProjectContext";
 import { useAuth } from "@/hooks/useAuth";
@@ -12,6 +12,8 @@ import ChatPanel from "@/components/ChatPanel";
 import CodeEditor from "@/components/CodeEditor";
 import CloudPanel from "@/components/CloudPanel";
 import PreviewPanel from "@/components/PreviewPanel";
+import ProjectBrain from "@/components/ProjectBrain";
+import PulseAnalytics from "@/components/PulseAnalytics";
 import PublishExportButtons from "@/components/PublishExportButtons";
 import LandingPage from "@/components/LandingPage";
 import CommandPalette from "@/components/CommandPalette";
@@ -42,7 +44,7 @@ const IDELayout = () => {
   const { user, signOut } = useAuth();
   const { projects, currentProject, selectProject, createProject, saveProject } = useProjects();
   const [selectedFile, setSelectedFile] = useState("App.tsx");
-  const [rightPanel, setRightPanel] = useState<"code" | "preview" | "cloud" | "history">("preview");
+  const [rightPanel, setRightPanel] = useState<"code" | "preview" | "cloud" | "history" | "brain" | "pulse">("preview");
   const [inIDE, setInIDE] = useState(false);
   const [initialPrompt, setInitialPrompt] = useState("");
   const [cmdOpen, setCmdOpen] = useState(false);
@@ -125,10 +127,12 @@ const IDELayout = () => {
   const currentStackInfo = TECH_STACKS.find(s => s.id === currentStack);
   const StackIcon = currentStackInfo?.icon;
 
-  const panelTabs: { id: "preview" | "code" | "cloud" | "history"; label: string; icon: typeof Eye }[] = [
+  const panelTabs: { id: "preview" | "code" | "cloud" | "history" | "brain" | "pulse"; label: string; icon: typeof Eye }[] = [
     { id: "preview", label: "Preview", icon: Eye },
     { id: "code", label: "Code", icon: Code },
     { id: "cloud", label: "Cloud", icon: Cloud },
+    { id: "brain", label: "Brain", icon: Brain },
+    { id: "pulse", label: "Pulse", icon: Activity },
     { id: "history", label: "History", icon: Clock },
   ];
 
@@ -374,6 +378,10 @@ const IDELayout = () => {
                 <CodeEditor selectedFile={selectedFile} />
               ) : rightPanel === "cloud" ? (
                 <CloudPanel />
+              ) : rightPanel === "brain" ? (
+                <ProjectBrain />
+              ) : rightPanel === "pulse" ? (
+                <PulseAnalytics />
               ) : rightPanel === "history" ? (
                 <VersionHistory
                   versions={versions}

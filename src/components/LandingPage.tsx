@@ -1,11 +1,12 @@
 import { useState, useRef } from "react";
-import { Zap, Send, FolderOpen, Trash2, Loader2, ArrowRight } from "lucide-react";
+import { Zap, Send, FolderOpen, Trash2, Loader2, ArrowRight, Copy, Rocket } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { useProjects, Project } from "@/contexts/ProjectContext";
 import { formatDistanceToNow } from "date-fns";
 import { motion } from "framer-motion";
 import TechStackSelector from "@/components/TechStackSelector";
 import { TechStackId, TECH_STACKS } from "@/lib/techStacks";
+import { TEMPLATES, Template } from "@/lib/templates";
 
 interface LandingPageProps {
   onStartProject: (prompt: string, techStack: TechStackId) => void;
@@ -14,7 +15,7 @@ interface LandingPageProps {
 
 const LandingPage = ({ onStartProject, onOpenProject }: LandingPageProps) => {
   const { user, signOut } = useAuth();
-  const { projects, loading, deleteProject } = useProjects();
+  const { projects, loading, deleteProject, cloneProject } = useProjects();
   const [input, setInput] = useState("");
   const [techStack, setTechStack] = useState<TechStackId>("html-tailwind");
   const inputRef = useRef<HTMLTextAreaElement>(null);
@@ -31,12 +32,19 @@ const LandingPage = ({ onStartProject, onOpenProject }: LandingPageProps) => {
     }
   };
 
+  const [showTemplates, setShowTemplates] = useState(false);
+
   const suggestions = [
     "A todo app with user accounts",
     "A SaaS landing page with pricing",
     "A CRM dashboard with contacts",
     "A blog with data persistence",
   ];
+
+  const handleUseTemplate = (template: Template) => {
+    setTechStack(template.techStack);
+    onStartProject(template.prompt, template.techStack);
+  };
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
@@ -119,6 +127,46 @@ const LandingPage = ({ onStartProject, onOpenProject }: LandingPageProps) => {
               </button>
             ))}
           </div>
+
+          {/* Launchpads (Templates) */}
+          <div className="flex justify-center">
+            <button
+              onClick={() => setShowTemplates(!showTemplates)}
+              className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-primary transition-colors px-3 py-1.5 rounded-full border border-border hover:border-primary/30"
+            >
+              <Rocket className="w-3.5 h-3.5" />
+              {showTemplates ? "Hide" : "Use a"} Launchpad
+            </button>
+          </div>
+
+          {showTemplates && (
+            <motion.div
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: "auto" }}
+              className="overflow-hidden"
+            >
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                {TEMPLATES.map((t) => {
+                  const Icon = t.icon;
+                  return (
+                    <button
+                      key={t.id}
+                      onClick={() => handleUseTemplate(t)}
+                      className="text-left p-3 rounded-xl border border-border hover:border-primary/30 hover:bg-secondary/50 transition-all group"
+                    >
+                      <div className="flex items-center gap-2 mb-1">
+                        <div className="w-7 h-7 rounded-lg bg-primary/10 flex items-center justify-center shrink-0 group-hover:bg-primary/20 transition-colors">
+                          <Icon className="w-3.5 h-3.5 text-primary" />
+                        </div>
+                        <span className="text-sm font-medium text-foreground">{t.name}</span>
+                      </div>
+                      <p className="text-[11px] text-muted-foreground ml-9">{t.description}</p>
+                    </button>
+                  );
+                })}
+              </div>
+            </motion.div>
+          )}
         </motion.div>
 
         {/* Recent projects */}
@@ -150,8 +198,16 @@ const LandingPage = ({ onStartProject, onOpenProject }: LandingPageProps) => {
                       </p>
                     </div>
                     <button
+                      onClick={(e) => { e.stopPropagation(); cloneProject(project.id); }}
+                      className="opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-primary transition-all p-1"
+                      title="Clone project"
+                    >
+                      <Copy className="w-3.5 h-3.5" />
+                    </button>
+                    <button
                       onClick={(e) => { e.stopPropagation(); deleteProject(project.id); }}
                       className="opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-destructive transition-all p-1"
+                      title="Delete project"
                     >
                       <Trash2 className="w-3.5 h-3.5" />
                     </button>
