@@ -333,7 +333,7 @@ const ChatPanel = ({ initialPrompt }: { initialPrompt?: string }) => {
       setIsBuilding(false);
       setBuildStep("");
     }
-  }, [isLoading, messages, currentProject, saveProject, setPreviewHtml, setIsBuilding, setBuildStep, selectedModel]);
+  }, [isLoading, messages, currentProject, saveProject, setPreviewHtml, setIsBuilding, setBuildStep, selectedModel, selectedTheme]);
 
   useEffect(() => {
     if (pendingPrompt && currentProject && !isLoading && messages.length === 0) {
