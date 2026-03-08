@@ -389,7 +389,7 @@ const SuggestionButtons = ({ suggestions, onClick }: { suggestions: Suggestion[]
 
 // --- Main component ---
 
-const ChatMessage = ({ content, role, timestamp, isLoading, onEdit, onRegenerate, showActions = true }: ChatMessageProps) => {
+const ChatMessage = ({ content, role, timestamp, isLoading, onEdit, onRegenerate, showActions = true, onSuggestionClick }: ChatMessageProps) => {
   const isUser = role === "user";
   const textContent = getTextContent(content);
   const imageUrls = getImageUrls(content);
@@ -397,7 +397,10 @@ const ChatMessage = ({ content, role, timestamp, isLoading, onEdit, onRegenerate
   // Detect and strip context hints for assistant messages
   const contextHints = !isUser ? detectContextHints(textContent) : [];
   const cleanText = !isUser ? stripContextMarkers(textContent) : textContent;
-  const sections = !isUser ? parseStructuredResponse(cleanText) : [];
+  
+  // Parse suggestion buttons from assistant responses
+  const { suggestions, cleanText: textWithoutSuggestions } = !isUser ? parseSuggestions(cleanText) : { suggestions: [], cleanText: cleanText };
+  const sections = !isUser ? parseStructuredResponse(textWithoutSuggestions) : [];
 
   return (
     <motion.div
