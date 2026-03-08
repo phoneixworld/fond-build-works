@@ -96,6 +96,15 @@ const IDELayout = () => {
               <Eye className="w-3.5 h-3.5" />
               Preview
             </button>
+            <button
+              onClick={() => setRightPanel("schema")}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
+                rightPanel === "schema" ? "bg-secondary text-foreground" : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              <Database className="w-3.5 h-3.5" />
+              Data
+            </button>
             <div className="w-px h-5 bg-border mx-2" />
             <PublishExportButtons />
             <div className="w-px h-5 bg-border mx-2" />
