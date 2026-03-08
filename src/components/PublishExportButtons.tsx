@@ -77,7 +77,20 @@ const PublishExportButtons = forwardRef<PublishExportHandle>((_, ref) => {
 
     try {
       const slug = (currentProject as any).published_slug || generateSlug(currentProject.name, currentProject.id);
-      const html = previewHtml || currentProject.html_content;
+      
+      // Try to get Production environment snapshot first (env-aware deploy)
+      let html = previewHtml || currentProject.html_content;
+      try {
+        const { data: prodEnv } = await supabase
+          .from("project_environments" as any)
+          .select("html_snapshot")
+          .eq("project_id", currentProject.id)
+          .eq("name", "production")
+          .single();
+        if (prodEnv && (prodEnv as any).html_snapshot && (prodEnv as any).html_snapshot.length > 0) {
+          html = (prodEnv as any).html_snapshot;
+        }
+      } catch {}
 
       if (!html) throw new Error("Nothing to publish — build something first!");
 
