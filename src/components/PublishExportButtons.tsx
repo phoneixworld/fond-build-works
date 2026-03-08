@@ -1,5 +1,5 @@
 import { useState, forwardRef, useImperativeHandle } from "react";
-import { Globe, Download, Check, Copy, Loader2, ExternalLink, Link2 } from "lucide-react";
+import { Globe, Download, Check, Copy, Loader2, ExternalLink, Link2, Shield, ArrowRight, AlertCircle } from "lucide-react";
 import { useProjects } from "@/contexts/ProjectContext";
 import { usePreview } from "@/contexts/PreviewContext";
 import { useVirtualFS } from "@/contexts/VirtualFSContext";
@@ -29,6 +29,8 @@ const PublishExportButtons = forwardRef<PublishExportHandle>((_, ref) => {
   const [publishing, setPublishing] = useState(false);
   const [publishedUrl, setPublishedUrl] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+  const [showDomain, setShowDomain] = useState(false);
+  const [domainInput, setDomainInput] = useState("");
 
   const handleExportFn = async () => {
     const html = previewHtml || currentProject?.html_content;
@@ -235,6 +237,72 @@ const PublishExportButtons = forwardRef<PublishExportHandle>((_, ref) => {
                   >
                     Unpublish
                   </button>
+                </div>
+
+                {/* Custom Domain Section */}
+                <div className="border-t border-border pt-4 mt-1">
+                  {!showDomain ? (
+                    <button
+                      onClick={() => setShowDomain(true)}
+                      className="w-full flex items-center gap-3 p-3 rounded-xl bg-secondary hover:bg-secondary/80 transition-colors text-left"
+                    >
+                      <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
+                        <Shield className="w-4 h-4 text-primary" />
+                      </div>
+                      <div className="flex-1">
+                        <p className="text-xs font-medium text-foreground">Connect Custom Domain</p>
+                        <p className="text-[10px] text-muted-foreground">Use your own domain like myapp.com</p>
+                      </div>
+                      <ArrowRight className="w-3.5 h-3.5 text-muted-foreground" />
+                    </button>
+                  ) : (
+                    <div className="space-y-3">
+                      <div className="flex items-center gap-2 mb-1">
+                        <Shield className="w-3.5 h-3.5 text-primary" />
+                        <span className="text-xs font-semibold text-foreground">Custom Domain</span>
+                      </div>
+                      <div>
+                        <label className="text-[10px] font-medium text-muted-foreground mb-1 block">Your Domain</label>
+                        <input
+                          type="text"
+                          value={domainInput}
+                          onChange={(e) => setDomainInput(e.target.value)}
+                          placeholder="myapp.com"
+                          className="w-full px-3 py-2 rounded-lg border border-border bg-secondary/50 text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary"
+                        />
+                      </div>
+                      <div className="p-3 rounded-lg bg-primary/5 border border-primary/10">
+                        <div className="flex items-start gap-2">
+                          <AlertCircle className="w-3.5 h-3.5 text-primary shrink-0 mt-0.5" />
+                          <div className="text-[10px] text-muted-foreground space-y-1">
+                            <p>Add these DNS records at your registrar:</p>
+                            <div className="font-mono bg-secondary/50 rounded p-2 space-y-1">
+                              <p><span className="text-primary font-semibold">A</span> @ → <span className="text-foreground">185.158.133.1</span></p>
+                              <p><span className="text-primary font-semibold">A</span> www → <span className="text-foreground">185.158.133.1</span></p>
+                              <p><span className="text-primary font-semibold">TXT</span> _lovable → <span className="text-foreground">lovable_verify={currentProject?.id?.slice(0, 12)}</span></p>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => setShowDomain(false)}
+                          className="flex-1 px-3 py-2 rounded-lg text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors"
+                        >
+                          Cancel
+                        </button>
+                        <button
+                          onClick={() => {
+                            toast({ title: "Domain setup started", description: "Add the DNS records above, then verification will begin automatically." });
+                          }}
+                          disabled={!domainInput.trim()}
+                          className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold bg-primary text-primary-foreground hover:bg-primary/90 transition-colors disabled:opacity-40"
+                        >
+                          <Globe className="w-3.5 h-3.5" /> Connect
+                        </button>
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
             ) : (
