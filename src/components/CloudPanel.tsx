@@ -52,6 +52,12 @@ const CloudPanel = () => {
         return <CloudOverview onNavigate={setActiveSection} />;
       case "database":
         return <SchemaBuilder />;
+      case "memory":
+        return <ProjectMemory />;
+      case "dependencies":
+        return <DependencyGraph />;
+      case "governance":
+        return <GovernanceEngine />;
       case "users":
         return <CloudUsers />;
       case "storage":
