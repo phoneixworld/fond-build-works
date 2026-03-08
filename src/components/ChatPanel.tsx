@@ -663,37 +663,50 @@ const ChatPanel = forwardRef<ChatPanelHandle, { initialPrompt?: string; onVersio
         onDone: async () => {
           if (abortController.signal.aborted) return;
           
-          const { files: parsedFiles, html: htmlCode, chatText } = parseMultiFileOutput(fullResponse);
+          // Check for React file output first
+          const reactResult = parseReactFiles(fullResponse);
+          let finalHtml: string | null = null;
           
-          if (Object.keys(parsedFiles).length > 0) {
-            setVirtualFiles(parsedFiles);
-          }
-          
-          if (htmlCode) setPreviewHtml(postProcessHtml(htmlCode));
+          if (reactResult.files) {
+            // React/Sandpack mode
+            setSandpackFiles(reactResult.files);
+            if (Object.keys(reactResult.deps).length > 0) setSandpackDeps(reactResult.deps);
+            setPreviewMode("sandpack");
+            console.log("[Sandpack] Loaded React files:", Object.keys(reactResult.files));
+          } else {
+            // Legacy HTML mode
+            const { files: parsedFiles, html: htmlCode, chatText } = parseMultiFileOutput(fullResponse);
+            
+            if (Object.keys(parsedFiles).length > 0) {
+              setVirtualFiles(parsedFiles);
+            }
+            
+            if (htmlCode) setPreviewHtml(postProcessHtml(htmlCode));
 
-          // Self-review pass for first-time generations
-          let finalHtml = htmlCode;
-          if (htmlCode && htmlCode.length > 200 && currentMessages.length === 0) {
-            setBuildStep("Reviewing & polishing...");
-            try {
-              const reviewResp = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/review-code`, {
-                method: "POST",
-                headers: {
-                  "Content-Type": "application/json",
-                  Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
-                },
-                body: JSON.stringify({ html: htmlCode }),
-              });
-              if (reviewResp.ok) {
-                const reviewData = await reviewResp.json();
-                if (reviewData.reviewed && reviewData.html && reviewData.html.length > 200) {
-                  finalHtml = reviewData.html;
-                  setPreviewHtml(postProcessHtml(finalHtml));
-                  console.log("[Phase 3] Self-review pass applied improvements");
+            // Self-review pass for first-time generations
+            finalHtml = htmlCode;
+            if (htmlCode && htmlCode.length > 200 && currentMessages.length === 0) {
+              setBuildStep("Reviewing & polishing...");
+              try {
+                const reviewResp = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/review-code`, {
+                  method: "POST",
+                  headers: {
+                    "Content-Type": "application/json",
+                    Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+                  },
+                  body: JSON.stringify({ html: htmlCode }),
+                });
+                if (reviewResp.ok) {
+                  const reviewData = await reviewResp.json();
+                  if (reviewData.reviewed && reviewData.html && reviewData.html.length > 200) {
+                    finalHtml = reviewData.html;
+                    setPreviewHtml(postProcessHtml(finalHtml));
+                    console.log("[Phase 3] Self-review pass applied improvements");
+                  }
                 }
+              } catch (e) {
+                console.warn("[Phase 3] Review pass skipped:", e);
               }
-            } catch (e) {
-              console.warn("[Phase 3] Review pass skipped:", e);
             }
           }
 
