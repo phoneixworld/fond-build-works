@@ -30,7 +30,7 @@ interface GitHubConfig {
 
 const GitHubPanel = () => {
   const { currentProject } = useProjects();
-  const { files, writeFile } = useVirtualFS();
+  const { files, addFile, updateFile } = useVirtualFS();
   const { toast } = useToast();
   const [connecting, setConnecting] = useState(false);
   const [syncing, setSyncing] = useState(false);
