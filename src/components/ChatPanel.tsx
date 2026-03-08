@@ -71,13 +71,15 @@ function parseReactFiles(text: string): { chatText: string; files: Record<string
   const fenceEnd = text.indexOf("\n```", codeStart);
   const block = fenceEnd === -1 ? text.slice(codeStart) : text.slice(codeStart, fenceEnd);
   
-  // Parse file sections: --- /App.jsx or --- App.jsx
+  // Parse file sections: --- /App.jsx or --- App.jsx or --- /src/App.jsx
   const fileSections = block.split(/^---\s+/m).filter(Boolean);
   for (const section of fileSections) {
     const lines = section.split("\n");
     const firstLine = lines[0].trim();
     if (firstLine.match(/^\/?\w[\w/.-]*\.(jsx?|tsx?|css)$/)) {
-      const filename = firstLine.startsWith("/") ? firstLine : `/${firstLine}`;
+      let filename = firstLine.startsWith("/") ? firstLine : `/${firstLine}`;
+      // Strip /src/ prefix — Sandpack expects files at root (e.g. /App.jsx not /src/App.jsx)
+      filename = filename.replace(/^\/src\//, "/");
       files[filename] = lines.slice(1).join("\n").trim();
     } else if (firstLine === "dependencies") {
       try {
