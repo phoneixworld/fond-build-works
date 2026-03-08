@@ -473,7 +473,14 @@ const ChatPanel = forwardRef<ChatPanelHandle, { initialPrompt?: string; onVersio
           setIsBuilding(false);
           setBuildStep("");
 
-          const [chatText, htmlCode] = parseResponse(fullResponse);
+          // Use multi-file parser
+          const { files: parsedFiles, html: htmlCode, chatText } = parseMultiFileOutput(fullResponse);
+          
+          // Populate virtual file system
+          if (Object.keys(parsedFiles).length > 0) {
+            setVirtualFiles(parsedFiles);
+          }
+          
           if (htmlCode) setPreviewHtml(postProcessHtml(htmlCode));
 
           // Create version snapshot
@@ -502,7 +509,6 @@ const ChatPanel = forwardRef<ChatPanelHandle, { initialPrompt?: string; onVersio
             const isFirstMessage = persistMessages.filter(m => m.role === "user").length === 1;
             
             if (isFirstMessage && currentProject.name === "Untitled Project") {
-              // Fire and forget AI name generation
               fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/project-name`, {
                 method: "POST",
                 headers: {
@@ -517,7 +523,6 @@ const ChatPanel = forwardRef<ChatPanelHandle, { initialPrompt?: string; onVersio
                   saveProject({ name: fullName });
                 })
                 .catch(() => {
-                  // Fallback to truncated prompt
                   saveProject({ name: persistMessages[0].content.slice(0, 40) });
                 });
             }
