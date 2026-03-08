@@ -388,6 +388,8 @@ const IDELayout = () => {
                 <PulseAnalytics />
               ) : rightPanel === "crew" ? (
                 <CrewSpaces />
+              ) : rightPanel === "brandkit" ? (
+                <BrandKitGenerator />
               ) : rightPanel === "history" ? (
                 <VersionHistory
                   versions={versions}
