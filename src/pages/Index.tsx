@@ -21,6 +21,8 @@ import BrandKitGenerator from "@/components/BrandKitGenerator";
 import ABTesting from "@/components/ABTesting";
 import PluginMarketplace from "@/components/PluginMarketplace";
 import WhiteLabelPanel from "@/components/WhiteLabelPanel";
+import GitHubPanel from "@/components/GitHubPanel";
+import CustomDomainPanel from "@/components/CustomDomainPanel";
 import LandingPage from "@/components/LandingPage";
 import CommandPalette from "@/components/CommandPalette";
 import VersionHistory, { Version } from "@/components/VersionHistory";
