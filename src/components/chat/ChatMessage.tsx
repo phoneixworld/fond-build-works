@@ -1,7 +1,12 @@
 import { useState } from "react";
 import { motion } from "framer-motion";
-import { Bot, User, ChevronDown, ChevronRight, CheckCircle2, Circle, Pencil, RotateCcw, Clock, Brain, Sparkles, Wrench, Copy, Check, Lightbulb, History, Bookmark } from "lucide-react";
+import { Bot, User, ChevronDown, ChevronRight, CheckCircle2, Circle, Pencil, RotateCcw, Clock, Brain, Sparkles, Wrench, Copy, Check, Lightbulb, History, Bookmark, ArrowRight } from "lucide-react";
 import ReactMarkdown from "react-markdown";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 type MsgContent = string | Array<{ type: "text"; text: string } | { type: "image_url"; image_url: { url: string } }>;
 
@@ -366,22 +371,33 @@ const SuggestionButtons = ({ suggestions, onClick }: { suggestions: Suggestion[]
   if (suggestions.length === 0 || !onClick) return null;
   
   return (
-    <div className="flex flex-wrap gap-2 mt-3">
+    <div className="grid gap-2 mt-4">
       {suggestions.map((s, i) => (
-        <motion.button
-          key={i}
-          initial={{ opacity: 0, y: 4 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: i * 0.05 }}
-          onClick={() => onClick(s.fullText)}
-          className="flex items-center gap-2 px-3 py-2 rounded-xl text-[12px] font-medium
-            border border-border/60 bg-card/60 backdrop-blur-sm
-            hover:border-primary/40 hover:bg-primary/5 hover:shadow-md hover:shadow-primary/5
-            transition-all group text-left"
-        >
-          <span className="text-base">{s.emoji}</span>
-          <span className="text-foreground/80 group-hover:text-foreground">{s.title}</span>
-        </motion.button>
+        <Tooltip key={i}>
+          <TooltipTrigger asChild>
+            <motion.button
+              initial={{ opacity: 0, x: -8 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ delay: i * 0.06, duration: 0.25 }}
+              onClick={() => onClick(s.fullText)}
+              className="flex items-center gap-3 w-full px-4 py-3 rounded-xl text-left
+                border border-border/50 bg-card/50 backdrop-blur-sm
+                hover:border-primary/50 hover:bg-primary/5 hover:shadow-lg hover:shadow-primary/5
+                active:scale-[0.98]
+                transition-all duration-200 group"
+            >
+              <span className="text-lg shrink-0">{s.emoji}</span>
+              <div className="flex-1 min-w-0">
+                <span className="text-[13px] font-semibold text-foreground/90 group-hover:text-foreground block">{s.title}</span>
+                <span className="text-[11px] text-muted-foreground/60 group-hover:text-muted-foreground/80 line-clamp-1 block">{s.description}</span>
+              </div>
+              <ArrowRight className="w-4 h-4 text-muted-foreground/20 group-hover:text-primary/60 group-hover:translate-x-0.5 transition-all shrink-0" />
+            </motion.button>
+          </TooltipTrigger>
+          <TooltipContent side="top" className="max-w-[280px] text-xs">
+            {s.description}
+          </TooltipContent>
+        </Tooltip>
       ))}
     </div>
   );
