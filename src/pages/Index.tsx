@@ -63,6 +63,8 @@ const PANEL_COMPONENTS: Record<string, React.FC<any>> = {
   abtesting: ABTesting,
   plugins: PluginMarketplace,
   whitelabel: WhiteLabelPanel,
+  github: GitHubPanel,
+  domains: CustomDomainPanel,
 };
 
 const IDELayout = () => {
