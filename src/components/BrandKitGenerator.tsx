@@ -1,12 +1,14 @@
 import { useState, useRef, useCallback, useEffect } from "react";
 import {
   Palette, Sparkles, Type, Layers, Copy, Check, Wand2,
-  CircleDot, Paintbrush, Download, RefreshCw, ImagePlus, X, CheckCircle2, Loader2
+  CircleDot, Paintbrush, Download, RefreshCw, ImagePlus, X, CheckCircle2, Loader2,
+  Image
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { motion, AnimatePresence } from "framer-motion";
 import { useToast } from "@/hooks/use-toast";
 import { useProjects } from "@/contexts/ProjectContext";
+import MarketingMaterials from "./MarketingMaterials";
 
 interface BrandColor {
   hsl: string;
@@ -55,6 +57,7 @@ const BrandKitGenerator = () => {
   const { toast } = useToast();
   const { currentProject } = useProjects();
   const fileRef = useRef<HTMLInputElement>(null);
+  const [activeTab, setActiveTab] = useState<"design" | "marketing">("design");
   const [image, setImage] = useState<string | null>(null);
   const [mood, setMood] = useState<string>("");
   const [description, setDescription] = useState("");
@@ -182,27 +185,55 @@ const BrandKitGenerator = () => {
   return (
     <div className="flex flex-col h-full bg-[hsl(var(--ide-panel))]">
       {/* Header */}
-      <div className="flex items-center justify-between px-4 py-3 border-b border-border bg-[hsl(var(--ide-panel-header))]">
-        <div className="flex items-center gap-2">
-          <Palette className="w-4 h-4 text-primary" />
-          <span className="text-sm font-semibold text-foreground">Brand Kit</span>
-          {applied && savedKit && (
-            <span className="flex items-center gap-1 text-[10px] text-[hsl(var(--ide-success))] bg-[hsl(var(--ide-success))]/10 px-1.5 py-0.5 rounded-full">
-              <CheckCircle2 className="w-3 h-3" /> Active
-            </span>
+      <div className="px-4 py-3 border-b border-border bg-[hsl(var(--ide-panel-header))]">
+        <div className="flex items-center justify-between mb-2">
+          <div className="flex items-center gap-2">
+            <Palette className="w-4 h-4 text-primary" />
+            <span className="text-sm font-semibold text-foreground">Brand Kit</span>
+            {applied && savedKit && (
+              <span className="flex items-center gap-1 text-[10px] text-[hsl(var(--ide-success))] bg-[hsl(var(--ide-success))]/10 px-1.5 py-0.5 rounded-full">
+                <CheckCircle2 className="w-3 h-3" /> Active
+              </span>
+            )}
+          </div>
+          {kit && activeTab === "design" && (
+            <button
+              onClick={() => { setKit(null); setImage(null); setDescription(""); setMood(""); setApplied(!!savedKit); }}
+              className="text-[11px] text-muted-foreground hover:text-foreground flex items-center gap-1 transition-colors"
+            >
+              <RefreshCw className="w-3 h-3" /> New
+            </button>
           )}
         </div>
-        {kit && (
+        {/* Tabs */}
+        <div className="flex gap-1 bg-secondary/50 rounded-lg p-0.5">
           <button
-            onClick={() => { setKit(null); setImage(null); setDescription(""); setMood(""); setApplied(!!savedKit); }}
-            className="text-[11px] text-muted-foreground hover:text-foreground flex items-center gap-1 transition-colors"
+            onClick={() => setActiveTab("design")}
+            className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-all ${
+              activeTab === "design"
+                ? "bg-background text-foreground shadow-sm"
+                : "text-muted-foreground hover:text-foreground"
+            }`}
           >
-            <RefreshCw className="w-3 h-3" /> New
+            <Palette className="w-3 h-3" /> Design System
           </button>
-        )}
+          <button
+            onClick={() => setActiveTab("marketing")}
+            className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-all ${
+              activeTab === "marketing"
+                ? "bg-background text-foreground shadow-sm"
+                : "text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            <Image className="w-3 h-3" /> Marketing
+          </button>
+        </div>
       </div>
 
       <div className="flex-1 overflow-y-auto p-4 space-y-4">
+        {activeTab === "marketing" ? (
+          <MarketingMaterials brandKit={kit || savedKit} />
+        ) : (
         <AnimatePresence mode="wait">
           {!kit ? (
             <motion.div
@@ -451,6 +482,7 @@ const BrandKitGenerator = () => {
             </motion.div>
           )}
         </AnimatePresence>
+        )}
       </div>
     </div>
   );
