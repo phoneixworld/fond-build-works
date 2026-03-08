@@ -469,6 +469,10 @@ const IDELayout = () => {
                 <CrewSpaces />
               ) : rightPanel === "brandkit" ? (
                 <BrandKitGenerator />
+              ) : rightPanel === "abtesting" ? (
+                <ABTesting />
+              ) : rightPanel === "plugins" ? (
+                <PluginMarketplace />
               ) : rightPanel === "history" ? (
                 <VersionHistory
                   versions={versions}
