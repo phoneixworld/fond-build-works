@@ -41,6 +41,47 @@ export type Database = {
         }
         Relationships: []
       }
+      project_analytics: {
+        Row: {
+          country: string | null
+          created_at: string
+          event: string
+          id: string
+          path: string
+          project_id: string
+          referrer: string | null
+          user_agent: string | null
+        }
+        Insert: {
+          country?: string | null
+          created_at?: string
+          event?: string
+          id?: string
+          path?: string
+          project_id: string
+          referrer?: string | null
+          user_agent?: string | null
+        }
+        Update: {
+          country?: string | null
+          created_at?: string
+          event?: string
+          id?: string
+          path?: string
+          project_id?: string
+          referrer?: string | null
+          user_agent?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "project_analytics_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       project_data: {
         Row: {
           collection: string
