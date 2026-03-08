@@ -188,7 +188,7 @@ export function parseMultiFileOutput(response: string): { files: Record<string, 
     }
   }
 
-  // Always add scaffold files
+  // Always add scaffold files for frontend
   if (Object.keys(files).length > 0 && !files["package.json"]) {
     files["package.json"] = {
       path: "package.json",
@@ -220,8 +220,18 @@ export function parseMultiFileOutput(response: string): { files: Record<string, 
     };
     files["README.md"] = {
       path: "README.md",
-      content: `# My App\n\nGenerated with AI. Run \`npm install && npm run dev\` to start.\n`,
+      content: `# My App\n\nGenerated with AI.\n\n## Frontend\n\`\`\`bash\nnpm install && npm run dev\n\`\`\`\n\n## Backend (if applicable)\nCheck the \`server/\` directory for backend setup instructions.\n`,
       language: "markdown",
+    };
+  }
+
+  // Add docker-compose if both frontend and backend exist
+  const hasBackend = Object.keys(files).some(p => p.startsWith("server/"));
+  if (hasBackend && !files["docker-compose.yml"]) {
+    files["docker-compose.yml"] = {
+      path: "docker-compose.yml",
+      content: `version: '3.8'\nservices:\n  frontend:\n    build: .\n    ports:\n      - "3000:3000"\n  backend:\n    build: ./server\n    ports:\n      - "8000:8000"\n    environment:\n      - NODE_ENV=production\n`,
+      language: "yaml",
     };
   }
 
