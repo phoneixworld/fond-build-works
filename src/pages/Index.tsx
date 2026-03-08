@@ -6,6 +6,7 @@ import {
 } from "@/components/ui/resizable";
 import { Code, Eye, Zap, LogOut, ArrowLeft, Cloud, ChevronDown, Clock, Command as CommandIcon, Brain, Activity, Users } from "lucide-react";
 import { PreviewProvider } from "@/contexts/PreviewContext";
+import { VirtualFSProvider } from "@/contexts/VirtualFSContext";
 import { ProjectProvider, useProjects } from "@/contexts/ProjectContext";
 import { useAuth } from "@/hooks/useAuth";
 import ChatPanel from "@/components/ChatPanel";
