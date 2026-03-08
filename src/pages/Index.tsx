@@ -49,6 +49,9 @@ const IDELayout = () => {
   const [renameOpen, setRenameOpen] = useState(false);
   const [renameValue, setRenameValue] = useState("");
   const [versions, setVersions] = useState<Version[]>([]);
+  const [renameEmoji, setRenameEmoji] = useState("");
+  const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+  const [renameError, setRenameError] = useState("");
   const publishRef = useRef<{ openPublish: () => void; handleExport: () => void } | null>(null);
   const chatRef = useRef<{ clearChat: () => void } | null>(null);
   const { toast } = useToast();
