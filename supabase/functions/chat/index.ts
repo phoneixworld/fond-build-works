@@ -209,27 +209,25 @@ export default function Header({ title }) {
 - Use Lucide React icons: import { Heart, Star } from "lucide-react"
 - NEVER use DaisyUI in React mode — use Tailwind utilities directly for styling
 - Build production-quality components with proper props, state, and composition
-- Use React Router for multi-page apps: import { BrowserRouter, Routes, Route } from "react-router-dom"`,`,
-
+- Use React Router for multi-page apps: import { BrowserRouter, Routes, Route } from "react-router-dom"`,
 
     "vue-cdn": `Use Vue 3 via CDN with Tailwind. Use Composition API with setup(). You can also import npm packages via esm.sh.`,
     "vanilla-js": `Use plain HTML, CSS, and vanilla JavaScript. No frameworks. Clean, semantic HTML. You can use ES modules via esm.sh for utility libraries.`,
-    "react-node": `Use HTML + Tailwind CSS + React via ES modules (same as html-tailwind stack). 
+    "react-node": `Use the \`\`\`react-preview format (same as react-cdn stack) for the frontend.
 For backend/data needs, use the Data API and Auth API described above.
-IMPORTANT: Everything runs in a browser preview iframe. Generate a SINGLE complete index.html file. 
-NEVER tell users to run terminal commands, install dependencies, or start servers.
-You can import ANY npm package via esm.sh. Use the same ES modules approach as html-tailwind.`,
-    "react-python": `Use HTML + Tailwind CSS + React via ES modules (same as html-tailwind stack).
-For backend/data needs, use the Data API and Auth API described above.
-IMPORTANT: Everything runs in a browser preview iframe. Generate a SINGLE complete index.html file.
+IMPORTANT: Everything runs in a browser preview. Generate React JSX files in react-preview fences.
 NEVER tell users to run terminal commands, install dependencies, or start servers.`,
-    "react-go": `Use HTML + Tailwind CSS + React via ES modules (same as html-tailwind stack).
+    "react-python": `Use the \`\`\`react-preview format (same as react-cdn stack) for the frontend.
 For backend/data needs, use the Data API and Auth API described above.
-IMPORTANT: Everything runs in a browser preview iframe. Generate a SINGLE complete index.html file.
+IMPORTANT: Everything runs in a browser preview. Generate React JSX files in react-preview fences.
 NEVER tell users to run terminal commands, install dependencies, or start servers.`,
-    "nextjs": `Use HTML + Tailwind CSS + React via ES modules (same as html-tailwind stack).
+    "react-go": `Use the \`\`\`react-preview format (same as react-cdn stack) for the frontend.
 For backend/data needs, use the Data API and Auth API described above.
-IMPORTANT: Everything runs in a browser preview iframe. Generate a SINGLE complete index.html file.
+IMPORTANT: Everything runs in a browser preview. Generate React JSX files in react-preview fences.
+NEVER tell users to run terminal commands, install dependencies, or start servers.`,
+    "nextjs": `Use the \`\`\`react-preview format (same as react-cdn stack) for the frontend.
+For backend/data needs, use the Data API and Auth API described above.
+IMPORTANT: Everything runs in a browser preview. Generate React JSX files in react-preview fences.
 NEVER tell users to run terminal commands, install dependencies, or start servers.`,
   };
 
