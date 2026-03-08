@@ -18,15 +18,24 @@ function parseResponse(text: string): [string, string | null] {
 }
 
 const ChatPanel = ({ initialPrompt }: { initialPrompt?: string }) => {
-  const { currentProject, saveProject, createProject } = useProjects();
+  const { currentProject, saveProject } = useProjects();
   const [messages, setMessages] = useState<Msg[]>([]);
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
-  const [hasAutoSent, setHasAutoSent] = useState(false);
+  const [pendingPrompt, setPendingPrompt] = useState<string | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const { setPreviewHtml, setIsBuilding, setBuildStep } = usePreview();
   const lastProjectIdRef = useRef<string | null>(null);
+  const hasProcessedInitialRef = useRef(false);
+
+  // Set pending prompt from initialPrompt (only once per mount)
+  useEffect(() => {
+    if (initialPrompt && !hasProcessedInitialRef.current) {
+      hasProcessedInitialRef.current = true;
+      setPendingPrompt(initialPrompt);
+    }
+  }, [initialPrompt]);
 
   // Sync messages & preview when project changes
   useEffect(() => {
@@ -42,28 +51,8 @@ const ChatPanel = ({ initialPrompt }: { initialPrompt?: string }) => {
     }
   }, [currentProject, setPreviewHtml]);
 
-  // Auto-send initial prompt from landing page
-  const sendRef = useRef<((text: string) => void) | null>(null);
-  useEffect(() => {
-    if (initialPrompt && !hasAutoSent && currentProject && messages.length === 0) {
-      setHasAutoSent(true);
-      setTimeout(() => sendRef.current?.(initialPrompt), 100);
-    }
-  }, [initialPrompt, hasAutoSent, currentProject, messages.length]);
-
-  useEffect(() => {
-    scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
-  }, [messages]);
-
-  const send = useCallback(async (overrideText?: string) => {
-    const text = overrideText || input.trim();
-    if (!text || isLoading) return;
-
-    let project = currentProject;
-    if (!project) {
-      project = await createProject(text.slice(0, 40));
-      if (!project) return;
-    }
+  const sendMessage = useCallback(async (text: string) => {
+    if (!text || isLoading || !currentProject) return;
 
     const userMsg: Msg = { role: "user", content: text };
     setInput("");
@@ -120,10 +109,10 @@ const ChatPanel = ({ initialPrompt }: { initialPrompt?: string }) => {
 
             saveProject({
               chat_history: final,
-              html_content: htmlCode || project!.html_content || "",
-              name: project!.name === "Untitled Project" && final.length > 0
+              html_content: htmlCode || currentProject.html_content || "",
+              name: currentProject.name === "Untitled Project" && final.length > 0
                 ? final[0].content.slice(0, 40)
-                : project!.name,
+                : currentProject.name,
             });
 
             return final;
@@ -141,12 +130,26 @@ const ChatPanel = ({ initialPrompt }: { initialPrompt?: string }) => {
       setIsBuilding(false);
       setBuildStep("");
     }
-  }, [input, isLoading, messages, currentProject, createProject, saveProject, setPreviewHtml, setIsBuilding, setBuildStep]);
+  }, [isLoading, messages, currentProject, saveProject, setPreviewHtml, setIsBuilding, setBuildStep]);
 
-  sendRef.current = send;
+  // Process pending prompt when ready
+  useEffect(() => {
+    if (pendingPrompt && currentProject && !isLoading && messages.length === 0) {
+      const prompt = pendingPrompt;
+      setPendingPrompt(null);
+      sendMessage(prompt);
+    }
+  }, [pendingPrompt, currentProject, isLoading, messages.length, sendMessage]);
+
+  useEffect(() => {
+    scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
+  }, [messages]);
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(); }
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      if (input.trim()) sendMessage(input.trim());
+    }
   };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
@@ -157,12 +160,17 @@ const ChatPanel = ({ initialPrompt }: { initialPrompt?: string }) => {
 
   return (
     <div className="flex flex-col h-full bg-ide-panel">
-      {/* Messages */}
       <div ref={scrollRef} className="flex-1 overflow-y-auto p-4 space-y-5">
-        {messages.length === 0 && (
+        {messages.length === 0 && !pendingPrompt && (
           <div className="flex flex-col items-center justify-center h-full text-muted-foreground gap-3">
             <Bot className="w-8 h-8 text-muted-foreground/40" />
             <p className="text-xs">Start a conversation to build your app</p>
+          </div>
+        )}
+        {pendingPrompt && messages.length === 0 && (
+          <div className="flex flex-col items-center justify-center h-full text-muted-foreground gap-3">
+            <Bot className="w-8 h-8 text-primary animate-pulse" />
+            <p className="text-xs">Starting build...</p>
           </div>
         )}
         <AnimatePresence initial={false}>
@@ -184,15 +192,14 @@ const ChatPanel = ({ initialPrompt }: { initialPrompt?: string }) => {
               <Bot className="w-3.5 h-3.5 text-accent" />
             </div>
             <div className="flex gap-1.5 items-center pt-2">
-              <span className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse-dot" />
-              <span className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse-dot [animation-delay:0.2s]" />
-              <span className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse-dot [animation-delay:0.4s]" />
+              <span className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse" />
+              <span className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse [animation-delay:0.2s]" />
+              <span className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse [animation-delay:0.4s]" />
             </div>
           </div>
         )}
       </div>
 
-      {/* Input */}
       <div className="p-3 border-t border-border">
         <div className="flex items-end gap-2 bg-secondary rounded-lg px-3 py-2">
           <textarea
@@ -206,7 +213,7 @@ const ChatPanel = ({ initialPrompt }: { initialPrompt?: string }) => {
             disabled={isLoading}
             rows={1}
           />
-          <button onClick={() => send()} disabled={isLoading || !input.trim()} className="text-primary hover:text-primary/80 disabled:text-muted-foreground transition-colors pb-0.5">
+          <button onClick={() => input.trim() && sendMessage(input.trim())} disabled={isLoading || !input.trim()} className="text-primary hover:text-primary/80 disabled:text-muted-foreground transition-colors pb-0.5">
             <Send className="w-4 h-4" />
           </button>
         </div>
