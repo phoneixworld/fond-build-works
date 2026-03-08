@@ -98,6 +98,11 @@ export default function Header() {
 - Use framer-motion for animations: import { motion } from "framer-motion"
 - Use React Router for multi-page apps: import { BrowserRouter, Routes, Route } from "react-router-dom"
 
+## JSX SYNTAX — CRITICAL
+- ⚠️ NEVER use bracket notation in JSX tags: <array[i].icon /> is INVALID JSX and will crash.
+- Instead, assign to a variable first: const Icon = array[i].icon; then <Icon size={24} />
+- This applies to ALL dynamic component references. Always extract to a capitalized variable before rendering.
+
 ## REACT DESIGN SYSTEM — Apply to EVERY app
 
 ### Typography
