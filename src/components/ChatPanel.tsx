@@ -18,11 +18,12 @@ function parseResponse(text: string): [string, string | null] {
   return [chatPart, htmlCode.trim()];
 }
 
-const ChatPanel = () => {
+const ChatPanel = ({ initialPrompt }: { initialPrompt?: string }) => {
   const { currentProject, saveProject, createProject } = useProjects();
   const [messages, setMessages] = useState<Msg[]>([]);
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [hasAutoSent, setHasAutoSent] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const { setPreviewHtml, setIsBuilding, setBuildStep } = usePreview();
@@ -39,21 +40,31 @@ const ChatPanel = () => {
     }
   }, [currentProject?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Auto-send initial prompt from landing page
+  const sendRef = useRef<((text: string) => void) | null>(null);
+  useEffect(() => {
+    if (initialPrompt && !hasAutoSent && currentProject && messages.length === 0) {
+      setHasAutoSent(true);
+      setTimeout(() => sendRef.current?.(initialPrompt), 100);
+    }
+  }, [initialPrompt, hasAutoSent, currentProject, messages.length]);
+
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
   }, [messages]);
 
-  const send = useCallback(async () => {
-    if (!input.trim() || isLoading) return;
+  const send = useCallback(async (overrideText?: string) => {
+    const text = overrideText || input.trim();
+    if (!text || isLoading) return;
 
     // Auto-create project if none selected
     let project = currentProject;
     if (!project) {
-      project = await createProject(input.trim().slice(0, 40));
+      project = await createProject(text.slice(0, 40));
       if (!project) return;
     }
 
-    const userMsg: Msg = { role: "user", content: input.trim() };
+    const userMsg: Msg = { role: "user", content: text };
     setInput("");
     if (inputRef.current) inputRef.current.style.height = "36px";
     setMessages((prev) => [...prev, userMsg]);
@@ -132,6 +143,9 @@ const ChatPanel = () => {
       setBuildStep("");
     }
   }, [input, isLoading, messages, currentProject, createProject, saveProject, setPreviewHtml, setIsBuilding, setBuildStep]);
+
+  // Keep ref in sync for auto-send
+  sendRef.current = send;
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(); }
@@ -218,7 +232,7 @@ const ChatPanel = () => {
             disabled={isLoading}
             rows={1}
           />
-          <button onClick={send} disabled={isLoading || !input.trim()} className="text-primary hover:text-primary/80 disabled:text-muted-foreground transition-colors pb-0.5">
+          <button onClick={() => send()} disabled={isLoading || !input.trim()} className="text-primary hover:text-primary/80 disabled:text-muted-foreground transition-colors pb-0.5">
             <Send className="w-4 h-4" />
           </button>
         </div>
