@@ -191,6 +191,7 @@ const ChatPanel = forwardRef<ChatPanelHandle, { initialPrompt?: string; onVersio
   // Edit/regenerate state
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
   const [editText, setEditText] = useState("");
+  const [selectedTemplate, setSelectedTemplate] = useState<PageTemplate | null>(null);
 
   // Elapsed time timer during loading
   useEffect(() => {
