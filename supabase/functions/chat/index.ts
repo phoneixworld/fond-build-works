@@ -275,6 +275,8 @@ ${schemas && schemas.length > 0 ? '- Use the DEFINED DATA MODELS above for colle
 
 ${designTheme ? `\n## USER'S CHOSEN DESIGN THEME\n${designTheme}\nFOLLOW THIS THEME STRICTLY for all visual decisions.` : ''}
 
+${knowledge && knowledge.length > 0 ? `\n## PROJECT BRAIN — Custom Knowledge\n\nThe user has saved these persistent instructions for this project. ALWAYS follow them:\n\n${knowledge.join('\n\n')}\n\nCRITICAL: These are standing instructions. Apply them to EVERY response.` : ''}
+
 ## QUALITY REFERENCE — Example of the quality bar you must hit
 
 Here is a PARTIAL example of a well-built hero section. Your output must be AT LEAST this quality:
