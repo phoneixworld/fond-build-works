@@ -1021,6 +1021,8 @@ const ChatPanel = forwardRef<ChatPanelHandle, { initialPrompt?: string; onVersio
           setIsLoading(false);
           setIsBuilding(false);
           setBuildStep("");
+          setPipelineStep("complete");
+          setCurrentAgent(null);
           isSendingRef.current = false;
           setTimeout(() => setBuildStreamContent(""), 3000);
 
