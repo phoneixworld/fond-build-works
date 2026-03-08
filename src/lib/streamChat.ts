@@ -95,6 +95,8 @@ export async function streamChat({
   designTheme,
   knowledge,
   templateContext,
+  currentCode,
+  snippetsContext,
   onDelta,
   onDone,
   onError,
@@ -107,6 +109,8 @@ export async function streamChat({
   designTheme?: string;
   knowledge?: string[];
   templateContext?: string;
+  currentCode?: string;
+  snippetsContext?: string;
   onDelta: (text: string) => void;
   onDone: () => void;
   onError: (error: string) => void;
@@ -114,18 +118,46 @@ export async function streamChat({
   // Trim messages to fit context window before sending
   const trimmedMessages = trimToContextWindow(messages);
 
-  const resp = await fetch(CHAT_URL, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
-    },
-    body: JSON.stringify({ messages: trimmedMessages, project_id: projectId, tech_stack: techStack, schemas, model, design_theme: designTheme, knowledge, template_context: templateContext }),
-  });
+  const payload = {
+    messages: trimmedMessages,
+    project_id: projectId,
+    tech_stack: techStack,
+    schemas,
+    model,
+    design_theme: designTheme,
+    knowledge,
+    template_context: templateContext,
+    current_code: currentCode,
+    snippets_context: snippetsContext,
+  };
 
-  if (!resp.ok || !resp.body) {
-    if (resp.status === 429) { onError("Rate limited. Try again shortly."); return; }
-    if (resp.status === 402) { onError("Usage limit reached."); return; }
+  // Retry once on network failure
+  let resp: Response | null = null;
+  for (let attempt = 0; attempt < 2; attempt++) {
+    try {
+      resp = await fetch(CHAT_URL, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+        },
+        body: JSON.stringify(payload),
+      });
+      break; // success
+    } catch (err) {
+      if (attempt === 0) {
+        console.warn("[streamChat] Network error, retrying in 1s...", err);
+        await new Promise(r => setTimeout(r, 1000));
+        continue;
+      }
+      onError("Network error. Check your connection and try again.");
+      return;
+    }
+  }
+
+  if (!resp || !resp.ok || !resp.body) {
+    if (resp?.status === 429) { onError("Rate limited. Try again shortly."); return; }
+    if (resp?.status === 402) { onError("Usage limit reached."); return; }
     onError("Failed to connect to AI.");
     return;
   }

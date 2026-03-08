@@ -155,6 +155,31 @@ const PreviewPanel = () => {
 
         {/* Preview content */}
         <div className="flex-1 relative flex items-stretch justify-center overflow-auto bg-background min-h-0">
+          {/* Building skeleton overlay */}
+          <AnimatePresence>
+            {isBuilding && !hasContent && (
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                className="absolute inset-0 z-10 bg-background flex flex-col items-center justify-center gap-6 p-8"
+              >
+                <div className="w-full max-w-md space-y-4">
+                  <div className="h-8 w-3/4 mx-auto rounded-lg bg-muted animate-pulse" />
+                  <div className="h-4 w-1/2 mx-auto rounded bg-muted animate-pulse" />
+                  <div className="h-48 w-full rounded-xl bg-muted/60 animate-pulse mt-6" />
+                  <div className="grid grid-cols-3 gap-3 mt-4">
+                    <div className="h-24 rounded-lg bg-muted animate-pulse" />
+                    <div className="h-24 rounded-lg bg-muted animate-pulse" style={{ animationDelay: "0.15s" }} />
+                    <div className="h-24 rounded-lg bg-muted animate-pulse" style={{ animationDelay: "0.3s" }} />
+                  </div>
+                  <div className="h-4 w-2/3 rounded bg-muted animate-pulse mt-4" />
+                  <div className="h-4 w-1/2 rounded bg-muted animate-pulse" />
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+
           {previewMode === "sandpack" ? (
             <div className="h-full w-full min-h-0" key={`sandpack-${refreshKey}`}>
               {sandpackFiles ? (

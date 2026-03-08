@@ -5,7 +5,7 @@ import VoiceInput from "@/components/VoiceInput";
 import { streamChat } from "@/lib/streamChat";
 import { validateAndFixHtml } from "@/lib/htmlValidator";
 import { matchTemplate, PAGE_TEMPLATES, type PageTemplate } from "@/lib/pageTemplates";
-import { COMPONENT_SNIPPETS } from "@/lib/componentSnippets";
+import { COMPONENT_SNIPPETS, getSnippetsPromptContext } from "@/lib/componentSnippets";
 import { AI_MODELS, DEFAULT_MODEL, PROMPT_SUGGESTIONS, QUICK_ACTIONS, DESIGN_THEMES, type AIModelId } from "@/lib/aiModels";
 import { motion, AnimatePresence } from "framer-motion";
 import { usePreview } from "@/contexts/PreviewContext";
@@ -500,7 +500,7 @@ const ChatPanel = forwardRef<ChatPanelHandle, { initialPrompt?: string; onVersio
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const { setPreviewHtml, setIsBuilding, setBuildStep, setSandpackFiles, setSandpackDeps, setPreviewMode } = usePreview();
+  const { previewHtml: currentPreviewHtml, sandpackFiles: currentSandpackFiles, setPreviewHtml, setIsBuilding, setBuildStep, setSandpackFiles, setSandpackDeps, setPreviewMode } = usePreview();
   const { setFiles: setVirtualFiles } = useVirtualFS();
   const lastProjectIdRef = useRef<string | null>(null);
   const hasProcessedInitialRef = useRef(false);
@@ -897,6 +897,25 @@ const ChatPanel = forwardRef<ChatPanelHandle, { initialPrompt?: string; onVersio
         }
       } catch {}
 
+      // Collect current app code for AI context awareness
+      let currentCodeSummary = "";
+      if (currentSandpackFiles && Object.keys(currentSandpackFiles).length > 0) {
+        const fileEntries = Object.entries(currentSandpackFiles);
+        const totalChars = fileEntries.reduce((sum, [, code]) => sum + code.length, 0);
+        if (totalChars < 8000) {
+          currentCodeSummary = fileEntries.map(([path, code]) => `--- ${path}\n${code}`).join("\n\n");
+        } else {
+          currentCodeSummary = fileEntries.map(([path, code]) => `--- ${path} (${code.length} chars)\n${code.slice(0, 500)}...[truncated]`).join("\n\n");
+        }
+      } else if (currentPreviewHtml && currentPreviewHtml.length > 0) {
+        currentCodeSummary = currentPreviewHtml.length < 8000
+          ? currentPreviewHtml
+          : currentPreviewHtml.slice(0, 6000) + "\n...[truncated]";
+      }
+
+      // Get component snippets reference for AI
+      const snippetsContext = getSnippetsPromptContext();
+
       // FIX: Read messages from ref to avoid stale closures
       const currentMessages = messagesRef.current;
       const apiMessages = [...currentMessages, userMsg].map(m => ({
@@ -924,6 +943,8 @@ const ChatPanel = forwardRef<ChatPanelHandle, { initialPrompt?: string; onVersio
         designTheme: themeInfo?.prompt,
         knowledge,
         templateContext: templateCtx || undefined,
+        currentCode: currentCodeSummary || undefined,
+        snippetsContext: snippetsContext || undefined,
         onDelta: upsert,
         onDone: async () => {
           if (abortController.signal.aborted) return;
@@ -1658,20 +1679,41 @@ const ChatPanel = forwardRef<ChatPanelHandle, { initialPrompt?: string; onVersio
               disabled={isLoading}
               rows={1}
             />
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <button
-                  onClick={handleSendClick}
-                  disabled={isLoading || (!input.trim() && attachedImages.length === 0)}
-                  className="text-primary hover:text-primary/80 disabled:text-muted-foreground/30 transition-colors pb-0.5"
-                >
-                  <Send className="w-4 h-4" />
-                </button>
-              </TooltipTrigger>
-              <TooltipContent side="top" className="text-xs">
-                Send <kbd className="ml-1 px-1 py-0.5 rounded bg-muted text-[10px] font-mono">Enter</kbd>
-              </TooltipContent>
-            </Tooltip>
+            {isLoading ? (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button
+                    onClick={() => {
+                      abortControllerRef.current?.abort();
+                      abortControllerRef.current = null;
+                      setIsLoading(false);
+                      setIsBuilding(false);
+                      setBuildStep("");
+                      isSendingRef.current = false;
+                    }}
+                    className="text-destructive hover:text-destructive/80 transition-colors pb-0.5 animate-pulse"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent side="top" className="text-xs">Stop generating</TooltipContent>
+              </Tooltip>
+            ) : (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button
+                    onClick={handleSendClick}
+                    disabled={!input.trim() && attachedImages.length === 0}
+                    className="text-primary hover:text-primary/80 disabled:text-muted-foreground/30 transition-colors pb-0.5"
+                  >
+                    <Send className="w-4 h-4" />
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent side="top" className="text-xs">
+                  Send <kbd className="ml-1 px-1 py-0.5 rounded bg-muted text-[10px] font-mono">Enter</kbd>
+                </TooltipContent>
+              </Tooltip>
+            )}
           </div>
 
           {/* Model + Theme + Actions bar */}

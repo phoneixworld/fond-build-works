@@ -698,7 +698,7 @@ serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
-    const { messages, project_id, tech_stack, schemas, model, design_theme, knowledge, template_context } = await req.json();
+    const { messages, project_id, tech_stack, schemas, model, design_theme, knowledge, template_context, current_code, snippets_context } = await req.json();
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY is not configured");
 
@@ -707,6 +707,16 @@ serve(async (req) => {
     // Phase 2: Inject template context if matched
     if (template_context) {
       systemPrompt += `\n\n${template_context}`;
+    }
+
+    // Inject current app code so AI modifies rather than regenerates
+    if (current_code) {
+      systemPrompt += `\n\n## CURRENT APP CODE — MODIFY THIS, DON'T REGENERATE FROM SCRATCH\n\nThe user already has this app running. When they ask for changes, MODIFY the existing code — preserve the structure, styling, and working features. Only change what the user asks for.\n\n\`\`\`\n${current_code}\n\`\`\`\n\nCRITICAL: Do NOT throw away existing code and start fresh. Build on top of what exists. Keep all existing components, routes, and styling unless the user explicitly asks to replace them.`;
+    }
+
+    // Inject component snippets reference
+    if (snippets_context) {
+      systemPrompt += `\n\n## AVAILABLE COMPONENT BLUEPRINTS\n\nYou have access to these pre-built section blueprints. Use them as structural references when building sections:\n\n${snippets_context}`;
     }
 
     // Use requested model or default (upgraded to Pro)
