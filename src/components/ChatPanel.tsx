@@ -246,13 +246,15 @@ const ChatPanel = forwardRef<ChatPanelHandle, { initialPrompt?: string; onVersio
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
   };
 
-  const clearChat = () => {
+  const clearChat = useCallback(() => {
     if (!currentProject || isLoading) return;
     setMessages([]);
     setPreviewHtml("");
     setPreviewErrors([]);
     saveProject({ chat_history: [], html_content: "" });
-  };
+  }, [currentProject, isLoading, setPreviewHtml, saveProject]);
+
+  useImperativeHandle(ref, () => ({ clearChat }), [clearChat]);
 
   const sendMessage = useCallback(async (text: string, images: string[] = []) => {
     if (!text || isLoading || !currentProject) return;
