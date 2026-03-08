@@ -9,22 +9,23 @@ interface TechStackSelectorProps {
 const TechStackSelector = ({ value, onChange, compact }: TechStackSelectorProps) => {
   if (compact) {
     return (
-      <div className="flex items-center gap-1">
+      <div className="flex items-center gap-0.5">
         {TECH_STACKS.map((stack) => {
           const Icon = stack.icon;
           const isActive = value === stack.id;
           return (
             <button
               key={stack.id}
-              onClick={() => onChange(stack.id)}
-              title={stack.label}
-              className={`p-1.5 rounded-md text-xs transition-colors ${
+              onClick={(e) => { e.preventDefault(); e.stopPropagation(); onChange(stack.id); }}
+              title={`Switch to ${stack.label}`}
+              className={`flex items-center gap-1 px-2 py-1 rounded-md text-[11px] font-medium transition-all ${
                 isActive
-                  ? "bg-primary/15 text-primary"
+                  ? "bg-primary text-primary-foreground"
                   : "text-muted-foreground hover:text-foreground hover:bg-secondary"
               }`}
             >
-              <Icon className="w-3.5 h-3.5" />
+              <Icon className="w-3 h-3" />
+              <span className="hidden lg:inline">{stack.label.split(" ")[0]}</span>
             </button>
           );
         })}

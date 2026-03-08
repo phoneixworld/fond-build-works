@@ -37,9 +37,9 @@ const IDELayout = () => {
     setInIDE(true);
   }, [selectProject]);
 
-  const handleTechStackChange = (id: TechStackId) => {
+  const handleTechStackChange = async (id: TechStackId) => {
     if (currentProject) {
-      saveProject({ tech_stack: id });
+      await saveProject({ tech_stack: id });
     }
   };
 
