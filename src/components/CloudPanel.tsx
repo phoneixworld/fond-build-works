@@ -9,6 +9,9 @@ import {
   Terminal,
   ScrollText,
   Download,
+  Brain,
+  GitBranch,
+  ShieldCheck,
 } from "lucide-react";
 import SchemaBuilder from "./SchemaBuilder";
 import CloudOverview from "./cloud/CloudOverview";
@@ -19,10 +22,16 @@ import CloudFunctions from "./cloud/CloudFunctions";
 import CloudSqlEditor from "./cloud/CloudSqlEditor";
 import CloudLogs from "./cloud/CloudLogs";
 import CloudExport from "./cloud/CloudExport";
+import ProjectMemory from "./cloud/ProjectMemory";
+import DependencyGraph from "./cloud/DependencyGraph";
+import GovernanceEngine from "./cloud/GovernanceEngine";
 
 const CLOUD_SECTIONS = [
   { id: "overview", label: "Overview", icon: LayoutDashboard },
   { id: "database", label: "Database", icon: Database },
+  { id: "memory", label: "Project Memory", icon: Brain },
+  { id: "dependencies", label: "Dependencies", icon: GitBranch },
+  { id: "governance", label: "Governance", icon: ShieldCheck },
   { id: "users", label: "Users", icon: Users },
   { id: "storage", label: "Storage", icon: HardDrive },
   { id: "secrets", label: "Secrets", icon: KeyRound },
@@ -43,6 +52,12 @@ const CloudPanel = () => {
         return <CloudOverview onNavigate={setActiveSection} />;
       case "database":
         return <SchemaBuilder />;
+      case "memory":
+        return <ProjectMemory />;
+      case "dependencies":
+        return <DependencyGraph />;
+      case "governance":
+        return <GovernanceEngine />;
       case "users":
         return <CloudUsers />;
       case "storage":
