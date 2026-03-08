@@ -101,10 +101,25 @@ export const VirtualFSProvider = ({ children }: { children: ReactNode }) => {
 
   const getFile = useCallback((path: string) => files[path] || null, [files]);
 
+  const addFile = useCallback((path: string, content: string) => {
+    setFilesState(prev => ({
+      ...prev,
+      [path]: { path, content, language: detectLanguage(path) },
+    }));
+  }, []);
+
+  const removeFile = useCallback((path: string) => {
+    setFilesState(prev => {
+      const next = { ...prev };
+      delete next[path];
+      return next;
+    });
+  }, []);
+
   const fileTree = buildTree(files);
 
   return (
-    <VirtualFSContext.Provider value={{ files, fileTree, setFiles, updateFile, getFile, activeFile, setActiveFile }}>
+    <VirtualFSContext.Provider value={{ files, fileTree, setFiles, updateFile, addFile, removeFile, getFile, activeFile, setActiveFile }}>
       {children}
     </VirtualFSContext.Provider>
   );
