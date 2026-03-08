@@ -677,20 +677,6 @@ const ChatPanel = forwardRef<ChatPanelHandle, { initialPrompt?: string; onVersio
             return final;
           });
         },
-            supabase
-              .from("project_environments" as any)
-              .update({
-                html_snapshot: postProcessHtml(htmlCode),
-                status: "active",
-                updated_at: new Date().toISOString(),
-              } as any)
-              .eq("project_id", currentProject.id)
-              .eq("name", "development")
-              .then(() => {});
-          }
-
-          // Create version snapshot
-          if (htmlCode && onVersionCreated) {
             const userPrompt = getTextContent(userMsg.content);
             onVersionCreated({
               id: crypto.randomUUID(),
