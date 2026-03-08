@@ -374,9 +374,8 @@ function parseFileSections(block: string): { files: Record<string, string>; deps
   
   return { files, deps, fileCount: Object.keys(files).length };
 }
-  
-  return { files, deps, fileCount: 0 };
-}
+
+
 
 function postProcessHtml(html: string): string {
   if (!html) return html;
