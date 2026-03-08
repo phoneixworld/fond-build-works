@@ -9,7 +9,7 @@ import { usePreview } from "@/contexts/PreviewContext";
 import { useProjects } from "@/contexts/ProjectContext";
 import { useVirtualFS, parseMultiFileOutput } from "@/contexts/VirtualFSContext";
 import { supabase } from "@/integrations/supabase/client";
-import ReactMarkdown from "react-markdown";
+import ChatMessage, { getTextContent as cmGetTextContent, getImageUrls as cmGetImageUrls } from "@/components/chat/ChatMessage";
 import {
   DropdownMenu,
   DropdownMenuContent,
