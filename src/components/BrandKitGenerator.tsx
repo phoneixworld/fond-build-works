@@ -1,12 +1,14 @@
 import { useState, useRef, useCallback, useEffect } from "react";
 import {
   Palette, Sparkles, Type, Layers, Copy, Check, Wand2,
-  CircleDot, Paintbrush, Download, RefreshCw, ImagePlus, X, CheckCircle2, Loader2
+  CircleDot, Paintbrush, Download, RefreshCw, ImagePlus, X, CheckCircle2, Loader2,
+  Image
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { motion, AnimatePresence } from "framer-motion";
 import { useToast } from "@/hooks/use-toast";
 import { useProjects } from "@/contexts/ProjectContext";
+import MarketingMaterials from "./MarketingMaterials";
 
 interface BrandColor {
   hsl: string;
