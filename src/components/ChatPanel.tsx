@@ -68,18 +68,87 @@ function isAllowedImport(pkg: string): boolean {
   return ALLOWED_PACKAGES.has(base);
 }
 
-/** Strip import lines for packages not available in Sandpack */
+/**
+ * Comprehensive import/require sanitizer.
+ * Handles: single-line imports, multi-line imports, side-effect imports,
+ * re-exports (export ... from), dynamic import(), and require().
+ */
 function sanitizeImports(code: string): string {
-  return code.split("\n").filter(line => {
-    const m = line.match(/^\s*import\s+.*?\s+from\s+['"]([^'"]+)['"]/);
-    if (!m) return true;
-    const pkg = m[1];
-    if (!isAllowedImport(pkg)) {
-      console.warn(`[Import Sanitizer] Stripped unknown import: ${pkg}`);
-      return false;
+  // 1. Strip multi-line and single-line: import ... from 'pkg'
+  //    Handles: import X from 'pkg', import { A, B } from 'pkg', import type { X } from 'pkg'
+  code = code.replace(
+    /^\s*import\s+[\s\S]*?\s+from\s+['"]([^'"]+)['"]\s*;?\s*$/gm,
+    (match, pkg) => {
+      if (!isAllowedImport(pkg)) {
+        console.warn(`[Import Sanitizer] Stripped import from: ${pkg}`);
+        return `// [STRIPPED] ${pkg}`;
+      }
+      return match;
     }
-    return true;
-  }).join("\n");
+  );
+
+  // 2. Strip side-effect imports: import 'pkg' or import "pkg"
+  code = code.replace(
+    /^\s*import\s+['"]([^'"]+)['"]\s*;?\s*$/gm,
+    (match, pkg) => {
+      if (!isAllowedImport(pkg)) {
+        console.warn(`[Import Sanitizer] Stripped side-effect import: ${pkg}`);
+        return `// [STRIPPED] ${pkg}`;
+      }
+      return match;
+    }
+  );
+
+  // 3. Strip re-exports: export { X } from 'pkg' or export * from 'pkg'
+  code = code.replace(
+    /^\s*export\s+[\s\S]*?\s+from\s+['"]([^'"]+)['"]\s*;?\s*$/gm,
+    (match, pkg) => {
+      if (!isAllowedImport(pkg)) {
+        console.warn(`[Import Sanitizer] Stripped re-export from: ${pkg}`);
+        return `// [STRIPPED] ${pkg}`;
+      }
+      return match;
+    }
+  );
+
+  // 4. Strip require() calls for unknown packages
+  code = code.replace(
+    /\brequire\s*\(\s*['"]([^'"]+)['"]\s*\)/g,
+    (match, pkg) => {
+      if (!isAllowedImport(pkg)) {
+        console.warn(`[Import Sanitizer] Stripped require: ${pkg}`);
+        return `undefined /* STRIPPED: ${pkg} */`;
+      }
+      return match;
+    }
+  );
+
+  // 5. Strip dynamic import() for unknown packages  
+  code = code.replace(
+    /\bimport\s*\(\s*['"]([^'"]+)['"]\s*\)/g,
+    (match, pkg) => {
+      if (!isAllowedImport(pkg)) {
+        console.warn(`[Import Sanitizer] Stripped dynamic import: ${pkg}`);
+        return `Promise.resolve({}) /* STRIPPED: ${pkg} */`;
+      }
+      return match;
+    }
+  );
+
+  // 6. Final pass: catch any remaining multi-line imports that span lines
+  //    Pattern: line starting with `import` ... eventually `from 'pkg'` across multiple lines
+  code = code.replace(
+    /^\s*import\s*\{[^}]*\}\s*from\s*['"]([^'"]+)['"]\s*;?\s*$/gm,
+    (match, pkg) => {
+      if (!isAllowedImport(pkg)) {
+        console.warn(`[Import Sanitizer] Stripped multi-line import: ${pkg}`);
+        return `// [STRIPPED] ${pkg}`;
+      }
+      return match;
+    }
+  );
+
+  return code;
 }
 
 /** Parse ```react-preview fences into a file map for Sandpack */
