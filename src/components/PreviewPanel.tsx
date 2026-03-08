@@ -56,7 +56,15 @@ const PreviewPanel = () => {
         {previewHtml ? (
           <iframe
             key={refreshKey}
-            srcDoc={previewHtml}
+            srcDoc={`${previewHtml}
+<script>
+window.onerror = function(msg, url, line) {
+  window.parent.postMessage({ type: 'preview-error', message: msg + ' (line ' + line + ')' }, '*');
+};
+window.addEventListener('unhandledrejection', function(e) {
+  window.parent.postMessage({ type: 'preview-error', message: 'Unhandled promise: ' + (e.reason?.message || e.reason) }, '*');
+});
+</script>`}
             className="w-full h-full border-0 bg-white"
             title="Preview"
             sandbox="allow-scripts allow-same-origin"
