@@ -194,6 +194,8 @@ const PublishExportButtons = forwardRef<PublishExportHandle>((_, ref) => {
       </Dialog>
     </>
   );
-};
+});
+
+PublishExportButtons.displayName = "PublishExportButtons";
 
 export default PublishExportButtons;
