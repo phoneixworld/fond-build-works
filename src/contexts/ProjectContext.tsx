@@ -26,6 +26,7 @@ interface ProjectContextType {
   saveProject: (updates: Partial<Pick<Project, "name" | "html_content" | "chat_history" | "tech_stack">>) => Promise<void>;
   deleteProject: (id: string) => Promise<void>;
   refreshProjects: () => Promise<void>;
+  clearCurrentProject: () => void;
 }
 
 const ProjectContext = createContext<ProjectContextType | null>(null);
