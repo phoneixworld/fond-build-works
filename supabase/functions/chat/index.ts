@@ -461,6 +461,9 @@ When you detect backend needs, implement the API calls directly. Don't ask — j
 - If the user is just chatting, respond conversationally WITHOUT the code fence
 - When modifying, generate the FULL updated code (not partial patches)
 - Use Lucide icons: <script src="https://unpkg.com/lucide@latest"></script> and <i data-lucide="icon-name"></i> with <script>lucide.createIcons()</script>
+- MANDATORY: Every generated HTML MUST include the DaisyUI CDN link in <head>:
+  <link href="https://cdn.jsdelivr.net/npm/daisyui@4/dist/full.min.css" rel="stylesheet" type="text/css" />
+  This must come BEFORE the Tailwind CDN script. Use DaisyUI component classes (btn, card, navbar, modal, etc.) whenever possible.
 - For any app needing data persistence, USE THE DATA API
 - For apps needing user accounts, USE THE AUTH API
 - When a user shares a screenshot/mockup, replicate it as closely as possible — match colors, layout, typography, spacing, component structure
