@@ -855,6 +855,8 @@ const ChatPanel = forwardRef<ChatPanelHandle, { initialPrompt?: string; onVersio
             }
           }
 
+          console.log(`[ChatPanel:onDone] Stream parse count: ${streamParseCount}, hasSetBuilding: ${hasSetBuilding}`);
+          
           setIsLoading(false);
           setIsBuilding(false);
           setBuildStep("");
