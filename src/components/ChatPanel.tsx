@@ -148,6 +148,27 @@ function sanitizeImports(code: string): string {
     }
   );
 
+  // 7. Fix invalid JSX: <array[index].prop /> → assign to variable first
+  // Pattern: <identifier[expression].property ... />
+  // Replace with: (() => { const _C = identifier[expression].property; return <_C ... />; })()
+  code = code.replace(
+    /<(\w+)\[([^\]]+)\]\.(\w+)(\s[^>]*)?\s*\/>/g,
+    (match, arr, idx, prop, attrs) => {
+      // Replace the JSX tag with a self-invoking function that assigns to a variable
+      const cleanAttrs = (attrs || '').trim();
+      return `{(() => { const _DynComp = ${arr}[${idx}].${prop}; return <_DynComp ${cleanAttrs} />; })()}`;
+    }
+  );
+  
+  // Also fix: <array[index].property> ... </array[index].property>
+  code = code.replace(
+    /<(\w+)\[([^\]]+)\]\.(\w+)(\s[^>]*)?>([^]*?)<\/\1\[\2\]\.\3>/g,
+    (match, arr, idx, prop, attrs, children) => {
+      const cleanAttrs = (attrs || '').trim();
+      return `{(() => { const _DynComp = ${arr}[${idx}].${prop}; return <_DynComp ${cleanAttrs}>${children}</_DynComp>; })()}`;
+    }
+  );
+
   return code;
 }
 
