@@ -964,6 +964,14 @@ const ChatPanel = forwardRef<ChatPanelHandle, { initialPrompt?: string; onVersio
           let finalHtml: string | null = null;
           
           if (reactResult.files) {
+            // Validation step
+            setPipelineStep("validating");
+            setBuildStep("✅ Validating code...");
+            const validation = validateReactCode(reactResult.files);
+            if (!validation.valid) {
+              console.warn("[ChatPanel:onDone] Validation warnings:", validation.errors);
+            }
+            
             // React/Sandpack mode
             const fileNames = Object.keys(reactResult.files);
             console.log(`[ChatPanel:onDone] ✅ React files found:`, fileNames, `Total code: ${Object.values(reactResult.files).join('').length} chars`);
