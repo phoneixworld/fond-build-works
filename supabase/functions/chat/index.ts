@@ -364,6 +364,18 @@ For full-page apps, follow this structure:
 - ❌ Missing loading states when fetching data
 - ❌ Inconsistent border radius or spacing
 - ❌ Using too many different colors — stick to the palette
+- ❌ Using href="#" placeholder links — ALWAYS use real hash anchors!
+
+### Navigation Links — CRITICAL
+- All navigation links MUST use real hash anchors that scroll to actual sections on the page
+- Navbar links: href="#features", href="#pricing", href="#about", href="#contact", etc.
+- Each section MUST have a matching id attribute: <section id="features">, <section id="pricing">, etc.
+- NEVER use href="#" as a placeholder — every link must navigate somewhere
+- CTA buttons: link to relevant sections (e.g., signup form, contact section, pricing)
+- Footer links: link back to page sections or use javascript:void(0) for non-functional items
+- For multi-page concepts in a single-page app, use hash-based navigation with JavaScript to show/hide sections
+- Add scroll-behavior: smooth to html element for smooth scrolling
+- Mobile menu links should close the menu AND scroll to the section
 
 ## BACKEND AUTO-DETECTION
 
@@ -428,17 +440,17 @@ Here is a PARTIAL example of a well-built hero section. Your output must be AT L
     Acme
   </a>
   <div class="ui-navbar-links">
-    <a href="#" class="ui-navbar-link ui-navbar-link-active">Product</a>
-    <a href="#" class="ui-navbar-link">Pricing</a>
-    <a href="#" class="ui-navbar-link">Docs</a>
+    <a href="#features" class="ui-navbar-link ui-navbar-link-active">Product</a>
+    <a href="#pricing" class="ui-navbar-link">Pricing</a>
+    <a href="#docs" class="ui-navbar-link">Docs</a>
   </div>
   <div class="ui-navbar-actions">
-    <a href="#" class="ui-btn ui-btn-ghost ui-btn-sm">Sign in</a>
-    <a href="#" class="ui-btn ui-btn-primary ui-btn-sm">Get Started</a>
+    <a href="#login" class="ui-btn ui-btn-ghost ui-btn-sm">Sign in</a>
+    <a href="#signup" class="ui-btn ui-btn-primary ui-btn-sm">Get Started</a>
   </div>
 </nav>
 
-<section class="ui-hero" style="position:relative;overflow:hidden;">
+<section id="hero" class="ui-hero" style="position:relative;overflow:hidden;">
   <!-- Decorative gradient blob -->
   <div style="position:absolute;top:-120px;left:50%;transform:translateX(-50%);width:600px;height:600px;background:radial-gradient(circle,rgba(99,102,241,0.15),transparent 70%);pointer-events:none;"></div>
   
@@ -453,11 +465,11 @@ Here is a PARTIAL example of a well-built hero section. Your output must be AT L
         Our AI understands your vision and writes clean, maintainable code.
       </p>
       <div class="ui-hero-actions">
-        <a href="#" class="ui-btn ui-btn-primary ui-btn-lg">
+        <a href="#signup" class="ui-btn ui-btn-primary ui-btn-lg">
           <i data-lucide="play" style="width:18px;height:18px;"></i>
           Start Building Free
         </a>
-        <a href="#" class="ui-btn ui-btn-secondary ui-btn-lg">
+        <a href="#github" class="ui-btn ui-btn-secondary ui-btn-lg">
           <i data-lucide="github" style="width:18px;height:18px;"></i>
           View on GitHub
         </a>
