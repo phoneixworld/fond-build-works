@@ -26,6 +26,7 @@ interface ProjectContextType {
   saveProject: (updates: Partial<Pick<Project, "name" | "html_content" | "chat_history" | "tech_stack">>) => Promise<void>;
   deleteProject: (id: string) => Promise<void>;
   refreshProjects: () => Promise<void>;
+  clearCurrentProject: () => void;
 }
 
 const ProjectContext = createContext<ProjectContextType | null>(null);
@@ -181,8 +182,12 @@ export const ProjectProvider = ({ children }: { children: ReactNode }) => {
     });
   }, [currentProject, toast]);
 
+  const clearCurrentProject = useCallback(() => {
+    setCurrentProject(null);
+  }, []);
+
   return (
-    <ProjectContext.Provider value={{ projects, currentProject, loading, selectProject, createProject, cloneProject, saveProject, deleteProject, refreshProjects: fetchProjects }}>
+    <ProjectContext.Provider value={{ projects, currentProject, loading, selectProject, createProject, cloneProject, saveProject, deleteProject, refreshProjects: fetchProjects, clearCurrentProject }}>
       {children}
     </ProjectContext.Provider>
   );
