@@ -111,34 +111,36 @@ const SandpackPreview = ({ viewport, showConsole = false }: SandpackPreviewProps
   }), [sandpackDeps]);
 
   return (
-    <SandpackProvider
-      template="react"
-      theme="auto"
-      files={files}
-      customSetup={{
-        dependencies,
-      }}
-      options={{
-        externalResources: [
-          "https://cdn.tailwindcss.com",
-        ],
-        recompileMode: "delayed",
-        recompileDelay: 500,
-      }}
-    >
-      <div className="h-full flex flex-col" style={viewport ? { width: viewport.width, maxWidth: viewport.maxWidth } : {}}>
-        <SandpackPreviewPane
-          showOpenInCodeSandbox={false}
-          showRefreshButton={false}
-          style={{ flex: 1, minHeight: 0 }}
-        />
-        {showConsole && (
-          <div className="h-40 border-t border-border overflow-auto">
-            <SandpackConsole />
-          </div>
-        )}
-      </div>
-    </SandpackProvider>
+    <div className="h-full w-full" style={{ minHeight: 0 }}>
+      <SandpackProvider
+        template="react"
+        theme="auto"
+        files={files}
+        customSetup={{
+          dependencies,
+        }}
+        options={{
+          externalResources: [
+            "https://cdn.tailwindcss.com",
+          ],
+          recompileMode: "delayed",
+          recompileDelay: 500,
+        }}
+      >
+        <div className="h-full flex flex-col" style={viewport ? { width: viewport.width, maxWidth: viewport.maxWidth, height: '100%' } : { height: '100%' }}>
+          <SandpackPreviewPane
+            showOpenInCodeSandbox={false}
+            showRefreshButton={false}
+            style={{ flex: 1, minHeight: 0, height: '100%' }}
+          />
+          {showConsole && (
+            <div className="h-40 border-t border-border overflow-auto">
+              <SandpackConsole />
+            </div>
+          )}
+        </div>
+      </SandpackProvider>
+    </div>
   );
 };
 
