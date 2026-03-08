@@ -12,6 +12,7 @@ import ChatPanel from "@/components/ChatPanel";
 // ProjectList removed — projects accessed from landing page
 import CodeEditor from "@/components/CodeEditor";
 import PreviewPanel from "@/components/PreviewPanel";
+import PublishExportButtons from "@/components/PublishExportButtons";
 import LandingPage from "@/components/LandingPage";
 
 const IDELayout = () => {
