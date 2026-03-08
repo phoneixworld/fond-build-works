@@ -369,8 +369,27 @@ const IDELayout = () => {
             </div>
           </div>
 
-          {/* Right: Cmd+K hint + Publish + User */}
+          {/* Right: Presence + Cmd+K + Publish + User */}
           <div className="flex items-center gap-1.5 shrink-0">
+            {/* Real-time presence */}
+            <PresenceAvatars
+              onlineUsers={onlineUsers}
+              currentUserEmail={user?.email || ""}
+              myColor={myColor}
+              onToggleChat={() => setTeamChatOpen(!teamChatOpen)}
+            />
+            <div className="w-px h-4 bg-border mx-0.5" />
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  onClick={() => setTeamChatOpen(!teamChatOpen)}
+                  className="p-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors relative"
+                >
+                  <MessageCircle className="w-3.5 h-3.5" />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent side="bottom" className="text-xs">Team Chat</TooltipContent>
+            </Tooltip>
             <Tooltip>
               <TooltipTrigger asChild>
                 <button
