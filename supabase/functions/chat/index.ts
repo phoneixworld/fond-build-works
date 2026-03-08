@@ -8,7 +8,7 @@ const corsHeaders = {
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY")!;
 
-function buildSystemPrompt(projectId: string, techStack: string): string {
+function buildSystemPrompt(projectId: string, techStack: string, schemas?: any[]): string {
   const apiBase = `${SUPABASE_URL}/functions/v1`;
 
   const dataApiDocs = `
@@ -92,6 +92,21 @@ TECH STACK: ${techStackInstructions[techStack] || techStackInstructions["html-ta
 
 ${dataApiDocs}
 
+${schemas && schemas.length > 0 ? `
+## DEFINED DATA MODELS
+
+The customer has defined the following data models. You MUST use these exact collection names and fields when building features that involve data:
+
+${schemas.map((s: any) => {
+  const fields = s.schema?.fields || [];
+  const fieldList = fields.map((f: any) => `  - ${f.name} (${f.type}${f.required ? ', required' : ''})`).join('\n');
+  return `### Collection: "${s.collection_name}"
+${fieldList || '  (no fields defined)'}`;
+}).join('\n\n')}
+
+IMPORTANT: When the user asks to build something related to these data models, use the Data API with these exact collection names and field names. Pre-populate forms with these fields. Use the correct field types for input validation.
+` : ''}
+
 RULES:
 - ALWAYS include the html-preview code fence when building something.
 - The HTML must be a COMPLETE standalone page.
@@ -103,18 +118,19 @@ RULES:
 - When modifying, generate the FULL updated HTML.
 - Use lucide icons: <script src="https://unpkg.com/lucide@latest"></script> and <i data-lucide="icon-name"></i> with <script>lucide.createIcons()</script>.
 - CRITICAL: For any app needing data (todos, notes, CRM, etc.), USE THE DATA API. Make it persist data for real.
-- For apps needing user accounts, USE THE AUTH API with signup/login forms.`;
+- For apps needing user accounts, USE THE AUTH API with signup/login forms.
+${schemas && schemas.length > 0 ? '- CRITICAL: Use the DEFINED DATA MODELS above for collection names and fields. Do NOT invent your own field names.' : ''}`;
 }
 
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
-    const { messages, project_id, tech_stack } = await req.json();
+    const { messages, project_id, tech_stack, schemas } = await req.json();
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY is not configured");
 
-    const systemPrompt = buildSystemPrompt(project_id || "unknown", tech_stack || "html-tailwind");
+    const systemPrompt = buildSystemPrompt(project_id || "unknown", tech_stack || "html-tailwind", schemas);
 
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",

@@ -4,6 +4,7 @@ import { streamChat } from "@/lib/streamChat";
 import { motion, AnimatePresence } from "framer-motion";
 import { usePreview } from "@/contexts/PreviewContext";
 import { useProjects } from "@/contexts/ProjectContext";
+import { supabase } from "@/integrations/supabase/client";
 
 type Msg = { role: "user" | "assistant"; content: string };
 
@@ -89,10 +90,21 @@ const ChatPanel = ({ initialPrompt }: { initialPrompt?: string }) => {
     };
 
     try {
+      // Fetch schemas for this project
+      let schemas: any[] = [];
+      try {
+        const { data } = await supabase
+          .from("project_schemas" as any)
+          .select("collection_name, schema")
+          .eq("project_id", currentProject.id);
+        schemas = data || [];
+      } catch {}
+
       await streamChat({
         messages: [...messages, userMsg],
         projectId: currentProject.id,
         techStack: currentProject.tech_stack || "html-tailwind",
+        schemas,
         onDelta: upsert,
         onDone: () => {
           setIsLoading(false);
