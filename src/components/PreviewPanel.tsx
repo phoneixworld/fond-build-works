@@ -1,8 +1,9 @@
 import { Globe, RefreshCw, ExternalLink, Loader2, Monitor, Tablet, Smartphone } from "lucide-react";
-import { useState } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import { usePreview } from "@/contexts/PreviewContext";
 import { motion, AnimatePresence } from "framer-motion";
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from "@/components/ui/tooltip";
+import DirectTouch, { DIRECT_TOUCH_SCRIPT } from "@/components/DirectTouch";
 
 const VIEWPORTS = [
   { id: "desktop", label: "Desktop", icon: Monitor, width: "100%", maxWidth: "none" },
