@@ -1,5 +1,5 @@
 import { useState, forwardRef, useImperativeHandle } from "react";
-import { Globe, Download, Check, Copy, Loader2, ExternalLink, Link2 } from "lucide-react";
+import { Globe, Download, Check, Copy, Loader2, ExternalLink, Link2, Shield, ArrowRight, AlertCircle } from "lucide-react";
 import { useProjects } from "@/contexts/ProjectContext";
 import { usePreview } from "@/contexts/PreviewContext";
 import { useVirtualFS } from "@/contexts/VirtualFSContext";
