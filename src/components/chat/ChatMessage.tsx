@@ -513,6 +513,9 @@ const ChatMessage = ({ content, role, timestamp, isLoading, onEdit, onRegenerate
                 }
               })}
             </div>
+            
+            {/* Suggestion buttons */}
+            <SuggestionButtons suggestions={suggestions} onClick={onSuggestionClick} />
           </div>
         </div>
       )}
