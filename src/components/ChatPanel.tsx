@@ -542,6 +542,15 @@ const ChatPanel = forwardRef<ChatPanelHandle, { initialPrompt?: string; onVersio
 
       const themeInfo = DESIGN_THEMES.find(t => t.id === selectedTheme);
       
+      // Phase 2: Auto-detect matching template for the user's prompt
+      const userText = typeof text === "string" ? text : "";
+      const matchedTemplate = messages.length === 0 ? matchTemplate(userText) : null;
+      let templateCtx = "";
+      if (matchedTemplate) {
+        templateCtx = `## MATCHED TEMPLATE: ${matchedTemplate.name}\n\nUse this as your structural blueprint:\n${matchedTemplate.blueprint}\n\nCustomize the content, colors, and details based on the user's specific request. Do NOT copy the blueprint literally — adapt it creatively.`;
+        console.log(`[Template Matched] ${matchedTemplate.emoji} ${matchedTemplate.name}`);
+      }
+      
       await streamChat({
         messages: apiMessages,
         projectId: currentProject.id,
@@ -550,6 +559,7 @@ const ChatPanel = forwardRef<ChatPanelHandle, { initialPrompt?: string; onVersio
         model: selectedModel,
         designTheme: themeInfo?.prompt,
         knowledge,
+        templateContext: templateCtx || undefined,
         onDelta: upsert,
         onDone: () => {
           setIsLoading(false);
