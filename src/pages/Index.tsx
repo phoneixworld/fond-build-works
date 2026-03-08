@@ -58,6 +58,8 @@ const PANEL_COMPONENTS: Record<string, React.FC<any>> = {
   brandkit: BrandKitGenerator,
   abtesting: ABTesting,
   plugins: PluginMarketplace,
+  whitelabel: WhiteLabelPanel,
+  plugins: PluginMarketplace,
 };
 
 const IDELayout = () => {
