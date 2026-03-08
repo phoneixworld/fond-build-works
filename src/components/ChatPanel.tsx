@@ -144,6 +144,9 @@ const ChatPanel = ({ initialPrompt }: { initialPrompt?: string }) => {
     }
   }, [input, isLoading, messages, currentProject, createProject, saveProject, setPreviewHtml, setIsBuilding, setBuildStep]);
 
+  // Keep ref in sync for auto-send
+  sendRef.current = send;
+
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(); }
   };
