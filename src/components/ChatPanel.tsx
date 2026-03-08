@@ -814,7 +814,8 @@ const ChatPanel = forwardRef<ChatPanelHandle, { initialPrompt?: string; onVersio
       const displayChat = reactResult.files ? reactResult.chatText : chatText;
 
       if (!hasSetAnalyzing && fullResponse.length > 20) {
-        setBuildStep("Generating components...");
+        setBuildStep("🔨 Build agent: generating components...");
+        setPipelineStep("generating");
         hasSetAnalyzing = true;
       }
       
