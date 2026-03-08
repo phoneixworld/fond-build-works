@@ -441,14 +441,46 @@ When continuing a conversation (messages.length > 2), reference earlier context 
 - User built a todo app first → [CONTEXT: Extending your existing app structure]
 - User uses specific naming patterns → [CONTEXT: Following your naming convention]
 
-## QUALITY REFERENCE — Example of the quality bar you must hit
+## QUALITY ENFORCEMENT — These rules MUST be followed for EVERY generated app
 
-Here is a PARTIAL example of a well-built hero section. Your output must be AT LEAST this quality:
+### Navigation MUST work
+- Every \`<a href="#section">\` MUST have a matching \`<section id="section">\` or \`<div id="section">\`
+- Test mentally: if a user clicks every nav link, will they scroll somewhere? If not, fix it.
+- The brand/logo link should use \`href="#hero"\` or \`href="#top"\` and include \`<section id="hero">\` at the top.
+
+### JavaScript MUST be error-free
+- ALL querySelector calls MUST use optional chaining or null checks: \`document.querySelector('.x')?.classList.add('y')\`
+- ALL getElementById calls MUST check for null: \`const el = document.getElementById('x'); if (el) { ... }\`
+- Mobile menu toggle: always check the element exists before toggling classes
+- Event listeners on elements that might not exist: always guard with \`if (el)\`
+
+### Images MUST work
+- NEVER use external image URLs (Unsplash, Pexels, Pixabay, etc.) — they BREAK in iframe previews
+- Use SVG illustrations, CSS gradients, colored divs with Lucide icons, or emoji instead
+- For avatars: \`<div style="width:40px;height:40px;border-radius:50%;background:#6366f1;display:flex;align-items:center;justify-content:center;color:white;font-weight:600;">JD</div>\`
+- For hero visuals: CSS gradient backgrounds, decorative blobs, or inline SVG art
+- For cards/products: colored placeholder with icon: \`<div style="height:200px;background:linear-gradient(135deg,#f0f9ff,#e0f2fe);display:flex;align-items:center;justify-content:center;border-radius:12px;"><i data-lucide="package" style="width:48px;height:48px;color:#0ea5e9;"></i></div>\`
+
+### Interactive elements MUST have feedback
+- Buttons: hover states, active states, focus rings
+- Cards: hover lift effect (transform + shadow transition)
+- Form inputs: focus ring, placeholder text, proper labels
+- Navigation: active state indicator for current section
+
+### The app MUST feel complete
+- No "Lorem ipsum" — use realistic content
+- No dead links — every link goes somewhere
+- No missing icons — use Lucide icons extensively
+- No generic styling — every app has a custom color palette
+- Footer with real-looking content (company links, social icons, copyright)
+- At least one animation or transition that adds polish
+
+## QUALITY REFERENCE — Example of minimum acceptable hero section
 
 \`\`\`html
-<!-- Example quality reference — DO NOT copy this verbatim, use as quality benchmark -->
+<!-- Quality benchmark — adapt style, don't copy verbatim -->
 <nav class="ui-navbar">
-  <a href="#" class="ui-navbar-brand">
+  <a href="#hero" class="ui-navbar-brand">
     <div style="width:32px;height:32px;border-radius:10px;background:linear-gradient(135deg,#6366f1,#ec4899);display:flex;align-items:center;justify-content:center;">
       <i data-lucide="zap" style="width:18px;height:18px;color:white;"></i>
     </div>
@@ -457,7 +489,7 @@ Here is a PARTIAL example of a well-built hero section. Your output must be AT L
   <div class="ui-navbar-links">
     <a href="#features" class="ui-navbar-link ui-navbar-link-active">Product</a>
     <a href="#pricing" class="ui-navbar-link">Pricing</a>
-    <a href="#docs" class="ui-navbar-link">Docs</a>
+    <a href="#contact" class="ui-navbar-link">Contact</a>
   </div>
   <div class="ui-navbar-actions">
     <a href="#login" class="ui-btn ui-btn-ghost ui-btn-sm">Sign in</a>
@@ -466,35 +498,29 @@ Here is a PARTIAL example of a well-built hero section. Your output must be AT L
 </nav>
 
 <section id="hero" class="ui-hero" style="position:relative;overflow:hidden;">
-  <!-- Decorative gradient blob -->
   <div style="position:absolute;top:-120px;left:50%;transform:translateX(-50%);width:600px;height:600px;background:radial-gradient(circle,rgba(99,102,241,0.15),transparent 70%);pointer-events:none;"></div>
-  
   <div class="ui-container" style="position:relative;z-index:1;">
     <div class="ui-animate-slide-up">
       <span class="ui-badge ui-badge-primary" style="margin-bottom:16px;">✨ Now in public beta</span>
-      <h1 class="ui-hero-title">
-        Build apps <span class="ui-text-gradient">10x faster</span><br>with AI
-      </h1>
-      <p class="ui-hero-subtitle">
-        Ship production-ready web apps in minutes, not months. 
-        Our AI understands your vision and writes clean, maintainable code.
-      </p>
+      <h1 class="ui-hero-title">Build apps <span class="ui-text-gradient">10x faster</span><br>with AI</h1>
+      <p class="ui-hero-subtitle">Ship production-ready web apps in minutes, not months.</p>
       <div class="ui-hero-actions">
         <a href="#signup" class="ui-btn ui-btn-primary ui-btn-lg">
-          <i data-lucide="play" style="width:18px;height:18px;"></i>
-          Start Building Free
+          <i data-lucide="play" style="width:18px;height:18px;"></i> Start Building Free
         </a>
-        <a href="#github" class="ui-btn ui-btn-secondary ui-btn-lg">
-          <i data-lucide="github" style="width:18px;height:18px;"></i>
-          View on GitHub
-        </a>
+        <a href="#features" class="ui-btn ui-btn-secondary ui-btn-lg">Learn More</a>
       </div>
     </div>
   </div>
 </section>
+
+<!-- EVERY section referenced in nav MUST exist -->
+<section id="features">...</section>
+<section id="pricing">...</section>
+<section id="contact">...</section>
 \`\`\`
 
-Notice: semantic HTML, ui-kit classes, decorative elements, gradient text, badge, icons in buttons, staggered animation, realistic content. THIS is the minimum quality bar.`;
+Notice: NO external images, ALL links have matching sections, optional chaining in JS, realistic content, decorative elements, proper animations. THIS is the minimum quality bar.`;
 }
 
 serve(async (req) => {
