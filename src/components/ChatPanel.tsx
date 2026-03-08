@@ -586,39 +586,35 @@ const ChatPanel = forwardRef<ChatPanelHandle, { initialPrompt?: string; onVersio
     });
   }, [isHealing, healAttempts, previewErrors]);
 
-  // Analyze prompt for follow-up questions
-  const analyzePrompt = useCallback(async (prompt: string): Promise<boolean> => {
-    // Skip for very short prompts or auto-fix messages
-    if (prompt.length < 20 || prompt.startsWith("🔧 AUTO-FIX")) return false;
+  // Classify intent using the dedicated classifier agent
+  const classifyUserIntent = useCallback(async (prompt: string): Promise<{ intent: AgentIntent; questions?: any[] } | null> => {
+    if (prompt.length < 15 || prompt.startsWith("🔧 AUTO-FIX") || prompt.startsWith("🔧")) return null;
     
     const hasHistory = messagesRef.current.length > 0;
+    const hasExistingCode = !!(currentSandpackFiles && Object.keys(currentSandpackFiles).length > 0) || !!(currentPreviewHtml && currentPreviewHtml.length > 0);
     
     setIsAnalyzing(true);
+    setPipelineStep("classifying");
     try {
-      const resp = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/analyze-prompt`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
-        },
-        body: JSON.stringify({ prompt, hasHistory }),
-      });
-      if (!resp.ok) { setIsAnalyzing(false); return false; }
-      const result = await resp.json();
+      const result = await classifyIntent(prompt, hasHistory, hasExistingCode);
       setAnalysisResult(result);
-      if (result.action === "ask" && result.questions?.length > 0) {
+      
+      if (result.intent === "clarify" && result.questions?.length) {
         setFollowUpQuestions(result.questions);
         setPendingFollowUpPrompt(prompt);
         setIsAnalyzing(false);
-        return true;
+        setPipelineStep(null);
+        return { intent: "clarify", questions: result.questions };
       }
+      
       setIsAnalyzing(false);
-      return false;
+      return { intent: result.intent };
     } catch {
       setIsAnalyzing(false);
-      return false;
+      setPipelineStep(null);
+      return null;
     }
-  }, []);
+  }, [currentSandpackFiles, currentPreviewHtml]);
 
   const handleFollowUpAnswer = (questionId: string, value: string) => {
     setFollowUpAnswers(prev => ({ ...prev, [questionId]: value }));
