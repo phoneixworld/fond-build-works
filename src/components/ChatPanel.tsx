@@ -1158,13 +1158,12 @@ const ChatPanel = forwardRef<ChatPanelHandle, { initialPrompt?: string; onVersio
 
   const handleSmartSend = useCallback(async (text: string, images: string[] = []) => {
     if (!text && images.length === 0) return;
-    if (isSendingRef.current || isLoadingRef.current) return; // FIX: guard
+    if (isSendingRef.current || isLoadingRef.current) return;
     const finalText = text || "Replicate this design";
     
-    // Only analyze for clarifying questions on the FIRST message (no history)
-    // Follow-up messages should always go straight to build
-    const hasHistory = messagesRef.current.length > 0;
-    if (!hasHistory && images.length === 0 && finalText.length >= 20) {
+    // Analyze prompt for clarifying questions — edge function dynamically decides
+    // Skip for: very short prompts, image-only, or auto-fix messages
+    if (images.length === 0 && finalText.length >= 30 && !finalText.startsWith("🔧")) {
       const needsQuestions = await analyzePrompt(finalText);
       if (needsQuestions) return;
     }
