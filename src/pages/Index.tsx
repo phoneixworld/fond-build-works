@@ -384,6 +384,8 @@ const IDELayout = () => {
                 <ProjectBrain />
               ) : rightPanel === "pulse" ? (
                 <PulseAnalytics />
+              ) : rightPanel === "crew" ? (
+                <CrewSpaces />
               ) : rightPanel === "history" ? (
                 <VersionHistory
                   versions={versions}
