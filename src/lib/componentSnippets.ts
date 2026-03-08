@@ -1,8 +1,8 @@
 /**
- * Phase 2: Component Snippets Library
+ * Component Snippets Library
  * 
  * Reusable section blueprints the AI can mix-and-match.
- * These are compact structural descriptions, not full HTML.
+ * Updated to leverage DaisyUI component classes where applicable.
  */
 
 export interface ComponentSnippet {

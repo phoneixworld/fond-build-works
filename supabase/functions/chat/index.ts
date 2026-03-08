@@ -57,8 +57,45 @@ POST JSON with:
 IMPORTANT: When building apps that need data persistence (todo lists, forms, dashboards, etc.), ALWAYS use the Data API. When building apps that need user accounts, ALWAYS use the Auth API. Make the app FULLY FUNCTIONAL with real data persistence.`;
 
   const techStackInstructions: Record<string, string> = {
-    "html-tailwind": `Use HTML + Tailwind CSS (via CDN). Include <script src="https://cdn.tailwindcss.com"></script>.
-Configure a custom Tailwind theme with your chosen color palette.
+    "html-tailwind": `Use HTML + Tailwind CSS + DaisyUI (via CDN). Include BOTH in <head>:
+<link href="https://cdn.jsdelivr.net/npm/daisyui@4/dist/full.min.css" rel="stylesheet" type="text/css" />
+<script src="https://cdn.tailwindcss.com"></script>
+
+## DaisyUI Component Library — USE THESE!
+DaisyUI gives you pre-built, beautiful components via CSS classes. ALWAYS prefer DaisyUI classes over hand-rolling components:
+
+### Buttons: btn btn-primary, btn-secondary, btn-accent, btn-ghost, btn-outline, btn-lg, btn-sm, btn-xs
+### Cards: card bg-base-100 shadow-xl → card-body → card-title + card-actions
+### Modals: dialog (use <dialog> element) → modal-box → modal-action
+### Tabs: tabs tabs-boxed → tab tab-active
+### Drawers: drawer → drawer-toggle + drawer-content + drawer-side
+### Navbar: navbar bg-base-100 → navbar-start + navbar-center + navbar-end
+### Footer: footer → footer-title
+### Hero: hero → hero-content → hero-overlay
+### Stats: stats shadow → stat → stat-title + stat-value + stat-desc
+### Steps: steps → step step-primary
+### Badges: badge badge-primary, badge-secondary, badge-accent, badge-outline
+### Alerts: alert alert-info, alert-success, alert-warning, alert-error
+### Avatar: avatar → w-12 rounded-full
+### Collapse/Accordion: collapse collapse-arrow bg-base-200
+### Dropdown: dropdown → dropdown-content menu
+### Toast: toast → alert
+### Table: table table-zebra
+### Toggle: toggle toggle-primary
+### Range: range range-primary
+### Rating: rating → input type="radio" with mask-star-2
+### Carousel: carousel → carousel-item
+### Chat Bubbles: chat chat-start/chat-end → chat-bubble
+### Timeline: timeline → timeline-start + timeline-middle + timeline-end
+### Skeleton: skeleton w-32 h-32
+
+### DaisyUI Themes — set on <html data-theme="...">
+Available: light, dark, cupcake, bumblebee, emerald, corporate, synthwave, retro, cyberpunk, valentine, halloween, garden, forest, aqua, lofi, pastel, fantasy, wireframe, black, luxury, dracula, cmyk, autumn, business, acid, lemonade, night, coffee, winter, dim, nord, sunset
+
+IMPORTANT: Set the theme on the <html> tag: <html data-theme="light"> or whichever fits the design.
+Use DaisyUI's semantic color classes: bg-primary, bg-secondary, bg-accent, bg-neutral, bg-base-100/200/300, text-primary-content, etc.
+
+Configure a custom Tailwind theme with your chosen color palette on top of DaisyUI.
 
 ## ES MODULES — Use Real npm Packages!
 You can import ANY npm package using ES modules via esm.sh. This is POWERFUL — use it!
