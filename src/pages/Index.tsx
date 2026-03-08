@@ -13,6 +13,7 @@ import CodeEditor from "@/components/CodeEditor";
 import PreviewPanel from "@/components/PreviewPanel";
 
 const Index = () => {
+  const { user, signOut } = useAuth();
   const [selectedFile, setSelectedFile] = useState("App.tsx");
   const [rightPanel, setRightPanel] = useState<"code" | "preview">("preview");
 
