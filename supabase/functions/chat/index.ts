@@ -164,61 +164,70 @@ Now you can write: html\`<div className="p-4"><h1>Hello \${name}</h1></div>\`
 This gives you JSX-like syntax without a build step!`,
 
     "html-bootstrap": `Use HTML + Bootstrap 5 (via CDN). Include Bootstrap CSS and JS from CDN. You can also use ES modules via esm.sh for complex functionality.`,
-    "react-cdn": `Use React via ES modules with htm for JSX-like templates. Include this setup:
+    "react-cdn": `You generate REAL React JSX code that runs in a Sandpack bundler with full npm support.
 
-<script src="https://cdn.tailwindcss.com"></script>
-<script type="importmap">
+## OUTPUT FORMAT — CRITICAL
+Instead of \`\`\`html-preview, wrap your output in a \`\`\`react-preview fence.
+Inside, use --- filename markers to define each file:
+
+\`\`\`react-preview
+--- /App.jsx
+import React, { useState } from "react";
+
+export default function App() {
+  const [count, setCount] = useState(0);
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-gray-50">
+      <button className="px-6 py-3 bg-indigo-600 text-white rounded-xl" onClick={() => setCount(c => c + 1)}>
+        Count: {count}
+      </button>
+    </div>
+  );
+}
+--- /components/Header.jsx
+import React from "react";
+
+export default function Header({ title }) {
+  return <header className="p-4 bg-white shadow"><h1 className="text-xl font-bold">{title}</h1></header>;
+}
+--- dependencies
 {
-  "imports": {
-    "react": "https://esm.sh/react@18",
-    "react-dom/client": "https://esm.sh/react-dom@18/client",
-    "react/jsx-runtime": "https://esm.sh/react@18/jsx-runtime",
-    "htm": "https://esm.sh/htm@3"
-  }
+  "lucide-react": "^0.400.0",
+  "framer-motion": "^11.0.0"
 }
-</script>
+\`\`\`
 
-<div id="root"></div>
-<script type="module">
-import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
-import { createRoot } from 'react-dom/client';
-import htm from 'htm';
-const html = htm.bind(React.createElement);
-
-function App() {
-  const [state, setState] = useState(initialValue);
-  return html\`<div className="p-8">...</div>\`;
-}
-
-createRoot(document.getElementById('root')).render(html\`<\${App} />\`);
-</script>
-
-You can import ANY npm package via esm.sh. For example:
-- Charts: import { Chart } from 'https://esm.sh/chart.js@4/auto';
-- Icons: import { icons } from 'https://esm.sh/lucide@0.400';
-- Animation: import { motion } from 'https://esm.sh/framer-motion@11';
-- State: import { create } from 'https://esm.sh/zustand@4';
-
-Build REAL React apps with hooks, state management, and npm packages. This is NOT a toy — build production-quality React applications.`,
+## RULES
+- Write standard JSX (not React.createElement) — the bundler compiles it
+- Use .jsx extension for all component files
+- The entry point is /App.jsx — it MUST export a default component
+- You can create as many component files as needed under /components/
+- Import npm packages normally: import { motion } from "framer-motion"
+- Tailwind CSS is available via CDN — use className with Tailwind classes
+- For additional npm packages, include a --- dependencies section with a JSON object
+- Available by default: react, react-dom, lucide-react, framer-motion, date-fns, recharts, react-router-dom, clsx, tailwind-merge
+- Use Lucide React icons: import { Heart, Star } from "lucide-react"
+- NEVER use DaisyUI in React mode — use Tailwind utilities directly for styling
+- Build production-quality components with proper props, state, and composition
+- Use React Router for multi-page apps: import { BrowserRouter, Routes, Route } from "react-router-dom"`,
 
     "vue-cdn": `Use Vue 3 via CDN with Tailwind. Use Composition API with setup(). You can also import npm packages via esm.sh.`,
     "vanilla-js": `Use plain HTML, CSS, and vanilla JavaScript. No frameworks. Clean, semantic HTML. You can use ES modules via esm.sh for utility libraries.`,
-    "react-node": `Use HTML + Tailwind CSS + React via ES modules (same as html-tailwind stack). 
+    "react-node": `Use the \`\`\`react-preview format (same as react-cdn stack) for the frontend.
 For backend/data needs, use the Data API and Auth API described above.
-IMPORTANT: Everything runs in a browser preview iframe. Generate a SINGLE complete index.html file. 
-NEVER tell users to run terminal commands, install dependencies, or start servers.
-You can import ANY npm package via esm.sh. Use the same ES modules approach as html-tailwind.`,
-    "react-python": `Use HTML + Tailwind CSS + React via ES modules (same as html-tailwind stack).
-For backend/data needs, use the Data API and Auth API described above.
-IMPORTANT: Everything runs in a browser preview iframe. Generate a SINGLE complete index.html file.
+IMPORTANT: Everything runs in a browser preview. Generate React JSX files in react-preview fences.
 NEVER tell users to run terminal commands, install dependencies, or start servers.`,
-    "react-go": `Use HTML + Tailwind CSS + React via ES modules (same as html-tailwind stack).
+    "react-python": `Use the \`\`\`react-preview format (same as react-cdn stack) for the frontend.
 For backend/data needs, use the Data API and Auth API described above.
-IMPORTANT: Everything runs in a browser preview iframe. Generate a SINGLE complete index.html file.
+IMPORTANT: Everything runs in a browser preview. Generate React JSX files in react-preview fences.
 NEVER tell users to run terminal commands, install dependencies, or start servers.`,
-    "nextjs": `Use HTML + Tailwind CSS + React via ES modules (same as html-tailwind stack).
+    "react-go": `Use the \`\`\`react-preview format (same as react-cdn stack) for the frontend.
 For backend/data needs, use the Data API and Auth API described above.
-IMPORTANT: Everything runs in a browser preview iframe. Generate a SINGLE complete index.html file.
+IMPORTANT: Everything runs in a browser preview. Generate React JSX files in react-preview fences.
+NEVER tell users to run terminal commands, install dependencies, or start servers.`,
+    "nextjs": `Use the \`\`\`react-preview format (same as react-cdn stack) for the frontend.
+For backend/data needs, use the Data API and Auth API described above.
+IMPORTANT: Everything runs in a browser preview. Generate React JSX files in react-preview fences.
 NEVER tell users to run terminal commands, install dependencies, or start servers.`,
   };
 
@@ -455,8 +464,10 @@ IMPORTANT: Proactively detect when an app needs backend functionality and USE IT
 When you detect backend needs, implement the API calls directly. Don't ask — just build it functional.
 
 ## CRITICAL RULES
-- ALWAYS generate a SINGLE complete index.html file inside a \`\`\`html-preview code fence. The HTML must be standalone and work in a browser iframe.
-- NEVER generate multi-file projects. NEVER tell users to run npm, pip, go, or any terminal commands. NEVER mention "open your terminal", "install dependencies", or "start the server". Everything runs in the browser preview.
+- For HTML stacks (html-tailwind, html-bootstrap, vanilla-js, vue-cdn): Generate a SINGLE complete index.html file inside a \`\`\`html-preview code fence.
+- For React stack (react-cdn): Generate React JSX files inside a \`\`\`react-preview code fence with --- filename markers. The entry point is /App.jsx.
+- For fullstack stacks (react-node, react-python, react-go, nextjs): Use the \`\`\`react-preview format for the frontend, and the Data API for backend persistence.
+- NEVER tell users to run npm, pip, go, or any terminal commands. NEVER mention "open your terminal", "install dependencies", or "start the server". Everything runs in the browser preview.
 - NEVER say "a direct preview isn't possible" — it IS always possible because you generate self-contained HTML.
 - If the user is just chatting, respond conversationally WITHOUT the code fence
 - When modifying, generate the FULL updated code (not partial patches)

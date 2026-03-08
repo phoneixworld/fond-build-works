@@ -1,23 +1,47 @@
 import { createContext, useContext, useState, ReactNode } from "react";
 
+export interface SandpackFileSet {
+  [path: string]: string;
+}
+
 interface PreviewContextType {
+  // Legacy HTML preview
   previewHtml: string;
   setPreviewHtml: (html: string) => void;
+  // Sandpack React preview
+  sandpackFiles: SandpackFileSet | null;
+  setSandpackFiles: (files: SandpackFileSet | null) => void;
+  sandpackDeps: Record<string, string>;
+  setSandpackDeps: (deps: Record<string, string>) => void;
+  // Build state
   isBuilding: boolean;
   setIsBuilding: (building: boolean) => void;
   buildStep: string;
   setBuildStep: (step: string) => void;
+  // Mode
+  previewMode: "html" | "sandpack";
+  setPreviewMode: (mode: "html" | "sandpack") => void;
 }
 
 const PreviewContext = createContext<PreviewContextType | null>(null);
 
 export const PreviewProvider = ({ children }: { children: ReactNode }) => {
   const [previewHtml, setPreviewHtml] = useState("");
+  const [sandpackFiles, setSandpackFiles] = useState<SandpackFileSet | null>(null);
+  const [sandpackDeps, setSandpackDeps] = useState<Record<string, string>>({});
   const [isBuilding, setIsBuilding] = useState(false);
   const [buildStep, setBuildStep] = useState("");
+  const [previewMode, setPreviewMode] = useState<"html" | "sandpack">("html");
 
   return (
-    <PreviewContext.Provider value={{ previewHtml, setPreviewHtml, isBuilding, setIsBuilding, buildStep, setBuildStep }}>
+    <PreviewContext.Provider value={{
+      previewHtml, setPreviewHtml,
+      sandpackFiles, setSandpackFiles,
+      sandpackDeps, setSandpackDeps,
+      isBuilding, setIsBuilding,
+      buildStep, setBuildStep,
+      previewMode, setPreviewMode,
+    }}>
       {children}
     </PreviewContext.Provider>
   );

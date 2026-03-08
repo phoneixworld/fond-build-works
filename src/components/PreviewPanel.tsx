@@ -1,9 +1,10 @@
-import { Globe, RefreshCw, ExternalLink, Loader2, Monitor, Tablet, Smartphone } from "lucide-react";
-import { useState, useCallback, useEffect, useRef } from "react";
+import { Globe, RefreshCw, ExternalLink, Loader2, Monitor, Tablet, Smartphone, Code2, FileText } from "lucide-react";
+import { useState, useCallback, useRef } from "react";
 import { usePreview } from "@/contexts/PreviewContext";
 import { motion, AnimatePresence } from "framer-motion";
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from "@/components/ui/tooltip";
 import DirectTouch, { DIRECT_TOUCH_SCRIPT } from "@/components/DirectTouch";
+import SandpackPreview from "@/components/SandpackPreview";
 
 const VIEWPORTS = [
   { id: "desktop", label: "Desktop", icon: Monitor, width: "100%", maxWidth: "none" },
@@ -18,7 +19,7 @@ const PreviewPanel = () => {
   const [viewport, setViewport] = useState<ViewportId>("desktop");
   const [directTouchActive, setDirectTouchActive] = useState(false);
   const iframeRef = useRef<HTMLIFrameElement>(null);
-  const { previewHtml, isBuilding, buildStep } = usePreview();
+  const { previewHtml, isBuilding, buildStep, previewMode, setPreviewMode, sandpackFiles } = usePreview();
 
   const toggleDirectTouch = useCallback(() => {
     const next = !directTouchActive;
@@ -29,6 +30,8 @@ const PreviewPanel = () => {
   }, [directTouchActive]);
 
   const currentViewport = VIEWPORTS.find(v => v.id === viewport)!;
+
+  const hasContent = previewMode === "sandpack" ? !!sandpackFiles : !!previewHtml;
 
   return (
     <TooltipProvider delayDuration={300}>
@@ -50,6 +53,40 @@ const PreviewPanel = () => {
           <div className="flex items-center gap-2 flex-1 bg-secondary rounded-md px-3 py-1">
             <Globe className="w-3 h-3 text-muted-foreground" />
             <span className="text-xs text-muted-foreground">my-app.lovable.app</span>
+          </div>
+
+          {/* Preview mode toggle */}
+          <div className="flex items-center gap-0.5 bg-secondary rounded-lg p-0.5">
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  onClick={() => setPreviewMode("html")}
+                  className={`p-1.5 rounded-md transition-all ${
+                    previewMode === "html"
+                      ? "bg-background text-foreground shadow-sm"
+                      : "text-muted-foreground hover:text-foreground"
+                  }`}
+                >
+                  <FileText className="w-3.5 h-3.5" />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent side="bottom" className="text-xs">HTML Preview</TooltipContent>
+            </Tooltip>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  onClick={() => setPreviewMode("sandpack")}
+                  className={`p-1.5 rounded-md transition-all ${
+                    previewMode === "sandpack"
+                      ? "bg-background text-foreground shadow-sm"
+                      : "text-muted-foreground hover:text-foreground"
+                  }`}
+                >
+                  <Code2 className="w-3.5 h-3.5" />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent side="bottom" className="text-xs">React Preview (Sandpack)</TooltipContent>
+            </Tooltip>
           </div>
 
           {/* Viewport toggles */}
@@ -77,7 +114,9 @@ const PreviewPanel = () => {
             })}
           </div>
 
-          <DirectTouch active={directTouchActive} onToggle={toggleDirectTouch} />
+          {previewMode === "html" && (
+            <DirectTouch active={directTouchActive} onToggle={toggleDirectTouch} />
+          )}
 
           <Tooltip>
             <TooltipTrigger asChild>
@@ -116,19 +155,32 @@ const PreviewPanel = () => {
 
         {/* Preview content */}
         <div className="flex-1 relative flex items-start justify-center overflow-auto bg-background">
-          {previewHtml ? (
-            <div
-              className="h-full transition-all duration-300 ease-in-out"
-              style={{
-                width: currentViewport.width,
-                maxWidth: currentViewport.maxWidth,
-                ...(viewport !== "desktop" ? { boxShadow: "0 0 0 1px hsl(var(--border))", borderRadius: "8px", margin: "12px 0" } : {}),
-              }}
-            >
-              <iframe
-                ref={iframeRef}
-                key={refreshKey}
-                srcDoc={`${previewHtml}
+          {previewMode === "sandpack" ? (
+            <div className="h-full w-full" key={`sandpack-${refreshKey}`}>
+              {sandpackFiles ? (
+                <SandpackPreview
+                  viewport={{ width: currentViewport.width, maxWidth: currentViewport.maxWidth }}
+                />
+              ) : (
+                <EmptyState />
+              )}
+            </div>
+          ) : (
+            // Legacy HTML iframe
+            <>
+              {previewHtml ? (
+                <div
+                  className="h-full transition-all duration-300 ease-in-out"
+                  style={{
+                    width: currentViewport.width,
+                    maxWidth: currentViewport.maxWidth,
+                    ...(viewport !== "desktop" ? { boxShadow: "0 0 0 1px hsl(var(--border))", borderRadius: "8px", margin: "12px 0" } : {}),
+                  }}
+                >
+                  <iframe
+                    ref={iframeRef}
+                    key={refreshKey}
+                    srcDoc={`${previewHtml}
 ${DIRECT_TOUCH_SCRIPT}
 <script>
 // === Enhanced Error Intelligence ===
@@ -188,26 +240,16 @@ ${DIRECT_TOUCH_SCRIPT}
   window.parent.postMessage({ type: 'preview-ready' }, '*');
 })();
 </script>`}
-                className="w-full h-full border-0 bg-white"
-                style={viewport !== "desktop" ? { borderRadius: "8px" } : {}}
-                title="Preview"
-                sandbox="allow-scripts allow-same-origin allow-popups allow-forms"
-              />
-            </div>
-          ) : (
-            <div className="flex items-center justify-center h-full w-full">
-              <div className="text-center space-y-4">
-                <div className="w-16 h-16 mx-auto rounded-2xl bg-gradient-to-br from-primary to-accent flex items-center justify-center">
-                  <span className="text-2xl font-bold text-primary-foreground">L</span>
+                    className="w-full h-full border-0 bg-white"
+                    style={viewport !== "desktop" ? { borderRadius: "8px" } : {}}
+                    title="Preview"
+                    sandbox="allow-scripts allow-same-origin allow-popups allow-forms"
+                  />
                 </div>
-                <div>
-                  <h1 className="text-2xl font-bold text-foreground">Welcome to Your App</h1>
-                  <p className="text-sm text-muted-foreground mt-1">
-                    Start building by chatting with the AI assistant
-                  </p>
-                </div>
-              </div>
-            </div>
+              ) : (
+                <EmptyState />
+              )}
+            </>
           )}
         </div>
 
@@ -221,5 +263,23 @@ ${DIRECT_TOUCH_SCRIPT}
     </TooltipProvider>
   );
 };
+
+function EmptyState() {
+  return (
+    <div className="flex items-center justify-center h-full w-full">
+      <div className="text-center space-y-4">
+        <div className="w-16 h-16 mx-auto rounded-2xl bg-gradient-to-br from-primary to-accent flex items-center justify-center">
+          <span className="text-2xl font-bold text-primary-foreground">L</span>
+        </div>
+        <div>
+          <h1 className="text-2xl font-bold text-foreground">Welcome to Your App</h1>
+          <p className="text-sm text-muted-foreground mt-1">
+            Start building by chatting with the AI assistant
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 export default PreviewPanel;

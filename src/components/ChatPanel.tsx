@@ -54,6 +54,50 @@ function parseResponse(text: string): [string, string | null] {
   return [chatPart, htmlCode.trim()];
 }
 
+/** Parse ```react-preview fences into a file map for Sandpack */
+function parseReactFiles(text: string): { chatText: string; files: Record<string, string> | null; deps: Record<string, string> } {
+  const files: Record<string, string> = {};
+  const deps: Record<string, string> = {};
+  let chatText = text;
+
+  // Match ```react-preview or ```jsx-preview blocks with --- filename.jsx markers
+  const reactFenceRegex = /```(?:react-preview|jsx-preview)\s*\n([\s\S]*?)```/g;
+  let match;
+  let firstFenceStart = -1;
+
+  while ((match = reactFenceRegex.exec(text)) !== null) {
+    if (firstFenceStart === -1) firstFenceStart = match.index;
+    const block = match[1];
+    
+    // Parse file sections: --- /App.jsx or --- App.jsx
+    const fileSections = block.split(/^---\s+/m).filter(Boolean);
+    for (const section of fileSections) {
+      const lines = section.split("\n");
+      const firstLine = lines[0].trim();
+      if (firstLine.match(/^\/?\w[\w/.-]*\.(jsx?|tsx?|css)$/)) {
+        const filename = firstLine.startsWith("/") ? firstLine : `/${firstLine}`;
+        files[filename] = lines.slice(1).join("\n").trim();
+      } else if (firstLine === "dependencies") {
+        // Parse deps block
+        try {
+          const depsJson = lines.slice(1).join("\n").trim();
+          Object.assign(deps, JSON.parse(depsJson));
+        } catch {}
+      }
+    }
+  }
+
+  if (firstFenceStart !== -1) {
+    chatText = text.slice(0, firstFenceStart).trim();
+  }
+
+  return {
+    chatText,
+    files: Object.keys(files).length > 0 ? files : null,
+    deps,
+  };
+}
+
 function postProcessHtml(html: string): string {
   if (!html) return html;
   
@@ -176,7 +220,7 @@ const ChatPanel = forwardRef<ChatPanelHandle, { initialPrompt?: string; onVersio
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const { setPreviewHtml, setIsBuilding, setBuildStep } = usePreview();
+  const { setPreviewHtml, setIsBuilding, setBuildStep, setSandpackFiles, setSandpackDeps, setPreviewMode } = usePreview();
   const { setFiles: setVirtualFiles } = useVirtualFS();
   const lastProjectIdRef = useRef<string | null>(null);
   const hasProcessedInitialRef = useRef(false);
@@ -448,6 +492,9 @@ const ChatPanel = forwardRef<ChatPanelHandle, { initialPrompt?: string; onVersio
     }
     setMessages([]);
     setPreviewHtml("");
+    setSandpackFiles(null);
+    setSandpackDeps({});
+    setPreviewMode("html");
     setPreviewErrors([]);
     setHealAttempts(0);
     setIsHealing(false);
@@ -496,25 +543,41 @@ const ChatPanel = forwardRef<ChatPanelHandle, { initialPrompt?: string; onVersio
       if (abortController.signal.aborted) return;
       fullResponse += chunk;
       setBuildStreamContent(fullResponse);
-      const [chatText, htmlCode] = parseResponse(fullResponse);
+      
+      // Try React files first, then HTML
+      const reactResult = parseReactFiles(fullResponse);
+      const [chatText, htmlCode] = reactResult.files ? [reactResult.chatText, null] : parseResponse(fullResponse);
+      const displayChat = reactResult.files ? reactResult.chatText : chatText;
 
       if (!hasSetAnalyzing && fullResponse.length > 20) {
         setBuildStep("Generating components...");
         hasSetAnalyzing = true;
       }
-      if (!hasSetBuilding && htmlCode) {
-        setBuildStep("Building your app...");
-        hasSetBuilding = true;
+      
+      if (reactResult.files) {
+        if (!hasSetBuilding) {
+          setBuildStep("Bundling React app...");
+          hasSetBuilding = true;
+        }
+        setSandpackFiles(reactResult.files);
+        if (Object.keys(reactResult.deps).length > 0) setSandpackDeps(reactResult.deps);
+        setPreviewMode("sandpack");
+      } else if (htmlCode) {
+        if (!hasSetBuilding) {
+          setBuildStep("Building your app...");
+          hasSetBuilding = true;
+        }
+        setPreviewHtml(postProcessHtml(htmlCode));
+        setPreviewMode("html");
       }
-      if (htmlCode) setPreviewHtml(postProcessHtml(htmlCode));
 
       setMessages((prev) => {
-        const displayText = chatText || "Building...";
+        const text = displayChat || "Building...";
         const last = prev[prev.length - 1];
         if (last?.role === "assistant") {
-          return prev.map((m, i) => (i === prev.length - 1 ? { ...m, content: displayText } : m));
+          return prev.map((m, i) => (i === prev.length - 1 ? { ...m, content: text } : m));
         }
-        return [...prev, { role: "assistant", content: displayText, timestamp: Date.now() }];
+        return [...prev, { role: "assistant", content: text, timestamp: Date.now() }];
       });
     };
 
@@ -600,37 +663,50 @@ const ChatPanel = forwardRef<ChatPanelHandle, { initialPrompt?: string; onVersio
         onDone: async () => {
           if (abortController.signal.aborted) return;
           
-          const { files: parsedFiles, html: htmlCode, chatText } = parseMultiFileOutput(fullResponse);
+          // Check for React file output first
+          const reactResult = parseReactFiles(fullResponse);
+          let finalHtml: string | null = null;
           
-          if (Object.keys(parsedFiles).length > 0) {
-            setVirtualFiles(parsedFiles);
-          }
-          
-          if (htmlCode) setPreviewHtml(postProcessHtml(htmlCode));
+          if (reactResult.files) {
+            // React/Sandpack mode
+            setSandpackFiles(reactResult.files);
+            if (Object.keys(reactResult.deps).length > 0) setSandpackDeps(reactResult.deps);
+            setPreviewMode("sandpack");
+            console.log("[Sandpack] Loaded React files:", Object.keys(reactResult.files));
+          } else {
+            // Legacy HTML mode
+            const { files: parsedFiles, html: htmlCode, chatText } = parseMultiFileOutput(fullResponse);
+            
+            if (Object.keys(parsedFiles).length > 0) {
+              setVirtualFiles(parsedFiles);
+            }
+            
+            if (htmlCode) setPreviewHtml(postProcessHtml(htmlCode));
 
-          // Self-review pass for first-time generations
-          let finalHtml = htmlCode;
-          if (htmlCode && htmlCode.length > 200 && currentMessages.length === 0) {
-            setBuildStep("Reviewing & polishing...");
-            try {
-              const reviewResp = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/review-code`, {
-                method: "POST",
-                headers: {
-                  "Content-Type": "application/json",
-                  Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
-                },
-                body: JSON.stringify({ html: htmlCode }),
-              });
-              if (reviewResp.ok) {
-                const reviewData = await reviewResp.json();
-                if (reviewData.reviewed && reviewData.html && reviewData.html.length > 200) {
-                  finalHtml = reviewData.html;
-                  setPreviewHtml(postProcessHtml(finalHtml));
-                  console.log("[Phase 3] Self-review pass applied improvements");
+            // Self-review pass for first-time generations
+            finalHtml = htmlCode;
+            if (htmlCode && htmlCode.length > 200 && currentMessages.length === 0) {
+              setBuildStep("Reviewing & polishing...");
+              try {
+                const reviewResp = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/review-code`, {
+                  method: "POST",
+                  headers: {
+                    "Content-Type": "application/json",
+                    Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+                  },
+                  body: JSON.stringify({ html: htmlCode }),
+                });
+                if (reviewResp.ok) {
+                  const reviewData = await reviewResp.json();
+                  if (reviewData.reviewed && reviewData.html && reviewData.html.length > 200) {
+                    finalHtml = reviewData.html;
+                    setPreviewHtml(postProcessHtml(finalHtml));
+                    console.log("[Phase 3] Self-review pass applied improvements");
+                  }
                 }
+              } catch (e) {
+                console.warn("[Phase 3] Review pass skipped:", e);
               }
-            } catch (e) {
-              console.warn("[Phase 3] Review pass skipped:", e);
             }
           }
 
@@ -668,9 +744,15 @@ const ChatPanel = forwardRef<ChatPanelHandle, { initialPrompt?: string; onVersio
             });
           }
 
+          // Extract final chat text for persistence
+          const finalChatText = reactResult.files ? reactResult.chatText : (() => {
+            const { chatText: ct } = parseMultiFileOutput(fullResponse);
+            return ct;
+          })();
+
           setMessages((prev) => {
-            const final = chatText
-              ? prev.map((m, i) => (i === prev.length - 1 && m.role === "assistant" ? { ...m, content: chatText } : m))
+            const final = finalChatText
+              ? prev.map((m, i) => (i === prev.length - 1 && m.role === "assistant" ? { ...m, content: finalChatText } : m))
               : prev;
 
             const persistMessages = final.map(m => ({
