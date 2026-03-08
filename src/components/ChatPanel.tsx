@@ -122,6 +122,7 @@ const ChatPanel = forwardRef<ChatPanelHandle, { initialPrompt?: string; onVersio
   const [isDragOver, setIsDragOver] = useState(false);
   const [showScrollBtn, setShowScrollBtn] = useState(false);
   const [elapsedTime, setElapsedTime] = useState(0);
+  const [buildStreamContent, setBuildStreamContent] = useState("");
   // Self-healing state
   const [healAttempts, setHealAttempts] = useState(0);
   const [isHealing, setIsHealing] = useState(false);
