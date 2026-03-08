@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect, useCallback, forwardRef, useImperativeHandle } from "react";
 import { Version } from "@/components/VersionHistory";
 import { Send, Bot, User, ChevronDown, Sparkles, AlertTriangle, Wand2, ImagePlus, X, Palette, ArrowDown, Clock, Zap, Trash2, ShieldCheck, MessageSquareMore, CheckCircle2, Pencil, RotateCcw, Upload } from "lucide-react";
+import VoiceInput from "@/components/VoiceInput";
 import { streamChat } from "@/lib/streamChat";
 import { AI_MODELS, DEFAULT_MODEL, PROMPT_SUGGESTIONS, QUICK_ACTIONS, DESIGN_THEMES, type AIModelId } from "@/lib/aiModels";
 import { motion, AnimatePresence } from "framer-motion";
@@ -1107,6 +1108,16 @@ const ChatPanel = forwardRef<ChatPanelHandle, { initialPrompt?: string; onVersio
                 Attach image <kbd className="ml-1 px-1 py-0.5 rounded bg-muted text-[10px] font-mono">Ctrl+V</kbd>
               </TooltipContent>
             </Tooltip>
+            <VoiceInput
+              onTranscript={(text) => {
+                setInput(prev => prev ? prev + " " + text : text);
+                if (inputRef.current) {
+                  inputRef.current.style.height = "auto";
+                  inputRef.current.style.height = inputRef.current.scrollHeight + "px";
+                }
+              }}
+              disabled={isLoading}
+            />
             <input
               ref={fileInputRef}
               type="file"
