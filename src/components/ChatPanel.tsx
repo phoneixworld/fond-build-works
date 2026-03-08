@@ -524,11 +524,24 @@ const ChatPanel = forwardRef<ChatPanelHandle, { initialPrompt?: string; onVersio
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
   }, [messages]);
 
+  const handleSmartSend = useCallback(async (text: string, images: string[] = []) => {
+    if (!text && images.length === 0) return;
+    const finalText = text || "Replicate this design";
+    
+    // Only analyze first message in a conversation (for new projects)
+    if (messages.length === 0 && images.length === 0 && finalText.length >= 20) {
+      const needsQuestions = await analyzePrompt(finalText);
+      if (needsQuestions) return; // Questions are now shown, wait for answers
+    }
+    
+    sendMessage(finalText, images);
+  }, [messages.length, analyzePrompt, sendMessage]);
+
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
       if (input.trim() || attachedImages.length > 0) {
-        sendMessage(input.trim() || "Replicate this design", attachedImages);
+        handleSmartSend(input.trim(), attachedImages);
       }
     }
   };
@@ -540,13 +553,14 @@ const ChatPanel = forwardRef<ChatPanelHandle, { initialPrompt?: string; onVersio
   };
 
   const handleAutoFix = () => {
+    setHealAttempts(0); // Manual fix resets counter
     const errorSummary = previewErrors.join("\n");
     sendMessage(`The app preview has these errors, please fix them:\n${errorSummary}`);
   };
 
   const handleSendClick = () => {
     if (input.trim() || attachedImages.length > 0) {
-      sendMessage(input.trim() || "Replicate this design", attachedImages);
+      handleSmartSend(input.trim(), attachedImages);
     }
   };
 
