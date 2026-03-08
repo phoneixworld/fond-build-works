@@ -458,6 +458,36 @@ const ChatPanel = forwardRef<ChatPanelHandle, { initialPrompt?: string; onVersio
         knowledge = (data || []).map((k: any) => `[${k.title}]: ${k.content}`);
       } catch {}
 
+      // Fetch Project Memory decisions
+      try {
+        const { data } = await supabase
+          .from("project_decisions" as any)
+          .select("category, title, description")
+          .eq("project_id", currentProject.id)
+          .eq("is_active", true);
+        if (data && data.length > 0) {
+          knowledge.push("[PROJECT DECISIONS - Follow these architectural decisions]:");
+          (data as any[]).forEach((d: any) => {
+            knowledge.push(`  [${d.category}] ${d.title}${d.description ? ': ' + d.description : ''}`);
+          });
+        }
+      } catch {}
+
+      // Fetch Governance rules
+      try {
+        const { data } = await supabase
+          .from("project_governance_rules" as any)
+          .select("category, name, description, severity")
+          .eq("project_id", currentProject.id)
+          .eq("is_active", true);
+        if (data && data.length > 0) {
+          knowledge.push("[GOVERNANCE RULES - Enforce these standards in generated code]:");
+          (data as any[]).forEach((r: any) => {
+            knowledge.push(`  [${r.severity.toUpperCase()}] ${r.name}${r.description ? ': ' + r.description : ''}`);
+          });
+        }
+      } catch {}
+
       const apiMessages = [...messages, userMsg].map(m => ({
         role: m.role,
         content: m.content,
