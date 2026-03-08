@@ -84,6 +84,7 @@ const IDELayout = () => {
               Preview
             </button>
             <div className="w-px h-5 bg-border mx-2" />
+            <PublishExportButtons />
             <span className="text-xs text-muted-foreground truncate max-w-[120px]">{user?.email}</span>
             <button onClick={signOut} className="text-muted-foreground hover:text-foreground transition-colors p-1.5" title="Sign out">
               <LogOut className="w-4 h-4" />
