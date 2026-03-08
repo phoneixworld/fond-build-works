@@ -1162,15 +1162,30 @@ const ChatPanel = forwardRef<ChatPanelHandle, { initialPrompt?: string; onVersio
     if (isSendingRef.current || isLoadingRef.current) return;
     const finalText = text || "Replicate this design";
     
-    // Analyze prompt for clarifying questions — edge function dynamically decides
-    // Skip for: very short prompts, image-only, or auto-fix messages
-    if (images.length === 0 && finalText.length >= 30 && !finalText.startsWith("🔧")) {
-      const needsQuestions = await analyzePrompt(finalText);
-      if (needsQuestions) return;
+    // Skip classification for: short prompts, image-only, auto-fix, or explicit build confirmations
+    const isAutoFix = finalText.startsWith("🔧");
+    const isShort = finalText.length < 15;
+    const hasImages = images.length > 0;
+    const isConfirmation = /^(yes|go ahead|do it|build it|sounds good|ok|sure)/i.test(finalText.trim());
+    
+    if (!isAutoFix && !isShort && !hasImages && !isConfirmation) {
+      const classification = await classifyUserIntent(finalText);
+      if (classification?.intent === "clarify") return; // Questions shown, wait for answers
+      
+      if (classification?.intent === "chat") {
+        // Route to chat agent — no code generation
+        setCurrentAgent("chat");
+        setPipelineStep("chatting");
+        sendChatMessage(finalText, images);
+        return;
+      }
     }
     
+    // Default: route to build agent
+    setCurrentAgent("build");
+    setPipelineStep("planning");
     sendMessage(finalText, images);
-  }, [analyzePrompt, sendMessage]);
+  }, [classifyUserIntent]);
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === "Enter" && !e.shiftKey) {
