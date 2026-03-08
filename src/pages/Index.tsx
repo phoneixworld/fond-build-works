@@ -380,6 +380,8 @@ const IDELayout = () => {
                 <CloudPanel />
               ) : rightPanel === "brain" ? (
                 <ProjectBrain />
+              ) : rightPanel === "pulse" ? (
+                <PulseAnalytics />
               ) : rightPanel === "history" ? (
                 <VersionHistory
                   versions={versions}
