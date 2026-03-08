@@ -10,6 +10,7 @@ import { ProjectProvider, useProjects } from "@/contexts/ProjectContext";
 import { useAuth } from "@/hooks/useAuth";
 import ChatPanel from "@/components/ChatPanel";
 import CodeEditor from "@/components/CodeEditor";
+import SchemaBuilder from "@/components/SchemaBuilder";
 import PreviewPanel from "@/components/PreviewPanel";
 import PublishExportButtons from "@/components/PublishExportButtons";
 import TechStackSelector from "@/components/TechStackSelector";
