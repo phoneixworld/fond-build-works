@@ -14,7 +14,7 @@ interface LandingPageProps {
 
 const LandingPage = ({ onStartProject, onOpenProject }: LandingPageProps) => {
   const { user, signOut } = useAuth();
-  const { projects, loading, deleteProject } = useProjects();
+  const { projects, loading, deleteProject, cloneProject } = useProjects();
   const [input, setInput] = useState("");
   const [techStack, setTechStack] = useState<TechStackId>("html-tailwind");
   const inputRef = useRef<HTMLTextAreaElement>(null);
