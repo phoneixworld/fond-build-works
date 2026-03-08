@@ -45,7 +45,7 @@ interface ParsedSection {
   tasks?: { label: string; done: boolean }[];
 }
 
-function parseStructuredResponse(text: string): ParsedSection[] {
+function parseStructuredResponse(text: string, isStreaming?: boolean): ParsedSection[] {
   const sections: ParsedSection[] = [];
   
   const thinkingPatterns = [
