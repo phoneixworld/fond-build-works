@@ -165,16 +165,110 @@ const ChatPanel = forwardRef<ChatPanelHandle, { initialPrompt?: string; onVersio
   useEffect(() => {
     const handler = (event: MessageEvent) => {
       if (event.data?.type === "preview-error") {
+        const errorType = event.data.errorType || "unknown";
+        const msg = event.data.message || "Unknown error";
+        const enriched = `[${errorType}] ${msg}`;
         setPreviewErrors((prev) => {
-          const msg = event.data.message || "Unknown error";
-          if (prev.includes(msg)) return prev;
-          return [...prev.slice(-4), msg];
+          if (prev.includes(enriched)) return prev;
+          return [...prev.slice(-9), enriched];
         });
       }
     };
     window.addEventListener("message", handler);
     return () => window.removeEventListener("message", handler);
   }, []);
+
+  // Self-healing: auto-trigger fix when errors detected after build
+  useEffect(() => {
+    if (healTimeoutRef.current) {
+      clearTimeout(healTimeoutRef.current);
+      healTimeoutRef.current = null;
+    }
+    if (previewErrors.length > 0 && !isLoading && !isHealing && healAttempts < MAX_HEAL_ATTEMPTS && messages.length > 0) {
+      healTimeoutRef.current = setTimeout(() => {
+        triggerSelfHeal();
+      }, 3000); // Wait 3s for errors to accumulate
+    }
+    return () => {
+      if (healTimeoutRef.current) clearTimeout(healTimeoutRef.current);
+    };
+  }, [previewErrors, isLoading, isHealing, healAttempts, messages.length]);
+
+  const triggerSelfHeal = useCallback(() => {
+    if (isLoading || isHealing || healAttempts >= MAX_HEAL_ATTEMPTS || previewErrors.length === 0) return;
+    setIsHealing(true);
+    setHealAttempts(prev => prev + 1);
+    const attempt = healAttempts + 1;
+    setHealingStatus(`Self-healing attempt ${attempt}/${MAX_HEAL_ATTEMPTS}...`);
+    const errorSummary = previewErrors.join("\n");
+    const healPrompt = `🔧 AUTO-FIX (attempt ${attempt}/${MAX_HEAL_ATTEMPTS}): The preview detected these errors:\n${errorSummary}\n\nPlease fix ALL these errors. Make sure the app works correctly without any console errors or broken functionality.`;
+    setPreviewErrors([]);
+    sendMessage(healPrompt).finally(() => {
+      setIsHealing(false);
+      setHealingStatus("");
+    });
+  }, [isLoading, isHealing, healAttempts, previewErrors]);
+
+  // Analyze prompt for follow-up questions
+  const analyzePrompt = useCallback(async (prompt: string): Promise<boolean> => {
+    // Skip analysis for follow-up messages, modifications, or short prompts
+    if (messages.length > 0 || prompt.length < 20) return false;
+    
+    setIsAnalyzing(true);
+    try {
+      const resp = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/analyze-prompt`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+        },
+        body: JSON.stringify({ prompt }),
+      });
+      if (!resp.ok) return false;
+      const result = await resp.json();
+      setAnalysisResult(result);
+      if (result.action === "ask" && result.questions?.length > 0) {
+        setFollowUpQuestions(result.questions);
+        setPendingFollowUpPrompt(prompt);
+        setIsAnalyzing(false);
+        return true; // Questions need answering
+      }
+      setIsAnalyzing(false);
+      return false; // Build immediately
+    } catch {
+      setIsAnalyzing(false);
+      return false;
+    }
+  }, [messages.length]);
+
+  const handleFollowUpAnswer = (questionId: string, value: string) => {
+    setFollowUpAnswers(prev => ({ ...prev, [questionId]: value }));
+  };
+
+  const submitFollowUpAnswers = useCallback(() => {
+    const answersText = followUpQuestions.map(q => {
+      const answer = followUpAnswers[q.id];
+      const option = q.options.find((o: any) => o.value === answer);
+      return `${q.text} → ${option?.label || answer || "Not specified"}`;
+    }).join("\n");
+    
+    const enrichedPrompt = `${pendingFollowUpPrompt}\n\n--- Additional Requirements ---\n${answersText}`;
+    
+    setFollowUpQuestions([]);
+    setFollowUpAnswers({});
+    setPendingFollowUpPrompt("");
+    setAnalysisResult(null);
+    sendMessage(enrichedPrompt);
+  }, [followUpQuestions, followUpAnswers, pendingFollowUpPrompt]);
+
+  const skipFollowUpQuestions = useCallback(() => {
+    const prompt = pendingFollowUpPrompt;
+    setFollowUpQuestions([]);
+    setFollowUpAnswers({});
+    setPendingFollowUpPrompt("");
+    setAnalysisResult(null);
+    sendMessage(prompt);
+  }, [pendingFollowUpPrompt]);
 
   useEffect(() => {
     if (initialPrompt && !hasProcessedInitialRef.current) {
