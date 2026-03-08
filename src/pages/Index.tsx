@@ -45,7 +45,6 @@ import {
 const IDELayout = () => {
   const { user, signOut } = useAuth();
   const { projects, currentProject, selectProject, createProject, saveProject } = useProjects();
-  const [selectedFile, setSelectedFile] = useState("App.tsx");
   const [rightPanel, setRightPanel] = useState<"code" | "preview" | "cloud" | "history" | "brain" | "pulse" | "crew">("preview");
   const [inIDE, setInIDE] = useState(false);
   const [initialPrompt, setInitialPrompt] = useState("");
