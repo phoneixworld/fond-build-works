@@ -152,6 +152,7 @@ const BuildPipelineCard = ({ isBuilding, streamContent, elapsed, tasks: external
         generate: "Build agent streaming code",
         build: "Assembling UI components & applying styles",
         validate: "Validating in Sandpack environment",
+        retry: "Auto-fixing validation errors...",
       };
       return descs[activeTask.id] || "Processing...";
     }
