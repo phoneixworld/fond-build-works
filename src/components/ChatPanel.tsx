@@ -197,9 +197,9 @@ function parseReactFiles(text: string): { chatText: string; files: Record<string
     }
   }
   
-  // Fallback: check if any code fence contains --- /App.jsx pattern
+  // Fallback: check if any code fence contains --- /App.jsx pattern (with or without trailing ---)
   if (fenceStart === -1) {
-    const genericFence = text.match(/```\w*\n[\s\S]*?---\s+\/?(App\.jsx|App\.js)/);
+    const genericFence = text.match(/```\w*\n[\s\S]*?---\s+\/?(src\/)?App\.jsx?\s*-{0,3}/);
     if (genericFence) {
       fenceStart = text.indexOf(genericFence[0]);
       matchedPattern = "generic-with-app";
