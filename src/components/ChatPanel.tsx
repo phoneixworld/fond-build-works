@@ -558,10 +558,10 @@ const ChatPanel = forwardRef<ChatPanelHandle, { initialPrompt?: string; onVersio
                     {isUser ? <User className="w-3.5 h-3.5 text-primary" /> : <Bot className="w-3.5 h-3.5 text-accent" />}
                   </div>
                   <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 mb-1">
-                      <span className="text-xs font-semibold text-muted-foreground">{isUser ? "You" : "Assistant"}</span>
+                    <div className="flex items-center gap-2 mb-1.5">
+                      <span className="text-[11px] font-semibold tracking-wide uppercase text-muted-foreground">{isUser ? "You" : "Assistant"}</span>
                       {msg.timestamp && (
-                        <span className="text-[10px] text-muted-foreground/40 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <span className="text-[10px] text-muted-foreground/40 font-mono opacity-0 group-hover:opacity-100 transition-opacity">
                           {formatTime(msg.timestamp)}
                         </span>
                       )}
@@ -579,11 +579,11 @@ const ChatPanel = forwardRef<ChatPanelHandle, { initialPrompt?: string; onVersio
                       </div>
                     )}
                     {!isUser ? (
-                      <div className="text-sm text-foreground leading-relaxed prose prose-invert prose-sm max-w-none prose-p:my-1.5 prose-headings:my-2.5 prose-ul:my-1 prose-li:my-0 prose-code:text-primary prose-code:bg-secondary prose-code:px-1.5 prose-code:py-0.5 prose-code:rounded-md prose-code:text-xs prose-pre:bg-secondary prose-pre:rounded-xl prose-pre:p-3 prose-pre:border prose-pre:border-border">
+                      <div className="text-[13px] text-foreground leading-[1.7] prose prose-invert prose-sm max-w-none prose-p:my-2 prose-headings:my-3 prose-headings:font-semibold prose-headings:tracking-tight prose-ul:my-1.5 prose-li:my-0.5 prose-code:font-[JetBrains_Mono] prose-code:text-primary prose-code:bg-secondary prose-code:px-1.5 prose-code:py-0.5 prose-code:rounded-md prose-code:text-[12px] prose-pre:bg-secondary prose-pre:rounded-xl prose-pre:p-4 prose-pre:border prose-pre:border-border prose-pre:font-[JetBrains_Mono] prose-pre:text-[12px] prose-pre:leading-relaxed prose-strong:text-foreground prose-a:text-primary prose-a:no-underline hover:prose-a:underline">
                         <ReactMarkdown>{textContent}</ReactMarkdown>
                       </div>
                     ) : (
-                      <p className="text-sm text-foreground leading-relaxed">{textContent}</p>
+                      <p className="text-[13px] text-foreground/90 leading-[1.7]">{textContent}</p>
                     )}
                   </div>
                 </motion.div>
