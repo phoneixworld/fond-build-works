@@ -404,6 +404,7 @@ const ChatPanel = forwardRef<ChatPanelHandle, { initialPrompt?: string; onVersio
     if (inputRef.current) inputRef.current.style.height = "36px";
     setMessages((prev) => [...prev, userMsg]);
     setIsLoading(true);
+    setBuildStreamContent("");
     setIsBuilding(true);
     setBuildStep(images.length > 0 ? "Analyzing your image..." : "Understanding your request...");
 
