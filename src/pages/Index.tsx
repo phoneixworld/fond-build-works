@@ -158,34 +158,79 @@ const IDELayout = () => {
         />
 
         {/* Rename Dialog */}
-        <Dialog open={renameOpen} onOpenChange={setRenameOpen}>
+        <Dialog open={renameOpen} onOpenChange={(o) => { setRenameOpen(o); if (!o) setRenameError(""); }}>
           <DialogContent className="sm:max-w-sm">
             <DialogHeader>
               <DialogTitle>Rename Project</DialogTitle>
             </DialogHeader>
             <div className="space-y-3 pt-2">
-              <input
-                value={renameValue}
-                onChange={(e) => setRenameValue(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && handleRename()}
-                placeholder="Project name"
-                className="w-full bg-secondary text-foreground text-sm rounded-lg px-3 py-2 outline-none border border-border focus:border-primary transition-colors"
-                autoFocus
-              />
-              <div className="flex justify-end gap-2">
-                <button
-                  onClick={() => setRenameOpen(false)}
-                  className="px-3 py-1.5 text-xs text-muted-foreground hover:text-foreground rounded-md hover:bg-secondary transition-colors"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={handleRename}
-                  disabled={!renameValue.trim()}
-                  className="px-3 py-1.5 text-xs font-medium bg-primary text-primary-foreground rounded-md hover:bg-primary/90 disabled:opacity-50 transition-colors"
-                >
-                  Rename
-                </button>
+              <div className="flex gap-2">
+                {/* Emoji picker button */}
+                <div className="relative">
+                  <button
+                    onClick={() => setShowEmojiPicker(!showEmojiPicker)}
+                    className="w-10 h-10 rounded-lg bg-secondary border border-border hover:border-primary/30 flex items-center justify-center text-lg transition-colors shrink-0"
+                    title="Pick emoji"
+                  >
+                    {renameEmoji || "🚀"}
+                  </button>
+                  {showEmojiPicker && (
+                    <div className="absolute top-12 left-0 z-50 bg-popover border border-border rounded-lg shadow-lg p-2 grid grid-cols-6 gap-1 w-[200px]">
+                      {["🚀", "📱", "🎨", "💡", "🔧", "📊", "🛒", "💬", "🎮", "📝", "🏠", "💰", "🎵", "📸", "🍳", "✅", "🌐", "⚡", "🔒", "📈", "🎯", "❤️", "🤖", "🗂️"].map(e => (
+                        <button
+                          key={e}
+                          onClick={() => { setRenameEmoji(e); setShowEmojiPicker(false); }}
+                          className="w-7 h-7 flex items-center justify-center rounded hover:bg-secondary transition-colors text-base"
+                        >
+                          {e}
+                        </button>
+                      ))}
+                      <button
+                        onClick={() => { setRenameEmoji(""); setShowEmojiPicker(false); }}
+                        className="col-span-6 text-[10px] text-muted-foreground hover:text-foreground py-1 mt-1 border-t border-border"
+                      >
+                        Remove emoji
+                      </button>
+                    </div>
+                  )}
+                </div>
+                <input
+                  value={renameValue}
+                  onChange={(e) => {
+                    setRenameValue(e.target.value);
+                    setRenameError(validateName(e.target.value));
+                  }}
+                  onKeyDown={(e) => e.key === "Enter" && handleRename()}
+                  placeholder="Project name"
+                  maxLength={PROJECT_NAME_MAX}
+                  className={`flex-1 bg-secondary text-foreground text-sm rounded-lg px-3 py-2 outline-none border transition-colors ${
+                    renameError ? "border-destructive" : "border-border focus:border-primary"
+                  }`}
+                  autoFocus
+                />
+              </div>
+              {renameError && (
+                <p className="text-xs text-destructive">{renameError}</p>
+              )}
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] text-muted-foreground">
+                  {renameValue.length}/{PROJECT_NAME_MAX}
+                </span>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => setRenameOpen(false)}
+                    className="px-3 py-1.5 text-xs text-muted-foreground hover:text-foreground rounded-md hover:bg-secondary transition-colors"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={handleRename}
+                    disabled={!renameValue.trim() || !!renameError}
+                    className="px-3 py-1.5 text-xs font-medium bg-primary text-primary-foreground rounded-md hover:bg-primary/90 disabled:opacity-50 transition-colors"
+                  >
+                    Rename
+                  </button>
+                </div>
               </div>
             </div>
           </DialogContent>
