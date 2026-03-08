@@ -3,8 +3,10 @@ import { Database, Users, HardDrive, KeyRound, Zap, ScrollText, Activity, ArrowR
 import { supabase } from "@/integrations/supabase/client";
 import { useProjects } from "@/contexts/ProjectContext";
 
+type SectionId = "overview" | "database" | "users" | "storage" | "secrets" | "functions" | "sql" | "logs";
+
 interface CloudOverviewProps {
-  onNavigate: (section: "overview" | "database" | "users" | "storage" | "secrets" | "functions" | "sql" | "logs") => void;
+  onNavigate: (section: SectionId) => void;
 }
 
 const CloudOverview = ({ onNavigate }: CloudOverviewProps) => {
