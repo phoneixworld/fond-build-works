@@ -776,6 +776,11 @@ const ChatPanel = forwardRef<ChatPanelHandle, { initialPrompt?: string; onVersio
         onDone: async () => {
           if (abortController.signal.aborted) return;
           
+          // Debug: log response length and fence detection
+          console.log(`[ChatPanel] Response length: ${fullResponse.length}, tech_stack: ${currentProject.tech_stack}`);
+          const fencesInResponse = fullResponse.match(/```\w*/g);
+          console.log(`[ChatPanel] Code fences found:`, fencesInResponse || "none");
+          
           // Check for React file output first
           const reactResult = parseReactFiles(fullResponse);
           let finalHtml: string | null = null;
@@ -787,6 +792,7 @@ const ChatPanel = forwardRef<ChatPanelHandle, { initialPrompt?: string; onVersio
             setPreviewMode("sandpack");
             console.log("[Sandpack] Loaded React files:", Object.keys(reactResult.files));
           } else {
+            console.log("[ChatPanel] No React files parsed — falling back to HTML mode");
             // Legacy HTML mode
             const { files: parsedFiles, html: htmlCode, chatText } = parseMultiFileOutput(fullResponse);
             
