@@ -4,11 +4,12 @@ import {
   ResizablePanel,
   ResizablePanelGroup,
 } from "@/components/ui/resizable";
-import { Code, Eye, Zap, LogOut, ArrowLeft, Cloud, ChevronDown, Clock, Command as CommandIcon, Brain, Activity, Users, Palette } from "lucide-react";
+import { Code, Eye, Zap, LogOut, ArrowLeft, Cloud, ChevronDown, Clock, Command as CommandIcon, Brain, Activity, Users, Palette, MessageCircle } from "lucide-react";
 import { PreviewProvider } from "@/contexts/PreviewContext";
 import { VirtualFSProvider } from "@/contexts/VirtualFSContext";
 import { ProjectProvider, useProjects } from "@/contexts/ProjectContext";
 import { useAuth } from "@/hooks/useAuth";
+import { useRealtimePresence } from "@/hooks/useRealtimePresence";
 import ChatPanel from "@/components/ChatPanel";
 import CodeEditor from "@/components/CodeEditor";
 import CloudPanel from "@/components/CloudPanel";
@@ -21,9 +22,12 @@ import PublishExportButtons from "@/components/PublishExportButtons";
 import LandingPage from "@/components/LandingPage";
 import CommandPalette from "@/components/CommandPalette";
 import VersionHistory, { Version } from "@/components/VersionHistory";
+import PresenceAvatars from "@/components/PresenceAvatars";
+import TeamChat from "@/components/TeamChat";
 import { TechStackId, TECH_STACKS } from "@/lib/techStacks";
 import { usePreview } from "@/contexts/PreviewContext";
 import { useToast } from "@/hooks/use-toast";
+import { AnimatePresence } from "framer-motion";
 import {
   DropdownMenu,
   DropdownMenuContent,
