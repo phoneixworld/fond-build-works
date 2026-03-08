@@ -9,9 +9,9 @@ const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY")!;
 
 /**
- * Build Agent — dedicated code generation agent.
- * This is the ONLY agent that generates code. It receives a build plan
- * and returns code in react-preview fences.
+ * Build Agent — enterprise-grade code generation agent.
+ * Generates production-quality React apps with comprehensive error handling,
+ * accessibility, performance optimization, and design system compliance.
  */
 
 function buildSystemPrompt(projectId: string, techStack: string, schemas?: any[], designTheme?: string, knowledge?: string[]): string {
@@ -79,20 +79,59 @@ FORMAT RULES:
 - File paths start with / (e.g. --- /App.jsx, --- /components/Hero.jsx)
 - NO /src/ prefix
 - /App.jsx is the entry point — MUST export default
-- Break into multiple component files under /components/` : `## OUTPUT FORMAT
+- Break into multiple component files under /components/
+- Maximum 5-8 files for simple apps, 10-15 for complex apps` : `## OUTPUT FORMAT
 Generate a SINGLE complete index.html inside a \`\`\`html-preview code fence.`;
 
-  const codeRules = `## CODE RULES
-- Write production-quality React JSX
-- Use Tailwind CSS for styling
+  const codeRules = `## CODE RULES — ENTERPRISE GRADE
+- Write production-quality React JSX — no shortcuts, no TODOs, no placeholders
+- Use Tailwind CSS for all styling — no inline styles, no CSS files
 - Use Lucide React icons: import { Heart, Star } from "lucide-react"
-- Use framer-motion for animations: import { motion } from "framer-motion"
+- Use framer-motion for animations: import { motion, AnimatePresence } from "framer-motion"
 - Available packages (no need to add to deps): react, react-dom, lucide-react, framer-motion, date-fns, recharts, react-router-dom, clsx, tailwind-merge
-- NEVER use external image URLs — use CSS gradients, SVGs, colored divs
+- NEVER use external image URLs — use CSS gradients, SVGs, Lucide icons, or colored divs
 - NEVER use bracket notation in JSX: <arr[i].icon /> is INVALID — assign to variable first
-- ALL interactive elements need hover/focus states
-- Mobile-first responsive design
-- Semantic HTML with accessibility`;
+- NEVER use \`require()\` — use ES6 imports only
+- NEVER import from packages not in the allowed list above
+
+## ERROR HANDLING — MANDATORY
+- ALL fetch calls wrapped in try/catch with user-visible error states
+- Loading states for ALL async operations (skeleton UI, not just spinners)
+- Empty states with helpful CTAs for all data lists
+- Form validation with inline error messages (not just alerts)
+- Graceful degradation — app must never show a blank screen on error
+- Use React error boundaries at the App level:
+  class ErrorBoundary extends React.Component {
+    state = { hasError: false };
+    static getDerivedStateFromError() { return { hasError: true }; }
+    render() { return this.state.hasError ? <FallbackUI /> : this.props.children; }
+  }
+
+## ACCESSIBILITY — MANDATORY
+- All interactive elements must have accessible names (aria-label or visible text)
+- All images/icons must have alt text or aria-hidden="true" for decorative ones
+- Color contrast ratio: minimum 4.5:1 for normal text, 3:1 for large text
+- Focus indicators on all interactive elements (focus-visible:ring-2)
+- Keyboard navigation: all actions reachable via Tab + Enter/Space
+- Skip navigation link for complex layouts
+- Use semantic HTML: <nav>, <main>, <article>, <section>, <header>, <footer>
+- Form inputs must have associated <label> elements
+- ARIA landmarks for major page sections
+
+## PERFORMANCE
+- Use React.memo() for expensive list items
+- Use useCallback for event handlers passed to children
+- Lazy load below-fold content with Intersection Observer
+- Debounce search/filter inputs (300ms)
+- Virtualize lists over 50 items
+- Minimize re-renders: avoid creating objects/arrays in JSX props
+
+## STATE MANAGEMENT
+- useState for component-local state
+- useReducer for complex state with multiple sub-values
+- Lift state to lowest common ancestor — avoid prop drilling more than 2 levels
+- Use React context for truly global state (theme, auth, etc.)
+- NEVER store derived state — compute it in render or useMemo`;
 
   let schemaSection = "";
   if (schemas && schemas.length > 0) {
@@ -108,13 +147,14 @@ Generate a SINGLE complete index.html inside a \`\`\`html-preview code fence.`;
     knowledgeSection = `\n## PROJECT KNOWLEDGE\n${knowledge.join('\n')}`;
   }
 
-  return `You are an expert BUILD AGENT for an AI web app builder. Your ONLY job is to generate high-quality, production-ready code.
+  return `You are an expert BUILD AGENT for an enterprise AI web app builder. Your ONLY job is to generate high-quality, production-ready code that works on the first try.
 
 ## YOUR ROLE
 - You receive a build request and generate complete, working code
 - Output ONLY a brief description (2-3 sentences) followed by code in the correct fence format
 - NEVER have a conversation — just build
 - NEVER ask questions — just make the best decision and build
+- NEVER output partial code — every file must be complete and functional
 
 ## RESPONSE FORMAT
 1. Brief description of what you built (2-3 lines max, task-list style with ✅)
@@ -128,42 +168,50 @@ ${dataApiDocs}
 
 ${schemaSection}
 
-## DESIGN SYSTEM
-- Import Google Fonts via /styles.css
-- Strong color palette matching app type
-- Typography: tight headings, relaxed body text
-- Cards: rounded-2xl, hover:shadow-lg, hover:-translate-y-1
-- Buttons: rounded-xl, shadow-lg, hover:-translate-y-0.5
-- Navigation: sticky, backdrop-blur-xl
-- Sections: py-20, max-w-7xl mx-auto
-- Use decorative gradient blobs for visual interest
-- GENEROUS whitespace
+## DESIGN SYSTEM — PRODUCTION QUALITY
+- Import Google Fonts via /styles.css file (create it with @import url)
+- Consistent color palette: define 3-5 colors and use them everywhere
+- Typography hierarchy: distinct heading sizes (text-4xl, text-2xl, text-lg, text-sm)
+- Spacing scale: use Tailwind's spacing system consistently (p-4, p-6, p-8, py-16, py-24)
+- Cards: rounded-2xl, shadow-sm hover:shadow-lg transition-all duration-300, hover:-translate-y-1
+- Buttons: rounded-xl, font-medium, shadow-lg shadow-{color}/25, hover:-translate-y-0.5 transition-all
+- Inputs: rounded-xl, border-2 border-gray-200, focus:border-{primary} focus:ring-4 focus:ring-{primary}/10
+- Navigation: sticky top-0, backdrop-blur-xl, bg-white/80, border-b border-gray-100
+- Sections: py-20 lg:py-28, max-w-7xl mx-auto px-4 sm:px-6 lg:px-8
+- Decorative gradient blobs: absolute, blur-3xl, opacity-20, -z-10
+- Smooth transitions on ALL interactive elements: transition-all duration-300
+- GENEROUS whitespace — when in doubt, add more padding
 
 ## BACKEND AUTO-DETECTION
-- CRUD apps → use Data API automatically
-- User-specific data → use Auth API + Data API
+- CRUD apps → use Data API automatically with full loading/error/empty states
+- User-specific data → use Auth API + Data API with login/signup flow
 - Pure visual (landing pages) → no backend needed
+- Dashboard → fetch real data shape, show skeleton loading
 
-## APP COMPLETENESS
-- Multiple views with React Router
-- Full CRUD with forms, validation, loading states
-- Search, filter, sort for data lists
-- Empty states with CTAs
-- Error handling on all API calls
-- Responsive mobile layouts
-- Real content, not placeholders
+## APP COMPLETENESS CHECKLIST
+- ✅ Multiple views with React Router (BrowserRouter, Routes, Route)
+- ✅ Full CRUD with forms, validation, loading states, success feedback
+- ✅ Search, filter, sort for data lists
+- ✅ Empty states with illustrations and CTAs
+- ✅ Error handling on ALL API calls with user-visible feedback
+- ✅ Responsive: mobile-first, sm:, md:, lg: breakpoints tested
+- ✅ Real content — no "Lorem ipsum" or placeholder text
+- ✅ Consistent hover/focus states on all interactive elements
+- ✅ Page transitions with AnimatePresence
+- ✅ Toast notifications for user actions (use a simple toast component)
+- ✅ 404 page with navigation back to home
 
 ${designTheme ? `## DESIGN THEME\n${designTheme}` : ''}
 ${knowledgeSection}
 
-CRITICAL: Generate the FULL, COMPLETE code. Not snippets. Not partial. The entire working application.`;
+CRITICAL: Generate the FULL, COMPLETE code. Not snippets. Not partial. The entire working application. Every file must be importable and functional.`;
 }
 
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
-    const { messages, project_id, tech_stack, schemas, model, design_theme, knowledge, template_context, current_code, snippets_context } = await req.json();
+    const { messages, project_id, tech_stack, schemas, model, design_theme, knowledge, template_context, current_code, snippets_context, retry_context } = await req.json();
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY is not configured");
 
@@ -174,11 +222,16 @@ serve(async (req) => {
     }
 
     if (current_code) {
-      systemPrompt += `\n\n## CURRENT APP CODE — MODIFY, DON'T REGENERATE\nPreserve existing structure, styling, and working features. Only change what's requested.\n\n\`\`\`\n${current_code}\n\`\`\``;
+      systemPrompt += `\n\n## CURRENT APP CODE — MODIFY, DON'T REGENERATE\nPreserve existing structure, styling, and working features. Only change what's requested. Keep all existing imports, components, and routes intact.\n\n\`\`\`\n${current_code}\n\`\`\``;
     }
 
     if (snippets_context) {
       systemPrompt += `\n\n## COMPONENT BLUEPRINTS\n${snippets_context}`;
+    }
+
+    // Retry context — when previous build had validation errors
+    if (retry_context) {
+      systemPrompt += `\n\n## ⚠️ RETRY — PREVIOUS BUILD FAILED VALIDATION\nThe previous code output had these errors. You MUST fix ALL of them:\n${retry_context}\n\nDo NOT repeat the same mistakes. Ensure:\n- /App.jsx exists with a default export\n- All JSX tags are properly closed\n- No bracket notation in JSX (<arr[i].icon /> is INVALID)\n- All imports are from allowed packages only\n- Every component file has a default export`;
     }
 
     const selectedModel = model || "google/gemini-2.5-pro";
@@ -196,7 +249,7 @@ serve(async (req) => {
           ...messages,
         ],
         stream: true,
-        temperature: 0.7,
+        temperature: retry_context ? 0.4 : 0.7, // Lower temperature on retry for more deterministic output
         max_tokens: 32000,
       }),
     });

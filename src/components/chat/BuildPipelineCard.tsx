@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { CheckCircle2, Circle, Loader2, ChevronRight, FileCode2, Bot, Cpu, Shield } from "lucide-react";
+import { CheckCircle2, Circle, Loader2, ChevronRight, FileCode2, Bot, Cpu, Shield, RotateCcw } from "lucide-react";
 import type { PipelineStep } from "@/lib/agentPipeline";
 
 export interface TaskItem {
@@ -102,6 +102,15 @@ function detectTasks(content: string, isBuilding: boolean, pipelineStep?: Pipeli
         status: hasClosingFence && !isBuilding ? "done" : "in_progress",
       });
     }
+
+    // Show retry step if pipeline is in retry mode
+    if (pipelineStep === "retrying") {
+      tasks.push({
+        id: "retry",
+        label: "Auto-fixing validation errors",
+        status: "in_progress",
+      });
+    }
   }
 
   if (!isBuilding && hasCode && len > 100) {
@@ -152,6 +161,7 @@ const BuildPipelineCard = ({ isBuilding, streamContent, elapsed, tasks: external
         generate: "Build agent streaming code",
         build: "Assembling UI components & applying styles",
         validate: "Validating in Sandpack environment",
+        retry: "Auto-fixing validation errors...",
       };
       return descs[activeTask.id] || "Processing...";
     }

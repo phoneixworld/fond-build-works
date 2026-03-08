@@ -3,7 +3,7 @@ import { Version } from "@/components/VersionHistory";
 import { Send, Bot, User, ChevronDown, Sparkles, AlertTriangle, Wand2, ImagePlus, X, Palette, ArrowDown, Clock, Zap, Trash2, ShieldCheck, MessageSquareMore, CheckCircle2, Pencil, RotateCcw, Upload } from "lucide-react";
 import VoiceInput from "@/components/VoiceInput";
 import { streamChat } from "@/lib/streamChat";
-import { classifyIntent, streamChatAgent, streamBuildAgent, validateReactCode, hasBuildConfirmation, stripBuildMarker, type AgentIntent, type PipelineStep } from "@/lib/agentPipeline";
+import { classifyIntent, streamChatAgent, streamBuildAgent, validateReactCode, hasBuildConfirmation, stripBuildMarker, formatRetryContext, MAX_BUILD_RETRIES, type AgentIntent, type PipelineStep } from "@/lib/agentPipeline";
 import { validateAndFixHtml } from "@/lib/htmlValidator";
 import { matchTemplate, PAGE_TEMPLATES, type PageTemplate } from "@/lib/pageTemplates";
 import { COMPONENT_SNIPPETS, getSnippetsPromptContext } from "@/lib/componentSnippets";
@@ -492,6 +492,8 @@ const ChatPanel = forwardRef<ChatPanelHandle, { initialPrompt?: string; onVersio
   const [healAttempts, setHealAttempts] = useState(0);
   const [isHealing, setIsHealing] = useState(false);
   const [healingStatus, setHealingStatus] = useState<string>("");
+  // Build retry state
+  const [buildRetryCount, setBuildRetryCount] = useState(0);
   // Follow-up questions state
   const [followUpQuestions, setFollowUpQuestions] = useState<any[]>([]);
   const [followUpAnswers, setFollowUpAnswers] = useState<Record<string, string>>({});
@@ -971,19 +973,109 @@ const ChatPanel = forwardRef<ChatPanelHandle, { initialPrompt?: string; onVersio
             setPipelineStep("validating");
             setBuildStep("✅ Validating code...");
             const validation = validateReactCode(reactResult.files);
-            if (!validation.valid) {
-              console.warn("[ChatPanel:onDone] Validation warnings:", validation.errors);
+            
+            if (!validation.valid && buildRetryCount < MAX_BUILD_RETRIES) {
+              // AUTO-RETRY: Re-invoke build agent with error context
+              console.warn(`[ChatPanel:onDone] Validation failed (attempt ${buildRetryCount + 1}/${MAX_BUILD_RETRIES + 1}):`, validation.errors);
+              setPipelineStep("retrying");
+              setBuildStep(`🔄 Auto-fixing ${validation.errors.length} issue(s)... (attempt ${buildRetryCount + 2})`);
+              setBuildRetryCount(prev => prev + 1);
+              
+              setMessages((prev) => {
+                const retryMsg = `⚠️ Found ${validation.errors.length} issue(s), auto-fixing...`;
+                const last = prev[prev.length - 1];
+                if (last?.role === "assistant") {
+                  return prev.map((m, i) => (i === prev.length - 1 ? { ...m, content: retryMsg } : m));
+                }
+                return [...prev, { role: "assistant", content: retryMsg, timestamp: Date.now() }];
+              });
+              
+              const retryContext = formatRetryContext(validation.errors, buildRetryCount + 1);
+              let retryFullResponse = "";
+              
+              await streamBuildAgent({
+                messages: apiMessages,
+                projectId: currentProject.id,
+                techStack: currentProject.tech_stack || "react-cdn",
+                schemas,
+                model: selectedModel,
+                designTheme: themeInfo?.prompt,
+                knowledge,
+                currentCode: currentCodeSummary || undefined,
+                snippetsContext: snippetsContext || undefined,
+                retryContext,
+                onDelta: (chunk) => {
+                  retryFullResponse += chunk;
+                  setBuildStreamContent(retryFullResponse);
+                },
+                onDone: (retryText) => {
+                  const retryResult = parseReactFiles(retryText);
+                  if (retryResult.files) {
+                    const retryValidation = validateReactCode(retryResult.files);
+                    if (!retryValidation.valid) {
+                      console.warn("[ChatPanel:retry] Still has errors:", retryValidation.errors);
+                    }
+                    setSandpackFiles(retryResult.files);
+                    if (Object.keys(retryResult.deps).length > 0) setSandpackDeps(retryResult.deps);
+                    setPreviewMode("sandpack");
+                    
+                    const retryChatText = retryResult.chatText || "✅ Fixed and rebuilt successfully";
+                    setMessages((prev) => {
+                      const last = prev[prev.length - 1];
+                      if (last?.role === "assistant") {
+                        return prev.map((m, i) => (i === prev.length - 1 ? { ...m, content: retryChatText } : m));
+                      }
+                      return prev;
+                    });
+                  }
+                  
+                  // Finalize
+                  setIsLoading(false);
+                  setIsBuilding(false);
+                  setBuildStep("");
+                  setPipelineStep("complete");
+                  setCurrentAgent(null);
+                  setBuildRetryCount(0);
+                  isSendingRef.current = false;
+                  setTimeout(() => setBuildStreamContent(""), 3000);
+                  
+                  const persistMessages = messagesRef.current.map(m => ({
+                    role: m.role,
+                    content: typeof m.content === "string" ? m.content : getTextContent(m.content),
+                  }));
+                  saveProject({ chat_history: persistMessages });
+                },
+                onError: (err) => {
+                  console.error("[ChatPanel:retry] Retry failed:", err);
+                  // Fall through with original flawed output
+                  setSandpackFiles(reactResult.files!);
+                  if (Object.keys(reactResult.deps).length > 0) setSandpackDeps(reactResult.deps);
+                  setPreviewMode("sandpack");
+                  setIsLoading(false);
+                  setIsBuilding(false);
+                  setBuildStep("");
+                  setPipelineStep("complete");
+                  setCurrentAgent(null);
+                  setBuildRetryCount(0);
+                  isSendingRef.current = false;
+                },
+              });
+              return; // Retry handler will finalize
             }
             
-            // React/Sandpack mode
+            if (!validation.valid) {
+              console.warn("[ChatPanel:onDone] Validation warnings (max retries reached):", validation.errors);
+            }
+            
+            // React/Sandpack mode — push to preview
             const fileNames = Object.keys(reactResult.files);
             console.log(`[ChatPanel:onDone] ✅ React files found:`, fileNames, `Total code: ${Object.values(reactResult.files).join('').length} chars`);
             setSandpackFiles(reactResult.files);
             if (Object.keys(reactResult.deps).length > 0) setSandpackDeps(reactResult.deps);
             setPreviewMode("sandpack");
+            setBuildRetryCount(0);
           } else {
             console.log("[ChatPanel:onDone] ❌ No React files parsed — falling back to HTML mode");
-            // Legacy HTML mode
             const { files: parsedFiles, html: htmlCode, chatText } = parseMultiFileOutput(fullResponse);
             
             if (Object.keys(parsedFiles).length > 0) {
@@ -992,7 +1084,6 @@ const ChatPanel = forwardRef<ChatPanelHandle, { initialPrompt?: string; onVersio
             
             if (htmlCode) setPreviewHtml(postProcessHtml(htmlCode));
 
-            // Self-review pass for first-time generations
             finalHtml = htmlCode;
             if (htmlCode && htmlCode.length > 200 && currentMessages.length === 0) {
               setBuildStep("Reviewing & polishing...");
@@ -1010,7 +1101,6 @@ const ChatPanel = forwardRef<ChatPanelHandle, { initialPrompt?: string; onVersio
                   if (reviewData.reviewed && reviewData.html && reviewData.html.length > 200) {
                     finalHtml = reviewData.html;
                     setPreviewHtml(postProcessHtml(finalHtml));
-                    console.log("[Phase 3] Self-review pass applied improvements");
                   }
                 }
               } catch (e) {
