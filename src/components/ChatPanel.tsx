@@ -58,37 +58,33 @@ function parseResponse(text: string): [string, string | null] {
 function parseReactFiles(text: string): { chatText: string; files: Record<string, string> | null; deps: Record<string, string> } {
   const files: Record<string, string> = {};
   const deps: Record<string, string> = {};
-  let chatText = text;
 
-  // Match ```react-preview or ```jsx-preview blocks with --- filename.jsx markers
-  const reactFenceRegex = /```(?:react-preview|jsx-preview)\s*\n([\s\S]*?)```/g;
-  let match;
-  let firstFenceStart = -1;
+  // Find the start of react-preview fence
+  let fenceStart = text.indexOf("```react-preview");
+  if (fenceStart === -1) fenceStart = text.indexOf("```jsx-preview");
+  if (fenceStart === -1) return { chatText: text, files: null, deps };
 
-  while ((match = reactFenceRegex.exec(text)) !== null) {
-    if (firstFenceStart === -1) firstFenceStart = match.index;
-    const block = match[1];
-    
-    // Parse file sections: --- /App.jsx or --- App.jsx
-    const fileSections = block.split(/^---\s+/m).filter(Boolean);
-    for (const section of fileSections) {
-      const lines = section.split("\n");
-      const firstLine = lines[0].trim();
-      if (firstLine.match(/^\/?\w[\w/.-]*\.(jsx?|tsx?|css)$/)) {
-        const filename = firstLine.startsWith("/") ? firstLine : `/${firstLine}`;
-        files[filename] = lines.slice(1).join("\n").trim();
-      } else if (firstLine === "dependencies") {
-        // Parse deps block
-        try {
-          const depsJson = lines.slice(1).join("\n").trim();
-          Object.assign(deps, JSON.parse(depsJson));
-        } catch {}
-      }
+  const chatText = text.slice(0, fenceStart).trim();
+  const codeStart = text.indexOf("\n", fenceStart) + 1;
+  
+  // Find closing fence — if not found yet (streaming), use rest of text
+  const fenceEnd = text.indexOf("\n```", codeStart);
+  const block = fenceEnd === -1 ? text.slice(codeStart) : text.slice(codeStart, fenceEnd);
+  
+  // Parse file sections: --- /App.jsx or --- App.jsx
+  const fileSections = block.split(/^---\s+/m).filter(Boolean);
+  for (const section of fileSections) {
+    const lines = section.split("\n");
+    const firstLine = lines[0].trim();
+    if (firstLine.match(/^\/?\w[\w/.-]*\.(jsx?|tsx?|css)$/)) {
+      const filename = firstLine.startsWith("/") ? firstLine : `/${firstLine}`;
+      files[filename] = lines.slice(1).join("\n").trim();
+    } else if (firstLine === "dependencies") {
+      try {
+        const depsJson = lines.slice(1).join("\n").trim();
+        Object.assign(deps, JSON.parse(depsJson));
+      } catch {}
     }
-  }
-
-  if (firstFenceStart !== -1) {
-    chatText = text.slice(0, firstFenceStart).trim();
   }
 
   return {
@@ -283,30 +279,8 @@ const ChatPanel = forwardRef<ChatPanelHandle, { initialPrompt?: string; onVersio
   }, []);
 
   // FIX: Self-healing with proper guards — only trigger once per error batch, never during loading
-  useEffect(() => {
-    if (healTimeoutRef.current) {
-      clearTimeout(healTimeoutRef.current);
-      healTimeoutRef.current = null;
-    }
-    if (
-      previewErrors.length > 0 &&
-      !isLoading &&
-      !isHealing &&
-      !isSendingRef.current &&
-      healAttempts < MAX_HEAL_ATTEMPTS &&
-      messagesRef.current.length > 0
-    ) {
-      healTimeoutRef.current = setTimeout(() => {
-        // Double-check guards at trigger time (not just schedule time)
-        if (!isLoadingRef.current && !isSendingRef.current) {
-          triggerSelfHeal();
-        }
-      }, 5000); // Increased to 5s for more error accumulation
-    }
-    return () => {
-      if (healTimeoutRef.current) clearTimeout(healTimeoutRef.current);
-    };
-  }, [previewErrors.length, isLoading, isHealing, healAttempts]);
+  // Self-healing DISABLED — was causing unwanted auto-fix loops
+  // Users can manually ask the AI to fix issues instead
 
   const triggerSelfHeal = useCallback(() => {
     if (isLoadingRef.current || isHealing || isSendingRef.current || healAttempts >= MAX_HEAL_ATTEMPTS || previewErrors.length === 0) return;
