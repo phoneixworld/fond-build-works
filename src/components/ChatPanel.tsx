@@ -303,7 +303,9 @@ const ChatPanel = forwardRef<ChatPanelHandle, { initialPrompt?: string; onVersio
       setPreviewErrors([]);
       setAttachedImages([]);
     }
-  }, [currentProject, setPreviewHtml]);
+    // Only react to project ID changes, not every currentProject update
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentProject?.id, setPreviewHtml]);
 
   useEffect(() => {
     const handlePaste = (e: ClipboardEvent) => {
