@@ -24,17 +24,39 @@ serve(async (req) => {
         messages: [
           {
             role: "system",
-            content: `You are an AI assistant inside a code editor IDE, similar to Lovable or Cursor. You help users build web apps.
+            content: `You are an AI app builder inside an IDE, similar to Lovable. When a user asks you to build something, you MUST respond in this exact format:
 
-STRICT rules:
-- Respond CONVERSATIONALLY. Describe what you're building in plain language.
-- Do NOT show code blocks or code snippets in chat. The code is generated behind the scenes.
-- Keep responses SHORT — 2-4 sentences max.
-- Be enthusiastic and helpful, like a friendly co-pilot.
-- When the user asks to build something, say what you're creating (e.g. "I'll create a hero section with a navigation bar and a call-to-action button.") — but NEVER show the actual code.
-- Don't give setup instructions or terminal commands.
-- Don't ask unnecessary questions. Just describe what you'll build and confirm it's done.
-- Use bullet points sparingly for listing what you created.`,
+1. First, write a SHORT conversational message (1-3 sentences) describing what you built. This is the chat message the user sees.
+
+2. Then, write the FULL HTML page inside a special code fence:
+
+\`\`\`html-preview
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>body { font-family: 'Inter', sans-serif; }</style>
+</head>
+<body>
+  <!-- Your beautiful HTML here -->
+</body>
+</html>
+\`\`\`
+
+RULES:
+- ALWAYS include the html-preview code fence when building something. This is what renders in the preview.
+- The HTML must be a COMPLETE standalone page with Tailwind CDN.
+- Make it BEAUTIFUL — use gradients, shadows, modern typography, proper spacing.
+- Use placeholder images from https://images.unsplash.com/ with relevant search terms.
+- Include hover effects, transitions, and interactivity using inline onclick or style changes.
+- The chat message should be brief and enthusiastic. Never show code to the user outside the html-preview fence.
+- If the user is just chatting (not asking to build), respond conversationally WITHOUT the html-preview fence.
+- When the user asks to modify the existing page, generate the FULL updated HTML page.
+- Use lucide icons via CDN: <script src="https://unpkg.com/lucide@latest"></script> and <i data-lucide="icon-name"></i> with <script>lucide.createIcons()</script> at the end of body.`,
           },
           ...messages,
         ],
@@ -45,21 +67,18 @@ STRICT rules:
     if (!response.ok) {
       if (response.status === 429) {
         return new Response(JSON.stringify({ error: "Rate limit exceeded. Please try again shortly." }), {
-          status: 429,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
+          status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
       if (response.status === 402) {
         return new Response(JSON.stringify({ error: "Usage limit reached. Please add credits." }), {
-          status: 402,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
+          status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
       const t = await response.text();
       console.error("AI gateway error:", response.status, t);
       return new Response(JSON.stringify({ error: "AI gateway error" }), {
-        status: 500,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
@@ -69,8 +88,7 @@ STRICT rules:
   } catch (e) {
     console.error("chat error:", e);
     return new Response(JSON.stringify({ error: e instanceof Error ? e.message : "Unknown error" }), {
-      status: 500,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
+      status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }
 });

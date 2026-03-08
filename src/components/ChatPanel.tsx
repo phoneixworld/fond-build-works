@@ -1,87 +1,25 @@
 import { useState, useRef, useEffect, useCallback } from "react";
-import { Send, Sparkles, Bot, User, Copy, Check } from "lucide-react";
-import ReactMarkdown from "react-markdown";
-import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
-import { oneDark } from "react-syntax-highlighter/dist/esm/styles/prism";
+import { Send, Sparkles, Bot, User } from "lucide-react";
 import { streamChat } from "@/lib/streamChat";
 import { motion, AnimatePresence } from "framer-motion";
+import { usePreview } from "@/contexts/PreviewContext";
 
 type Msg = { role: "user" | "assistant"; content: string };
 
-const CopyButton = ({ text }: { text: string }) => {
-  const [copied, setCopied] = useState(false);
-  const copy = () => {
-    navigator.clipboard.writeText(text);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
-  };
-  return (
-    <button onClick={copy} className="p-1 rounded hover:bg-border/80 text-muted-foreground hover:text-foreground transition-colors">
-      {copied ? <Check className="w-3 h-3 text-ide-success" /> : <Copy className="w-3 h-3" />}
-    </button>
-  );
-};
+/** Extract html-preview fence and return [chatText, htmlCode] */
+function parseResponse(text: string): [string, string | null] {
+  const fenceStart = text.indexOf("```html-preview");
+  if (fenceStart === -1) return [text, null];
 
-const MarkdownContent = ({ content }: { content: string }) => (
-  <ReactMarkdown
-    components={{
-      code(props) {
-        const { className, children, node, ref: _ref, ...rest } = props as any;
-        const match = /language-(\w+)/.exec(className || "");
-        const codeStr = String(children).replace(/\n$/, "");
-        const isBlock = match || String(children).includes("\n");
+  const chatPart = text.slice(0, fenceStart).trim();
+  const codeStart = text.indexOf("\n", fenceStart) + 1;
+  const fenceEnd = text.indexOf("```", codeStart);
+  const htmlCode = fenceEnd === -1
+    ? text.slice(codeStart) // still streaming
+    : text.slice(codeStart, fenceEnd);
 
-        if (isBlock) {
-          const lang = match ? match[1] : "text";
-          return (
-            <div className="relative my-3 rounded-lg overflow-hidden border border-border">
-              <div className="flex items-center justify-between px-3 py-1.5 bg-ide-panel-header border-b border-border">
-                <span className="text-[10px] font-mono text-muted-foreground uppercase">{lang}</span>
-                <CopyButton text={codeStr} />
-              </div>
-              <SyntaxHighlighter
-                style={oneDark}
-                language={lang}
-                PreTag="div"
-                customStyle={{
-                  margin: 0,
-                  padding: "12px 16px",
-                  background: "hsl(220 14% 10%)",
-                  fontSize: "12px",
-                  lineHeight: "1.6",
-                }}
-              >
-                {codeStr}
-              </SyntaxHighlighter>
-            </div>
-          );
-        }
-
-        return (
-          <code className="px-1.5 py-0.5 rounded bg-secondary text-primary font-mono text-xs" {...rest}>
-            {children}
-          </code>
-        );
-      },
-      p: ({ children }) => <p className="mb-2 last:mb-0">{children}</p>,
-      ul: ({ children }) => <ul className="list-disc pl-4 mb-2 space-y-1">{children}</ul>,
-      ol: ({ children }) => <ol className="list-decimal pl-4 mb-2 space-y-1">{children}</ol>,
-      h1: ({ children }) => <h1 className="text-base font-bold mb-2 mt-3">{children}</h1>,
-      h2: ({ children }) => <h2 className="text-sm font-bold mb-2 mt-3">{children}</h2>,
-      h3: ({ children }) => <h3 className="text-sm font-semibold mb-1 mt-2">{children}</h3>,
-      blockquote: ({ children }) => (
-        <blockquote className="border-l-2 border-primary pl-3 italic text-muted-foreground my-2">{children}</blockquote>
-      ),
-      a: ({ href, children }) => (
-        <a href={href} className="text-primary underline underline-offset-2 hover:text-primary/80" target="_blank" rel="noopener">
-          {children}
-        </a>
-      ),
-    }}
-  >
-    {content}
-  </ReactMarkdown>
-);
+  return [chatPart, htmlCode.trim()];
+}
 
 const ChatPanel = () => {
   const [messages, setMessages] = useState<Msg[]>([]);
@@ -89,6 +27,7 @@ const ChatPanel = () => {
   const [isLoading, setIsLoading] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+  const { setPreviewHtml, setIsBuilding, setBuildStep } = usePreview();
 
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
@@ -101,16 +40,40 @@ const ChatPanel = () => {
     if (inputRef.current) inputRef.current.style.height = "36px";
     setMessages((prev) => [...prev, userMsg]);
     setIsLoading(true);
+    setIsBuilding(true);
+    setBuildStep("Understanding your request...");
 
-    let assistantSoFar = "";
+    let fullResponse = "";
+    let hasSetAnalyzing = false;
+    let hasSetBuilding = false;
+
     const upsert = (chunk: string) => {
-      assistantSoFar += chunk;
+      fullResponse += chunk;
+      const [chatText, htmlCode] = parseResponse(fullResponse);
+
+      // Update build step based on progress
+      if (!hasSetAnalyzing && fullResponse.length > 20) {
+        setBuildStep("Generating components...");
+        hasSetAnalyzing = true;
+      }
+      if (!hasSetBuilding && htmlCode) {
+        setBuildStep("Building your app...");
+        hasSetBuilding = true;
+      }
+
+      // Live update preview as HTML streams in
+      if (htmlCode) {
+        setPreviewHtml(htmlCode);
+      }
+
+      // Show only the chat part (no code) in messages
       setMessages((prev) => {
+        const displayText = chatText || "Building...";
         const last = prev[prev.length - 1];
         if (last?.role === "assistant") {
-          return prev.map((m, i) => (i === prev.length - 1 ? { ...m, content: assistantSoFar } : m));
+          return prev.map((m, i) => (i === prev.length - 1 ? { ...m, content: displayText } : m));
         }
-        return [...prev, { role: "assistant", content: assistantSoFar }];
+        return [...prev, { role: "assistant", content: displayText }];
       });
     };
 
@@ -118,16 +81,35 @@ const ChatPanel = () => {
       await streamChat({
         messages: [...messages, userMsg],
         onDelta: upsert,
-        onDone: () => setIsLoading(false),
+        onDone: () => {
+          setIsLoading(false);
+          setIsBuilding(false);
+          setBuildStep("");
+
+          // Final parse to make sure preview is set
+          const [chatText, htmlCode] = parseResponse(fullResponse);
+          if (htmlCode) setPreviewHtml(htmlCode);
+
+          // Clean up the final message
+          if (chatText) {
+            setMessages((prev) =>
+              prev.map((m, i) => (i === prev.length - 1 && m.role === "assistant" ? { ...m, content: chatText } : m))
+            );
+          }
+        },
         onError: (err) => {
           setMessages((prev) => [...prev, { role: "assistant", content: `⚠️ ${err}` }]);
           setIsLoading(false);
+          setIsBuilding(false);
+          setBuildStep("");
         },
       });
     } catch {
       setIsLoading(false);
+      setIsBuilding(false);
+      setBuildStep("");
     }
-  }, [input, isLoading, messages]);
+  }, [input, isLoading, messages, setPreviewHtml, setIsBuilding, setBuildStep]);
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === "Enter" && !e.shiftKey) {
@@ -149,7 +131,7 @@ const ChatPanel = () => {
         <span className="text-sm font-semibold text-foreground">AI Chat</span>
         {messages.length > 0 && (
           <button
-            onClick={() => setMessages([])}
+            onClick={() => { setMessages([]); setPreviewHtml(""); }}
             className="ml-auto text-xs text-muted-foreground hover:text-foreground transition-colors"
           >
             Clear
@@ -164,11 +146,11 @@ const ChatPanel = () => {
               <Bot className="w-6 h-6 text-primary" />
             </div>
             <div className="text-center space-y-1">
-              <p className="text-sm font-medium text-foreground">How can I help?</p>
-              <p className="text-xs">Describe what you want to build</p>
+              <p className="text-sm font-medium text-foreground">What do you want to build?</p>
+              <p className="text-xs">Describe it and I'll create it for you</p>
             </div>
             <div className="flex flex-wrap gap-2 justify-center max-w-[280px]">
-              {["Build a landing page", "Create a dashboard", "Add a contact form"].map((s) => (
+              {["A school website", "A portfolio page", "A restaurant landing page"].map((s) => (
                 <button
                   key={s}
                   onClick={() => { setInput(s); inputRef.current?.focus(); }}
@@ -202,13 +184,7 @@ const ChatPanel = () => {
                 <span className="text-xs font-medium text-muted-foreground mb-1 block">
                   {msg.role === "user" ? "You" : "Assistant"}
                 </span>
-                {msg.role === "assistant" ? (
-                  <div className="text-sm text-foreground leading-relaxed">
-                    <MarkdownContent content={msg.content} />
-                  </div>
-                ) : (
-                  <p className="text-sm text-foreground">{msg.content}</p>
-                )}
+                <p className="text-sm text-foreground leading-relaxed">{msg.content}</p>
               </div>
             </motion.div>
           ))}
