@@ -9,7 +9,7 @@ import { PreviewProvider } from "@/contexts/PreviewContext";
 import { ProjectProvider, useProjects } from "@/contexts/ProjectContext";
 import { useAuth } from "@/hooks/useAuth";
 import ChatPanel from "@/components/ChatPanel";
-import ProjectList from "@/components/ProjectList";
+// ProjectList removed — projects accessed from landing page
 import CodeEditor from "@/components/CodeEditor";
 import PreviewPanel from "@/components/PreviewPanel";
 import LandingPage from "@/components/LandingPage";
@@ -93,17 +93,9 @@ const IDELayout = () => {
         {/* Main area */}
         <div className="flex-1 overflow-hidden">
           <ResizablePanelGroup direction="horizontal">
-            {/* Left: Projects + Chat */}
+            {/* Left: Chat only */}
             <ResizablePanel defaultSize={35} minSize={25} maxSize={50}>
-              <ResizablePanelGroup direction="vertical">
-                <ResizablePanel defaultSize={25} minSize={10} maxSize={45}>
-                  <ProjectList />
-                </ResizablePanel>
-                <ResizableHandle className="h-px bg-border hover:bg-primary transition-colors" />
-                <ResizablePanel defaultSize={75}>
-                  <ChatPanel initialPrompt={initialPrompt} />
-                </ResizablePanel>
-              </ResizablePanelGroup>
+              <ChatPanel initialPrompt={initialPrompt} />
             </ResizablePanel>
 
             <ResizableHandle className="w-px bg-border hover:bg-primary transition-colors" />
