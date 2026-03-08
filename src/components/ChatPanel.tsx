@@ -857,8 +857,8 @@ const ChatPanel = forwardRef<ChatPanelHandle, { initialPrompt?: string; onVersio
             })}
           </AnimatePresence>
 
-          {/* Build Pipeline Progress Card */}
-          {(isLoading || (buildStreamContent.length > 100 && !isLoading)) && (
+          {/* Build Pipeline Progress Card — only show when HTML is being generated */}
+          {buildStreamContent.length > 0 && (buildStreamContent.includes("```html") || isLoading) && (
             <BuildPipelineCard
               isBuilding={isLoading}
               streamContent={buildStreamContent}
