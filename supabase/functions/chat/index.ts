@@ -58,12 +58,114 @@ IMPORTANT: When building apps that need data persistence (todo lists, forms, das
 
   const techStackInstructions: Record<string, string> = {
     "html-tailwind": `Use HTML + Tailwind CSS (via CDN). Include <script src="https://cdn.tailwindcss.com"></script>.
-Configure a custom Tailwind theme with your chosen color palette.`,
-    "html-bootstrap": `Use HTML + Bootstrap 5 (via CDN). Include Bootstrap CSS and JS from CDN.`,
-    "react-cdn": `Use React via CDN with Babel standalone. Include React, ReactDOM, Babel, and Tailwind CDN scripts.
-Write JSX in <script type="text/babel">. Use functional components with hooks.`,
-    "vue-cdn": `Use Vue 3 via CDN with Tailwind. Use Composition API with setup().`,
-    "vanilla-js": `Use plain HTML, CSS, and vanilla JavaScript. No frameworks. Clean, semantic HTML.`,
+Configure a custom Tailwind theme with your chosen color palette.
+
+## ES MODULES — Use Real npm Packages!
+You can import ANY npm package using ES modules via esm.sh. This is POWERFUL — use it!
+
+Add this to the <head>:
+<script type="importmap">
+{
+  "imports": {
+    "react": "https://esm.sh/react@18",
+    "react-dom/client": "https://esm.sh/react-dom@18/client",
+    "react/jsx-runtime": "https://esm.sh/react@18/jsx-runtime",
+    "chart.js": "https://esm.sh/chart.js@4",
+    "three": "https://esm.sh/three@0.160",
+    "lodash-es": "https://esm.sh/lodash-es@4",
+    "date-fns": "https://esm.sh/date-fns@3",
+    "framer-motion": "https://esm.sh/framer-motion@11",
+    "zustand": "https://esm.sh/zustand@4",
+    "zod": "https://esm.sh/zod@3"
+  }
+}
+</script>
+
+Then use <script type="module"> to import them:
+<script type="module">
+import React, { useState, useEffect } from 'react';
+import { createRoot } from 'react-dom/client';
+// ... build your app with real React!
+</script>
+
+You can import ANY package from esm.sh: https://esm.sh/PACKAGE_NAME@VERSION
+For packages with sub-paths: https://esm.sh/PACKAGE_NAME@VERSION/sub/path
+
+### When to use ES modules (PREFER THIS for complex apps):
+- Apps with complex state management → use zustand or React state
+- Apps with charts → import chart.js directly
+- Apps with 3D → import three.js
+- Apps with form validation → import zod
+- Apps needing date handling → import date-fns
+- ANY app that would benefit from React components and hooks
+
+### When plain HTML is fine:
+- Simple landing pages, static content
+- Very simple interactive pages
+
+IMPORTANT: When using React via ES modules, render like this:
+<div id="root"></div>
+<script type="module">
+import React, { useState } from 'react';
+import { createRoot } from 'react-dom/client';
+
+function App() {
+  const [count, setCount] = useState(0);
+  return React.createElement('div', { className: 'p-8' },
+    React.createElement('h1', null, 'Hello World'),
+    React.createElement('button', { onClick: () => setCount(c => c + 1) }, \`Count: \${count}\`)
+  );
+}
+
+createRoot(document.getElementById('root')).render(React.createElement(App));
+</script>
+
+Note: Since we don't have JSX transform, use React.createElement() or the htm library:
+<script type="importmap">{ "imports": { "htm": "https://esm.sh/htm@3" } }</script>
+Then: import htm from 'htm'; const html = htm.bind(React.createElement);
+Now you can write: html\`<div className="p-4"><h1>Hello \${name}</h1></div>\`
+This gives you JSX-like syntax without a build step!`,
+
+    "html-bootstrap": `Use HTML + Bootstrap 5 (via CDN). Include Bootstrap CSS and JS from CDN. You can also use ES modules via esm.sh for complex functionality.`,
+    "react-cdn": `Use React via ES modules with htm for JSX-like templates. Include this setup:
+
+<script src="https://cdn.tailwindcss.com"></script>
+<script type="importmap">
+{
+  "imports": {
+    "react": "https://esm.sh/react@18",
+    "react-dom/client": "https://esm.sh/react-dom@18/client",
+    "react/jsx-runtime": "https://esm.sh/react@18/jsx-runtime",
+    "htm": "https://esm.sh/htm@3"
+  }
+}
+</script>
+
+<div id="root"></div>
+<script type="module">
+import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
+import { createRoot } from 'react-dom/client';
+import htm from 'htm';
+const html = htm.bind(React.createElement);
+
+function App() {
+  const [state, setState] = useState(initialValue);
+  return html\`<div className="p-8">...</div>\`;
+}
+
+createRoot(document.getElementById('root')).render(html\`<\${App} />\`);
+</script>
+
+You can import ANY npm package via esm.sh. For example:
+- Charts: import { Chart } from 'https://esm.sh/chart.js@4/auto';
+- Icons: import { icons } from 'https://esm.sh/lucide@0.400';
+- Animation: import { motion } from 'https://esm.sh/framer-motion@11';
+- State: import { create } from 'https://esm.sh/zustand@4';
+
+Build REAL React apps with hooks, state management, and npm packages. This is NOT a toy — build production-quality React applications.`,
+
+    "vue-cdn": `Use Vue 3 via CDN with Tailwind. Use Composition API with setup(). You can also import npm packages via esm.sh.`,
+    "vanilla-js": `Use plain HTML, CSS, and vanilla JavaScript. No frameworks. Clean, semantic HTML. You can use ES modules via esm.sh for utility libraries.`,
     "react-node": `Generate a FULL-STACK project with:
 ## Frontend (React + Tailwind)
 - Generate files using \`\`\`file:src/App.tsx format
@@ -391,7 +493,7 @@ serve(async (req) => {
         ],
         stream: true,
         temperature: 0.7,
-        max_tokens: 16000,
+        max_tokens: 32000,
       }),
     });
 
