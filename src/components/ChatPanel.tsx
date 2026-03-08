@@ -492,6 +492,9 @@ const ChatPanel = forwardRef<ChatPanelHandle, { initialPrompt?: string; onVersio
     }
     setMessages([]);
     setPreviewHtml("");
+    setSandpackFiles(null);
+    setSandpackDeps({});
+    setPreviewMode("html");
     setPreviewErrors([]);
     setHealAttempts(0);
     setIsHealing(false);
