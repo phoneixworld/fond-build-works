@@ -37,7 +37,9 @@ function getImageUrls(content: MsgContent): string[] {
 }
 
 function parseResponse(text: string): [string, string | null] {
-  const fenceStart = text.indexOf("```html-preview");
+  // Try html-preview first, then fall back to plain html fence
+  let fenceStart = text.indexOf("```html-preview");
+  if (fenceStart === -1) fenceStart = text.indexOf("```html");
   if (fenceStart === -1) return [text, null];
   const chatPart = text.slice(0, fenceStart).trim();
   const codeStart = text.indexOf("\n", fenceStart) + 1;
