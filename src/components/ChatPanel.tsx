@@ -897,6 +897,25 @@ const ChatPanel = forwardRef<ChatPanelHandle, { initialPrompt?: string; onVersio
         }
       } catch {}
 
+      // Collect current app code for AI context awareness
+      let currentCodeSummary = "";
+      if (currentSandpackFiles && Object.keys(currentSandpackFiles).length > 0) {
+        const fileEntries = Object.entries(currentSandpackFiles);
+        const totalChars = fileEntries.reduce((sum, [, code]) => sum + code.length, 0);
+        if (totalChars < 8000) {
+          currentCodeSummary = fileEntries.map(([path, code]) => `--- ${path}\n${code}`).join("\n\n");
+        } else {
+          currentCodeSummary = fileEntries.map(([path, code]) => `--- ${path} (${code.length} chars)\n${code.slice(0, 500)}...[truncated]`).join("\n\n");
+        }
+      } else if (currentPreviewHtml && currentPreviewHtml.length > 0) {
+        currentCodeSummary = currentPreviewHtml.length < 8000
+          ? currentPreviewHtml
+          : currentPreviewHtml.slice(0, 6000) + "\n...[truncated]";
+      }
+
+      // Get component snippets reference for AI
+      const snippetsContext = getSnippetsPromptContext();
+
       // FIX: Read messages from ref to avoid stale closures
       const currentMessages = messagesRef.current;
       const apiMessages = [...currentMessages, userMsg].map(m => ({
