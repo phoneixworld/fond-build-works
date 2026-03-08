@@ -77,6 +77,8 @@ const PreviewPanel = () => {
             })}
           </div>
 
+          <DirectTouch active={directTouchActive} onToggle={toggleDirectTouch} />
+
           <Tooltip>
             <TooltipTrigger asChild>
               <button className="text-muted-foreground hover:text-foreground transition-colors">
