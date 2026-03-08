@@ -943,6 +943,8 @@ const ChatPanel = forwardRef<ChatPanelHandle, { initialPrompt?: string; onVersio
         designTheme: themeInfo?.prompt,
         knowledge,
         templateContext: templateCtx || undefined,
+        currentCode: currentCodeSummary || undefined,
+        snippetsContext: snippetsContext || undefined,
         onDelta: upsert,
         onDone: async () => {
           if (abortController.signal.aborted) return;
