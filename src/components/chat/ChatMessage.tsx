@@ -69,6 +69,13 @@ function parseStructuredResponse(text: string, isStreaming?: boolean): ParsedSec
     sections.push({ type: "thinking", content: thinkingText });
   }
 
+  // While streaming, skip task/summary parsing — just render as plain text to avoid premature "Changes complete"
+  if (isStreaming) {
+    sections.push({ type: "text", content: remaining });
+    if (sections.length === 0) sections.push({ type: "text", content: text });
+    return sections;
+  }
+
   const taskLines: { label: string; done: boolean }[] = [];
   const lines = remaining.split("\n");
   const nonTaskLines: string[] = [];
