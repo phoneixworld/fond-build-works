@@ -56,6 +56,87 @@ POST JSON with:
 
 IMPORTANT: When building apps that need data persistence (todo lists, forms, dashboards, etc.), ALWAYS use the Data API. When building apps that need user accounts, ALWAYS use the Auth API. Make the app FULLY FUNCTIONAL with real data persistence.`;
 
+  const reactCdnInstructions = `You generate REAL React JSX code that runs in a Sandpack bundler with full npm support.
+
+## OUTPUT FORMAT — CRITICAL
+Instead of \\\`\\\`\\\`html-preview, wrap your output in a \\\`\\\`\\\`react-preview fence.
+Inside, use --- filename markers to define each file:
+
+\\\`\\\`\\\`react-preview
+--- /App.jsx
+import React from "react";
+import Header from "./components/Header";
+export default function App() {
+  return <div className="min-h-screen bg-white"><Header /></div>;
+}
+--- /components/Header.jsx
+import React from "react";
+export default function Header() {
+  return <header className="p-6"><h1>Brand</h1></header>;
+}
+--- dependencies
+{
+  "lucide-react": "^0.400.0",
+  "framer-motion": "^11.0.0"
+}
+\\\`\\\`\\\`
+
+## RULES
+- Write standard JSX (not React.createElement) — the bundler compiles it
+- Use .jsx extension for all component files
+- The entry point is /App.jsx — it MUST export a default component
+- Break apps into MULTIPLE component files under /components/
+- Import npm packages normally: import { motion } from "framer-motion"
+- Tailwind CSS is available via CDN — use className with Tailwind classes
+- For additional npm packages, include a --- dependencies section with a JSON object
+- Available by default: react, react-dom, lucide-react, framer-motion, date-fns, recharts, react-router-dom, clsx, tailwind-merge
+- Use Lucide React icons EXTENSIVELY: import { Heart, Star, ArrowRight } from "lucide-react"
+- Use framer-motion for animations: import { motion } from "framer-motion"
+- Use React Router for multi-page apps: import { BrowserRouter, Routes, Route } from "react-router-dom"
+
+## REACT DESIGN SYSTEM — Apply to EVERY app
+
+### Typography
+- Import a Google Font via a /styles.css file: @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+- Hero headings: text-4xl md:text-5xl lg:text-6xl font-extrabold leading-tight tracking-tight
+- Section headings: text-3xl font-bold
+- Body: text-base text-gray-600 leading-relaxed
+
+### Color Palette
+- Pick a strong primary color that matches the app type (indigo for tech, emerald for edu, rose for creative, amber for food)
+- Primary CTA: bg-{primary}-600 text-white shadow-lg hover:shadow-xl hover:-translate-y-0.5 transition-all
+- Backgrounds: alternate white and gray-50 sections for visual rhythm
+
+### Component Quality
+- **Buttons**: px-6 py-3 rounded-xl font-medium text-sm with shadow, hover lift, focus ring
+- **Cards**: bg-white rounded-2xl border border-gray-100 p-6 hover:shadow-lg hover:-translate-y-1 transition-all duration-300
+- **Navigation**: sticky top-0 backdrop-blur-xl bg-white/80 border-b border-gray-100 with mobile hamburger
+- **Sections**: py-20 md:py-24 with max-w-7xl mx-auto px-6
+
+### Visual Polish
+- Use framer-motion for scroll animations and page transitions
+- Decorative blobs, gradient text, hover states on EVERYTHING interactive
+- Lucide React icons in feature cards
+
+### Layout Patterns
+- Hero: min-h-[80vh] flex items-center, centered text, 2 CTA buttons
+- Features: grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8
+- Footer: 4-column grid with logo, link groups, social icons
+
+### Images — Use CSS/SVG only
+- NEVER use external URLs (Unsplash etc.)
+- Avatars: colored circles with initials. Hero visuals: CSS gradients, inline SVGs. Feature icons: Lucide React icons.
+
+### Responsive
+- ALWAYS mobile-first: grid-cols-1 md:grid-cols-2 lg:grid-cols-3
+- Text sizes: text-3xl md:text-4xl lg:text-5xl
+- Hidden elements: hidden md:flex for desktop nav`;
+
+  const reactBackendSuffix = `
+For backend/data needs, use the Data API and Auth API described above.
+IMPORTANT: Everything runs in a browser preview. Generate React JSX files in react-preview fences.
+NEVER tell users to run terminal commands, install dependencies, or start servers.`;
+
   const techStackInstructions: Record<string, string> = {
     "html-tailwind": `Use HTML + Tailwind CSS + DaisyUI (via CDN). Include BOTH in <head>:
 <link href="https://cdn.jsdelivr.net/npm/daisyui@4/dist/full.min.css" rel="stylesheet" type="text/css" />
