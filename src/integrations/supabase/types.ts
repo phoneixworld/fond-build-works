@@ -41,6 +41,36 @@ export type Database = {
         }
         Relationships: []
       }
+      projects: {
+        Row: {
+          chat_history: Json
+          created_at: string
+          html_content: string
+          id: string
+          name: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          chat_history?: Json
+          created_at?: string
+          html_content?: string
+          id?: string
+          name?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          chat_history?: Json
+          created_at?: string
+          html_content?: string
+          id?: string
+          name?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never

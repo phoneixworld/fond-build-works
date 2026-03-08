@@ -3,6 +3,7 @@ import { Send, Sparkles, Bot, User } from "lucide-react";
 import { streamChat } from "@/lib/streamChat";
 import { motion, AnimatePresence } from "framer-motion";
 import { usePreview } from "@/contexts/PreviewContext";
+import { useProjects } from "@/contexts/ProjectContext";
 
 type Msg = { role: "user" | "assistant"; content: string };
 
@@ -10,18 +11,15 @@ type Msg = { role: "user" | "assistant"; content: string };
 function parseResponse(text: string): [string, string | null] {
   const fenceStart = text.indexOf("```html-preview");
   if (fenceStart === -1) return [text, null];
-
   const chatPart = text.slice(0, fenceStart).trim();
   const codeStart = text.indexOf("\n", fenceStart) + 1;
   const fenceEnd = text.indexOf("```", codeStart);
-  const htmlCode = fenceEnd === -1
-    ? text.slice(codeStart) // still streaming
-    : text.slice(codeStart, fenceEnd);
-
+  const htmlCode = fenceEnd === -1 ? text.slice(codeStart) : text.slice(codeStart, fenceEnd);
   return [chatPart, htmlCode.trim()];
 }
 
 const ChatPanel = () => {
+  const { currentProject, saveProject, createProject } = useProjects();
   const [messages, setMessages] = useState<Msg[]>([]);
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
@@ -29,12 +27,32 @@ const ChatPanel = () => {
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const { setPreviewHtml, setIsBuilding, setBuildStep } = usePreview();
 
+  // Sync messages & preview when project changes
+  useEffect(() => {
+    if (currentProject) {
+      const history = currentProject.chat_history ?? [];
+      setMessages(history);
+      setPreviewHtml(currentProject.html_content || "");
+    } else {
+      setMessages([]);
+      setPreviewHtml("");
+    }
+  }, [currentProject?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
   }, [messages]);
 
   const send = useCallback(async () => {
     if (!input.trim() || isLoading) return;
+
+    // Auto-create project if none selected
+    let project = currentProject;
+    if (!project) {
+      project = await createProject(input.trim().slice(0, 40));
+      if (!project) return;
+    }
+
     const userMsg: Msg = { role: "user", content: input.trim() };
     setInput("");
     if (inputRef.current) inputRef.current.style.height = "36px";
@@ -51,7 +69,6 @@ const ChatPanel = () => {
       fullResponse += chunk;
       const [chatText, htmlCode] = parseResponse(fullResponse);
 
-      // Update build step based on progress
       if (!hasSetAnalyzing && fullResponse.length > 20) {
         setBuildStep("Generating components...");
         hasSetAnalyzing = true;
@@ -60,13 +77,8 @@ const ChatPanel = () => {
         setBuildStep("Building your app...");
         hasSetBuilding = true;
       }
+      if (htmlCode) setPreviewHtml(htmlCode);
 
-      // Live update preview as HTML streams in
-      if (htmlCode) {
-        setPreviewHtml(htmlCode);
-      }
-
-      // Show only the chat part (no code) in messages
       setMessages((prev) => {
         const displayText = chatText || "Building...";
         const last = prev[prev.length - 1];
@@ -86,16 +98,26 @@ const ChatPanel = () => {
           setIsBuilding(false);
           setBuildStep("");
 
-          // Final parse to make sure preview is set
           const [chatText, htmlCode] = parseResponse(fullResponse);
           if (htmlCode) setPreviewHtml(htmlCode);
 
-          // Clean up the final message
-          if (chatText) {
-            setMessages((prev) =>
-              prev.map((m, i) => (i === prev.length - 1 && m.role === "assistant" ? { ...m, content: chatText } : m))
-            );
-          }
+          // Build final messages for saving
+          setMessages((prev) => {
+            const final = chatText
+              ? prev.map((m, i) => (i === prev.length - 1 && m.role === "assistant" ? { ...m, content: chatText } : m))
+              : prev;
+
+            // Auto-save to database
+            saveProject({
+              chat_history: final,
+              html_content: htmlCode || project!.html_content || "",
+              name: project!.name === "Untitled Project" && final.length > 0
+                ? final[0].content.slice(0, 40)
+                : project!.name,
+            });
+
+            return final;
+          });
         },
         onError: (err) => {
           setMessages((prev) => [...prev, { role: "assistant", content: `⚠️ ${err}` }]);
@@ -109,13 +131,10 @@ const ChatPanel = () => {
       setIsBuilding(false);
       setBuildStep("");
     }
-  }, [input, isLoading, messages, setPreviewHtml, setIsBuilding, setBuildStep]);
+  }, [input, isLoading, messages, currentProject, createProject, saveProject, setPreviewHtml, setIsBuilding, setBuildStep]);
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === "Enter" && !e.shiftKey) {
-      e.preventDefault();
-      send();
-    }
+    if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(); }
   };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
@@ -129,13 +148,10 @@ const ChatPanel = () => {
       <div className="flex items-center gap-2 px-4 py-3 border-b border-border bg-ide-panel-header">
         <Sparkles className="w-4 h-4 text-primary" />
         <span className="text-sm font-semibold text-foreground">AI Chat</span>
-        {messages.length > 0 && (
-          <button
-            onClick={() => { setMessages([]); setPreviewHtml(""); }}
-            className="ml-auto text-xs text-muted-foreground hover:text-foreground transition-colors"
-          >
-            Clear
-          </button>
+        {currentProject && (
+          <span className="ml-auto text-xs text-muted-foreground truncate max-w-[140px]">
+            {currentProject.name}
+          </span>
         )}
       </div>
 
@@ -164,26 +180,12 @@ const ChatPanel = () => {
         )}
         <AnimatePresence initial={false}>
           {messages.map((msg, i) => (
-            <motion.div
-              key={i}
-              initial={{ opacity: 0, y: 6 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.15 }}
-              className="flex gap-3"
-            >
-              <div className={`w-6 h-6 rounded-md flex items-center justify-center shrink-0 mt-0.5 ${
-                msg.role === "user" ? "bg-primary/15" : "bg-accent/15"
-              }`}>
-                {msg.role === "user" ? (
-                  <User className="w-3.5 h-3.5 text-primary" />
-                ) : (
-                  <Bot className="w-3.5 h-3.5 text-accent" />
-                )}
+            <motion.div key={i} initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.15 }} className="flex gap-3">
+              <div className={`w-6 h-6 rounded-md flex items-center justify-center shrink-0 mt-0.5 ${msg.role === "user" ? "bg-primary/15" : "bg-accent/15"}`}>
+                {msg.role === "user" ? <User className="w-3.5 h-3.5 text-primary" /> : <Bot className="w-3.5 h-3.5 text-accent" />}
               </div>
               <div className="flex-1 min-w-0">
-                <span className="text-xs font-medium text-muted-foreground mb-1 block">
-                  {msg.role === "user" ? "You" : "Assistant"}
-                </span>
+                <span className="text-xs font-medium text-muted-foreground mb-1 block">{msg.role === "user" ? "You" : "Assistant"}</span>
                 <p className="text-sm text-foreground leading-relaxed">{msg.content}</p>
               </div>
             </motion.div>
@@ -216,11 +218,7 @@ const ChatPanel = () => {
             disabled={isLoading}
             rows={1}
           />
-          <button
-            onClick={send}
-            disabled={isLoading || !input.trim()}
-            className="text-primary hover:text-primary/80 disabled:text-muted-foreground transition-colors pb-0.5"
-          >
+          <button onClick={send} disabled={isLoading || !input.trim()} className="text-primary hover:text-primary/80 disabled:text-muted-foreground transition-colors pb-0.5">
             <Send className="w-4 h-4" />
           </button>
         </div>
