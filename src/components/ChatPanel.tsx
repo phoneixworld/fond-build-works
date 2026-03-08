@@ -72,6 +72,7 @@ const ChatPanel = ({ initialPrompt }: { initialPrompt?: string }) => {
   const [isLoading, setIsLoading] = useState(false);
   const [pendingPrompt, setPendingPrompt] = useState<string | null>(null);
   const [selectedModel, setSelectedModel] = useState<AIModelId>(DEFAULT_MODEL);
+  const [selectedTheme, setSelectedTheme] = useState<string>("minimal");
   const [previewErrors, setPreviewErrors] = useState<string[]>([]);
   const [attachedImages, setAttachedImages] = useState<string[]>([]); // base64 data URLs
   const [isDragOver, setIsDragOver] = useState(false);
