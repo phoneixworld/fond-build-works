@@ -54,6 +54,50 @@ function parseResponse(text: string): [string, string | null] {
   return [chatPart, htmlCode.trim()];
 }
 
+/** Parse ```react-preview fences into a file map for Sandpack */
+function parseReactFiles(text: string): { chatText: string; files: Record<string, string> | null; deps: Record<string, string> } {
+  const files: Record<string, string> = {};
+  const deps: Record<string, string> = {};
+  let chatText = text;
+
+  // Match ```react-preview or ```jsx-preview blocks with --- filename.jsx markers
+  const reactFenceRegex = /```(?:react-preview|jsx-preview)\s*\n([\s\S]*?)```/g;
+  let match;
+  let firstFenceStart = -1;
+
+  while ((match = reactFenceRegex.exec(text)) !== null) {
+    if (firstFenceStart === -1) firstFenceStart = match.index;
+    const block = match[1];
+    
+    // Parse file sections: --- /App.jsx or --- App.jsx
+    const fileSections = block.split(/^---\s+/m).filter(Boolean);
+    for (const section of fileSections) {
+      const lines = section.split("\n");
+      const firstLine = lines[0].trim();
+      if (firstLine.match(/^\/?\w[\w/.-]*\.(jsx?|tsx?|css)$/)) {
+        const filename = firstLine.startsWith("/") ? firstLine : `/${firstLine}`;
+        files[filename] = lines.slice(1).join("\n").trim();
+      } else if (firstLine === "dependencies") {
+        // Parse deps block
+        try {
+          const depsJson = lines.slice(1).join("\n").trim();
+          Object.assign(deps, JSON.parse(depsJson));
+        } catch {}
+      }
+    }
+  }
+
+  if (firstFenceStart !== -1) {
+    chatText = text.slice(0, firstFenceStart).trim();
+  }
+
+  return {
+    chatText,
+    files: Object.keys(files).length > 0 ? files : null,
+    deps,
+  };
+}
+
 function postProcessHtml(html: string): string {
   if (!html) return html;
   
