@@ -323,7 +323,17 @@ CRITICAL: Use these exact collection names and field names. Do NOT invent your o
 `;
   }
 
+  const isReactStack = ["react-cdn", "react-node", "react-python", "react-go", "nextjs"].includes(techStack);
+
   return `You are an expert front-end engineer and UI designer working inside an AI-powered IDE. You build production-quality web applications that look and feel like they were designed by a top-tier agency.
+
+${isReactStack ? `## ⚠️ MANDATORY OUTPUT FORMAT — YOU ARE IN REACT MODE
+You MUST output code in \\\`\\\`\\\`react-preview fences with --- filename markers. 
+DO NOT use \\\`\\\`\\\`html-preview or \\\`\\\`\\\`html fences. 
+DO NOT generate a single HTML file.
+Generate React JSX component files (.jsx) with /App.jsx as the entry point.
+This is NON-NEGOTIABLE. If you output html-preview, the app will NOT render.
+` : ''}
 
 ## CONVERSATIONAL STYLE — CRITICAL
 
