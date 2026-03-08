@@ -671,6 +671,7 @@ const ChatPanel = forwardRef<ChatPanelHandle, { initialPrompt?: string; onVersio
     let hasSetAnalyzing = false;
     let hasSetBuilding = false;
 
+    let streamParseCount = 0;
     const upsert = (chunk: string) => {
       if (abortController.signal.aborted) return;
       fullResponse += chunk;
@@ -688,9 +689,13 @@ const ChatPanel = forwardRef<ChatPanelHandle, { initialPrompt?: string; onVersio
       
       if (reactResult.files) {
         if (!hasSetBuilding) {
+          const fileNames = Object.keys(reactResult.files);
+          const totalChars = Object.values(reactResult.files).join('').length;
+          console.log(`[upsert] ✅ First React parse success: files=${fileNames.join(',')}, chars=${totalChars}`);
           setBuildStep("Bundling React app...");
           hasSetBuilding = true;
         }
+        streamParseCount++;
         setSandpackFiles(reactResult.files);
         if (Object.keys(reactResult.deps).length > 0) setSandpackDeps(reactResult.deps);
         setPreviewMode("sandpack");
