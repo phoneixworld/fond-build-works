@@ -62,6 +62,8 @@ const CloudPanel = () => {
         return <SchemaBuilder />;
       case "environments":
         return <EnvironmentManager />;
+      case "security":
+        return <SecurityDashboard />;
       case "memory":
         return <ProjectMemory />;
       case "dependencies":
