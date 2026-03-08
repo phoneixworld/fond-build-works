@@ -11,6 +11,8 @@ const ALLOWED_PACKAGES = new Set([
   "react", "react-dom", "react/jsx-runtime",
   "lucide-react", "framer-motion", "date-fns", "recharts",
   "react-router-dom", "clsx", "tailwind-merge",
+  "react-intersection-observer", "zustand", "zod", "axios",
+  "@tanstack/react-query", "react-hook-form", "sonner",
 ]);
 
 function isAllowedPkg(pkg: string): boolean {
@@ -141,6 +143,7 @@ const SandpackPreview = ({ viewport, showConsole = false }: SandpackPreviewProps
     "react-router-dom": "^6.22.0",
     "clsx": "^2.1.0",
     "tailwind-merge": "^2.2.0",
+    "react-intersection-observer": "^9.10.0",
     ...sandpackDeps,
   }), [sandpackDeps]);
 
