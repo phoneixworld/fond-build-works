@@ -4,6 +4,8 @@ import { Send, Bot, User, ChevronDown, Sparkles, AlertTriangle, Wand2, ImagePlus
 import VoiceInput from "@/components/VoiceInput";
 import { streamChat } from "@/lib/streamChat";
 import { validateAndFixHtml } from "@/lib/htmlValidator";
+import { matchTemplate, PAGE_TEMPLATES, type PageTemplate } from "@/lib/pageTemplates";
+import { COMPONENT_SNIPPETS } from "@/lib/componentSnippets";
 import { AI_MODELS, DEFAULT_MODEL, PROMPT_SUGGESTIONS, QUICK_ACTIONS, DESIGN_THEMES, type AIModelId } from "@/lib/aiModels";
 import { motion, AnimatePresence } from "framer-motion";
 import { usePreview } from "@/contexts/PreviewContext";
@@ -189,6 +191,7 @@ const ChatPanel = forwardRef<ChatPanelHandle, { initialPrompt?: string; onVersio
   // Edit/regenerate state
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
   const [editText, setEditText] = useState("");
+  const [selectedTemplate, setSelectedTemplate] = useState<PageTemplate | null>(null);
 
   // Elapsed time timer during loading
   useEffect(() => {
@@ -540,6 +543,16 @@ const ChatPanel = forwardRef<ChatPanelHandle, { initialPrompt?: string; onVersio
 
       const themeInfo = DESIGN_THEMES.find(t => t.id === selectedTheme);
       
+      // Phase 2: Use manually selected template OR auto-detect
+      const userText = typeof text === "string" ? text : "";
+      const template = selectedTemplate || (messages.length === 0 ? matchTemplate(userText) : null);
+      let templateCtx = "";
+      if (template) {
+        templateCtx = `## MATCHED TEMPLATE: ${template.name}\n\nUse this as your structural blueprint:\n${template.blueprint}\n\nCustomize the content, colors, and details based on the user's specific request. Do NOT copy the blueprint literally — adapt it creatively.`;
+        console.log(`[Template Matched] ${template.emoji} ${template.name}`);
+        setSelectedTemplate(null); // Clear after use
+      }
+      
       await streamChat({
         messages: apiMessages,
         projectId: currentProject.id,
@@ -548,6 +561,7 @@ const ChatPanel = forwardRef<ChatPanelHandle, { initialPrompt?: string; onVersio
         model: selectedModel,
         designTheme: themeInfo?.prompt,
         knowledge,
+        templateContext: templateCtx || undefined,
         onDelta: upsert,
         onDone: () => {
           setIsLoading(false);
@@ -809,6 +823,50 @@ const ChatPanel = forwardRef<ChatPanelHandle, { initialPrompt?: string; onVersio
                       <span className="text-xs font-medium text-foreground group-hover:text-primary transition-colors">{s.label}</span>
                     </motion.button>
                   ))}
+                </div>
+
+                {/* Template selector */}
+                <div className="mt-3">
+                  <p className="text-[10px] text-muted-foreground/40 font-medium mb-1.5 text-center">Or start with a template:</p>
+                  <div className="flex flex-wrap gap-1.5 justify-center">
+                    {PAGE_TEMPLATES.slice(0, 6).map((t) => (
+                      <button
+                        key={t.id}
+                        onClick={() => setSelectedTemplate(selectedTemplate?.id === t.id ? null : t)}
+                        className={`inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[11px] font-medium border transition-all ${
+                          selectedTemplate?.id === t.id
+                            ? "border-primary bg-primary/10 text-primary"
+                            : "border-border bg-card text-muted-foreground hover:border-primary/30 hover:text-foreground"
+                        }`}
+                      >
+                        <span>{t.emoji}</span>
+                        <span>{t.name}</span>
+                      </button>
+                    ))}
+                  </div>
+                  {PAGE_TEMPLATES.length > 6 && (
+                    <details className="mt-1.5">
+                      <summary className="text-[10px] text-muted-foreground/30 cursor-pointer hover:text-muted-foreground/50 text-center">
+                        +{PAGE_TEMPLATES.length - 6} more templates
+                      </summary>
+                      <div className="flex flex-wrap gap-1.5 justify-center mt-1.5">
+                        {PAGE_TEMPLATES.slice(6).map((t) => (
+                          <button
+                            key={t.id}
+                            onClick={() => setSelectedTemplate(selectedTemplate?.id === t.id ? null : t)}
+                            className={`inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[11px] font-medium border transition-all ${
+                              selectedTemplate?.id === t.id
+                                ? "border-primary bg-primary/10 text-primary"
+                                : "border-border bg-card text-muted-foreground hover:border-primary/30 hover:text-foreground"
+                            }`}
+                          >
+                            <span>{t.emoji}</span>
+                            <span>{t.name}</span>
+                          </button>
+                        ))}
+                      </div>
+                    </details>
+                  )}
                 </div>
               </motion.div>
 
@@ -1099,6 +1157,26 @@ const ChatPanel = forwardRef<ChatPanelHandle, { initialPrompt?: string; onVersio
                     Fix now
                   </button>
                 </div>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* Selected template chip */}
+        <AnimatePresence>
+          {selectedTemplate && (
+            <motion.div
+              initial={{ height: 0, opacity: 0 }}
+              animate={{ height: "auto", opacity: 1 }}
+              exit={{ height: 0, opacity: 0 }}
+              className="border-t border-border px-3 py-1.5"
+            >
+              <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-primary/10 border border-primary/20 text-primary text-[11px] font-medium">
+                <span>{selectedTemplate.emoji}</span>
+                <span>Template: {selectedTemplate.name}</span>
+                <button onClick={() => setSelectedTemplate(null)} className="ml-1 hover:text-primary/70 transition-colors">
+                  <X className="w-3 h-3" />
+                </button>
               </div>
             </motion.div>
           )}

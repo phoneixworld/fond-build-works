@@ -527,11 +527,16 @@ serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
-    const { messages, project_id, tech_stack, schemas, model, design_theme, knowledge } = await req.json();
+    const { messages, project_id, tech_stack, schemas, model, design_theme, knowledge, template_context } = await req.json();
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY is not configured");
 
-    const systemPrompt = buildSystemPrompt(project_id || "unknown", tech_stack || "html-tailwind", schemas, design_theme, knowledge);
+    let systemPrompt = buildSystemPrompt(project_id || "unknown", tech_stack || "html-tailwind", schemas, design_theme, knowledge);
+    
+    // Phase 2: Inject template context if matched
+    if (template_context) {
+      systemPrompt += `\n\n${template_context}`;
+    }
 
     // Use requested model or default (upgraded to Pro)
     const selectedModel = model || "google/gemini-2.5-pro";
