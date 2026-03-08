@@ -1,1 +1,4 @@
 project_id = "oyjwexbyxggotuuxxisq"
+
+[functions.generate-marketing-materials]
+verify_jwt = false
