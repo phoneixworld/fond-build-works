@@ -118,6 +118,16 @@ const ChatPanel = forwardRef<ChatPanelHandle, { initialPrompt?: string; onVersio
   const [isDragOver, setIsDragOver] = useState(false);
   const [showScrollBtn, setShowScrollBtn] = useState(false);
   const [elapsedTime, setElapsedTime] = useState(0);
+  // Self-healing state
+  const [healAttempts, setHealAttempts] = useState(0);
+  const [isHealing, setIsHealing] = useState(false);
+  const [healingStatus, setHealingStatus] = useState<string>("");
+  // Follow-up questions state
+  const [followUpQuestions, setFollowUpQuestions] = useState<any[]>([]);
+  const [followUpAnswers, setFollowUpAnswers] = useState<Record<string, string>>({});
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [pendingFollowUpPrompt, setPendingFollowUpPrompt] = useState<string>("");
+  const [analysisResult, setAnalysisResult] = useState<any>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -125,6 +135,8 @@ const ChatPanel = forwardRef<ChatPanelHandle, { initialPrompt?: string; onVersio
   const lastProjectIdRef = useRef<string | null>(null);
   const hasProcessedInitialRef = useRef(false);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const healTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const MAX_HEAL_ATTEMPTS = 3;
 
   // Elapsed time timer during loading
   useEffect(() => {
