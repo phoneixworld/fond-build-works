@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { CheckCircle2, Circle, Loader2, ChevronRight, FileCode2, Bot, Cpu, Shield } from "lucide-react";
+import { CheckCircle2, Circle, Loader2, ChevronRight, FileCode2, Bot, Cpu, Shield, RotateCcw } from "lucide-react";
 import type { PipelineStep } from "@/lib/agentPipeline";
 
 export interface TaskItem {
