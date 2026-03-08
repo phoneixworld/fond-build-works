@@ -326,7 +326,16 @@ const PublishExportButtons = forwardRef<PublishExportHandle>((_, ref) => {
                       <p className="text-[10px] text-muted-foreground">Anyone with the link can view your app</p>
                     </div>
                   </div>
-                </div>
+                  </div>
+                  <div className="flex items-center gap-3 p-3 rounded-xl bg-secondary">
+                    <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center">
+                      <Shield className="w-4 h-4 text-primary" />
+                    </div>
+                    <div>
+                      <p className="text-xs font-medium text-foreground">Custom domain</p>
+                      <p className="text-[10px] text-muted-foreground">Connect your own domain like myapp.com</p>
+                    </div>
+                  </div>
 
                 <button
                   onClick={handlePublish}
