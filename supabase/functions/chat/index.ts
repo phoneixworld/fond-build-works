@@ -440,17 +440,17 @@ Here is a PARTIAL example of a well-built hero section. Your output must be AT L
     Acme
   </a>
   <div class="ui-navbar-links">
-    <a href="#" class="ui-navbar-link ui-navbar-link-active">Product</a>
-    <a href="#" class="ui-navbar-link">Pricing</a>
-    <a href="#" class="ui-navbar-link">Docs</a>
+    <a href="#features" class="ui-navbar-link ui-navbar-link-active">Product</a>
+    <a href="#pricing" class="ui-navbar-link">Pricing</a>
+    <a href="#docs" class="ui-navbar-link">Docs</a>
   </div>
   <div class="ui-navbar-actions">
-    <a href="#" class="ui-btn ui-btn-ghost ui-btn-sm">Sign in</a>
-    <a href="#" class="ui-btn ui-btn-primary ui-btn-sm">Get Started</a>
+    <a href="#login" class="ui-btn ui-btn-ghost ui-btn-sm">Sign in</a>
+    <a href="#signup" class="ui-btn ui-btn-primary ui-btn-sm">Get Started</a>
   </div>
 </nav>
 
-<section class="ui-hero" style="position:relative;overflow:hidden;">
+<section id="hero" class="ui-hero" style="position:relative;overflow:hidden;">
   <!-- Decorative gradient blob -->
   <div style="position:absolute;top:-120px;left:50%;transform:translateX(-50%);width:600px;height:600px;background:radial-gradient(circle,rgba(99,102,241,0.15),transparent 70%);pointer-events:none;"></div>
   
