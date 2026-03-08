@@ -4,14 +4,16 @@ import {
   ResizablePanel,
   ResizablePanelGroup,
 } from "@/components/ui/resizable";
-import { Code, Eye, Settings, Zap } from "lucide-react";
+import { Code, Eye, Settings, Zap, LogOut } from "lucide-react";
 import { PreviewProvider } from "@/contexts/PreviewContext";
+import { useAuth } from "@/hooks/useAuth";
 import ChatPanel from "@/components/ChatPanel";
 import FileTree from "@/components/FileTree";
 import CodeEditor from "@/components/CodeEditor";
 import PreviewPanel from "@/components/PreviewPanel";
 
 const Index = () => {
+  const { user, signOut } = useAuth();
   const [selectedFile, setSelectedFile] = useState("App.tsx");
   const [rightPanel, setRightPanel] = useState<"code" | "preview">("preview");
 
@@ -51,8 +53,15 @@ const Index = () => {
               Preview
             </button>
             <div className="w-px h-5 bg-border mx-2" />
-            <button className="text-muted-foreground hover:text-foreground transition-colors p-1.5">
-              <Settings className="w-4 h-4" />
+            <span className="text-xs text-muted-foreground truncate max-w-[120px]">
+              {user?.email}
+            </span>
+            <button
+              onClick={signOut}
+              className="text-muted-foreground hover:text-foreground transition-colors p-1.5"
+              title="Sign out"
+            >
+              <LogOut className="w-4 h-4" />
             </button>
           </div>
         </header>
