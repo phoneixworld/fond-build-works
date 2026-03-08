@@ -69,9 +69,8 @@ const PANEL_COMPONENTS: Record<string, React.FC<any>> = {
 
 const IDELayout = () => {
   const { user, signOut } = useAuth();
-  const { projects, currentProject, selectProject, createProject, saveProject } = useProjects();
+  const { projects, currentProject, selectProject, createProject, saveProject, clearCurrentProject } = useProjects();
   const [rightPanel, setRightPanel] = useState<PanelId>("preview");
-  const [inIDE, setInIDE] = useState(false);
   const [initialPrompt, setInitialPrompt] = useState("");
   const [cmdOpen, setCmdOpen] = useState(false);
   const [renameOpen, setRenameOpen] = useState(false);
@@ -82,11 +81,13 @@ const IDELayout = () => {
   const { toast } = useToast();
   const { onlineUsers, setTyping, myColor } = useRealtimePresence(rightPanel);
 
+  // Derive IDE mode from whether a project is selected
+  const inIDE = !!currentProject;
+
   const handleStartProject = useCallback(async (prompt: string, techStack: TechStackId) => {
     setInitialPrompt(prompt);
     setVersions([]);
     
-    // Generate AI name before creating project
     let projectName = "Untitled Project";
     try {
       const resp = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/project-name`, {
@@ -103,16 +104,18 @@ const IDELayout = () => {
       }
     } catch {}
     
-    const project = await createProject(projectName, techStack);
-    if (project) setInIDE(true);
+    await createProject(projectName, techStack);
   }, [createProject]);
 
   const handleOpenProject = useCallback((id: string) => {
     selectProject(id);
     setInitialPrompt("");
     setVersions([]);
-    setInIDE(true);
   }, [selectProject]);
+
+  const handleBack = useCallback(() => {
+    clearCurrentProject();
+  }, [clearCurrentProject]);
 
   const handleTechStackChange = async (id: TechStackId) => {
     if (currentProject) await saveProject({ tech_stack: id });
@@ -144,7 +147,6 @@ const IDELayout = () => {
     toast({ title: "Reverted", description: `Restored to: ${version.label}` });
   }, [currentProject, saveProject, toast]);
 
-  // Parse emoji from project name for rename dialog
   const getNameParts = () => {
     const name = currentProject?.name || "";
     const match = name.match(/^(\p{Emoji})\s*/u);
