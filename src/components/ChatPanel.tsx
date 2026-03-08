@@ -1110,6 +1110,8 @@ const ChatPanel = forwardRef<ChatPanelHandle, { initialPrompt?: string; onVersio
           setIsLoading(false);
           setIsBuilding(false);
           setBuildStep("");
+          setPipelineStep("error");
+          setCurrentAgent(null);
           isSendingRef.current = false;
         },
       });
