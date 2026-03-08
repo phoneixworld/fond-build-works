@@ -85,7 +85,25 @@ const IDELayout = () => {
   const handleStartProject = useCallback(async (prompt: string, techStack: TechStackId) => {
     setInitialPrompt(prompt);
     setVersions([]);
-    const project = await createProject("Untitled Project", techStack);
+    
+    // Generate AI name before creating project
+    let projectName = "Untitled Project";
+    try {
+      const resp = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/project-name`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+        },
+        body: JSON.stringify({ prompt }),
+      });
+      if (resp.ok) {
+        const { name, emoji } = await resp.json();
+        projectName = emoji ? `${emoji} ${name}` : (name || projectName);
+      }
+    } catch {}
+    
+    const project = await createProject(projectName, techStack);
     if (project) setInIDE(true);
   }, [createProject]);
 
