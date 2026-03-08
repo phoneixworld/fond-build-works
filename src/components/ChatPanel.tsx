@@ -63,11 +63,11 @@ const ChatPanel = ({ initialPrompt }: { initialPrompt?: string }) => {
     // Auto-create project if none selected
     let project = currentProject;
     if (!project) {
-      project = await createProject(input.trim().slice(0, 40));
+      project = await createProject(text.slice(0, 40));
       if (!project) return;
     }
 
-    const userMsg: Msg = { role: "user", content: input.trim() };
+    const userMsg: Msg = { role: "user", content: text };
     setInput("");
     if (inputRef.current) inputRef.current.style.height = "36px";
     setMessages((prev) => [...prev, userMsg]);
