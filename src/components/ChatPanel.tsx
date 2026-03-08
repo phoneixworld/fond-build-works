@@ -597,39 +597,70 @@ const ChatPanel = ({ initialPrompt }: { initialPrompt?: string }) => {
           </button>
         </div>
 
-        {/* Model selector bar */}
+        {/* Model + Theme selector bar */}
         <div className="flex items-center justify-between mt-2 px-1">
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <button className="flex items-center gap-1.5 text-[11px] text-muted-foreground hover:text-foreground transition-colors">
-                <Sparkles className={`w-3 h-3 ${TIER_COLORS[currentModelInfo.tier]}`} />
-                <span>{currentModelInfo.label}</span>
-                <ChevronDown className="w-3 h-3 opacity-50" />
-              </button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="start" className="min-w-[220px]">
-              <DropdownMenuLabel className="text-[10px] uppercase tracking-wider text-muted-foreground">AI Model</DropdownMenuLabel>
-              <DropdownMenuSeparator />
-              {AI_MODELS.map((model) => (
-                <DropdownMenuItem
-                  key={model.id}
-                  onClick={() => setSelectedModel(model.id)}
-                  className={`flex items-center justify-between gap-3 ${selectedModel === model.id ? "text-primary font-medium" : ""}`}
-                >
-                  <div className="flex items-center gap-2">
-                    <Sparkles className={`w-3 h-3 ${TIER_COLORS[model.tier]}`} />
-                    <div>
-                      <span className="text-xs">{model.label}</span>
-                      <span className="text-[10px] text-muted-foreground ml-1.5">{model.description}</span>
+          <div className="flex items-center gap-3">
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button className="flex items-center gap-1.5 text-[11px] text-muted-foreground hover:text-foreground transition-colors">
+                  <Sparkles className={`w-3 h-3 ${TIER_COLORS[currentModelInfo.tier]}`} />
+                  <span>{currentModelInfo.label}</span>
+                  <ChevronDown className="w-3 h-3 opacity-50" />
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start" className="min-w-[220px]">
+                <DropdownMenuLabel className="text-[10px] uppercase tracking-wider text-muted-foreground">AI Model</DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                {AI_MODELS.map((model) => (
+                  <DropdownMenuItem
+                    key={model.id}
+                    onClick={() => setSelectedModel(model.id)}
+                    className={`flex items-center justify-between gap-3 ${selectedModel === model.id ? "text-primary font-medium" : ""}`}
+                  >
+                    <div className="flex items-center gap-2">
+                      <Sparkles className={`w-3 h-3 ${TIER_COLORS[model.tier]}`} />
+                      <div>
+                        <span className="text-xs">{model.label}</span>
+                        <span className="text-[10px] text-muted-foreground ml-1.5">{model.description}</span>
+                      </div>
                     </div>
-                  </div>
-                  <span className={`text-[9px] uppercase font-bold tracking-wider ${TIER_COLORS[model.tier]}`}>
-                    {TIER_LABELS[model.tier]}
-                  </span>
-                </DropdownMenuItem>
-              ))}
-            </DropdownMenuContent>
-          </DropdownMenu>
+                    <span className={`text-[9px] uppercase font-bold tracking-wider ${TIER_COLORS[model.tier]}`}>
+                      {TIER_LABELS[model.tier]}
+                    </span>
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
+
+            <div className="w-px h-3 bg-border" />
+
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button className="flex items-center gap-1.5 text-[11px] text-muted-foreground hover:text-foreground transition-colors">
+                  <Palette className="w-3 h-3 text-accent" />
+                  <span>{DESIGN_THEMES.find(t => t.id === selectedTheme)?.emoji} {DESIGN_THEMES.find(t => t.id === selectedTheme)?.label}</span>
+                  <ChevronDown className="w-3 h-3 opacity-50" />
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start" className="min-w-[220px]">
+                <DropdownMenuLabel className="text-[10px] uppercase tracking-wider text-muted-foreground">Design Theme</DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                {DESIGN_THEMES.map((theme) => (
+                  <DropdownMenuItem
+                    key={theme.id}
+                    onClick={() => setSelectedTheme(theme.id)}
+                    className={`flex items-center gap-2 ${selectedTheme === theme.id ? "text-primary font-medium" : ""}`}
+                  >
+                    <span className="text-sm">{theme.emoji}</span>
+                    <div>
+                      <span className="text-xs">{theme.label}</span>
+                      <span className="text-[10px] text-muted-foreground ml-1.5">{theme.description}</span>
+                    </div>
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
           <span className="text-[10px] text-muted-foreground/50">
             {messages.filter(m => m.role === "user").length} messages
           </span>
