@@ -45,7 +45,7 @@ interface ParsedSection {
   tasks?: { label: string; done: boolean }[];
 }
 
-function parseStructuredResponse(text: string): ParsedSection[] {
+function parseStructuredResponse(text: string, isStreaming?: boolean): ParsedSection[] {
   const sections: ParsedSection[] = [];
   
   const thinkingPatterns = [
@@ -67,6 +67,13 @@ function parseStructuredResponse(text: string): ParsedSection[] {
   
   if (thinkingText) {
     sections.push({ type: "thinking", content: thinkingText });
+  }
+
+  // While streaming, skip task/summary parsing — just render as plain text to avoid premature "Changes complete"
+  if (isStreaming) {
+    sections.push({ type: "text", content: remaining });
+    if (sections.length === 0) sections.push({ type: "text", content: text });
+    return sections;
   }
 
   const taskLines: { label: string; done: boolean }[] = [];
@@ -413,7 +420,8 @@ const ChatMessage = ({ content, role, timestamp, isLoading, onEdit, onRegenerate
   
   // Parse suggestion buttons from assistant responses
   const { suggestions, cleanText: textWithoutSuggestions } = !isUser ? parseSuggestions(cleanText) : { suggestions: [], cleanText: cleanText };
-  const sections = !isUser ? parseStructuredResponse(textWithoutSuggestions) : [];
+  // Don't parse structured sections (task cards, summaries) while still loading — prevents premature "Changes complete"
+  const sections = !isUser ? parseStructuredResponse(textWithoutSuggestions, isLoading) : [];
 
   return (
     <motion.div
