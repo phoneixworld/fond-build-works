@@ -455,6 +455,17 @@ const IDELayout = () => {
               )}
             </ResizablePanel>
           </ResizablePanelGroup>
+
+          {/* Team Chat floating panel */}
+          <AnimatePresence>
+            {teamChatOpen && (
+              <TeamChat
+                onlineUsers={onlineUsers}
+                isOpen={teamChatOpen}
+                onClose={() => setTeamChatOpen(false)}
+              />
+            )}
+          </AnimatePresence>
         </div>
       </div>
     </TooltipProvider>
