@@ -493,8 +493,8 @@ const ChatMessage = ({ content, role, timestamp, isLoading, onEdit, onRegenerate
           <div className="flex-1 min-w-0">
             {/* Header */}
             <div className="flex items-center gap-2 mb-2">
-              <span className="text-[11px] font-semibold tracking-wide text-accent/70">
-                Assistant
+              <span className="text-[11px] font-semibold tracking-wide text-white">
+                Phoenix
               </span>
               {timestamp && (
                 <span className="text-[10px] text-muted-foreground/25 font-mono opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1">
