@@ -128,13 +128,41 @@ const PublishExportButtons = forwardRef<PublishExportHandle>((_, ref) => {
     })();
   }, [showPublish, currentProject]);
 
-  // Check if already published on open
+  // Load environment statuses on open
+  const fetchEnvStatus = useCallback(async () => {
+    if (!currentProject) return;
+    try {
+      const { data } = await supabase
+        .from("project_environments")
+        .select("*")
+        .eq("project_id", currentProject.id);
+      if (data) {
+        const staging = (data as any[]).find((e: any) => e.name === "staging");
+        const production = (data as any[]).find((e: any) => e.name === "production");
+        setEnvStatus({
+          staging: {
+            deployed: !!(staging?.html_snapshot?.length > 0),
+            deployedAt: staging?.deployed_at || null,
+            snapshotSize: staging?.html_snapshot?.length || 0,
+          },
+          production: {
+            deployed: !!(production?.html_snapshot?.length > 0),
+            deployedAt: production?.deployed_at || null,
+            snapshotSize: production?.html_snapshot?.length || 0,
+          },
+        });
+      }
+    } catch {}
+  }, [currentProject]);
+
   useEffect(() => {
     if (showPublish && currentProject?.is_published && currentProject?.published_slug) {
       const slug = currentProject.published_slug;
       setPublishedUrl(`${window.location.origin}/app/${slug}`);
+      setStagingUrl(`${window.location.origin}/app/staging-${slug}`);
     }
-  }, [showPublish, currentProject]);
+    if (showPublish) fetchEnvStatus();
+  }, [showPublish, currentProject, fetchEnvStatus]);
 
   // Load deploy history
   const fetchHistory = useCallback(async () => {
@@ -190,99 +218,178 @@ const PublishExportButtons = forwardRef<PublishExportHandle>((_, ref) => {
     return `${base}-${id.slice(0, 8)}`;
   };
 
-  const resolveHtml = async (): Promise<string> => {
-    // Prefer Sandpack files from preview context, then fall back to VirtualFS files
+  const resolveCurrentHtml = (): string => {
     let filesToPublish: Record<string, string> | null = null;
-
     if (sandpackFiles && Object.keys(sandpackFiles).length > 0) {
       filesToPublish = sandpackFiles;
     } else if (files && Object.keys(files).length > 0) {
-      // Convert VirtualFile records to plain string map
       const converted: Record<string, string> = {};
       for (const [path, vf] of Object.entries(files)) {
         converted[path] = vf.content;
       }
       filesToPublish = converted;
     }
-
-    // If we have project files, save them as JSON with a marker prefix
-    // so PublishedApp can render them with the Sandpack bundler
     if (filesToPublish) {
       return "<!--SANDPACK_JSON-->" + JSON.stringify(filesToPublish);
     }
-
-    // Fallback to raw HTML
-    let html = previewHtml || currentProject?.html_content || "";
-
-    // If deploying to production, try to use the environment snapshot
-    if (deployTarget === "production") {
-      try {
-        const { data: prodEnv } = await supabase
-          .from("project_environments" as any)
-          .select("html_snapshot")
-          .eq("project_id", currentProject!.id)
-          .eq("name", "production")
-          .maybeSingle();
-        if (prodEnv && (prodEnv as any).html_snapshot?.length > 0) {
-          html = (prodEnv as any).html_snapshot;
-        }
-      } catch {}
-    }
-
-    if (!html) throw new Error("Nothing to publish — build something first!");
-    return html;
+    return previewHtml || currentProject?.html_content || "";
   };
 
-  const handlePublish = async () => {
-    if (!currentProject) return;
+  // Step 1: Deploy current build → Staging
+  const handleDeployToStaging = async () => {
+    if (!currentProject || !user) return;
     setPublishing(true);
-
     try {
+      const html = resolveCurrentHtml();
+      if (!html) throw new Error("Nothing to deploy — build something first!");
+
       const slug = currentProject.published_slug || generateSlug(currentProject.name, currentProject.id);
-      const html = await resolveHtml();
 
-      // Update project - no storage upload needed, PublishedApp component will render from DB
-      const { error } = await supabase
-        .from("projects")
-        .update({ is_published: true, published_slug: slug, html_content: html } as any)
-        .eq("id", currentProject.id);
-      if (error) throw error;
+      // Upsert staging environment
+      const { data: existing } = await supabase
+        .from("project_environments")
+        .select("id")
+        .eq("project_id", currentProject.id)
+        .eq("name", "staging")
+        .maybeSingle();
 
-      // Log to deploy_history
-      try {
-        await supabase.from("deploy_history").insert({
-          project_id: currentProject.id,
-          deployed_by: user!.id,
-          deployed_by_email: user?.email || "",
-          from_env: "development",
-          to_env: deployTarget,
-          status: "success",
-          notes: deployNotes || `Deployed to ${deployTarget}`,
-        } as any);
-      } catch (e) {
-        console.error("Failed to log deploy:", e);
+      if (existing) {
+        await supabase
+          .from("project_environments")
+          .update({
+            html_snapshot: html,
+            status: "deployed",
+            deployed_at: new Date().toISOString(),
+            deployed_by: user.id,
+            updated_at: new Date().toISOString(),
+          } as any)
+          .eq("id", existing.id);
+      } else {
+        await supabase
+          .from("project_environments")
+          .insert({
+            project_id: currentProject.id,
+            name: "staging",
+            label: "Staging",
+            html_snapshot: html,
+            status: "deployed",
+            deployed_at: new Date().toISOString(),
+            deployed_by: user.id,
+          } as any);
       }
+
+      // Also ensure the project has a slug for staging URL
+      if (!currentProject.published_slug) {
+        await supabase
+          .from("projects")
+          .update({ published_slug: slug } as any)
+          .eq("id", currentProject.id);
+      }
+
+      // Log
+      await supabase.from("deploy_history").insert({
+        project_id: currentProject.id,
+        deployed_by: user.id,
+        deployed_by_email: user.email || "",
+        from_env: "development",
+        to_env: "staging",
+        status: "success",
+        notes: deployNotes || "Deployed to staging",
+      } as any);
+
+      setStagingUrl(`${window.location.origin}/app/staging-${slug}`);
+      setDeployNotes("");
+      toast({ title: "Deployed to Staging! 🎯", description: "Preview and test before promoting to production." });
+      fetchEnvStatus();
+      fetchHistory();
+    } catch (err: any) {
+      toast({ title: "Deploy failed", description: err.message, variant: "destructive" });
+    } finally {
+      setPublishing(false);
+    }
+  };
+
+  // Step 2: Promote Staging → Production
+  const handlePromoteToProduction = async () => {
+    if (!currentProject || !user) return;
+    setPromotingToProd(true);
+    try {
+      // Get staging snapshot
+      const { data: stagingEnv } = await supabase
+        .from("project_environments")
+        .select("html_snapshot")
+        .eq("project_id", currentProject.id)
+        .eq("name", "staging")
+        .maybeSingle();
+
+      const stagingHtml = (stagingEnv as any)?.html_snapshot;
+      if (!stagingHtml || stagingHtml.length === 0) {
+        throw new Error("Nothing in staging to promote. Deploy to staging first!");
+      }
+
+      const slug = currentProject.published_slug || generateSlug(currentProject.name, currentProject.id);
+
+      // Update production environment
+      const { data: existingProd } = await supabase
+        .from("project_environments")
+        .select("id")
+        .eq("project_id", currentProject.id)
+        .eq("name", "production")
+        .maybeSingle();
+
+      if (existingProd) {
+        await supabase
+          .from("project_environments")
+          .update({
+            html_snapshot: stagingHtml,
+            status: "deployed",
+            deployed_at: new Date().toISOString(),
+            deployed_by: user.id,
+            updated_at: new Date().toISOString(),
+          } as any)
+          .eq("id", existingProd.id);
+      } else {
+        await supabase
+          .from("project_environments")
+          .insert({
+            project_id: currentProject.id,
+            name: "production",
+            label: "Production",
+            html_snapshot: stagingHtml,
+            status: "deployed",
+            deployed_at: new Date().toISOString(),
+            deployed_by: user.id,
+          } as any);
+      }
+
+      // Publish the project with the staging HTML
+      await supabase
+        .from("projects")
+        .update({ is_published: true, published_slug: slug, html_content: stagingHtml } as any)
+        .eq("id", currentProject.id);
+
+      // Log
+      await supabase.from("deploy_history").insert({
+        project_id: currentProject.id,
+        deployed_by: user.id,
+        deployed_by_email: user.email || "",
+        from_env: "staging",
+        to_env: "production",
+        status: "success",
+        notes: deployNotes || "Promoted staging to production",
+      } as any);
 
       const liveUrl = `${window.location.origin}/app/${slug}`;
       setPublishedUrl(liveUrl);
       setDeployNotes("");
-      toast({ title: "Published! 🚀", description: `Deployed to ${deployTarget} successfully.` });
+      setConfirmPromote(false);
+      toast({ title: "Live in Production! 🚀", description: "Your staging build is now serving real users." });
+      fetchEnvStatus();
+      fetchHistory();
     } catch (err: any) {
-      // Log failed deploy
-      try {
-        await supabase.from("deploy_history").insert({
-          project_id: currentProject.id,
-          deployed_by: user!.id,
-          deployed_by_email: user?.email || "",
-          from_env: "development",
-          to_env: deployTarget,
-          status: "failed",
-          notes: err.message || "Deploy failed",
-        } as any);
-      } catch {}
-      toast({ title: "Publish failed", description: err.message, variant: "destructive" });
+      toast({ title: "Promotion failed", description: err.message, variant: "destructive" });
     } finally {
-      setPublishing(false);
+      setPromotingToProd(false);
     }
   };
 
@@ -308,8 +415,6 @@ const PublishExportButtons = forwardRef<PublishExportHandle>((_, ref) => {
     if (!currentProject) return;
     setRollingBack(record.id);
     try {
-      // Re-deploy from the snapshot at that time (we'd need snapshot_id in practice)
-      // For now, we log the rollback intent and notify
       await supabase.from("deploy_history").insert({
         project_id: currentProject.id,
         deployed_by: user!.id,
@@ -328,20 +433,22 @@ const PublishExportButtons = forwardRef<PublishExportHandle>((_, ref) => {
     }
   };
 
-  const handleCopy = () => {
-    if (publishedUrl) {
-      navigator.clipboard.writeText(publishedUrl);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    }
+  const handleCopy = (url: string) => {
+    navigator.clipboard.writeText(url);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
   };
 
   const handleConnectDomain = () => {
     if (!domainInput.trim()) return;
     setDomainStatus("pending");
     toast({ title: "Domain setup started", description: "Add the DNS records shown, then we'll verify automatically." });
-    // Simulate verification check
     setTimeout(() => setDomainStatus("verifying"), 1500);
+  };
+
+  const formatEnvDate = (d: string | null) => {
+    if (!d) return "Never";
+    return new Date(d).toLocaleString([], { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" });
   };
 
   const tabs: { id: DialogTab; label: string; icon: any }[] = [
@@ -377,7 +484,7 @@ const PublishExportButtons = forwardRef<PublishExportHandle>((_, ref) => {
                 Publish
               </DialogTitle>
               <DialogDescription className="text-xs text-muted-foreground">
-                Deploy your app and share it with the world.
+                Deploy to staging, review, then promote to production.
               </DialogDescription>
             </DialogHeader>
           </div>
@@ -406,152 +513,194 @@ const PublishExportButtons = forwardRef<PublishExportHandle>((_, ref) => {
           </div>
 
           {/* Content */}
-          <div className="px-5 py-4">
+          <div className="px-5 py-4 max-h-[60vh] overflow-y-auto">
             {/* ========= DEPLOY TAB ========= */}
             {activeTab === "deploy" && (
-              <>
-                {publishedUrl ? (
-                  <div className="space-y-4">
-                    {/* Live badge */}
-                    <div className="flex items-center gap-2.5 p-3 rounded-lg bg-ide-success/10 border border-ide-success/20">
-                      <div className="w-2 h-2 rounded-full bg-ide-success animate-pulse-dot" />
-                      <span className="text-xs font-medium text-foreground">Live</span>
-                    </div>
+              <div className="space-y-4">
+                {/* Pipeline visualization */}
+                <div className="flex items-center justify-center gap-1.5 py-2">
+                  <div className="flex items-center gap-1 px-2.5 py-1.5 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-[11px] font-medium text-emerald-400">
+                    <Eye className="w-3 h-3" /> Dev
+                    <Check className="w-3 h-3" />
+                  </div>
+                  <ArrowRight className="w-3.5 h-3.5 text-muted-foreground/40" />
+                  <div className={`flex items-center gap-1 px-2.5 py-1.5 rounded-full border text-[11px] font-medium ${
+                    envStatus.staging.deployed
+                      ? "bg-amber-500/10 border-amber-500/30 text-amber-400"
+                      : "bg-muted border-border text-muted-foreground"
+                  }`}>
+                    <Server className="w-3 h-3" /> Staging
+                    {envStatus.staging.deployed && <Check className="w-3 h-3" />}
+                  </div>
+                  <ArrowRight className="w-3.5 h-3.5 text-muted-foreground/40" />
+                  <div className={`flex items-center gap-1 px-2.5 py-1.5 rounded-full border text-[11px] font-medium ${
+                    envStatus.production.deployed
+                      ? "bg-red-500/10 border-red-500/30 text-red-400"
+                      : "bg-muted border-border text-muted-foreground"
+                  }`}>
+                    <Globe className="w-3 h-3" /> Production
+                    {envStatus.production.deployed && <Check className="w-3 h-3" />}
+                  </div>
+                </div>
 
-                    {/* URL row */}
-                    <div className="rounded-lg border border-border bg-background overflow-hidden">
-                      <div className="flex items-center gap-2 px-3 py-2.5">
-                        <Link2 className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
-                        <span className="text-xs text-foreground font-mono select-all break-all">{publishedUrl}</span>
+                {/* Step 1: Deploy to Staging */}
+                <div className="rounded-lg border border-amber-500/20 bg-amber-500/5 p-4 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <div className="w-6 h-6 rounded-full bg-amber-500/20 flex items-center justify-center text-amber-400 text-[10px] font-bold">1</div>
+                      <div>
+                        <p className="text-xs font-semibold text-foreground">Deploy to Staging</p>
+                        <p className="text-[10px] text-muted-foreground">Push current build for review &amp; testing</p>
+                      </div>
+                    </div>
+                    {envStatus.staging.deployed && (
+                      <span className="text-[9px] text-amber-400 bg-amber-400/10 px-1.5 py-0.5 rounded-full">
+                        {formatEnvDate(envStatus.staging.deployedAt)}
+                      </span>
+                    )}
+                  </div>
+
+                  {/* Staging URL if deployed */}
+                  {stagingUrl && envStatus.staging.deployed && (
+                    <div className="rounded-md border border-border bg-background/50 overflow-hidden">
+                      <div className="flex items-center gap-2 px-2.5 py-2">
+                        <Link2 className="w-3 h-3 text-muted-foreground shrink-0" />
+                        <span className="text-[11px] text-foreground font-mono select-all break-all truncate">{stagingUrl}</span>
                       </div>
                       <div className="flex border-t border-border">
-                        <button onClick={handleCopy} className="flex-1 flex items-center justify-center gap-1.5 py-2 text-xs text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors">
-                          {copied ? <><Check className="w-3.5 h-3.5 text-ide-success" /> Copied</> : <><Copy className="w-3.5 h-3.5" /> Copy</>}
+                        <button onClick={() => handleCopy(stagingUrl)} className="flex-1 flex items-center justify-center gap-1 py-1.5 text-[10px] text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors">
+                          {copied ? <><Check className="w-3 h-3 text-emerald-400" /> Copied</> : <><Copy className="w-3 h-3" /> Copy</>}
                         </button>
                         <div className="w-px bg-border" />
-                        <a href={publishedUrl} target="_blank" rel="noopener noreferrer" className="flex-1 flex items-center justify-center gap-1.5 py-2 text-xs text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors">
-                          <ExternalLink className="w-3.5 h-3.5" /> Open
+                        <a href={stagingUrl} target="_blank" rel="noopener noreferrer" className="flex-1 flex items-center justify-center gap-1 py-1.5 text-[10px] text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors">
+                          <ExternalLink className="w-3 h-3" /> Preview
                         </a>
                       </div>
                     </div>
+                  )}
 
-                    {/* Deploy target */}
-                    <div className="space-y-1.5">
-                      <label className="text-[11px] font-medium text-muted-foreground">Environment</label>
-                      <div className="grid grid-cols-2 gap-2">
-                        {(["staging", "production"] as const).map(env => (
-                          <button
-                            key={env}
-                            onClick={() => setDeployTarget(env)}
-                            className={`flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium border transition-all ${
-                              deployTarget === env
-                                ? "border-primary bg-primary/5 text-foreground"
-                                : "border-border text-muted-foreground hover:border-primary/30"
-                            }`}
-                          >
-                            {env === "staging" ? <Eye className="w-3.5 h-3.5" /> : <Server className="w-3.5 h-3.5" />}
-                            {env.charAt(0).toUpperCase() + env.slice(1)}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-
-                    {/* Notes */}
-                    <div className="space-y-1.5">
-                      <label className="text-[11px] font-medium text-muted-foreground">Notes <span className="text-muted-foreground/50">(optional)</span></label>
-                      <input
-                        type="text"
-                        value={deployNotes}
-                        onChange={e => setDeployNotes(e.target.value)}
-                        placeholder="What changed in this deploy?"
-                        className="w-full px-3 py-2 rounded-lg border border-border bg-background text-xs text-foreground placeholder:text-muted-foreground/40 focus:outline-none focus:ring-1 focus:ring-primary transition-shadow"
-                      />
-                    </div>
-
-                    {/* Actions */}
-                    <div className="flex gap-2 pt-1">
-                      <button
-                        onClick={handlePublish}
-                        disabled={publishing || isBuilding}
-                        className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-xs font-semibold bg-primary text-primary-foreground hover:bg-primary/90 transition-colors disabled:opacity-50"
-                      >
-                        {publishing ? (
-                          <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Deploying...</>
-                        ) : (
-                          <><ArrowRight className="w-3.5 h-3.5" /> Update</>
-                        )}
-                      </button>
-                      <button
-                        onClick={handleUnpublish}
-                        disabled={publishing || isBuilding}
-                        className="px-3 py-2.5 rounded-lg text-xs font-medium text-muted-foreground hover:text-destructive hover:bg-destructive/10 border border-transparent hover:border-destructive/20 transition-all"
-                      >
-                        Unpublish
-                      </button>
-                    </div>
+                  <div className="space-y-1.5">
+                    <input
+                      type="text"
+                      value={deployNotes}
+                      onChange={e => setDeployNotes(e.target.value)}
+                      placeholder="Deploy notes (optional)"
+                      className="w-full px-3 py-2 rounded-lg border border-border bg-background text-xs text-foreground placeholder:text-muted-foreground/40 focus:outline-none focus:ring-1 focus:ring-primary transition-shadow"
+                    />
                   </div>
-                ) : (
-                  /* Pre-publish */
-                  <div className="space-y-4">
-                    <div className="grid grid-cols-2 gap-2">
-                      {[
-                        { icon: Globe, title: "Public URL", desc: "Hosted on our CDN", action: () => publishedUrl && navigator.clipboard.writeText(publishedUrl) },
-                        { icon: Link2, title: "Share anywhere", desc: "Instant access link", action: () => publishedUrl && navigator.clipboard.writeText(publishedUrl) },
-                        { icon: Shield, title: "Custom domain", desc: "Use your own .com", action: () => setActiveTab("domain") },
-                        { icon: History, title: "Version history", desc: "Rollback anytime", action: () => setActiveTab("history") },
-                      ].map((item, i) => {
-                        const Icon = item.icon;
-                        return (
-                          <button
-                            key={i}
-                            onClick={item.action}
-                            className="flex items-start gap-2.5 p-3 rounded-lg border border-border bg-background hover:border-primary/30 hover:bg-primary/5 transition-all text-left"
-                          >
-                            <Icon className="w-4 h-4 text-primary shrink-0 mt-0.5" />
-                            <div>
-                              <p className="text-xs font-medium text-foreground leading-tight">{item.title}</p>
-                              <p className="text-[10px] text-muted-foreground mt-0.5">{item.desc}</p>
-                            </div>
-                          </button>
-                        );
-                      })}
-                    </div>
 
-                    {/* Environment */}
-                    <div className="space-y-1.5">
-                      <label className="text-[11px] font-medium text-muted-foreground">Environment</label>
-                      <div className="grid grid-cols-2 gap-2">
-                        {(["staging", "production"] as const).map(env => (
-                          <button
-                            key={env}
-                            onClick={() => setDeployTarget(env)}
-                            className={`flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium border transition-all ${
-                              deployTarget === env
-                                ? "border-primary bg-primary/5 text-foreground"
-                                : "border-border text-muted-foreground hover:border-primary/30"
-                            }`}
-                          >
-                            {env === "staging" ? <Eye className="w-3.5 h-3.5" /> : <Server className="w-3.5 h-3.5" />}
-                            {env.charAt(0).toUpperCase() + env.slice(1)}
-                          </button>
-                        ))}
+                  <button
+                    onClick={handleDeployToStaging}
+                    disabled={publishing || isBuilding}
+                    className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-xs font-semibold bg-amber-500 text-white hover:bg-amber-600 transition-colors disabled:opacity-50"
+                  >
+                    {publishing ? (
+                      <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Deploying to Staging...</>
+                    ) : (
+                      <><ArrowRight className="w-3.5 h-3.5" /> {envStatus.staging.deployed ? "Update Staging" : "Deploy to Staging"}</>
+                    )}
+                  </button>
+                </div>
+
+                {/* Step 2: Promote to Production */}
+                <div className={`rounded-lg border p-4 space-y-3 transition-all ${
+                  envStatus.staging.deployed
+                    ? "border-red-500/20 bg-red-500/5"
+                    : "border-border bg-muted/30 opacity-60"
+                }`}>
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <div className={`w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold ${
+                        envStatus.staging.deployed ? "bg-red-500/20 text-red-400" : "bg-muted text-muted-foreground"
+                      }`}>2</div>
+                      <div>
+                        <p className="text-xs font-semibold text-foreground">Promote to Production</p>
+                        <p className="text-[10px] text-muted-foreground">
+                          {envStatus.staging.deployed
+                            ? "Push staging build live to real users"
+                            : "Deploy to staging first"}
+                        </p>
                       </div>
                     </div>
+                    {envStatus.production.deployed && (
+                      <div className="flex items-center gap-1.5">
+                        <div className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                        <span className="text-[9px] text-emerald-400 font-medium">Live</span>
+                      </div>
+                    )}
+                  </div>
 
+                  {/* Production URL if live */}
+                  {publishedUrl && envStatus.production.deployed && (
+                    <div className="rounded-md border border-border bg-background/50 overflow-hidden">
+                      <div className="flex items-center gap-2 px-2.5 py-2">
+                        <Globe className="w-3 h-3 text-emerald-400 shrink-0" />
+                        <span className="text-[11px] text-foreground font-mono select-all break-all truncate">{publishedUrl}</span>
+                      </div>
+                      <div className="flex border-t border-border">
+                        <button onClick={() => handleCopy(publishedUrl)} className="flex-1 flex items-center justify-center gap-1 py-1.5 text-[10px] text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors">
+                          {copied ? <><Check className="w-3 h-3 text-emerald-400" /> Copied</> : <><Copy className="w-3 h-3" /> Copy</>}
+                        </button>
+                        <div className="w-px bg-border" />
+                        <a href={publishedUrl} target="_blank" rel="noopener noreferrer" className="flex-1 flex items-center justify-center gap-1 py-1.5 text-[10px] text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors">
+                          <ExternalLink className="w-3 h-3" /> Visit
+                        </a>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Promote confirmation */}
+                  {envStatus.staging.deployed && !confirmPromote && (
                     <button
-                      onClick={handlePublish}
-                      disabled={publishing || isBuilding}
-                      className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-sm font-semibold bg-primary text-primary-foreground hover:bg-primary/90 transition-colors disabled:opacity-50"
+                      onClick={() => setConfirmPromote(true)}
+                      className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-xs font-semibold bg-primary text-primary-foreground hover:bg-primary/90 transition-colors"
                     >
-                      {publishing ? (
-                        <><Loader2 className="w-4 h-4 animate-spin" /> Publishing...</>
-                      ) : (
-                        <><Rocket className="w-4 h-4" /> Publish &amp; Deploy to {deployTarget}</>
-                      )}
+                      <Rocket className="w-3.5 h-3.5" /> Promote Staging → Production
                     </button>
-                  </div>
-                )}
-              </>
+                  )}
+
+                  {envStatus.staging.deployed && confirmPromote && (
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-2 p-2.5 rounded-lg bg-destructive/10 border border-destructive/20">
+                        <AlertCircle className="w-3.5 h-3.5 text-destructive shrink-0" />
+                        <p className="text-[11px] text-foreground">
+                          This will replace the live production build with the current staging version.
+                        </p>
+                      </div>
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => setConfirmPromote(false)}
+                          className="flex-1 px-3 py-2 rounded-lg text-xs text-muted-foreground hover:text-foreground hover:bg-secondary border border-border transition-colors"
+                        >
+                          Cancel
+                        </button>
+                        <button
+                          onClick={handlePromoteToProduction}
+                          disabled={promotingToProd}
+                          className="flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-xs font-semibold bg-primary text-primary-foreground hover:bg-primary/90 transition-colors disabled:opacity-50"
+                        >
+                          {promotingToProd ? (
+                            <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Promoting...</>
+                          ) : (
+                            <><Rocket className="w-3.5 h-3.5" /> Confirm &amp; Go Live</>
+                          )}
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Unpublish */}
+                  {envStatus.production.deployed && publishedUrl && (
+                    <button
+                      onClick={handleUnpublish}
+                      disabled={publishing}
+                      className="w-full text-center text-[11px] text-muted-foreground hover:text-destructive transition-colors py-1"
+                    >
+                      Unpublish from production
+                    </button>
+                  )}
+                </div>
+              </div>
             )}
 
             {/* ========= HISTORY TAB ========= */}
