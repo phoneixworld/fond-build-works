@@ -149,6 +149,7 @@ export async function streamBuildAgent({
   retryContext,
   maxTokens,
   taskType,
+  irContext,
   onDelta,
   onDone,
   onError,
