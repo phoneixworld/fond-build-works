@@ -647,8 +647,9 @@ const CONTEXT_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
     // IMPORTANT: Go directly to build agent — skip classification since user already answered
     setCurrentAgent("build");
     setPipelineStep("planning");
-    sendMessage(enrichedPrompt);
-  }, [followUpQuestions, followUpAnswers, pendingFollowUpPrompt, sendMessage]);
+    // Use ref to avoid block-scoped declaration issue
+    setTimeout(() => sendMessageRef.current(enrichedPrompt), 0);
+  }, [followUpQuestions, followUpAnswers, pendingFollowUpPrompt]);
 
   const skipFollowUpQuestions = useCallback(() => {
     const prompt = pendingFollowUpPrompt;
@@ -659,8 +660,8 @@ const CONTEXT_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
     // Skip classification — user explicitly chose to skip, go straight to build
     setCurrentAgent("build");
     setPipelineStep("planning");
-    sendMessage(prompt);
-  }, [pendingFollowUpPrompt, sendMessage]);
+    setTimeout(() => sendMessageRef.current(prompt), 0);
+  }, [pendingFollowUpPrompt]);
 
   useEffect(() => {
     if (initialPrompt && !hasProcessedInitialRef.current) {
