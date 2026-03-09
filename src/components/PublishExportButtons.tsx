@@ -155,14 +155,25 @@ const PublishExportButtons = forwardRef<PublishExportHandle>((_, ref) => {
     } catch {}
   }, [currentProject]);
 
+  // Determine the public-facing origin for published URLs
+  const getPublishedOrigin = useCallback(() => {
+    const origin = window.location.origin;
+    // If we're on a preview domain, use the published lovable.app domain instead
+    if (origin.includes("lovableproject.com") || origin.includes("id-preview")) {
+      return "https://fond-build-works.lovable.app";
+    }
+    return origin;
+  }, []);
+
   useEffect(() => {
     if (showPublish && currentProject?.is_published && currentProject?.published_slug) {
       const slug = currentProject.published_slug;
-      setPublishedUrl(`${window.location.origin}/app/${slug}`);
-      setStagingUrl(`${window.location.origin}/app/staging-${slug}`);
+      const pubOrigin = getPublishedOrigin();
+      setPublishedUrl(`${pubOrigin}/app/${slug}`);
+      setStagingUrl(`${pubOrigin}/app/staging-${slug}`);
     }
     if (showPublish) fetchEnvStatus();
-  }, [showPublish, currentProject, fetchEnvStatus]);
+  }, [showPublish, currentProject, fetchEnvStatus, getPublishedOrigin]);
 
   // Load deploy history
   const fetchHistory = useCallback(async () => {
@@ -297,7 +308,7 @@ const PublishExportButtons = forwardRef<PublishExportHandle>((_, ref) => {
         notes: deployNotes || "Deployed to staging",
       } as any);
 
-      setStagingUrl(`${window.location.origin}/app/staging-${slug}`);
+      setStagingUrl(`${getPublishedOrigin()}/app/staging-${slug}`);
       setDeployNotes("");
       toast({ title: "Deployed to Staging! 🎯", description: "Preview and test before promoting to production." });
       fetchEnvStatus();
@@ -379,7 +390,7 @@ const PublishExportButtons = forwardRef<PublishExportHandle>((_, ref) => {
         notes: deployNotes || "Promoted staging to production",
       } as any);
 
-      const liveUrl = `${window.location.origin}/app/${slug}`;
+      const liveUrl = `${getPublishedOrigin()}/app/${slug}`;
       setPublishedUrl(liveUrl);
       setDeployNotes("");
       setConfirmPromote(false);
