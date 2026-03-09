@@ -182,7 +182,7 @@ const UserMenuDialogs = ({ open, onOpenChange }: UserMenuDialogsProps) => {
               { icon: BookOpen, label: "Documentation", desc: "Guides, API reference & tutorials", href: "#" },
               { icon: MessageCircle, label: "Community", desc: "Join our Discord community", href: "#" },
               { icon: Bug, label: "Report a Bug", desc: "Found something broken? Let us know", href: "#" },
-              { icon: Mail, label: "Contact Support", desc: "Email us at support@phoenix.world", href: "#" },
+              { icon: Mail, label: "Contact Support", desc: "Email us at support@phoneix.world", href: "#" },
             ].map(({ icon: Icon, label, desc, href }) => (
               <button
                 key={label}
