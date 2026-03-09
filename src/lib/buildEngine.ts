@@ -919,7 +919,7 @@ async function runDirectBuild(
   
   const existingCode = config.existingFiles 
     ? buildFullCodeContext(config.existingFiles) 
-    : "";
+    : buildFullCodeContext(getBaseTemplate());
   
   const result = await executeSingleTask(prompt, config, existingCode, callbacks.onDelta);
   
