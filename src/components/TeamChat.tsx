@@ -174,7 +174,7 @@ const TeamChat = ({ onlineUsers, isOpen, onClose }: TeamChatProps) => {
                 >
                   {getInitials(msg.user_email)}
                 </div>
-                <div className={`max-w-[75%] ${isMe ? "items-end" : "items-start"}`}>
+                <div className={`flex flex-col max-w-[75%] ${isMe ? "items-end" : "items-start"}`}>
                   {!isMe && (
                     <p className="text-[10px] text-muted-foreground mb-0.5 truncate">{msg.user_email}</p>
                   )}
@@ -185,7 +185,7 @@ const TeamChat = ({ onlineUsers, isOpen, onClose }: TeamChatProps) => {
                   }`}>
                     {msg.content}
                   </div>
-                  <p className="text-[11px] text-white mt-1 font-medium">
+                  <p className="text-sm text-foreground font-semibold mt-1.5">
                     {new Date(msg.created_at).toLocaleDateString([], { month: "short", day: "numeric" })} at {new Date(msg.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
                   </p>
                 </div>
