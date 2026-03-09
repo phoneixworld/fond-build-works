@@ -1468,7 +1468,7 @@ const CONTEXT_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
           const instantTemplate = findInstantTemplate(templateId);
           
           if (instantTemplate) {
-            console.log(`[ChatPanel] ⚡ INSTANT PATH: Rendering "${template.name}" in <1s`);
+            console.log(`[ChatPanel] ⚡ INSTANT PATH: Rendering "${templateName}" in <1s`);
             setBuildStep("⚡ Instant preview loading...");
             setPipelineStep("bundling");
             
