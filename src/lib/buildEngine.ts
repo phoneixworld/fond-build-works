@@ -1775,7 +1775,7 @@ async function runPlannedBuild(
   
   console.log(`[BuildEngine] ${executableTasks.length} tasks in ${parallelGroups.length} parallel groups: ${parallelGroups.map(g => `[${g.map(t => t.title).join(", ")}]`).join(" → ")}`);
 
-  const baseTemplate = getBaseTemplate();
+  const baseTemplate = getBaseTemplate(config.domainModel);
   let accumulatedFiles: Record<string, string> = config.existingFiles ? { ...config.existingFiles } : { ...baseTemplate };
   let previousFiles: Record<string, string> | null = config.existingFiles ? { ...config.existingFiles } : { ...baseTemplate };
   let allDeps: Record<string, string> = {};
