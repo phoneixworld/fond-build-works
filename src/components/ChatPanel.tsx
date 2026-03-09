@@ -472,6 +472,7 @@ const MAX_IMAGE_SIZE = 4 * 1024 * 1024;
 
 export interface ChatPanelHandle {
   clearChat: () => void;
+  sendMessage: (text: string) => void;
 }
 
 const ChatPanel = forwardRef<ChatPanelHandle, { initialPrompt?: string; onVersionCreated?: (version: Version) => void }>(({ initialPrompt, onVersionCreated }, ref) => {
@@ -769,7 +770,9 @@ const ChatPanel = forwardRef<ChatPanelHandle, { initialPrompt?: string; onVersio
     saveProject({ chat_history: [], html_content: "" });
   }, [currentProject, isLoading, setPreviewHtml, saveProject]);
 
-  useImperativeHandle(ref, () => ({ clearChat }), [clearChat]);
+  // sendMessage is defined below — use a stable ref so useImperativeHandle doesn't need it in deps
+  const sendMessageRef = useRef<(text: string, images?: string[]) => void>(() => {});
+  useImperativeHandle(ref, () => ({ clearChat, sendMessage: (text: string) => sendMessageRef.current(text) }), [clearChat]);
 
   const sendMessage = useCallback(async (text: string, images: string[] = []) => {
     if (!text || !currentProject) return;
@@ -1217,7 +1220,10 @@ const ChatPanel = forwardRef<ChatPanelHandle, { initialPrompt?: string; onVersio
     }
   }, [currentProject, saveProject, setPreviewHtml, setIsBuilding, setBuildStep, selectedModel, selectedTheme, onVersionCreated, setVirtualFiles]);
 
-  // Edit a previous user message and regenerate from that point
+  // Keep ref in sync so useImperativeHandle can call the latest version
+  sendMessageRef.current = sendMessage;
+
+
   const handleEditMessage = useCallback((index: number) => {
     const msg = messagesRef.current[index];
     if (msg?.role !== "user") return;

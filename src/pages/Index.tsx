@@ -62,7 +62,6 @@ const SECONDARY_TABS = [
 const PANEL_COMPONENTS: Record<string, React.FC<any>> = {
   code: CodeEditor,
   cloud: CloudPanel,
-  planning: PlanningPanel,
   quality: CodeQualityPanel,
   search: SemanticSearchPanel,
   brain: ProjectBrain,
@@ -86,7 +85,7 @@ const IDELayout = () => {
   const [versions, setVersions] = useState<Version[]>([]);
   const [teamChatOpen, setTeamChatOpen] = useState(false);
   const publishRef = useRef<{ openPublish: () => void; handleExport: () => void } | null>(null);
-  const chatRef = useRef<{ clearChat: () => void } | null>(null);
+  const chatRef = useRef<{ clearChat: () => void; sendMessage: (text: string) => void } | null>(null);
   const { toast } = useToast();
   const { onlineUsers, setTyping, myColor } = useRealtimePresence(rightPanel);
 
@@ -170,6 +169,16 @@ const IDELayout = () => {
     if (rightPanel === "preview") return <PreviewPanel />;
     if (rightPanel === "history") {
       return <VersionHistory versions={versions} onRevert={handleRevert} onClose={() => setRightPanel("preview")} />;
+    }
+    if (rightPanel === "planning") {
+      return (
+        <PlanningPanel
+          onExecuteTask={(prompt) => {
+            chatRef.current?.sendMessage(prompt);
+            setRightPanel("preview");
+          }}
+        />
+      );
     }
     const Component = PANEL_COMPONENTS[rightPanel];
     return Component ? <Component /> : <PreviewPanel />;
