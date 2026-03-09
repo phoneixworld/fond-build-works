@@ -32,7 +32,7 @@ import {
 } from "@/lib/buildCache";
 import {
   startBuild, recordPlanningLatency, startTask, completeTask,
-  finishBuild, timer, type TaskMetrics,
+  finishBuild, timer, type TaskMetrics, type BuildMetrics,
 } from "@/lib/buildObservability";
 import { buildIncrementalContext, contextReductionRatio } from "@/lib/incrementalContext";
 import { applyAdaptiveSplitting } from "@/lib/adaptiveTaskSplitter";
