@@ -516,10 +516,10 @@ const LandingPage = ({ onStartProject, onOpenProject }: LandingPageProps) => {
           {/* ─── FOOTER ─── */}
           <footer className="px-6 py-8 text-center">
             <div className="flex items-center justify-center gap-2 mb-3">
-              <img src="/logo.png" alt="Phoenix World" className="w-6 h-6 rounded-md object-cover" />
-              <span className="text-sm font-semibold text-foreground">Phoenix.World</span>
+              <img src="/logo.png" alt="Phoneix World" className="w-6 h-6 rounded-md object-cover" />
+              <span className="text-sm font-semibold text-foreground">Phoneix.World</span>
             </div>
-            <p className="text-xs text-muted-foreground">Built with Phoenix World • © {new Date().getFullYear()} All rights reserved.</p>
+            <p className="text-xs text-muted-foreground">Built with Phoneix World • © {new Date().getFullYear()} All rights reserved.</p>
           </footer>
         </main>
       </div>
