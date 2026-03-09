@@ -1658,7 +1658,7 @@ async function runDirectBuild(
   
   const existingCode = config.existingFiles 
     ? buildFullCodeContext(config.existingFiles) 
-    : buildFullCodeContext(getBaseTemplate());
+    : buildFullCodeContext(getBaseTemplate(config.domainModel));
   
   const result = await executeSingleTask(prompt, config, existingCode, callbacks.onDelta);
   
