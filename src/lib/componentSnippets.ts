@@ -1092,6 +1092,693 @@ export function getSnippetsByCategory(category: ComponentSnippet["category"]): C
   return COMPONENT_SNIPPETS.filter(s => s.category === category);
 }
 
+// === LOGO CLOUD / TRUSTED BY ===
+COMPONENT_SNIPPETS.push(
+  {
+    id: "logo-cloud",
+    name: "Logo Cloud (Trusted By)",
+    category: "logo-cloud",
+    structure: `<section class="py-16 bg-gray-50">
+  <div class="max-w-6xl mx-auto px-4 text-center">
+    <p class="text-sm font-medium text-gray-500 uppercase tracking-wider mb-8">Trusted by leading companies</p>
+    <div class="flex flex-wrap items-center justify-center gap-8 md:gap-12">
+      <div class="grayscale opacity-50 hover:grayscale-0 hover:opacity-100 transition-all duration-300" style="width:120px;height:40px;background:#e5e7eb;border-radius:8px;display:flex;align-items:center;justify-content:center;font-weight:600;color:#6b7280;">Logo 1</div>
+      <div class="grayscale opacity-50 hover:grayscale-0 hover:opacity-100 transition-all duration-300" style="width:120px;height:40px;background:#e5e7eb;border-radius:8px;display:flex;align-items:center;justify-content:center;font-weight:600;color:#6b7280;">Logo 2</div>
+      <div class="grayscale opacity-50 hover:grayscale-0 hover:opacity-100 transition-all duration-300" style="width:120px;height:40px;background:#e5e7eb;border-radius:8px;display:flex;align-items:center;justify-content:center;font-weight:600;color:#6b7280;">Logo 3</div>
+      <div class="grayscale opacity-50 hover:grayscale-0 hover:opacity-100 transition-all duration-300" style="width:120px;height:40px;background:#e5e7eb;border-radius:8px;display:flex;align-items:center;justify-content:center;font-weight:600;color:#6b7280;">Logo 4</div>
+      <div class="grayscale opacity-50 hover:grayscale-0 hover:opacity-100 transition-all duration-300" style="width:120px;height:40px;background:#e5e7eb;border-radius:8px;display:flex;align-items:center;justify-content:center;font-weight:600;color:#6b7280;">Logo 5</div>
+      <div class="grayscale opacity-50 hover:grayscale-0 hover:opacity-100 transition-all duration-300" style="width:120px;height:40px;background:#e5e7eb;border-radius:8px;display:flex;align-items:center;justify-content:center;font-weight:600;color:#6b7280;">Logo 6</div>
+    </div>
+  </div>
+</section>`,
+  },
+  {
+    id: "logo-cloud-scrolling",
+    name: "Infinite Scrolling Logo Cloud",
+    category: "logo-cloud",
+    structure: `<section class="py-12 overflow-hidden bg-white">
+  <p class="text-center text-sm font-medium text-gray-500 uppercase tracking-wider mb-8">Trusted by 1000+ companies</p>
+  <div style="display:flex;gap:3rem;animation:logoScroll 20s linear infinite;width:max-content;">
+    <div style="display:flex;gap:3rem;">
+      <div style="width:120px;height:40px;background:#f3f4f6;border-radius:8px;display:flex;align-items:center;justify-content:center;font-weight:600;color:#9ca3af;flex-shrink:0;">Brand 1</div>
+      <div style="width:120px;height:40px;background:#f3f4f6;border-radius:8px;display:flex;align-items:center;justify-content:center;font-weight:600;color:#9ca3af;flex-shrink:0;">Brand 2</div>
+      <div style="width:120px;height:40px;background:#f3f4f6;border-radius:8px;display:flex;align-items:center;justify-content:center;font-weight:600;color:#9ca3af;flex-shrink:0;">Brand 3</div>
+      <div style="width:120px;height:40px;background:#f3f4f6;border-radius:8px;display:flex;align-items:center;justify-content:center;font-weight:600;color:#9ca3af;flex-shrink:0;">Brand 4</div>
+      <div style="width:120px;height:40px;background:#f3f4f6;border-radius:8px;display:flex;align-items:center;justify-content:center;font-weight:600;color:#9ca3af;flex-shrink:0;">Brand 5</div>
+      <div style="width:120px;height:40px;background:#f3f4f6;border-radius:8px;display:flex;align-items:center;justify-content:center;font-weight:600;color:#9ca3af;flex-shrink:0;">Brand 6</div>
+    </div>
+    <div style="display:flex;gap:3rem;" aria-hidden="true">
+      <div style="width:120px;height:40px;background:#f3f4f6;border-radius:8px;display:flex;align-items:center;justify-content:center;font-weight:600;color:#9ca3af;flex-shrink:0;">Brand 1</div>
+      <div style="width:120px;height:40px;background:#f3f4f6;border-radius:8px;display:flex;align-items:center;justify-content:center;font-weight:600;color:#9ca3af;flex-shrink:0;">Brand 2</div>
+      <div style="width:120px;height:40px;background:#f3f4f6;border-radius:8px;display:flex;align-items:center;justify-content:center;font-weight:600;color:#9ca3af;flex-shrink:0;">Brand 3</div>
+      <div style="width:120px;height:40px;background:#f3f4f6;border-radius:8px;display:flex;align-items:center;justify-content:center;font-weight:600;color:#9ca3af;flex-shrink:0;">Brand 4</div>
+      <div style="width:120px;height:40px;background:#f3f4f6;border-radius:8px;display:flex;align-items:center;justify-content:center;font-weight:600;color:#9ca3af;flex-shrink:0;">Brand 5</div>
+      <div style="width:120px;height:40px;background:#f3f4f6;border-radius:8px;display:flex;align-items:center;justify-content:center;font-weight:600;color:#9ca3af;flex-shrink:0;">Brand 6</div>
+    </div>
+  </div>
+  <style>@keyframes logoScroll{0%{transform:translateX(0)}100%{transform:translateX(-50%)}}</style>
+</section>`,
+  },
+
+  // === BLOG CARDS ===
+  {
+    id: "blog-cards-grid",
+    name: "Blog Cards Grid",
+    category: "blog",
+    structure: `<section class="py-20">
+  <div class="max-w-6xl mx-auto px-4">
+    <h2 class="text-3xl font-bold mb-2">Latest Articles</h2>
+    <p class="text-gray-600 mb-12">Insights, tutorials, and updates from our team.</p>
+    <div class="grid md:grid-cols-3 gap-8">
+      <article class="group cursor-pointer">
+        <div class="aspect-video bg-gradient-to-br from-primary/20 to-accent/20 rounded-xl mb-4 overflow-hidden">
+          <div class="w-full h-full group-hover:scale-105 transition-transform duration-500"></div>
+        </div>
+        <div class="flex items-center gap-2 mb-3">
+          <span class="px-2.5 py-0.5 bg-primary/10 text-primary text-xs font-medium rounded-full">Category</span>
+          <span class="text-xs text-gray-500">5 min read</span>
+        </div>
+        <h3 class="text-lg font-semibold mb-2 group-hover:text-primary transition-colors">Article Title Goes Here</h3>
+        <p class="text-sm text-gray-600 line-clamp-2">Brief description of the article content that gives readers a preview.</p>
+        <div class="flex items-center gap-3 mt-4">
+          <div class="w-8 h-8 rounded-full bg-gray-200"></div>
+          <div><p class="text-sm font-medium">Author Name</p><p class="text-xs text-gray-500">Jan 15, 2025</p></div>
+        </div>
+      </article>
+      <article class="group cursor-pointer">
+        <div class="aspect-video bg-gradient-to-br from-blue-100 to-purple-100 rounded-xl mb-4 overflow-hidden">
+          <div class="w-full h-full group-hover:scale-105 transition-transform duration-500"></div>
+        </div>
+        <div class="flex items-center gap-2 mb-3">
+          <span class="px-2.5 py-0.5 bg-blue-100 text-blue-700 text-xs font-medium rounded-full">Tutorial</span>
+          <span class="text-xs text-gray-500">8 min read</span>
+        </div>
+        <h3 class="text-lg font-semibold mb-2 group-hover:text-primary transition-colors">Second Article Title</h3>
+        <p class="text-sm text-gray-600 line-clamp-2">Another engaging article preview to draw readers in.</p>
+        <div class="flex items-center gap-3 mt-4">
+          <div class="w-8 h-8 rounded-full bg-gray-200"></div>
+          <div><p class="text-sm font-medium">Author Two</p><p class="text-xs text-gray-500">Jan 12, 2025</p></div>
+        </div>
+      </article>
+      <article class="group cursor-pointer">
+        <div class="aspect-video bg-gradient-to-br from-green-100 to-teal-100 rounded-xl mb-4 overflow-hidden">
+          <div class="w-full h-full group-hover:scale-105 transition-transform duration-500"></div>
+        </div>
+        <div class="flex items-center gap-2 mb-3">
+          <span class="px-2.5 py-0.5 bg-green-100 text-green-700 text-xs font-medium rounded-full">Update</span>
+          <span class="text-xs text-gray-500">3 min read</span>
+        </div>
+        <h3 class="text-lg font-semibold mb-2 group-hover:text-primary transition-colors">Third Article Title</h3>
+        <p class="text-sm text-gray-600 line-clamp-2">A third preview to complete the blog grid layout.</p>
+        <div class="flex items-center gap-3 mt-4">
+          <div class="w-8 h-8 rounded-full bg-gray-200"></div>
+          <div><p class="text-sm font-medium">Author Three</p><p class="text-xs text-gray-500">Jan 10, 2025</p></div>
+        </div>
+      </article>
+    </div>
+  </div>
+</section>`,
+  },
+
+  // === TEAM SECTION ===
+  {
+    id: "team-grid",
+    name: "Team Members Grid",
+    category: "team",
+    structure: `<section class="py-20 bg-gray-50">
+  <div class="max-w-6xl mx-auto px-4 text-center">
+    <h2 class="text-3xl font-bold mb-4">Meet Our Team</h2>
+    <p class="text-gray-600 mb-12 max-w-2xl mx-auto">The talented people behind our product.</p>
+    <div class="grid sm:grid-cols-2 lg:grid-cols-4 gap-8">
+      <div class="group">
+        <div class="w-32 h-32 mx-auto rounded-full bg-gradient-to-br from-primary/30 to-accent/30 mb-4 group-hover:scale-110 transition-transform duration-300"></div>
+        <h3 class="font-semibold text-lg">Jane Smith</h3>
+        <p class="text-sm text-primary font-medium">CEO & Founder</p>
+        <p class="text-sm text-gray-500 mt-2">Visionary leader with 15+ years in tech.</p>
+        <div class="flex justify-center gap-3 mt-3">
+          <a href="#" class="text-gray-400 hover:text-primary transition-colors">𝕏</a>
+          <a href="#" class="text-gray-400 hover:text-primary transition-colors">in</a>
+        </div>
+      </div>
+      <div class="group">
+        <div class="w-32 h-32 mx-auto rounded-full bg-gradient-to-br from-blue-200 to-indigo-200 mb-4 group-hover:scale-110 transition-transform duration-300"></div>
+        <h3 class="font-semibold text-lg">Alex Chen</h3>
+        <p class="text-sm text-primary font-medium">CTO</p>
+        <p class="text-sm text-gray-500 mt-2">Full-stack architect and AI enthusiast.</p>
+        <div class="flex justify-center gap-3 mt-3">
+          <a href="#" class="text-gray-400 hover:text-primary transition-colors">𝕏</a>
+          <a href="#" class="text-gray-400 hover:text-primary transition-colors">in</a>
+        </div>
+      </div>
+      <div class="group">
+        <div class="w-32 h-32 mx-auto rounded-full bg-gradient-to-br from-pink-200 to-rose-200 mb-4 group-hover:scale-110 transition-transform duration-300"></div>
+        <h3 class="font-semibold text-lg">Maria Lopez</h3>
+        <p class="text-sm text-primary font-medium">Head of Design</p>
+        <p class="text-sm text-gray-500 mt-2">Pixel-perfect design craftsperson.</p>
+        <div class="flex justify-center gap-3 mt-3">
+          <a href="#" class="text-gray-400 hover:text-primary transition-colors">𝕏</a>
+          <a href="#" class="text-gray-400 hover:text-primary transition-colors">in</a>
+        </div>
+      </div>
+      <div class="group">
+        <div class="w-32 h-32 mx-auto rounded-full bg-gradient-to-br from-amber-200 to-orange-200 mb-4 group-hover:scale-110 transition-transform duration-300"></div>
+        <h3 class="font-semibold text-lg">Sam Park</h3>
+        <p class="text-sm text-primary font-medium">Lead Engineer</p>
+        <p class="text-sm text-gray-500 mt-2">Performance-obsessed engineer.</p>
+        <div class="flex justify-center gap-3 mt-3">
+          <a href="#" class="text-gray-400 hover:text-primary transition-colors">𝕏</a>
+          <a href="#" class="text-gray-400 hover:text-primary transition-colors">in</a>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>`,
+  },
+
+  // === TIMELINE / HOW IT WORKS ===
+  {
+    id: "timeline-steps",
+    name: "How It Works Timeline",
+    category: "timeline",
+    structure: `<section class="py-20">
+  <div class="max-w-4xl mx-auto px-4">
+    <h2 class="text-3xl font-bold text-center mb-4">How It Works</h2>
+    <p class="text-center text-gray-600 mb-16">Get started in three simple steps.</p>
+    <div class="relative">
+      <div class="absolute left-8 top-0 bottom-0 w-0.5 bg-gray-200 md:left-1/2 md:-translate-x-0.5"></div>
+      <div class="space-y-12">
+        <div class="relative flex items-start gap-6 md:gap-0">
+          <div class="flex-shrink-0 w-16 h-16 rounded-full bg-primary text-white flex items-center justify-center text-xl font-bold z-10 shadow-lg shadow-primary/25 md:absolute md:left-1/2 md:-translate-x-1/2">1</div>
+          <div class="md:w-1/2 md:pr-12 md:text-right">
+            <h3 class="text-xl font-semibold mb-2">Sign Up</h3>
+            <p class="text-gray-600">Create your account in seconds. No credit card required.</p>
+          </div>
+        </div>
+        <div class="relative flex items-start gap-6 md:gap-0">
+          <div class="flex-shrink-0 w-16 h-16 rounded-full bg-primary text-white flex items-center justify-center text-xl font-bold z-10 shadow-lg shadow-primary/25 md:absolute md:left-1/2 md:-translate-x-1/2">2</div>
+          <div class="md:w-1/2 md:ml-auto md:pl-12">
+            <h3 class="text-xl font-semibold mb-2">Configure</h3>
+            <p class="text-gray-600">Customize your workspace and invite your team.</p>
+          </div>
+        </div>
+        <div class="relative flex items-start gap-6 md:gap-0">
+          <div class="flex-shrink-0 w-16 h-16 rounded-full bg-primary text-white flex items-center justify-center text-xl font-bold z-10 shadow-lg shadow-primary/25 md:absolute md:left-1/2 md:-translate-x-1/2">3</div>
+          <div class="md:w-1/2 md:pr-12 md:text-right">
+            <h3 class="text-xl font-semibold mb-2">Launch</h3>
+            <p class="text-gray-600">Go live and start growing your business immediately.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>`,
+  },
+
+  // === GALLERY / PORTFOLIO ===
+  {
+    id: "gallery-masonry",
+    name: "Masonry Image Gallery",
+    category: "gallery",
+    structure: `<section class="py-20">
+  <div class="max-w-6xl mx-auto px-4">
+    <h2 class="text-3xl font-bold text-center mb-4">Our Work</h2>
+    <p class="text-center text-gray-600 mb-8">A selection of our favorite projects.</p>
+    <div class="flex gap-2 justify-center mb-12">
+      <button class="px-4 py-2 bg-primary text-white rounded-full text-sm font-medium" onclick="filterGallery('all')">All</button>
+      <button class="px-4 py-2 bg-gray-100 text-gray-600 rounded-full text-sm font-medium hover:bg-gray-200 transition" onclick="filterGallery('web')">Web</button>
+      <button class="px-4 py-2 bg-gray-100 text-gray-600 rounded-full text-sm font-medium hover:bg-gray-200 transition" onclick="filterGallery('mobile')">Mobile</button>
+      <button class="px-4 py-2 bg-gray-100 text-gray-600 rounded-full text-sm font-medium hover:bg-gray-200 transition" onclick="filterGallery('brand')">Branding</button>
+    </div>
+    <div class="columns-1 sm:columns-2 lg:columns-3 gap-4 space-y-4">
+      <div class="break-inside-avoid group relative overflow-hidden rounded-xl cursor-pointer" data-cat="web">
+        <div class="aspect-square bg-gradient-to-br from-primary/20 to-accent/30 group-hover:scale-105 transition-transform duration-500"></div>
+        <div class="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-end p-6">
+          <div><h3 class="text-white font-semibold text-lg">Project Alpha</h3><p class="text-white/70 text-sm">Web Design</p></div>
+        </div>
+      </div>
+      <div class="break-inside-avoid group relative overflow-hidden rounded-xl cursor-pointer" data-cat="mobile">
+        <div class="aspect-[3/4] bg-gradient-to-br from-blue-100 to-indigo-200 group-hover:scale-105 transition-transform duration-500"></div>
+        <div class="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-end p-6">
+          <div><h3 class="text-white font-semibold text-lg">App Beta</h3><p class="text-white/70 text-sm">Mobile App</p></div>
+        </div>
+      </div>
+      <div class="break-inside-avoid group relative overflow-hidden rounded-xl cursor-pointer" data-cat="brand">
+        <div class="aspect-video bg-gradient-to-br from-pink-100 to-rose-200 group-hover:scale-105 transition-transform duration-500"></div>
+        <div class="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-end p-6">
+          <div><h3 class="text-white font-semibold text-lg">Brand Gamma</h3><p class="text-white/70 text-sm">Branding</p></div>
+        </div>
+      </div>
+      <div class="break-inside-avoid group relative overflow-hidden rounded-xl cursor-pointer" data-cat="web">
+        <div class="aspect-[4/3] bg-gradient-to-br from-green-100 to-teal-200 group-hover:scale-105 transition-transform duration-500"></div>
+        <div class="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-end p-6">
+          <div><h3 class="text-white font-semibold text-lg">Dashboard Delta</h3><p class="text-white/70 text-sm">Web App</p></div>
+        </div>
+      </div>
+      <div class="break-inside-avoid group relative overflow-hidden rounded-xl cursor-pointer" data-cat="mobile">
+        <div class="aspect-square bg-gradient-to-br from-amber-100 to-orange-200 group-hover:scale-105 transition-transform duration-500"></div>
+        <div class="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-end p-6">
+          <div><h3 class="text-white font-semibold text-lg">App Epsilon</h3><p class="text-white/70 text-sm">Mobile App</p></div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <script>function filterGallery(c){document.querySelectorAll('[data-cat]').forEach(el=>{el.style.display=c==='all'||el.dataset.cat===c?'':'none'})}</script>
+</section>`,
+  },
+
+  // === AUTH / LOGIN FORM ===
+  {
+    id: "auth-login",
+    name: "Login / Signup Form",
+    category: "auth",
+    structure: `<section class="min-h-screen flex items-center justify-center bg-gray-50 py-12">
+  <div class="w-full max-w-md mx-auto">
+    <div class="bg-white rounded-2xl shadow-xl p-8">
+      <div class="text-center mb-8">
+        <div class="w-12 h-12 bg-primary rounded-xl mx-auto mb-4 flex items-center justify-center"><span class="text-white font-bold text-xl">L</span></div>
+        <h1 class="text-2xl font-bold">Welcome back</h1>
+        <p class="text-gray-600 text-sm mt-1">Sign in to your account</p>
+      </div>
+      <div class="space-y-3 mb-6">
+        <button class="w-full flex items-center justify-center gap-3 px-4 py-2.5 border border-gray-200 rounded-xl hover:bg-gray-50 transition text-sm font-medium">
+          <svg width="18" height="18" viewBox="0 0 24 24"><path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 01-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z" fill="#4285F4"/><path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/><path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/><path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/></svg>
+          Continue with Google
+        </button>
+        <button class="w-full flex items-center justify-center gap-3 px-4 py-2.5 border border-gray-200 rounded-xl hover:bg-gray-50 transition text-sm font-medium">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/></svg>
+          Continue with GitHub
+        </button>
+      </div>
+      <div class="flex items-center gap-3 mb-6">
+        <div class="flex-1 h-px bg-gray-200"></div>
+        <span class="text-xs text-gray-500">OR</span>
+        <div class="flex-1 h-px bg-gray-200"></div>
+      </div>
+      <form class="space-y-4">
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">Email</label>
+          <input type="email" class="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition" placeholder="you@example.com">
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">Password</label>
+          <input type="password" class="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition" placeholder="••••••••">
+        </div>
+        <div class="flex items-center justify-between text-sm">
+          <label class="flex items-center gap-2"><input type="checkbox" class="rounded"> Remember me</label>
+          <a href="#" class="text-primary hover:underline">Forgot password?</a>
+        </div>
+        <button type="submit" class="w-full py-2.5 bg-primary text-white rounded-xl font-medium shadow-lg shadow-primary/25 hover:shadow-xl transition-all">Sign In</button>
+      </form>
+      <p class="text-center text-sm text-gray-600 mt-6">Don't have an account? <a href="#" class="text-primary font-medium hover:underline">Sign up</a></p>
+    </div>
+  </div>
+</section>`,
+  },
+
+  // === ANNOUNCEMENT BANNER ===
+  {
+    id: "banner-announcement",
+    name: "Announcement Banner",
+    category: "banner",
+    structure: `<div class="bg-gradient-to-r from-primary to-indigo-600 text-white" id="announcement-banner">
+  <div class="max-w-7xl mx-auto px-4 py-3 flex items-center justify-center gap-4 text-sm">
+    <span class="inline-flex items-center gap-1.5">
+      <span class="flex h-2 w-2 rounded-full bg-white animate-pulse"></span>
+      <strong>New:</strong> We just launched v2.0 with amazing features
+    </span>
+    <a href="#" class="px-3 py-1 bg-white/20 rounded-full hover:bg-white/30 transition font-medium text-xs">Learn more →</a>
+    <button onclick="document.getElementById('announcement-banner').remove()" class="absolute right-4 hover:opacity-70 transition">✕</button>
+  </div>
+</div>`,
+  },
+
+  // === TABS CONTENT ===
+  {
+    id: "tabs-content",
+    name: "Tabbed Content Section",
+    category: "tabs",
+    structure: `<section class="py-20">
+  <div class="max-w-4xl mx-auto px-4">
+    <h2 class="text-3xl font-bold text-center mb-12">Explore Features</h2>
+    <div class="flex justify-center gap-1 mb-8 bg-gray-100 rounded-xl p-1 max-w-md mx-auto" id="tabBar">
+      <button class="flex-1 py-2.5 px-4 rounded-lg text-sm font-medium bg-white shadow text-primary transition" onclick="switchTab(0)">Overview</button>
+      <button class="flex-1 py-2.5 px-4 rounded-lg text-sm font-medium text-gray-600 hover:text-gray-900 transition" onclick="switchTab(1)">Features</button>
+      <button class="flex-1 py-2.5 px-4 rounded-lg text-sm font-medium text-gray-600 hover:text-gray-900 transition" onclick="switchTab(2)">Integrations</button>
+    </div>
+    <div id="tabContent">
+      <div class="tab-panel" data-tab="0">
+        <div class="bg-gray-50 rounded-2xl p-8 text-center">
+          <div class="w-full aspect-video bg-gradient-to-br from-primary/10 to-accent/10 rounded-xl mb-6"></div>
+          <h3 class="text-xl font-semibold mb-2">Product Overview</h3>
+          <p class="text-gray-600 max-w-lg mx-auto">A comprehensive look at what our platform offers and how it can transform your workflow.</p>
+        </div>
+      </div>
+      <div class="tab-panel hidden" data-tab="1">
+        <div class="bg-gray-50 rounded-2xl p-8">
+          <div class="grid sm:grid-cols-2 gap-4">
+            <div class="bg-white rounded-xl p-4 shadow-sm"><h4 class="font-semibold mb-1">Feature One</h4><p class="text-sm text-gray-600">Description of this powerful feature.</p></div>
+            <div class="bg-white rounded-xl p-4 shadow-sm"><h4 class="font-semibold mb-1">Feature Two</h4><p class="text-sm text-gray-600">Another great capability explained.</p></div>
+            <div class="bg-white rounded-xl p-4 shadow-sm"><h4 class="font-semibold mb-1">Feature Three</h4><p class="text-sm text-gray-600">Yet another impressive ability.</p></div>
+            <div class="bg-white rounded-xl p-4 shadow-sm"><h4 class="font-semibold mb-1">Feature Four</h4><p class="text-sm text-gray-600">The last but not least feature.</p></div>
+          </div>
+        </div>
+      </div>
+      <div class="tab-panel hidden" data-tab="2">
+        <div class="bg-gray-50 rounded-2xl p-8 text-center">
+          <div class="flex flex-wrap justify-center gap-4">
+            <div class="w-16 h-16 bg-white rounded-xl shadow-sm flex items-center justify-center text-2xl">📊</div>
+            <div class="w-16 h-16 bg-white rounded-xl shadow-sm flex items-center justify-center text-2xl">💬</div>
+            <div class="w-16 h-16 bg-white rounded-xl shadow-sm flex items-center justify-center text-2xl">📧</div>
+            <div class="w-16 h-16 bg-white rounded-xl shadow-sm flex items-center justify-center text-2xl">🔗</div>
+            <div class="w-16 h-16 bg-white rounded-xl shadow-sm flex items-center justify-center text-2xl">⚡</div>
+          </div>
+          <p class="text-gray-600 mt-6">Connects with 100+ tools you already use.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+  <script>
+  function switchTab(i){
+    document.querySelectorAll('.tab-panel').forEach(p=>p.classList.add('hidden'));
+    document.querySelector('[data-tab="'+i+'"]').classList.remove('hidden');
+    document.querySelectorAll('#tabBar button').forEach((b,idx)=>{
+      b.className=idx===i?'flex-1 py-2.5 px-4 rounded-lg text-sm font-medium bg-white shadow text-primary transition':'flex-1 py-2.5 px-4 rounded-lg text-sm font-medium text-gray-600 hover:text-gray-900 transition';
+    });
+  }
+  </script>
+</section>`,
+  },
+
+  // === VIDEO HERO ===
+  {
+    id: "hero-video",
+    name: "Video Hero with Play Button",
+    category: "video",
+    structure: `<section class="py-24 relative overflow-hidden">
+  <div class="max-w-5xl mx-auto px-4 text-center">
+    <h1 class="text-4xl md:text-6xl font-bold tracking-tight mb-6">See it in action</h1>
+    <p class="text-xl text-gray-600 mb-12 max-w-2xl mx-auto">Watch how our platform transforms the way you work.</p>
+    <div class="relative max-w-3xl mx-auto group cursor-pointer" onclick="this.querySelector('video')?.play()">
+      <div class="aspect-video bg-gradient-to-br from-gray-900 to-gray-700 rounded-2xl overflow-hidden shadow-2xl">
+        <div class="w-full h-full flex items-center justify-center" id="videoPlaceholder">
+          <div class="w-20 h-20 rounded-full bg-white/90 flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform duration-300">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="ml-1 text-gray-900"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+          </div>
+        </div>
+      </div>
+      <div class="absolute -inset-4 bg-gradient-to-r from-primary/20 to-accent/20 rounded-3xl blur-2xl -z-10 opacity-50 group-hover:opacity-80 transition-opacity"></div>
+    </div>
+  </div>
+</section>`,
+  },
+
+  // === SOCIAL PROOF BAR ===
+  {
+    id: "social-proof-bar",
+    name: "Social Proof Numbers Bar",
+    category: "social-proof",
+    structure: `<section class="py-8 border-y border-gray-100">
+  <div class="max-w-6xl mx-auto px-4 flex flex-wrap items-center justify-center gap-8 md:gap-16">
+    <div class="text-center">
+      <div class="text-3xl font-bold text-primary">10K+</div>
+      <div class="text-sm text-gray-500 mt-1">Active Users</div>
+    </div>
+    <div class="w-px h-12 bg-gray-200 hidden md:block"></div>
+    <div class="text-center">
+      <div class="text-3xl font-bold text-primary">99.9%</div>
+      <div class="text-sm text-gray-500 mt-1">Uptime</div>
+    </div>
+    <div class="w-px h-12 bg-gray-200 hidden md:block"></div>
+    <div class="text-center">
+      <div class="text-3xl font-bold text-primary">4.9★</div>
+      <div class="text-sm text-gray-500 mt-1">Rating</div>
+    </div>
+    <div class="w-px h-12 bg-gray-200 hidden md:block"></div>
+    <div class="text-center">
+      <div class="text-3xl font-bold text-primary">50+</div>
+      <div class="text-sm text-gray-500 mt-1">Countries</div>
+    </div>
+  </div>
+</section>`,
+  },
+
+  // === COOKIE CONSENT ===
+  {
+    id: "cookie-consent",
+    name: "Cookie Consent Banner",
+    category: "cookie",
+    structure: `<div id="cookieBanner" style="position:fixed;bottom:0;left:0;right:0;z-index:9999;transform:translateY(100%);animation:cookieSlideUp 0.5s ease-out 1s forwards;">
+  <div class="max-w-6xl mx-auto px-4 py-4">
+    <div class="bg-white rounded-2xl shadow-2xl border border-gray-100 p-6 flex flex-col sm:flex-row items-start sm:items-center gap-4">
+      <div class="flex-1">
+        <p class="text-sm text-gray-700"><strong>🍪 We use cookies</strong> to improve your experience. By continuing to use this site, you agree to our <a href="#" class="text-primary hover:underline">Privacy Policy</a>.</p>
+      </div>
+      <div class="flex gap-2 flex-shrink-0">
+        <button onclick="document.getElementById('cookieBanner').style.display='none'" class="px-4 py-2 text-sm text-gray-600 hover:text-gray-900 transition">Decline</button>
+        <button onclick="document.getElementById('cookieBanner').style.display='none'" class="px-5 py-2 bg-primary text-white text-sm font-medium rounded-lg hover:opacity-90 transition">Accept All</button>
+      </div>
+    </div>
+  </div>
+  <style>@keyframes cookieSlideUp{to{transform:translateY(0)}}</style>
+</div>`,
+  },
+
+  // === 404 ERROR PAGE ===
+  {
+    id: "error-404",
+    name: "404 Error Page",
+    category: "error",
+    structure: `<section class="min-h-screen flex items-center justify-center bg-white">
+  <div class="text-center px-4">
+    <div class="text-8xl font-black text-transparent bg-clip-text bg-gradient-to-r from-primary to-accent mb-4">404</div>
+    <h1 class="text-3xl font-bold mb-4">Page not found</h1>
+    <p class="text-gray-600 mb-8 max-w-md mx-auto">Sorry, we couldn't find the page you're looking for. It might have been moved or deleted.</p>
+    <div class="flex gap-3 justify-center">
+      <a href="/" class="px-6 py-3 bg-primary text-white rounded-xl font-medium shadow-lg shadow-primary/25 hover:-translate-y-0.5 transition-all">Go Home</a>
+      <a href="#" class="px-6 py-3 border border-gray-200 rounded-xl font-medium hover:bg-gray-50 transition-all">Contact Support</a>
+    </div>
+  </div>
+</section>`,
+  },
+
+  // === DASHBOARD STATS CARDS ===
+  {
+    id: "dashboard-stats",
+    name: "Dashboard Stats Cards",
+    category: "dashboard",
+    structure: `<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 p-4">
+  <div class="bg-white rounded-xl border border-gray-100 p-6 hover:shadow-lg transition-shadow">
+    <div class="flex items-center justify-between mb-4">
+      <span class="text-sm font-medium text-gray-500">Total Revenue</span>
+      <span class="w-10 h-10 rounded-lg bg-green-100 flex items-center justify-center text-green-600">$</span>
+    </div>
+    <div class="text-2xl font-bold">$45,231</div>
+    <div class="flex items-center gap-1 mt-2 text-sm"><span class="text-green-600">↑ 20.1%</span><span class="text-gray-400">from last month</span></div>
+  </div>
+  <div class="bg-white rounded-xl border border-gray-100 p-6 hover:shadow-lg transition-shadow">
+    <div class="flex items-center justify-between mb-4">
+      <span class="text-sm font-medium text-gray-500">Users</span>
+      <span class="w-10 h-10 rounded-lg bg-blue-100 flex items-center justify-center text-blue-600">👤</span>
+    </div>
+    <div class="text-2xl font-bold">2,350</div>
+    <div class="flex items-center gap-1 mt-2 text-sm"><span class="text-green-600">↑ 12.5%</span><span class="text-gray-400">from last month</span></div>
+  </div>
+  <div class="bg-white rounded-xl border border-gray-100 p-6 hover:shadow-lg transition-shadow">
+    <div class="flex items-center justify-between mb-4">
+      <span class="text-sm font-medium text-gray-500">Active Sessions</span>
+      <span class="w-10 h-10 rounded-lg bg-purple-100 flex items-center justify-center text-purple-600">⚡</span>
+    </div>
+    <div class="text-2xl font-bold">1,247</div>
+    <div class="flex items-center gap-1 mt-2 text-sm"><span class="text-red-500">↓ 3.2%</span><span class="text-gray-400">from last hour</span></div>
+  </div>
+  <div class="bg-white rounded-xl border border-gray-100 p-6 hover:shadow-lg transition-shadow">
+    <div class="flex items-center justify-between mb-4">
+      <span class="text-sm font-medium text-gray-500">Conversion</span>
+      <span class="w-10 h-10 rounded-lg bg-amber-100 flex items-center justify-center text-amber-600">📈</span>
+    </div>
+    <div class="text-2xl font-bold">3.2%</div>
+    <div class="flex items-center gap-1 mt-2 text-sm"><span class="text-green-600">↑ 0.8%</span><span class="text-gray-400">from last week</span></div>
+  </div>
+</div>`,
+  },
+
+  // === PROGRESS STEPS ===
+  {
+    id: "progress-steps",
+    name: "Progress Steps Indicator",
+    category: "progress",
+    structure: `<div class="max-w-3xl mx-auto px-4 py-8">
+  <div class="flex items-center justify-between">
+    <div class="flex items-center gap-3">
+      <div class="w-10 h-10 rounded-full bg-primary text-white flex items-center justify-center font-semibold text-sm shadow-lg shadow-primary/25">✓</div>
+      <span class="text-sm font-medium text-primary hidden sm:block">Account</span>
+    </div>
+    <div class="flex-1 h-1 mx-2 bg-primary rounded-full"></div>
+    <div class="flex items-center gap-3">
+      <div class="w-10 h-10 rounded-full bg-primary text-white flex items-center justify-center font-semibold text-sm shadow-lg shadow-primary/25">2</div>
+      <span class="text-sm font-medium text-primary hidden sm:block">Details</span>
+    </div>
+    <div class="flex-1 h-1 mx-2 bg-gray-200 rounded-full"><div class="h-full w-1/2 bg-primary rounded-full"></div></div>
+    <div class="flex items-center gap-3">
+      <div class="w-10 h-10 rounded-full bg-gray-200 text-gray-500 flex items-center justify-center font-semibold text-sm">3</div>
+      <span class="text-sm font-medium text-gray-500 hidden sm:block">Payment</span>
+    </div>
+    <div class="flex-1 h-1 mx-2 bg-gray-200 rounded-full"></div>
+    <div class="flex items-center gap-3">
+      <div class="w-10 h-10 rounded-full bg-gray-200 text-gray-500 flex items-center justify-center font-semibold text-sm">4</div>
+      <span class="text-sm font-medium text-gray-500 hidden sm:block">Confirm</span>
+    </div>
+  </div>
+</div>`,
+  },
+
+  // === SIDEBAR NAVIGATION ===
+  {
+    id: "sidebar-nav",
+    name: "Dashboard Sidebar Navigation",
+    category: "sidebar",
+    structure: `<aside class="w-64 bg-gray-900 text-white min-h-screen flex flex-col">
+  <div class="p-6 border-b border-gray-800">
+    <div class="flex items-center gap-3">
+      <div class="w-8 h-8 rounded-lg bg-primary flex items-center justify-center font-bold text-sm">A</div>
+      <span class="font-semibold">AppName</span>
+    </div>
+  </div>
+  <nav class="flex-1 p-4 space-y-1">
+    <a href="#" class="flex items-center gap-3 px-3 py-2.5 rounded-lg bg-white/10 text-white text-sm font-medium">
+      <span>📊</span> Dashboard
+    </a>
+    <a href="#" class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-gray-400 hover:bg-white/5 hover:text-white text-sm transition">
+      <span>👥</span> Users
+    </a>
+    <a href="#" class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-gray-400 hover:bg-white/5 hover:text-white text-sm transition">
+      <span>📦</span> Products
+    </a>
+    <a href="#" class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-gray-400 hover:bg-white/5 hover:text-white text-sm transition">
+      <span>📈</span> Analytics
+    </a>
+    <div class="pt-4 pb-2"><p class="px-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Settings</p></div>
+    <a href="#" class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-gray-400 hover:bg-white/5 hover:text-white text-sm transition">
+      <span>⚙️</span> General
+    </a>
+    <a href="#" class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-gray-400 hover:bg-white/5 hover:text-white text-sm transition">
+      <span>🔒</span> Security
+    </a>
+  </nav>
+  <div class="p-4 border-t border-gray-800">
+    <div class="flex items-center gap-3 px-3 py-2">
+      <div class="w-8 h-8 rounded-full bg-gradient-to-br from-primary to-accent"></div>
+      <div class="flex-1 min-w-0">
+        <p class="text-sm font-medium truncate">John Doe</p>
+        <p class="text-xs text-gray-500 truncate">john@example.com</p>
+      </div>
+    </div>
+  </div>
+</aside>`,
+  },
+
+  // === FEATURE COMPARISON TABLE ===
+  {
+    id: "feature-comparison",
+    name: "Feature Comparison Table",
+    category: "pricing",
+    structure: `<section class="py-20">
+  <div class="max-w-4xl mx-auto px-4">
+    <h2 class="text-3xl font-bold text-center mb-12">Compare Plans</h2>
+    <div class="overflow-x-auto">
+      <table class="w-full text-left">
+        <thead>
+          <tr class="border-b border-gray-200">
+            <th class="py-4 pr-4 text-sm font-medium text-gray-500 w-1/3">Feature</th>
+            <th class="py-4 px-4 text-center text-sm font-semibold">Free</th>
+            <th class="py-4 px-4 text-center text-sm font-semibold text-primary">Pro</th>
+            <th class="py-4 px-4 text-center text-sm font-semibold">Enterprise</th>
+          </tr>
+        </thead>
+        <tbody class="text-sm">
+          <tr class="border-b border-gray-100"><td class="py-3.5 pr-4 font-medium">Projects</td><td class="py-3.5 px-4 text-center">3</td><td class="py-3.5 px-4 text-center text-primary font-medium">Unlimited</td><td class="py-3.5 px-4 text-center">Unlimited</td></tr>
+          <tr class="border-b border-gray-100"><td class="py-3.5 pr-4 font-medium">Team Members</td><td class="py-3.5 px-4 text-center">1</td><td class="py-3.5 px-4 text-center text-primary font-medium">10</td><td class="py-3.5 px-4 text-center">Unlimited</td></tr>
+          <tr class="border-b border-gray-100"><td class="py-3.5 pr-4 font-medium">Storage</td><td class="py-3.5 px-4 text-center">1 GB</td><td class="py-3.5 px-4 text-center text-primary font-medium">100 GB</td><td class="py-3.5 px-4 text-center">Unlimited</td></tr>
+          <tr class="border-b border-gray-100"><td class="py-3.5 pr-4 font-medium">Custom Domain</td><td class="py-3.5 px-4 text-center text-gray-400">✕</td><td class="py-3.5 px-4 text-center text-green-600">✓</td><td class="py-3.5 px-4 text-center text-green-600">✓</td></tr>
+          <tr class="border-b border-gray-100"><td class="py-3.5 pr-4 font-medium">Analytics</td><td class="py-3.5 px-4 text-center text-gray-400">Basic</td><td class="py-3.5 px-4 text-center text-primary font-medium">Advanced</td><td class="py-3.5 px-4 text-center">Custom</td></tr>
+          <tr class="border-b border-gray-100"><td class="py-3.5 pr-4 font-medium">Priority Support</td><td class="py-3.5 px-4 text-center text-gray-400">✕</td><td class="py-3.5 px-4 text-center text-green-600">✓</td><td class="py-3.5 px-4 text-center text-green-600">✓</td></tr>
+          <tr><td class="py-3.5 pr-4 font-medium">SLA</td><td class="py-3.5 px-4 text-center text-gray-400">✕</td><td class="py-3.5 px-4 text-center text-gray-400">✕</td><td class="py-3.5 px-4 text-center text-green-600">99.9%</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</section>`,
+  },
+
+  // === CTA WITH IMAGE ===
+  {
+    id: "cta-split-image",
+    name: "CTA with Image Split",
+    category: "cta",
+    structure: `<section class="py-20 bg-gray-50">
+  <div class="max-w-6xl mx-auto px-4 flex flex-col lg:flex-row items-center gap-12">
+    <div class="flex-1">
+      <h2 class="text-3xl md:text-4xl font-bold mb-4">Ready to get started?</h2>
+      <p class="text-lg text-gray-600 mb-8">Join thousands of teams who already use our platform to build better products faster.</p>
+      <div class="flex gap-3">
+        <a href="#" class="px-8 py-3 bg-primary text-white rounded-xl font-medium shadow-lg shadow-primary/25 hover:-translate-y-0.5 transition-all">Start Free Trial</a>
+        <a href="#" class="px-8 py-3 border border-gray-200 rounded-xl font-medium hover:bg-white transition-all">Book a Demo</a>
+      </div>
+      <p class="text-sm text-gray-500 mt-4">No credit card required · Free for 14 days</p>
+    </div>
+    <div class="flex-1">
+      <div class="aspect-square max-w-md bg-gradient-to-br from-primary/10 to-accent/20 rounded-2xl shadow-xl"></div>
+    </div>
+  </div>
+</section>`,
+  },
+
+  // === FOOTER WITH NEWSLETTER ===
+  {
+    id: "footer-mega",
+    name: "Mega Footer with Newsletter",
+    category: "footer",
+    structure: `<footer class="bg-gray-900 text-gray-300 pt-16 pb-8">
+  <div class="max-w-6xl mx-auto px-4">
+    <div class="grid md:grid-cols-2 lg:grid-cols-5 gap-8 mb-12">
+      <div class="lg:col-span-2">
+        <div class="flex items-center gap-2 mb-4">
+          <div class="w-8 h-8 bg-primary rounded-lg flex items-center justify-center"><span class="text-white font-bold">A</span></div>
+          <span class="font-semibold text-white text-lg">AppName</span>
+        </div>
+        <p class="text-sm text-gray-400 mb-6 max-w-sm">Building the future of work, one product at a time. Join our community today.</p>
+        <div class="flex gap-3">
+          <input type="email" placeholder="Enter your email" class="flex-1 px-4 py-2.5 bg-gray-800 border border-gray-700 rounded-lg text-sm text-white placeholder-gray-500 focus:ring-2 focus:ring-primary/50 focus:border-primary outline-none transition">
+          <button class="px-4 py-2.5 bg-primary text-white rounded-lg text-sm font-medium hover:opacity-90 transition">Subscribe</button>
+        </div>
+      </div>
+      <div>
+        <h4 class="font-semibold text-white text-sm uppercase tracking-wider mb-4">Product</h4>
+        <ul class="space-y-2.5 text-sm"><li><a href="#" class="hover:text-white transition">Features</a></li><li><a href="#" class="hover:text-white transition">Pricing</a></li><li><a href="#" class="hover:text-white transition">Changelog</a></li><li><a href="#" class="hover:text-white transition">Roadmap</a></li></ul>
+      </div>
+      <div>
+        <h4 class="font-semibold text-white text-sm uppercase tracking-wider mb-4">Company</h4>
+        <ul class="space-y-2.5 text-sm"><li><a href="#" class="hover:text-white transition">About</a></li><li><a href="#" class="hover:text-white transition">Blog</a></li><li><a href="#" class="hover:text-white transition">Careers</a></li><li><a href="#" class="hover:text-white transition">Press</a></li></ul>
+      </div>
+      <div>
+        <h4 class="font-semibold text-white text-sm uppercase tracking-wider mb-4">Legal</h4>
+        <ul class="space-y-2.5 text-sm"><li><a href="#" class="hover:text-white transition">Privacy</a></li><li><a href="#" class="hover:text-white transition">Terms</a></li><li><a href="#" class="hover:text-white transition">Security</a></li><li><a href="#" class="hover:text-white transition">Cookies</a></li></ul>
+      </div>
+    </div>
+    <div class="border-t border-gray-800 pt-8 flex flex-col sm:flex-row items-center justify-between gap-4 text-sm text-gray-500">
+      <p>© 2025 AppName. All rights reserved.</p>
+      <div class="flex gap-4">
+        <a href="#" class="hover:text-white transition">Twitter</a>
+        <a href="#" class="hover:text-white transition">GitHub</a>
+        <a href="#" class="hover:text-white transition">LinkedIn</a>
+        <a href="#" class="hover:text-white transition">Discord</a>
+      </div>
+    </div>
+  </div>
+</footer>`,
+  }
+);
+
 /**
  * Get a compact snippets reference for the AI system prompt
  */
