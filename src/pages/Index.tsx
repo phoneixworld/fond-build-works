@@ -4,7 +4,7 @@ import {
   ResizablePanel,
   ResizablePanelGroup,
 } from "@/components/ui/resizable";
-import { Code, Eye, Cloud, Clock, Brain, Activity, Users, Palette, FlaskConical, Puzzle, Tag, GitBranch, Globe } from "lucide-react";
+import { Code, Eye, Cloud, Clock, Brain, Activity, Users, Palette, FlaskConical, Puzzle, Tag, GitBranch, Globe, ListChecks, Shield, Search } from "lucide-react";
 import { PreviewProvider } from "@/contexts/PreviewContext";
 import { VirtualFSProvider } from "@/contexts/VirtualFSContext";
 import { ProjectProvider, useProjects } from "@/contexts/ProjectContext";
@@ -23,6 +23,9 @@ import PluginMarketplace from "@/components/PluginMarketplace";
 import WhiteLabelPanel from "@/components/WhiteLabelPanel";
 import GitHubPanel from "@/components/GitHubPanel";
 import CustomDomainPanel from "@/components/CustomDomainPanel";
+import PlanningPanel from "@/components/PlanningPanel";
+import CodeQualityPanel from "@/components/CodeQualityPanel";
+import SemanticSearchPanel from "@/components/SemanticSearchPanel";
 import LandingPage from "@/components/LandingPage";
 import CommandPalette from "@/components/CommandPalette";
 import VersionHistory, { Version } from "@/components/VersionHistory";
@@ -41,6 +44,9 @@ const PRIMARY_TABS = [
 ];
 
 const SECONDARY_TABS = [
+  { id: "planning" as PanelId, label: "Planner", icon: ListChecks },
+  { id: "quality" as PanelId, label: "Quality", icon: Shield },
+  { id: "search" as PanelId, label: "Search", icon: Search },
   { id: "brain" as PanelId, label: "Brain", icon: Brain },
   { id: "pulse" as PanelId, label: "Pulse", icon: Activity },
   { id: "crew" as PanelId, label: "Crew", icon: Users },
@@ -56,6 +62,9 @@ const SECONDARY_TABS = [
 const PANEL_COMPONENTS: Record<string, React.FC<any>> = {
   code: CodeEditor,
   cloud: CloudPanel,
+  planning: PlanningPanel,
+  quality: CodeQualityPanel,
+  search: SemanticSearchPanel,
   brain: ProjectBrain,
   pulse: PulseAnalytics,
   crew: CrewSpaces,
