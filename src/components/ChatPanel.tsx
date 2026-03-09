@@ -489,7 +489,7 @@ const ChatPanel = forwardRef<ChatPanelHandle, { initialPrompt?: string; onVersio
   const [attachedImages, setAttachedImages] = useState<string[]>([]);
   const [isDragOver, setIsDragOver] = useState(false);
   const [showScrollBtn, setShowScrollBtn] = useState(false);
-  const [elapsedTime, setElapsedTime] = useState(0);
+  
   const [buildStreamContent, setBuildStreamContent] = useState("");
   // Self-healing state
   const [healAttempts, setHealAttempts] = useState(0);
@@ -518,7 +518,7 @@ const ChatPanel = forwardRef<ChatPanelHandle, { initialPrompt?: string; onVersio
   const { setFiles: setVirtualFiles } = useVirtualFS();
   const lastProjectIdRef = useRef<string | null>(null);
   const hasProcessedInitialRef = useRef(false);
-const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
 const healTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 const MAX_HEAL_ATTEMPTS = 3;
 // ─── Project context cache — avoids re-fetching on every message ───────────
@@ -545,16 +545,7 @@ const CONTEXT_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
   const isSendingRef = useRef(false);
 
   // Elapsed time timer during loading
-  useEffect(() => {
-    if (isLoading) {
-      setElapsedTime(0);
-      timerRef.current = setInterval(() => setElapsedTime(t => t + 1), 1000);
-    } else {
-      if (timerRef.current) clearInterval(timerRef.current);
-      timerRef.current = null;
-    }
-    return () => { if (timerRef.current) clearInterval(timerRef.current); };
-  }, [isLoading]);
+  // Timer moved to BuildPipelineCard — no more per-second re-renders here
 
   // Scroll detection for scroll-to-bottom button
   useEffect(() => {
@@ -1794,7 +1785,6 @@ const CONTEXT_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
             <BuildPipelineCard
               isBuilding={isLoading}
               streamContent={buildStreamContent}
-              elapsed={elapsedTime}
               pipelineStep={pipelineStep}
               currentAgent={currentAgent === "clarify" ? null : currentAgent}
             />
