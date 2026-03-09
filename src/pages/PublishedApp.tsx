@@ -9,6 +9,68 @@ import {
 
 const SANDPACK_MARKER = "<!--SANDPACK_JSON-->";
 
+// ─── Same boilerplate used by the in-app SandpackPreview ───────────────────
+const INDEX_JS = `import React, { StrictMode } from "react";
+import { createRoot } from "react-dom/client";
+import App from "./App";
+import "./styles.css";
+
+const root = createRoot(document.getElementById("root"));
+root.render(
+  <StrictMode>
+    <App />
+  </StrictMode>
+);
+`;
+
+const DEFAULT_STYLES = `@tailwind base;
+@tailwind components;
+@tailwind utilities;
+`;
+
+const DEFAULT_INDEX_HTML = `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>App</title>
+</head>
+<body>
+  <div id="root"></div>
+</body>
+</html>`;
+
+const DEFAULT_APP = `import React from "react";
+export default function App() {
+  return <div className="p-8"><h1>App</h1></div>;
+}
+`;
+
+function buildFiles(raw: Record<string, string>): Record<string, string> {
+  const base: Record<string, string> = {
+    "/index.js": INDEX_JS,
+    "/styles.css": DEFAULT_STYLES,
+    "/public/index.html": DEFAULT_INDEX_HTML,
+  };
+
+  for (const [path, code] of Object.entries(raw)) {
+    const normalized = path.startsWith("/") ? path : `/${path}`;
+    const sandpackPath = normalized.replace(/\.tsx?$/, ".js");
+    base[sandpackPath] = code;
+  }
+
+  if (!base["/App.js"] && !base["/App.jsx"]) {
+    base["/App.js"] = DEFAULT_APP;
+  }
+
+  if (base["/App.jsx"] && !base["/App.js"]) {
+    base["/index.js"] = INDEX_JS.replace("./App", "./App.jsx");
+  }
+
+  return base;
+}
+
+// ─── Component ─────────────────────────────────────────────────────────────
 const PublishedApp = () => {
   const { slug } = useParams<{ slug: string }>();
   const [content, setContent] = useState<string | null>(null);
@@ -43,12 +105,7 @@ const PublishedApp = () => {
     try {
       const json = content.slice(SANDPACK_MARKER.length);
       const raw = JSON.parse(json) as Record<string, string>;
-      // Convert to Sandpack file format
-      const files: Record<string, { code: string }> = {};
-      for (const [path, code] of Object.entries(raw)) {
-        files[path] = { code };
-      }
-      return files;
+      return buildFiles(raw);
     } catch {
       return null;
     }
@@ -73,7 +130,6 @@ const PublishedApp = () => {
     );
   }
 
-  // Render Sandpack files using the real Sandpack bundler
   if (isSandpack && sandpackFiles) {
     return (
       <div className="h-screen w-screen">
@@ -87,6 +143,9 @@ const PublishedApp = () => {
               "lucide-react": "^0.400.0",
               "clsx": "^2.1.0",
               "tailwind-merge": "^2.2.0",
+              "date-fns": "^3.6.0",
+              "recharts": "^2.12.0",
+              "react-intersection-observer": "^9.10.0",
             },
           }}
           options={{
@@ -104,7 +163,6 @@ const PublishedApp = () => {
     );
   }
 
-  // Fallback: render raw HTML in iframe
   return (
     <iframe
       srcDoc={content}
