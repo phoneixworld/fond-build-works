@@ -181,6 +181,7 @@ export interface EngineResult {
   plan?: BuildPlan;
   chatText: string;
   mergeConflicts: string[];
+  metrics?: BuildMetrics;
 }
 
 // ─── File Validation (real parsers — single source of truth) ──────────────
