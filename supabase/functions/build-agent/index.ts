@@ -582,20 +582,21 @@ serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
-    const { messages, project_id, tech_stack, schemas, model, design_theme, knowledge, template_context, current_code, snippets_context, retry_context, max_tokens: requestedMaxTokens } = await req.json();
+    const { messages, project_id, tech_stack, schemas, model, design_theme, knowledge, template_context, current_code, snippets_context, retry_context, max_tokens: requestedMaxTokens, task_type } = await req.json();
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY is not configured");
 
-    let systemPrompt = buildSystemPrompt(project_id || "unknown", tech_stack || "react-cdn", schemas, design_theme, knowledge);
+    const projectId = project_id || "default";
+    const techStack = tech_stack || "react-cdn";
+
+    const systemPrompt = buildSystemPrompt(projectId, techStack, schemas, design_theme, knowledge);
 
     if (template_context) {
-      systemPrompt += `\n\n${template_context}`;
+      systemPrompt += `\n\n## TEMPLATE CONTEXT\n${template_context}`;
     }
-
     if (current_code) {
-      systemPrompt += `\n\n## CURRENT APP CODE — MODIFY, DON'T REGENERATE\nPreserve existing structure, styling, and working features. Only change what's requested. Keep all existing imports, components, and routes intact.\n\n\`\`\`\n${current_code}\n\`\`\``;
+      systemPrompt += `\n\n## CURRENT CODE (modify/extend this — do NOT regenerate unchanged files)\n${current_code}`;
     }
-
     if (snippets_context) {
       systemPrompt += `\n\n## COMPONENT BLUEPRINTS\n${snippets_context}`;
     }
@@ -617,7 +618,18 @@ CRITICAL FIXES REQUIRED:
 Review the error details above carefully and fix ALL issues. Do not repeat the same mistakes.`;
     }
 
-    const selectedModel = model || "google/gemini-2.5-flash";
+    // ── Server-side model routing based on task type ──
+    // Backend/schema tasks → openai/gpt-5 (SQL correctness, merge-safe code)
+    // Frontend tasks → gemini-3-flash-preview (fast JSX/UI generation)
+    // If client explicitly passes a model, respect it as override
+    let selectedModel: string;
+    if (model) {
+      selectedModel = model; // explicit override from client
+    } else if (task_type === "schema" || task_type === "backend") {
+      selectedModel = "openai/gpt-5";
+    } else {
+      selectedModel = "google/gemini-3-flash-preview";
+    }
     
     // Smart temperature based on context
     let temperature = 0.3;
