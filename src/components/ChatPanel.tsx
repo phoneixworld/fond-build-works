@@ -4,6 +4,8 @@ import { Send, Bot, User, ChevronDown, Sparkles, AlertTriangle, Wand2, ImagePlus
 import VoiceInput from "@/components/VoiceInput";
 import { streamChat } from "@/lib/streamChat";
 import { classifyIntent, streamChatAgent, streamBuildAgent, validateReactCode, hasBuildConfirmation, stripBuildMarker, formatRetryContext, MAX_BUILD_RETRIES, type AgentIntent, type PipelineStep } from "@/lib/agentPipeline";
+import { generatePlan, type BuildPlan, type PlanTask } from "@/lib/planningAgent";
+import { executePlan } from "@/lib/taskExecutor";
 import { validateAndFixHtml } from "@/lib/htmlValidator";
 import { matchTemplate, PAGE_TEMPLATES, type PageTemplate } from "@/lib/pageTemplates";
 import { COMPONENT_SNIPPETS, getSnippetsPromptContext } from "@/lib/componentSnippets";
