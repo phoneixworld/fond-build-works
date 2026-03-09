@@ -1044,6 +1044,7 @@ function findMissingFileImports(
     }
   }
   return missing;
+}
 
 /**
  * Find JSX component references (PascalCase) that are neither imported nor defined in the file.
