@@ -325,7 +325,7 @@ const EnvironmentManager = () => {
                 </div>
 
                 {/* Promote button */}
-                {nextEnv && hasSnapshot && (
+                {nextEnv && (
                   <div className="mt-3 pt-3 border-t border-border/50">
                     {confirmPromote?.from === envConfig.name && confirmPromote?.to === nextEnv.name ? (
                       <div className="space-y-2">
@@ -363,13 +363,25 @@ const EnvironmentManager = () => {
                         </div>
                       </div>
                     ) : (
-                      <button
-                        onClick={() => setConfirmPromote({ from: envConfig.name, to: nextEnv.name })}
-                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium text-primary hover:bg-primary/10 transition-colors"
-                      >
-                        <ArrowRight className="w-3.5 h-3.5" />
-                        Promote to {nextEnv.label}
-                      </button>
+                      (() => {
+                        const nextEnvData = environments.find(e => e.name === nextEnv.name);
+                        const hasChanges = hasSnapshot && envData.html_snapshot !== (nextEnvData?.html_snapshot || "");
+                        return (
+                          <button
+                            onClick={() => hasChanges && setConfirmPromote({ from: envConfig.name, to: nextEnv.name })}
+                            disabled={!hasChanges}
+                            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-all ${
+                              hasChanges
+                                ? "text-primary-foreground bg-primary hover:bg-primary/90 shadow-sm shadow-primary/25 ring-1 ring-primary/50"
+                                : "text-muted-foreground/40 bg-muted/30 cursor-not-allowed"
+                            }`}
+                          >
+                            <ArrowRight className="w-3.5 h-3.5" />
+                            Promote to {nextEnv.label}
+                            {!hasChanges && <span className="text-[9px] opacity-60 ml-1">• No changes</span>}
+                          </button>
+                        );
+                      })()
                     )}
                   </div>
                 )}
