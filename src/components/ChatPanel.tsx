@@ -512,9 +512,17 @@ const ChatPanel = forwardRef<ChatPanelHandle, { initialPrompt?: string; onVersio
   const { setFiles: setVirtualFiles } = useVirtualFS();
   const lastProjectIdRef = useRef<string | null>(null);
   const hasProcessedInitialRef = useRef(false);
-  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const healTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const MAX_HEAL_ATTEMPTS = 3;
+const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+const healTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+const MAX_HEAL_ATTEMPTS = 3;
+// ─── Project context cache — avoids re-fetching on every message ───────────
+const projectContextCacheRef = useRef<{
+  projectId: string;
+  schemas: any[];
+  knowledge: string[];
+  fetchedAt: number;
+} | null>(null);
+const CONTEXT_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
   // Edit/regenerate state
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
   const [editText, setEditText] = useState("");
@@ -675,6 +683,56 @@ const ChatPanel = forwardRef<ChatPanelHandle, { initialPrompt?: string; onVersio
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentProject?.id, setPreviewHtml]);
+
+  // ─── fetchProjectContext ──────────────────────────────────────────────────
+  // All 4 DB queries run in parallel (Promise.allSettled) and the result is
+  // cached per project for CONTEXT_CACHE_TTL_MS so subsequent messages are
+  // instant — no DB round-trips at send time.
+  const fetchProjectContext = useCallback(async (projectId: string): Promise<{ schemas: any[]; knowledge: string[] }> => {
+    const cache = projectContextCacheRef.current;
+    if (cache && cache.projectId === projectId && (Date.now() - cache.fetchedAt) < CONTEXT_CACHE_TTL_MS) {
+      return { schemas: cache.schemas, knowledge: cache.knowledge };
+    }
+
+    const [schemasRes, knowledgeRes, decisionsRes, governanceRes] = await Promise.allSettled([
+      supabase.from("project_schemas" as any).select("collection_name, schema").eq("project_id", projectId),
+      supabase.from("project_knowledge" as any).select("title, content").eq("project_id", projectId).eq("is_active", true),
+      supabase.from("project_decisions" as any).select("category, title, description").eq("project_id", projectId).eq("is_active", true),
+      supabase.from("project_governance_rules" as any).select("category, name, description, severity").eq("project_id", projectId).eq("is_active", true),
+    ]);
+
+    const schemas = schemasRes.status === "fulfilled" ? (schemasRes.value.data || []) : [];
+    const knowledge: string[] = knowledgeRes.status === "fulfilled"
+      ? (knowledgeRes.value.data || []).map((k: any) => `[${k.title}]: ${k.content}`)
+      : [];
+
+    if (decisionsRes.status === "fulfilled" && decisionsRes.value.data?.length) {
+      knowledge.push("[PROJECT DECISIONS - Follow these architectural decisions]:");
+      decisionsRes.value.data.forEach((d: any) => {
+        knowledge.push(`  [${d.category}] ${d.title}${d.description ? ': ' + d.description : ''}`);
+      });
+    }
+    if (governanceRes.status === "fulfilled" && governanceRes.value.data?.length) {
+      knowledge.push("[GOVERNANCE RULES - Enforce these standards in generated code]:");
+      governanceRes.value.data.forEach((r: any) => {
+        knowledge.push(`  [${r.severity.toUpperCase()}] ${r.name}${r.description ? ': ' + r.description : ''}`);
+      });
+    }
+
+    projectContextCacheRef.current = { projectId, schemas, knowledge, fetchedAt: Date.now() };
+    return { schemas, knowledge };
+  }, []);
+
+  // Prefetch context when a project is loaded — so the FIRST message has zero DB wait
+  useEffect(() => {
+    if (currentProject?.id) {
+      // Invalidate cache on project switch
+      if (projectContextCacheRef.current?.projectId !== currentProject.id) {
+        projectContextCacheRef.current = null;
+      }
+      fetchProjectContext(currentProject.id);
+    }
+  }, [currentProject?.id, fetchProjectContext]);
 
   useEffect(() => {
     const handlePaste = (e: ClipboardEvent) => {
@@ -859,70 +917,44 @@ const ChatPanel = forwardRef<ChatPanelHandle, { initialPrompt?: string; onVersio
     };
 
     try {
-      let schemas: any[] = [];
-      try {
-        const { data } = await supabase
-          .from("project_schemas" as any)
-          .select("collection_name, schema")
-          .eq("project_id", currentProject.id);
-        schemas = data || [];
-      } catch {}
+      // ─── Context: served from in-memory cache (populated at project load) ───────
+      // fetchProjectContext uses Promise.allSettled internally so 4 queries run
+      // in parallel. On repeated messages the cache is hit and no DB query fires.
+      const { schemas, knowledge } = await fetchProjectContext(currentProject.id);
 
-      // Fetch Project Brain knowledge
-      let knowledge: string[] = [];
-      try {
-        const { data } = await supabase
-          .from("project_knowledge" as any)
-          .select("title, content")
-          .eq("project_id", currentProject.id)
-          .eq("is_active", true);
-        knowledge = (data || []).map((k: any) => `[${k.title}]: ${k.content}`);
-      } catch {}
-
-      // Fetch Project Memory decisions
-      try {
-        const { data } = await supabase
-          .from("project_decisions" as any)
-          .select("category, title, description")
-          .eq("project_id", currentProject.id)
-          .eq("is_active", true);
-        if (data && data.length > 0) {
-          knowledge.push("[PROJECT DECISIONS - Follow these architectural decisions]:");
-          (data as any[]).forEach((d: any) => {
-            knowledge.push(`  [${d.category}] ${d.title}${d.description ? ': ' + d.description : ''}`);
-          });
-        }
-      } catch {}
-
-      // Fetch Governance rules
-      try {
-        const { data } = await supabase
-          .from("project_governance_rules" as any)
-          .select("category, name, description, severity")
-          .eq("project_id", currentProject.id)
-          .eq("is_active", true);
-        if (data && data.length > 0) {
-          knowledge.push("[GOVERNANCE RULES - Enforce these standards in generated code]:");
-          (data as any[]).forEach((r: any) => {
-            knowledge.push(`  [${r.severity.toUpperCase()}] ${r.name}${r.description ? ': ' + r.description : ''}`);
-          });
-        }
-      } catch {}
-
-      // Collect current app code for AI context awareness
+      // ─── Current code context: smart file prioritization ─────────────────────
+      // The build agent receives the FULL current project so it never regresses or
+      // overwrites features the user already has.
       let currentCodeSummary = "";
       if (currentSandpackFiles && Object.keys(currentSandpackFiles).length > 0) {
         const fileEntries = Object.entries(currentSandpackFiles);
         const totalChars = fileEntries.reduce((sum, [, code]) => sum + code.length, 0);
-        if (totalChars < 8000) {
+        if (totalChars <= 16000) {
+          // Small project — send everything in full
           currentCodeSummary = fileEntries.map(([path, code]) => `--- ${path}\n${code}`).join("\n\n");
         } else {
-          currentCodeSummary = fileEntries.map(([path, code]) => `--- ${path} (${code.length} chars)\n${code.slice(0, 500)}...[truncated]`).join("\n\n");
+          // Large project — always include App entry point fully, then fill remaining budget
+          const ENTRY_PATTERNS = ["/App.jsx", "/App.tsx", "/App.js"];
+          const keyFiles = fileEntries.filter(([p]) => ENTRY_PATTERNS.some(k => p.endsWith(k)));
+          const otherFiles = fileEntries.filter(([p]) => !ENTRY_PATTERNS.some(k => p.endsWith(k)));
+          const keyCode = keyFiles.map(([path, code]) => `--- ${path}\n${code}`).join("\n\n");
+          let remainingBudget = 14000 - keyCode.length;
+          const otherCode = otherFiles.map(([path, code]) => {
+            if (remainingBudget <= 0) return `--- ${path} (${code.length} chars — omitted for token budget)`;
+            if (code.length <= remainingBudget) {
+              remainingBudget -= code.length;
+              return `--- ${path}\n${code}`;
+            }
+            const snippet = code.slice(0, Math.max(200, Math.floor(remainingBudget * 0.6)));
+            remainingBudget = 0;
+            return `--- ${path} (${code.length} chars)\n${snippet}\n...[truncated]`;
+          }).join("\n\n");
+          currentCodeSummary = `${keyCode}\n\n${otherCode}`;
         }
       } else if (currentPreviewHtml && currentPreviewHtml.length > 0) {
-        currentCodeSummary = currentPreviewHtml.length < 8000
+        currentCodeSummary = currentPreviewHtml.length < 16000
           ? currentPreviewHtml
-          : currentPreviewHtml.slice(0, 6000) + "\n...[truncated]";
+          : currentPreviewHtml.slice(0, 12000) + `\n...[truncated — ${Math.round(currentPreviewHtml.length / 1000)}k chars total]`;
       }
 
       // Get component snippets reference for AI
