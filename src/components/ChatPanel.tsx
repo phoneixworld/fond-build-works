@@ -1414,13 +1414,15 @@ const CONTEXT_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
     if (isSendingRef.current || isLoadingRef.current) return;
     const finalText = text || "Replicate this design";
     
-    // Skip classification for: short prompts, image-only, auto-fix, or explicit build confirmations
+    // Skip classification for: short prompts, image-only, auto-fix, explicit build confirmations,
+    // or prompts that contain "Additional Requirements" (already answered clarifying questions)
     const isAutoFix = finalText.startsWith("🔧");
     const isShort = finalText.length < 15;
     const hasImages = images.length > 0;
     const isConfirmation = /^(yes|go ahead|do it|build it|sounds good|ok|sure)/i.test(finalText.trim());
+    const hasAnswers = finalText.includes("--- Additional Requirements ---");
     
-    if (!isAutoFix && !isShort && !hasImages && !isConfirmation) {
+    if (!isAutoFix && !isShort && !hasImages && !isConfirmation && !hasAnswers) {
       const classification = await classifyUserIntent(finalText);
       if (classification?.intent === "clarify") return; // Questions shown, wait for answers
       
