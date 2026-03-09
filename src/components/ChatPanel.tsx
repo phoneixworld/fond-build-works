@@ -507,6 +507,10 @@ const ChatPanel = forwardRef<ChatPanelHandle, { initialPrompt?: string; onVersio
   const [currentAgent, setCurrentAgent] = useState<AgentIntent | null>(null);
   const [pipelineStep, setPipelineStep] = useState<PipelineStep | null>(null);
   const [pendingBuildPrompt, setPendingBuildPrompt] = useState<string | null>(null);
+  // Planning agent state
+  const [currentPlan, setCurrentPlan] = useState<BuildPlan | null>(null);
+  const [currentTaskIndex, setCurrentTaskIndex] = useState(0);
+  const [totalPlanTasks, setTotalPlanTasks] = useState(0);
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
