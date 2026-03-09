@@ -279,7 +279,7 @@ const PublishExportButtons = forwardRef<PublishExportHandle>((_, ref) => {
       </button>
 
       <Dialog open={showPublish} onOpenChange={setShowPublish}>
-        <DialogContent className="sm:max-w-md p-0 gap-0 overflow-hidden border-border/50 bg-card">
+        <DialogContent className="sm:max-w-lg p-0 gap-0 overflow-hidden border-border/50 bg-card">
           {/* Header */}
           <div className="px-5 pt-5 pb-4">
             <DialogHeader className="space-y-1">
@@ -329,15 +329,20 @@ const PublishExportButtons = forwardRef<PublishExportHandle>((_, ref) => {
                     </div>
 
                     {/* URL row */}
-                    <div className="flex items-center gap-2 rounded-lg border border-border bg-background px-3 py-2">
-                      <Link2 className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
-                      <span className="text-xs text-foreground truncate flex-1 font-mono select-all">{publishedUrl}</span>
-                      <button onClick={handleCopy} className="text-muted-foreground hover:text-foreground shrink-0 transition-colors p-1 rounded hover:bg-secondary">
-                        {copied ? <Check className="w-3.5 h-3.5 text-ide-success" /> : <Copy className="w-3.5 h-3.5" />}
-                      </button>
-                      <a href={publishedUrl} target="_blank" rel="noopener noreferrer" className="text-muted-foreground hover:text-foreground shrink-0 transition-colors p-1 rounded hover:bg-secondary">
-                        <ExternalLink className="w-3.5 h-3.5" />
-                      </a>
+                    <div className="rounded-lg border border-border bg-background overflow-hidden">
+                      <div className="flex items-center gap-2 px-3 py-2.5">
+                        <Link2 className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
+                        <span className="text-xs text-foreground font-mono select-all break-all">{publishedUrl}</span>
+                      </div>
+                      <div className="flex border-t border-border">
+                        <button onClick={handleCopy} className="flex-1 flex items-center justify-center gap-1.5 py-2 text-xs text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors">
+                          {copied ? <><Check className="w-3.5 h-3.5 text-ide-success" /> Copied</> : <><Copy className="w-3.5 h-3.5" /> Copy</>}
+                        </button>
+                        <div className="w-px bg-border" />
+                        <a href={publishedUrl} target="_blank" rel="noopener noreferrer" className="flex-1 flex items-center justify-center gap-1.5 py-2 text-xs text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors">
+                          <ExternalLink className="w-3.5 h-3.5" /> Open
+                        </a>
+                      </div>
                     </div>
 
                     {/* Deploy target */}
