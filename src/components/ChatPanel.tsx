@@ -951,7 +951,7 @@ const CONTEXT_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
         }
         return [...prev, { role: "assistant", content: msg, timestamp: Date.now() }];
       });
-    }, 90_000);
+    }, 180_000);
 
     // FIX: Create abort controller for this request
     const abortController = new AbortController();
