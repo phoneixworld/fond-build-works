@@ -37,7 +37,15 @@ interface DeployRecord {
   created_at: string;
 }
 
-type DialogTab = "deploy" | "history" | "domain";
+type DialogTab = "deploy" | "history" | "domain" | "siteinfo";
+
+interface SiteInfo {
+  siteTitle: string;
+  siteDescription: string;
+  faviconUrl: string;
+  logoUrl: string;
+  ogImageUrl: string;
+}
 
 const PublishExportButtons = forwardRef<PublishExportHandle>((_, ref) => {
   const { currentProject, saveProject } = useProjects();
