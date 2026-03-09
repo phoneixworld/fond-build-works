@@ -2343,7 +2343,7 @@ ${Object.entries(files).map(([path, code]) => `--- ${path}\n${code}`).join("\n\n
                 className="w-full max-w-sm"
               >
                 <div className="rounded-xl border border-border/50 bg-card/50 p-3">
-                  <p className="text-[10px] font-semibold text-muted-foreground/60 uppercase tracking-wider mb-2 text-center">What Phoenix Builder can do</p>
+                  <p className="text-[10px] font-semibold text-muted-foreground/60 uppercase tracking-wider mb-2 text-center">What Phoneix Builder can do</p>
                   <div className="grid grid-cols-2 gap-1.5">
                     {[
                       { icon: "🧠", label: "Multi-model AI", desc: "GPT-5, Gemini 2.5 & more" },
