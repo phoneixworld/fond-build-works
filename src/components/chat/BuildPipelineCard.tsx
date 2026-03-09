@@ -47,14 +47,7 @@ function detectTasks(content: string, isBuilding: boolean, pipelineStep?: Pipeli
 
   const tasks: TaskItem[] = [];
 
-  // Step 1: Intent Classification
-  if (pipelineStep) {
-    tasks.push({
-      id: "classify",
-      label: "Intent classified",
-      status: pipelineStep === "classifying" ? "in_progress" : "done",
-    });
-  }
+  // Step 1: Intent Classification (hidden from UI — internal detail)
 
   // For chat agent, just show "Responding..."
   if (currentAgent === "chat") {
