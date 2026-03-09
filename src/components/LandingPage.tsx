@@ -96,7 +96,7 @@ const LandingPage = ({ onStartProject, onOpenProject }: LandingPageProps) => {
             />
             <div className="absolute bottom-3 left-3 right-3 flex items-center justify-between">
               <span className="text-xs text-muted-foreground">
-                React + Lovable Cloud
+                React + Full-stack backend
               </span>
               <button
                 onClick={handleSubmit}
