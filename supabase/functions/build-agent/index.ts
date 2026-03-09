@@ -396,7 +396,7 @@ function ProtectedRoute({ children }) {
 export default function App() {
   return (
     <AuthProvider>
-      <BrowserRouter>
+       <HashRouter>
         <Routes>
           <Route path="/login" element={<LoginPage />} />
           <Route path="/*" element={
@@ -413,7 +413,7 @@ export default function App() {
             </ProtectedRoute>
           } />
         </Routes>
-      </BrowserRouter>
+      </HashRouter>
     </AuthProvider>
   );
 }
