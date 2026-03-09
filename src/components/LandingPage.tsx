@@ -445,7 +445,7 @@ const LandingPage = ({ onStartProject, onOpenProject }: LandingPageProps) => {
               <motion.div variants={fadeUp} className="text-center mb-14">
                 <p className="text-xs font-semibold uppercase tracking-widest text-[hsl(var(--ide-success))] mb-2">What You Can Build</p>
                 <h2 className="text-3xl md:text-4xl font-bold text-foreground">From landing pages to full apps</h2>
-                <p className="text-muted-foreground text-base mt-3 max-w-lg mx-auto">Phoenix World generates production-ready apps — not templates, not mockups.</p>
+                <p className="text-muted-foreground text-base mt-3 max-w-lg mx-auto">Phoneix World generates production-ready apps — not templates, not mockups.</p>
               </motion.div>
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                 {SHOWCASE_APPS.map((app, i) => {
