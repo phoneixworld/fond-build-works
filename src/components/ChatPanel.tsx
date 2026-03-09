@@ -519,9 +519,34 @@ const ChatPanel = forwardRef<ChatPanelHandle, { initialPrompt?: string; onVersio
   const { setFiles: setVirtualFiles } = useVirtualFS();
   const lastProjectIdRef = useRef<string | null>(null);
   const hasProcessedInitialRef = useRef(false);
+  const buildSafetyTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Convert sandpack files (Record<string, string>) to VirtualFile format and sync to VirtualFS
+  const syncSandpackToVirtualFS = useCallback((sandpackFiles: Record<string, string>) => {
+    const virtualFiles: Record<string, { path: string; content: string; language: string }> = {};
+    for (const [path, content] of Object.entries(sandpackFiles)) {
+      const cleanPath = path.startsWith("/") ? path.slice(1) : path;
+      const ext = cleanPath.split(".").pop()?.toLowerCase() || "";
+      const langMap: Record<string, string> = {
+        tsx: "typescript", ts: "typescript", jsx: "javascript", js: "javascript",
+        css: "css", html: "html", json: "json",
+      };
+      virtualFiles[cleanPath] = { path: cleanPath, content, language: langMap[ext] || "text" };
+    }
+    setVirtualFiles(virtualFiles);
+  }, [setVirtualFiles]);
 
 const healTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 const MAX_HEAL_ATTEMPTS = 3;
+
+// Auto-clear safety timeout when isBuilding goes false
+const isBuildingValue = usePreview().isBuilding;
+useEffect(() => {
+  if (!isBuildingValue && buildSafetyTimeoutRef.current) {
+    clearTimeout(buildSafetyTimeoutRef.current);
+    buildSafetyTimeoutRef.current = null;
+  }
+}, [isBuildingValue]);
 // ─── Project context cache — avoids re-fetching on every message ───────────
 const projectContextCacheRef = useRef<{
   projectId: string;
@@ -710,12 +735,12 @@ const CONTEXT_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
             if (state.files && Object.keys(state.files).length > 0) {
               console.log("[ChatPanel] ✅ Restored sandpack state:", Object.keys(state.files).length, "files");
               setSandpackFiles(state.files);
+              syncSandpackToVirtualFS(state.files);
               if (state.deps) setSandpackDeps(state.deps);
               setPreviewMode("sandpack");
             }
           }
         });
-    } else if (!currentProject) {
     } else if (!currentProject) {
       lastProjectIdRef.current = null;
       setMessages([]);
@@ -908,6 +933,18 @@ const CONTEXT_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
     setBuildStep(images.length > 0 ? "🖼️ Analyzing image..." : "🏗️ Build agent generating code...");
     setPipelineStep("generating");
 
+    // Safety timeout: if build doesn't complete in 3 minutes, force reset
+    if (buildSafetyTimeoutRef.current) clearTimeout(buildSafetyTimeoutRef.current);
+    buildSafetyTimeoutRef.current = setTimeout(() => {
+      console.warn("[ChatPanel] Build safety timeout — forcing isBuilding=false");
+      setIsBuilding(false);
+      setIsLoading(false);
+      setBuildStep("");
+      setPipelineStep(null);
+      setCurrentAgent(null);
+      isSendingRef.current = false;
+    }, 180_000);
+
     // FIX: Create abort controller for this request
     const abortController = new AbortController();
     abortControllerRef.current = abortController;
@@ -1072,6 +1109,7 @@ const CONTEXT_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
                 const retryResult = parseReactFiles(retryText);
                 if (retryResult.files) {
                   setSandpackFiles(retryResult.files);
+                  syncSandpackToVirtualFS(retryResult.files);
                   if (Object.keys(retryResult.deps).length > 0) setSandpackDeps(retryResult.deps);
                   setPreviewMode("sandpack");
                   
@@ -1103,6 +1141,7 @@ const CONTEXT_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
               onError: (err) => {
                 console.error("[ChatPanel:retry] Retry failed:", err);
                 setSandpackFiles(reactResult.files!);
+                syncSandpackToVirtualFS(reactResult.files!);
                 if (Object.keys(reactResult.deps).length > 0) setSandpackDeps(reactResult.deps);
                 setPreviewMode("sandpack");
                 setIsLoading(false);
@@ -1124,6 +1163,7 @@ const CONTEXT_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
           const fileNames = Object.keys(reactResult.files);
           console.log(`[ChatPanel:onDone] ✅ React files:`, fileNames);
           setSandpackFiles(reactResult.files);
+          syncSandpackToVirtualFS(reactResult.files);
           if (Object.keys(reactResult.deps).length > 0) setSandpackDeps(reactResult.deps);
           setPreviewMode("sandpack");
           setBuildRetryCount(0);
@@ -1176,6 +1216,7 @@ const CONTEXT_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
                 const retryResult = parseReactFiles(retryText);
                 if (retryResult.files) {
                   setSandpackFiles(retryResult.files);
+                  syncSandpackToVirtualFS(retryResult.files);
                   if (Object.keys(retryResult.deps).length > 0) setSandpackDeps(retryResult.deps);
                   setPreviewMode("sandpack");
                   
@@ -1425,6 +1466,7 @@ const CONTEXT_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
           },
           onFilesReady: (files, deps) => {
             setSandpackFiles(files);
+            syncSandpackToVirtualFS(files);
             if (Object.keys(deps).length > 0) setSandpackDeps(deps);
             setPreviewMode("sandpack");
           },
