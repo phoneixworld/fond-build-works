@@ -160,56 +160,28 @@ function attemptRepair(code: string, error: string): string | null {
   return code;
 }
 /**
- * Repair common CSS issues from AI-generated code.
- * Fixes missing semicolons, unclosed braces, and truncated @import statements.
+ * Validate CSS with PostCSS. Returns null if valid, or error string if invalid.
  */
-function repairCSS(code: string): string {
-  const lines = code.split("\n");
-  const repaired: string[] = [];
-  let braceDepth = 0;
-
-  for (let i = 0; i < lines.length; i++) {
-    let line = lines[i];
-    const trimmed = line.trim();
-
-    // Skip empty lines and comments
-    if (!trimmed || trimmed.startsWith('/*') || trimmed.startsWith('//')) {
-      repaired.push(line);
-      continue;
-    }
-
-    // Track braces
-    for (const ch of trimmed) {
-      if (ch === '{') braceDepth++;
-      if (ch === '}') braceDepth--;
-    }
-
-    // Inside a rule block: property lines need semicolons
-    if (braceDepth > 0 && trimmed.includes(':') && !trimmed.endsWith('{') && !trimmed.endsWith('}') && !trimmed.endsWith(';') && !trimmed.startsWith('@') && !trimmed.startsWith('/*')) {
-      line = line.trimEnd() + ';';
-    }
-
-    repaired.push(line);
+function tryParseCSS(code: string): string | null {
+  try {
+    postcss.parse(code);
+    return null;
+  } catch (e: any) {
+    return e.message || "Unknown CSS parse error";
   }
-
-  let result = repaired.join("\n");
-
-  // Close unclosed braces
-  if (braceDepth > 0) {
-    for (let i = 0; i < braceDepth; i++) {
-      result += '\n}';
-    }
-  }
-
-  return result;
 }
 
 function repairTruncatedCode(code: string, filePath: string): string {
-  if (code.trim().length < 30) return makeStub(filePath);
+  if (code.trim().length < 30 && filePath.match(/\.(jsx?|tsx?)$/)) return makeStub(filePath);
   
-  // CSS files: basic repair (fix missing semicolons at end of property lines)
+  // CSS files: validate with PostCSS — don't repair, return safe fallback if broken
   if (filePath.match(/\.css$/)) {
-    return repairCSS(code);
+    const cssError = tryParseCSS(code);
+    if (cssError) {
+      console.warn(`[SandpackRepair] CSS error in "${filePath}": ${cssError}`);
+      return `/* CSS parse error in ${filePath}: ${cssError.replace(/\*\//g, '')} */\n@tailwind base;\n@tailwind components;\n@tailwind utilities;\n`;
+    }
+    return code;
   }
 
   // Skip non-JSX files
