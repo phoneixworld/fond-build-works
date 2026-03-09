@@ -39,6 +39,7 @@ import { buildIncrementalContext, contextReductionRatio } from "@/lib/incrementa
 import { applyAdaptiveSplitting } from "@/lib/adaptiveTaskSplitter";
 import { persistTaskOutput, getPersistedTaskOutput } from "@/lib/persistentCache";
 import { DESIGN_SYSTEM_CSS, lintDesignTokens } from "@/lib/designSystem";
+import { buildSmartChatHistory } from "@/lib/contextManager";
 
 // ─── Base Template (mandatory scaffold for all new builds) ────────────────
 //
