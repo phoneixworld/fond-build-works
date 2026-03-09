@@ -12,6 +12,7 @@
  */
 
 import { streamBuildAgent, validateReactCode, formatRetryContext, MAX_BUILD_RETRIES } from "@/lib/agentPipeline";
+import { transform } from "sucrase";
 import { generatePlan, type BuildPlan, type PlanTask } from "@/lib/planningAgent";
 import { topologicalSort } from "@/lib/taskExecutor";
 import { mergeFiles, buildFullCodeContext, type MergeResult } from "@/lib/codeMerger";
@@ -184,7 +185,16 @@ export interface EngineResult {
  * Auto-repair common JSX issues from AI-generated code.
  */
 function autoRepairJSX(code: string): string {
-  // ── Fix unterminated strings at FILE level (not per-line — multi-line templates are valid) ──
+  // ── Use Sucrase for real parsing — if it parses, code is valid ──
+  try {
+    transform(code, { transforms: ["jsx", "imports"], filePath: "file.jsx" });
+    return code; // Already valid
+  } catch (e: any) {
+    const error = e.message || "";
+    console.warn(`[autoRepairJSX] Parse error: ${error.slice(0, 120)}`);
+  }
+
+  // ── Fix unterminated strings at FILE level ──
   let inSingle = false, inDouble = false, inTemplate = false;
   let prevCh = '';
   for (const ch of code) {
@@ -195,32 +205,32 @@ function autoRepairJSX(code: string): string {
     }
     prevCh = ch;
   }
-  // Close any unterminated strings at end of file
   if (inTemplate) code = code.trimEnd() + '`';
   if (inDouble) code = code.trimEnd() + '"';
   if (inSingle) code = code.trimEnd() + "'";
 
-  // ── Truncation recovery: if file ends mid-expression, add closing structures ──
-  const trimmed = code.trimEnd();
-  // Count unmatched brackets/braces/parens
+  // ── Close unclosed brackets ──
   let braces = 0, brackets = 0, parens = 0;
-  for (const ch of trimmed) {
-    if (ch === '{') braces++;
-    else if (ch === '}') braces--;
-    else if (ch === '[') brackets++;
-    else if (ch === ']') brackets--;
-    else if (ch === '(') parens++;
-    else if (ch === ')') parens--;
+  let inStr = false, strCh = '';
+  let prev = '';
+  for (const ch of code) {
+    if (prev !== '\\') {
+      if (!inStr && (ch === '"' || ch === "'" || ch === '`')) { inStr = true; strCh = ch; }
+      else if (inStr && ch === strCh) { inStr = false; }
+    }
+    if (!inStr) {
+      if (ch === '{') braces++; else if (ch === '}') braces--;
+      if (ch === '[') brackets++; else if (ch === ']') brackets--;
+      if (ch === '(') parens++; else if (ch === ')') parens--;
+    }
+    prev = ch;
   }
-  // Close any unclosed structures (up to a reasonable limit)
   const closers: string[] = [];
-  for (let i = 0; i < Math.min(parens, 10); i++) closers.push(')');
-  for (let i = 0; i < Math.min(brackets, 10); i++) closers.push(']');
-  for (let i = 0; i < Math.min(braces, 10); i++) closers.push('}');
+  for (let i = 0; i < Math.min(Math.max(0, parens), 10); i++) closers.push(')');
+  for (let i = 0; i < Math.min(Math.max(0, brackets), 10); i++) closers.push(']');
+  for (let i = 0; i < Math.min(Math.max(0, braces), 10); i++) closers.push('}');
   if (closers.length > 0) {
-    // Add a semicolon after string termination, then close structures
     code = code.trimEnd() + ';\n' + closers.join(';\n') + ';\n';
-    // If there's a default export missing, try to add one
     if (!code.includes('export default') && code.includes('function App')) {
       code += '\nexport default App;\n';
     }
@@ -236,7 +246,7 @@ function autoRepairJSX(code: string): string {
     "$1 />\n"
   );
 
-  // Remove duplicate Route entries (same path appearing twice)
+  // Remove duplicate Route entries
   const routePaths = new Map<string, boolean>();
   const routeLines = code.split("\n");
   const cleanedLines: string[] = [];
@@ -256,6 +266,14 @@ function autoRepairJSX(code: string): string {
   const closeRoutes = (code.match(/<\/Routes>/g) || []).length;
   if (openRoutes > closeRoutes) {
     code = code.replace(/(<\/HashRouter>)/, "</Routes>\n    $1");
+  }
+
+  // Final validation pass
+  try {
+    transform(code, { transforms: ["jsx", "imports"], filePath: "file.jsx" });
+    console.info("[autoRepairJSX] Successfully repaired code");
+  } catch (e: any) {
+    console.warn(`[autoRepairJSX] Code still has errors after repair: ${(e.message || "").slice(0, 100)}`);
   }
 
   return code;

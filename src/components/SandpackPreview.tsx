@@ -6,6 +6,7 @@ import {
 } from "@codesandbox/sandpack-react";
 import { usePreview, SandpackFileSet } from "@/contexts/PreviewContext";
 import { AlertTriangle, RefreshCw } from "lucide-react";
+import { transform } from "sucrase";
 
 // ─── Error Boundary ───────────────────────────────────────────────────────────
 interface ErrorBoundaryState {
@@ -85,79 +86,111 @@ function makeStub(filePath: string): string {
   return `import React from "react";\n\nexport default function ${safeName}() {\n  return (\n    <div className="p-8 text-center space-y-3">\n      <div className="w-10 h-10 mx-auto rounded-full bg-amber-100 flex items-center justify-center"><span className="text-amber-600 text-xl">\u26A0</span></div>\n      <h2 className="text-lg font-semibold text-slate-800">${safeName}</h2>\n      <p className="text-sm text-slate-500">This module had a build error. Send a follow-up message to fix it.</p>\n    </div>\n  );\n}\n`;
 }
 
-function repairTruncatedCode(code: string, filePath: string): string {
-  // Quick check: if file is very short or empty, stub it
-  if (code.trim().length < 30) return makeStub(filePath);
-
-  // ── Step 1: Fix unterminated strings per-line (same as autoRepairJSX) ──
-  const lines = code.split("\n");
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i];
-    const dq = (line.match(/(?<!\\)"/g) || []).length;
-    const sq = (line.match(/(?<!\\)'/g) || []).length;
-    const bt = (line.match(/(?<!\\)`/g) || []).length;
-    if (dq % 2 !== 0) lines[i] = line + '"';
-    if (sq % 2 !== 0) lines[i] = lines[i] + "'";
-    if (bt % 2 !== 0) lines[i] = lines[i] + "`";
+/**
+ * Try to parse JSX with Sucrase. Returns null if valid, or error message if invalid.
+ */
+function tryParse(code: string): string | null {
+  try {
+    transform(code, { transforms: ["jsx", "imports"], filePath: "file.jsx" });
+    return null;
+  } catch (e: any) {
+    return e.message || "Unknown parse error";
   }
-  code = lines.join("\n");
+}
 
-  // ── Step 2: Count unmatched brackets AFTER string repair ──
-  let braces = 0, brackets = 0, parens = 0;
-  let inSingleStr = false, inDoubleStr = false, inTemplate = false;
-  let prevCh = '';
-  for (const ch of code) {
-    if (prevCh !== '\\') {
-      if (ch === "'" && !inDoubleStr && !inTemplate) inSingleStr = !inSingleStr;
-      if (ch === '"' && !inSingleStr && !inTemplate) inDoubleStr = !inDoubleStr;
-      if (ch === '`' && !inSingleStr && !inDoubleStr) inTemplate = !inTemplate;
-    }
-    if (!inSingleStr && !inDoubleStr && !inTemplate) {
-      if (ch === '{') braces++; else if (ch === '}') braces--;
-      if (ch === '[') brackets++; else if (ch === ']') brackets--;
-      if (ch === '(') parens++; else if (ch === ')') parens--;
-    }
-    prevCh = ch;
+/**
+ * Attempt targeted repairs based on Sucrase parse error messages.
+ * Returns repaired code or null if unrepairable.
+ */
+function attemptRepair(code: string, error: string): string | null {
+  // Unterminated template literal
+  if (/unterminated template/i.test(error)) {
+    code = code.trimEnd() + '`';
   }
-
-  // Close any remaining unterminated strings at file level
-  if (inTemplate) code = code.trimEnd() + '`';
-  if (inDoubleStr) code = code.trimEnd() + '"';
-  if (inSingleStr) code = code.trimEnd() + "'";
-
-  const totalUnclosed = Math.max(0, braces) + Math.max(0, brackets) + Math.max(0, parens);
-
-  // Only stub if SEVERELY broken (>8 unclosed) — otherwise try to repair
-  if (totalUnclosed > 8) {
-    console.warn(`[SandpackRepair] File "${filePath}" has ${totalUnclosed} unclosed brackets — stubbing.`);
-    return makeStub(filePath);
-  }
-
-  // Close unclosed brackets (up to 8)
-  const closers: string[] = [];
-  for (let i = 0; i < Math.max(0, parens); i++) closers.push(')');
-  for (let i = 0; i < Math.max(0, brackets); i++) closers.push(']');
-  for (let i = 0; i < Math.max(0, braces); i++) closers.push('}');
-  if (closers.length > 0) {
-    code = code.trimEnd() + ';\n' + closers.join(';\n') + ';\n';
-  }
-
-  // If no export, add a default export wrapper instead of stubbing
-  const hasExport = /export\s+(default|const|function|class|let|var|\{)/.test(code) || code.includes('module.exports');
-  if (!hasExport) {
-    if (filePath.match(/\.(jsx?|tsx?)$/) && !filePath.includes('styles') && !filePath.includes('utils') && !filePath.includes('data') && !filePath.includes('config') && !filePath.includes('constants')) {
-      // Try to find a function/const component name
-      const fnMatch = code.match(/(?:function|const|class)\s+([A-Z]\w+)/);
-      if (fnMatch) {
-        code += `\nexport default ${fnMatch[1]};\n`;
-      } else {
-        // No recoverable component — stub it
-        return makeStub(filePath);
+  // Unterminated string literal  
+  else if (/unterminated string/i.test(error)) {
+    // Detect which quote type
+    let inSingle = false, inDouble = false, prevCh = '';
+    for (const ch of code) {
+      if (prevCh !== '\\') {
+        if (ch === "'" && !inDouble) inSingle = !inSingle;
+        if (ch === '"' && !inSingle) inDouble = !inDouble;
       }
+      prevCh = ch;
+    }
+    if (inDouble) code = code.trimEnd() + '"';
+    else if (inSingle) code = code.trimEnd() + "'";
+    else code = code.trimEnd() + '"';
+  }
+  // Unterminated regular expression
+  else if (/unterminated regular expression/i.test(error)) {
+    // Usually means a template literal or string was misinterpreted
+    // Try closing with backtick first
+    code = code.trimEnd() + '`';
+  }
+  // Unexpected token / unexpected EOF — likely unclosed brackets
+  else if (/unexpected (token|eof)/i.test(error) || /expected/i.test(error)) {
+    // Count bracket imbalances
+    let braces = 0, brackets = 0, parens = 0;
+    let inStr = false, strCh = '';
+    let prev = '';
+    for (const ch of code) {
+      if (prev !== '\\') {
+        if (!inStr && (ch === '"' || ch === "'" || ch === '`')) { inStr = true; strCh = ch; }
+        else if (inStr && ch === strCh) { inStr = false; }
+      }
+      if (!inStr) {
+        if (ch === '{') braces++; else if (ch === '}') braces--;
+        if (ch === '[') brackets++; else if (ch === ']') brackets--;
+        if (ch === '(') parens++; else if (ch === ')') parens--;
+      }
+      prev = ch;
+    }
+    const closers: string[] = [];
+    for (let i = 0; i < Math.max(0, parens); i++) closers.push(')');
+    for (let i = 0; i < Math.max(0, brackets); i++) closers.push(']');
+    for (let i = 0; i < Math.max(0, braces); i++) closers.push('}');
+    if (closers.length > 0) {
+      code = code.trimEnd() + ';\n' + closers.join(';\n') + ';\n';
+    }
+  } else {
+    return null; // Unknown error type
+  }
+  return code;
+}
+
+function repairTruncatedCode(code: string, filePath: string): string {
+  if (code.trim().length < 30) return makeStub(filePath);
+  
+  // Skip non-JSX files
+  if (!filePath.match(/\.(jsx?|tsx?)$/)) return code;
+
+  // ── Step 1: Try parsing as-is ──
+  let parseError = tryParse(code);
+  if (!parseError) return code; // Valid! No repair needed.
+
+  // ── Step 2: Try up to 3 rounds of targeted repair ──
+  let repaired = code;
+  for (let attempt = 0; attempt < 3; attempt++) {
+    const fixed = attemptRepair(repaired, parseError!);
+    if (!fixed) break;
+    repaired = fixed;
+    parseError = tryParse(repaired);
+    if (!parseError) {
+      console.info(`[SandpackRepair] Fixed "${filePath}" after ${attempt + 1} repair(s)`);
+      // Ensure export exists
+      const hasExport = /export\s+(default|const|function|class|let|var|\{)/.test(repaired) || repaired.includes('module.exports');
+      if (!hasExport) {
+        const fnMatch = repaired.match(/(?:function|const|class)\s+([A-Z]\w+)/);
+        if (fnMatch) repaired += `\nexport default ${fnMatch[1]};\n`;
+      }
+      return repaired;
     }
   }
 
-  return code;
+  // ── Step 3: All repairs failed — stub it ──
+  console.warn(`[SandpackRepair] Could not fix "${filePath}": ${parseError}`);
+  return makeStub(filePath);
 }
 
 /** Second-pass sanitizer applied right before Sandpack receives code */
