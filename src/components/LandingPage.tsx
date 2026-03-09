@@ -59,7 +59,7 @@ const LandingPage = ({ onStartProject, onOpenProject }: LandingPageProps) => {
   };
 
   const HOW_IT_WORKS = [
-    { step: "01", title: "Describe your app", description: "Tell Phoenix what you want in plain English. Be as detailed or brief as you like.", icon: MessageSquare, gradient: "from-[hsl(210,100%,56%)] to-[hsl(210,100%,40%)]" },
+    { step: "01", title: "Describe your app", description: "Tell Phoneix what you want in plain English. Be as detailed or brief as you like.", icon: MessageSquare, gradient: "from-[hsl(210,100%,56%)] to-[hsl(210,100%,40%)]" },
     { step: "02", title: "Instant preview loads", description: "Your app renders in under 1 second. A live, interactive preview — not a mockup.", icon: Eye, gradient: "from-[hsl(265,89%,62%)] to-[hsl(265,89%,48%)]" },
     { step: "03", title: "AI customizes in real time", description: "Iterate with chat. The AI refines code, adds features, and fixes bugs automatically.", icon: Wand2, gradient: "from-[hsl(142,71%,45%)] to-[hsl(142,71%,32%)]" },
   ];
