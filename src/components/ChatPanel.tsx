@@ -1548,7 +1548,7 @@ ${Object.entries(files).map(([path, code]) => `--- ${path}\n${code}`).join("\n\n
                       { project_id: buildProjectId, collection: "sandpack_state", data: polishedPayload as any },
                       { onConflict: "project_id,collection" }
                     )
-                    .catch(() => {});
+                    .then(({ error }) => { if (error) console.warn("Polish persist error:", error); });
                   
                   const polishedMsg = reactResult.chatText || `✅ **${template.name} customized!** Your site is ready with personalized content.`;
                   setMessages((prev) => {
