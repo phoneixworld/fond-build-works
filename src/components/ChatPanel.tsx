@@ -2636,7 +2636,7 @@ ${Object.entries(files).map(([path, code]) => `--- ${path}\n${code}`).join("\n\n
               className="flex-1 bg-transparent text-sm text-foreground placeholder:text-muted-foreground/60 outline-none resize-none leading-[1.4]"
               style={{ minHeight: "60px", maxHeight: "160px" }}
               disabled={isLoading}
-              rows={1}
+              rows={3}
             />
             {isLoading ? (
               <Tooltip>
