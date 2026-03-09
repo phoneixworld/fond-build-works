@@ -674,7 +674,7 @@ const CONTEXT_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
       const history = currentProject.chat_history ?? [];
       setMessages(history);
       setPreviewHtml(currentProject.html_content || "");
-      // CRITICAL: Reset sandpack state on project switch to prevent cross-contamination
+      // Reset sandpack state first, then try to restore from DB
       setSandpackFiles(null);
       setSandpackDeps({});
       setPreviewMode("html");
@@ -696,6 +696,26 @@ const CONTEXT_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
         abortControllerRef.current = null;
       }
       isSendingRef.current = false;
+
+      // Restore persisted sandpack state from project_data
+      supabase
+        .from("project_data")
+        .select("data")
+        .eq("project_id", currentProject.id)
+        .eq("collection", "sandpack_state")
+        .maybeSingle()
+        .then(({ data: row }) => {
+          if (row?.data && typeof row.data === "object") {
+            const state = row.data as any;
+            if (state.files && Object.keys(state.files).length > 0) {
+              console.log("[ChatPanel] ✅ Restored sandpack state:", Object.keys(state.files).length, "files");
+              setSandpackFiles(state.files);
+              if (state.deps) setSandpackDeps(state.deps);
+              setPreviewMode("sandpack");
+            }
+          }
+        });
+    } else if (!currentProject) {
     } else if (!currentProject) {
       lastProjectIdRef.current = null;
       setMessages([]);
@@ -1293,6 +1313,21 @@ const CONTEXT_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
           }
 
           saveProject({ chat_history: persistMessages, html_content: finalHtml || currentProject.html_content || "" });
+          
+          // Persist sandpack files for session restoration (direct chat build path)
+          if (reactResult.files && Object.keys(reactResult.files).length > 0) {
+            const payload = { files: reactResult.files, deps: reactResult.deps || {} };
+            supabase
+              .from("project_data")
+              .upsert(
+                { project_id: currentProject.id, collection: "sandpack_state", data: payload as any },
+                { onConflict: "project_id,collection" }
+              )
+              .then(({ error }) => {
+                if (error) console.warn("[ChatPanel] Failed to persist sandpack state:", error);
+              });
+          }
+          
           return final;
         });
       };
@@ -1418,6 +1453,21 @@ const CONTEXT_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
               content: typeof m.content === "string" ? m.content : getTextContent(m.content),
             }));
             saveProject({ chat_history: persistMessages, html_content: currentProject.html_content || "" });
+            
+            // Persist sandpack files to project_data for session restoration
+            if (result.files && Object.keys(result.files).length > 0) {
+              const payload = { files: result.files, deps: result.deps || {} };
+              supabase
+                .from("project_data")
+                .upsert(
+                  { project_id: currentProject.id, collection: "sandpack_state", data: payload as any },
+                  { onConflict: "project_id,collection" }
+                )
+                .then(({ error }) => {
+                  if (error) console.warn("[ChatPanel] Failed to persist sandpack state:", error);
+                  else console.log("[ChatPanel] ✅ Sandpack state persisted");
+                });
+            }
             
             if (onVersionCreated) {
               onVersionCreated({

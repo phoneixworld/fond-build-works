@@ -1,0 +1,1 @@
+DELETE FROM public.project_data a USING public.project_data b WHERE a.project_id = b.project_id AND a.collection = b.collection AND a.created_at < b.created_at; DROP INDEX IF EXISTS idx_project_data_lookup; CREATE UNIQUE INDEX idx_project_data_unique_lookup ON public.project_data (project_id, collection);
