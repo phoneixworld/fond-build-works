@@ -55,8 +55,8 @@ const LandingPage = ({ onStartProject, onOpenProject }: LandingPageProps) => {
         <div className="flex items-center gap-3">
           <span className="text-sm text-muted-foreground">{user?.email}</span>
           <button
-            onClick={signOut}
-            className="text-xs text-muted-foreground hover:text-foreground transition-colors px-3 py-1.5 rounded-md hover:bg-secondary"
+            onClick={() => { console.log("Sign out clicked"); signOut(); }}
+            className="text-xs text-muted-foreground hover:text-foreground transition-colors px-3 py-1.5 rounded-md hover:bg-secondary relative z-50"
           >
             Sign out
           </button>
