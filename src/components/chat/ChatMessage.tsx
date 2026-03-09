@@ -465,9 +465,9 @@ const ChatMessage = ({ content, role, timestamp, isLoading, onEdit, onRegenerate
           <div className="max-w-[85%] rounded-2xl rounded-tr-md bg-primary/12 border border-primary/15 px-4 py-2.5">
             <p className="text-[13px] text-foreground leading-[1.7] whitespace-pre-wrap">{textContent}</p>
           </div>
-          <div className="flex items-center gap-1.5 px-1 opacity-0 group-hover:opacity-100 transition-opacity">
+          <div className="flex items-center gap-1.5 px-1 transition-opacity">
             {timestamp && (
-              <span className="text-[10px] text-white/60 font-mono flex items-center gap-1">
+              <span className="text-[11px] text-white font-semibold flex items-center gap-1">
                 <Clock className="w-2.5 h-2.5" />
                 {formatTime(timestamp)}
               </span>
