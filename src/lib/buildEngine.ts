@@ -12,6 +12,7 @@
  */
 
 import { streamBuildAgent, validateReactCode, formatRetryContext, MAX_BUILD_RETRIES } from "@/lib/agentPipeline";
+import { transform } from "sucrase";
 import { generatePlan, type BuildPlan, type PlanTask } from "@/lib/planningAgent";
 import { topologicalSort } from "@/lib/taskExecutor";
 import { mergeFiles, buildFullCodeContext, type MergeResult } from "@/lib/codeMerger";
