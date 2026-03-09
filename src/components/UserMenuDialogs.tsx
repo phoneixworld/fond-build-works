@@ -175,7 +175,7 @@ const UserMenuDialogs = ({ open, onOpenChange }: UserMenuDialogsProps) => {
               <HelpCircle className="w-4 h-4 text-primary" />
               Help & Support
             </DialogTitle>
-            <DialogDescription className="text-xs">Get help with Phoenix Builder</DialogDescription>
+            <DialogDescription className="text-xs">Get help with Phoneix Builder</DialogDescription>
           </DialogHeader>
           <div className="space-y-2 pt-2">
             {[
