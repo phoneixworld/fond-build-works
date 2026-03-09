@@ -348,42 +348,48 @@ ${schemaSection}
 - ✅ Professional color palette — NOT generic gray/white. Use a strong primary + accent.
 
 ## MULTI-PAGE ROUTING — MANDATORY FOR APPS WITH 2+ FEATURES
-Every app with multiple features MUST use React Router with distinct pages:
+Every app with multiple features MUST use React Router with distinct pages in nested folders:
 
 \`\`\`jsx
-// App.jsx MUST look like this for multi-feature apps:
+// /App.jsx — entry point with router
 import { HashRouter, Routes, Route, Navigate } from "react-router-dom";
-import Sidebar from "./components/Sidebar";
-import Dashboard from "./components/Dashboard";
-import Students from "./components/Students";
-import Settings from "./components/Settings";
+import AppLayout from "./layout/AppLayout";
+import Dashboard from "./pages/Dashboard/Dashboard";
+import StudentList from "./pages/Students/StudentList";
+import FeeManager from "./pages/Fees/FeeManager";
+import Settings from "./pages/Settings/Settings";
 
 export default function App() {
   return (
     <HashRouter>
-      <div className="flex h-screen">
-        <Sidebar />
-        <main className="flex-1 overflow-auto">
-          <Routes>
-            <Route path="/" element={<Dashboard />} />
-            <Route path="/students" element={<Students />} />
-            <Route path="/settings" element={<Settings />} />
-            <Route path="*" element={<Navigate to="/" />} />
-          </Routes>
-        </main>
-      </div>
+      <Routes>
+        <Route path="/" element={<AppLayout />}>
+          <Route index element={<Dashboard />} />
+          <Route path="students" element={<StudentList />} />
+          <Route path="fees" element={<FeeManager />} />
+          <Route path="settings" element={<Settings />} />
+          <Route path="*" element={<Navigate to="/" />} />
+        </Route>
+      </Routes>
     </HashRouter>
   );
 }
-\`\`\`
 
-RULES:
-- ALWAYS use HashRouter (NOT BrowserRouter) — the app runs in an iframe sandbox
-- Each feature = separate Route with its own component file
-- Sidebar/Nav uses NavLink from react-router-dom with active state styling
-- NEVER dump all features on a single page with sections — use ROUTES
-- Each route's component has its own full CRUD operations
-- URL changes when navigating between modules
+// /layout/AppLayout.jsx — layout shell
+import { Outlet } from "react-router-dom";
+import Sidebar from "./Sidebar";
+
+export default function AppLayout() {
+  return (
+    <div className="flex h-screen">
+      <Sidebar />
+      <main className="flex-1 overflow-auto bg-gray-50">
+        <Outlet />
+      </main>
+    </div>
+  );
+}
+\`\`\`
 
 ## DATABASE AUTO-CREATION — CRITICAL
 When generating apps with data, you MUST use the Data API with meaningful collection names.
