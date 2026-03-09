@@ -351,12 +351,20 @@ async function executeSingleTask(
   retryCount = 0,
   maxTokens?: number
 ): Promise<{ files: Record<string, string>; deps: Record<string, string>; chatText: string; modelMs: number; cached: boolean }> {
-  // ── Check cache first ──
+  // ── Check in-memory cache first, then persistent cache ──
   const cacheKey = getTaskCacheKey(prompt, accumulatedCode);
   const cached = getCachedTaskOutput(cacheKey);
   if (cached && retryCount === 0) {
-    console.log("[BuildEngine] Cache hit — skipping model call");
+    console.log("[BuildEngine] Memory cache hit — skipping model call");
     return { ...cached, modelMs: 0, cached: true };
+  }
+  if (retryCount === 0) {
+    const persisted = await getPersistedTaskOutput(cacheKey);
+    if (persisted) {
+      console.log("[BuildEngine] IndexedDB cache hit — skipping model call");
+      setCachedTaskOutput(cacheKey, { ...persisted, timestamp: Date.now() });
+      return { ...persisted, modelMs: 0, cached: true };
+    }
   }
 
   const modelTimer = timer();
