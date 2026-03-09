@@ -1789,8 +1789,8 @@ async function runDirectBuild(
     ? config.existingFiles
     : getBaseTemplate(config.domainModel);
   
-  callbacks.onProgress({ phase: "merging", message: "Merging with base template..." });
-  const merged = mergeFiles(baseOrExisting, result.files);
+  callbacks.onProgress({ phase: "merging", message: "Diff-merging with base..." });
+  const merged = mergeFiles(baseOrExisting, result.files, false, config.existingFiles ? baseOrExisting : undefined);
   finalFiles = merged.files;
   conflicts = merged.conflicts;
   const mergeMs = mergeTimer.elapsed();
@@ -2012,8 +2012,9 @@ ${task.filesAffected.map(f => `- ${f}`).join("\n")}
       }
 
       // Protect backend files from being overwritten by frontend tasks
+      // Use 3-way diff merge with the pre-group snapshot as base
       const isFrontendTask = (task as any).taskType === "frontend";
-      const merged = mergeFiles(accumulatedFiles, result.files, isFrontendTask);
+      const merged = mergeFiles(accumulatedFiles, result.files, isFrontendTask, previousFiles || undefined);
       accumulatedFiles = merged.files;
       allConflicts.push(...merged.conflicts);
       Object.assign(allDeps, result.deps);
