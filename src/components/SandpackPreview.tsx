@@ -75,56 +75,63 @@ function isAllowedPkg(pkg: string): boolean {
 }
 
 /** Second-pass sanitizer applied right before Sandpack receives code */
+function makeStub(filePath: string): string {
+  const componentName = filePath
+    .replace(/.*\//, '')
+    .replace(/\.(jsx?|tsx?)$/, '')
+    .replace(/[^a-zA-Z0-9]/g, '');
+  const safeName = componentName.charAt(0).toUpperCase() + componentName.slice(1) || 'TruncatedPage';
+  console.warn(`[SandpackRepair] File "${filePath}" is truncated. Replacing with stub.`);
+  return `import React from "react";\n\nexport default function ${safeName}() {\n  return (\n    <div className="p-8 text-center">\n      <h2 className="text-lg font-semibold text-slate-800">${safeName}</h2>\n      <p className="text-sm text-slate-500 mt-2">This page is being generated. Please rebuild.</p>\n    </div>\n  );\n}\n`;
+}
+
 function repairTruncatedCode(code: string, filePath: string): string {
-  // Fix unterminated strings line-by-line
-  const lines = code.split("\n");
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i];
-    // Count quotes not inside template literals or escaped
-    const dq = (line.match(/(?<!\\)"/g) || []).length;
-    const sq = (line.match(/(?<!\\)'/g) || []).length;
-    const bt = (line.match(/(?<!\\)`/g) || []).length;
-    if (dq % 2 !== 0) lines[i] = line + '"';
-    if (sq % 2 !== 0) lines[i] = lines[i] + "'";
-    if (bt % 2 !== 0) lines[i] = lines[i] + '`';
-  }
-  code = lines.join("\n");
+  // Quick check: if file is very short or empty, stub it
+  if (code.trim().length < 30) return makeStub(filePath);
 
-  // Close unmatched brackets/braces/parens
+  // Count unmatched brackets BEFORE any repair
   let braces = 0, brackets = 0, parens = 0;
+  // Also check for unterminated strings (odd quotes across entire file)
+  let inSingleStr = false, inDoubleStr = false, inTemplate = false;
+  let prevCh = '';
   for (const ch of code) {
-    if (ch === '{') braces++; else if (ch === '}') braces--;
-    if (ch === '[') brackets++; else if (ch === ']') brackets--;
-    if (ch === '(') parens++; else if (ch === ')') parens--;
+    if (prevCh !== '\\') {
+      if (ch === "'" && !inDoubleStr && !inTemplate) inSingleStr = !inSingleStr;
+      if (ch === '"' && !inSingleStr && !inTemplate) inDoubleStr = !inDoubleStr;
+      if (ch === '`' && !inSingleStr && !inDoubleStr) inTemplate = !inTemplate;
+    }
+    if (!inSingleStr && !inDoubleStr && !inTemplate) {
+      if (ch === '{') braces++; else if (ch === '}') braces--;
+      if (ch === '[') brackets++; else if (ch === ']') brackets--;
+      if (ch === '(') parens++; else if (ch === ')') parens--;
+    }
+    prevCh = ch;
   }
 
-  // Detect if file ends mid-data (e.g. truncated inside an array/object literal)
-  const lastLines = code.split("\n").slice(-5).join("\n");
-  const endsAbruptly = /['"][,\s]*$/.test(lastLines.trim()) === false && 
-    (lastLines.includes("{ id:") || lastLines.includes("code:") || lastLines.includes("text:"));
-
-  // If severely unbalanced (>3 unclosed) or ends mid-data, the file is fatally truncated
   const totalUnclosed = Math.max(0, braces) + Math.max(0, brackets) + Math.max(0, parens);
-  if (totalUnclosed > 3 || (totalUnclosed > 1 && endsAbruptly)) {
-    const componentName = filePath
-      .replace(/.*\//, '')
-      .replace(/\.(jsx?|tsx?)$/, '')
-      .replace(/[^a-zA-Z0-9]/g, '');
-    const safeName = componentName.charAt(0).toUpperCase() + componentName.slice(1);
-    console.warn(`[SandpackRepair] File "${filePath}" is fatally truncated (${totalUnclosed} unclosed). Replacing with stub.`);
-    return `import React from "react";\n\nexport default function ${safeName || 'TruncatedPage'}() {\n  return (\n    <div className="p-8 text-center">\n      <h2 className="text-lg font-semibold text-slate-800">Loading ${safeName}...</h2>\n      <p className="text-sm text-slate-500 mt-2">This page is being generated. Please rebuild.</p>\n    </div>\n  );\n}\n`;
+  const hasUnterminatedString = inSingleStr || inDoubleStr || inTemplate;
+
+  // If ANY unterminated string or >2 unclosed brackets, the file is fatally truncated
+  // Trying to "repair" it produces broken code that crashes Sandpack's Babel
+  if (hasUnterminatedString || totalUnclosed > 2) {
+    return makeStub(filePath);
   }
 
+  // Also stub if no export statement exists (component file without export = truncated)
+  if (!code.includes('export default') && !code.includes('export {') && !code.includes('module.exports')) {
+    // Only for component-like files (not utility/css)
+    if (filePath.match(/\.(jsx?|tsx?)$/) && !filePath.includes('styles') && !filePath.includes('utils')) {
+      return makeStub(filePath);
+    }
+  }
+
+  // Light repair: close minor imbalances (1-2 brackets)
   const closers: string[] = [];
-  for (let i = 0; i < Math.min(parens, 15); i++) closers.push(')');
-  for (let i = 0; i < Math.min(brackets, 15); i++) closers.push(']');
-  for (let i = 0; i < Math.min(braces, 15); i++) closers.push('}');
+  for (let i = 0; i < Math.max(0, parens); i++) closers.push(')');
+  for (let i = 0; i < Math.max(0, brackets); i++) closers.push(']');
+  for (let i = 0; i < Math.max(0, braces); i++) closers.push('}');
   if (closers.length > 0) {
     code = code.trimEnd() + ';\n' + closers.join(';\n') + ';\n';
-    if (!code.includes('export default')) {
-      const compMatch = code.match(/function\s+(\w+)\s*\(/);
-      if (compMatch) code += `\nexport default ${compMatch[1]};\n`;
-    }
   }
   return code;
 }
