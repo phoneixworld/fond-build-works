@@ -34,6 +34,9 @@ import {
   startBuild, recordPlanningLatency, startTask, completeTask,
   finishBuild, timer, type TaskMetrics,
 } from "@/lib/buildObservability";
+import { buildIncrementalContext, contextReductionRatio } from "@/lib/incrementalContext";
+import { applyAdaptiveSplitting } from "@/lib/adaptiveTaskSplitter";
+import { persistTaskOutput, getPersistedTaskOutput } from "@/lib/persistentCache";
 
 // ─── Auto-Schema Detection ────────────────────────────────────────────────
 
@@ -348,12 +351,20 @@ async function executeSingleTask(
   retryCount = 0,
   maxTokens?: number
 ): Promise<{ files: Record<string, string>; deps: Record<string, string>; chatText: string; modelMs: number; cached: boolean }> {
-  // ── Check cache first ──
+  // ── Check in-memory cache first, then persistent cache ──
   const cacheKey = getTaskCacheKey(prompt, accumulatedCode);
   const cached = getCachedTaskOutput(cacheKey);
   if (cached && retryCount === 0) {
-    console.log("[BuildEngine] Cache hit — skipping model call");
+    console.log("[BuildEngine] Memory cache hit — skipping model call");
     return { ...cached, modelMs: 0, cached: true };
+  }
+  if (retryCount === 0) {
+    const persisted = await getPersistedTaskOutput(cacheKey);
+    if (persisted) {
+      console.log("[BuildEngine] IndexedDB cache hit — skipping model call");
+      setCachedTaskOutput(cacheKey, { ...persisted, timestamp: Date.now() });
+      return { ...persisted, modelMs: 0, cached: true };
+    }
   }
 
   const modelTimer = timer();
@@ -404,9 +415,10 @@ async function executeSingleTask(
               console.warn(`[BuildEngine] Max retries reached, stubbing ${validationErrors.length} broken file(s)`);
               finalFiles = stubBrokenFiles(parsed.files, validationErrors);
             }
-            // Cache successful output
+            // Cache successful output (memory + persistent)
             const output = { files: finalFiles, deps: parsed.deps, chatText: parsed.chatText };
             setCachedTaskOutput(cacheKey, { ...output, timestamp: Date.now() });
+            persistTaskOutput(cacheKey, output).catch(() => {});
             resolve({ ...output, modelMs, cached: false });
           }
         } else if (retryCount < 2) {
@@ -674,6 +686,13 @@ async function runPlannedBuild(
     return;
   }
 
+  // ── Adaptive task splitting ──
+  const splitResult = applyAdaptiveSplitting(plan.tasks);
+  if (splitResult.splitCount > 0) {
+    console.log(`[BuildEngine] Split ${splitResult.splitCount} oversized tasks: ${splitResult.originalCount} → ${splitResult.totalAfterSplit}`);
+    plan = { ...plan, tasks: splitResult.tasks };
+  }
+
   const sortedTasks = topologicalSort(plan.tasks);
   const executableTasks = sortedTasks.filter(t => !t.needsUserInput);
   const parallelGroups = buildParallelGroups(executableTasks);
@@ -692,7 +711,7 @@ async function runPlannedBuild(
 
   // ── Execute groups (parallel within each group, sequential across groups) ──
   for (const group of parallelGroups) {
-    const codeContext = buildFullCodeContext(accumulatedFiles);
+    // Use incremental context per task instead of full codebase
 
     // Run all tasks in this group concurrently
     const taskPromises = group.map(async (task, groupIdx) => {
