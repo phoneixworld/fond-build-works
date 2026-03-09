@@ -40,7 +40,7 @@ interface AndroidConfig {
 
 const DEFAULT_CONFIG: AndroidConfig = {
   appName: "",
-  packageId: "com.phoenix.app",
+  packageId: "com.phoneix.app",
   versionName: "1.0.0",
   versionCode: 1,
   iconUrl: "",
