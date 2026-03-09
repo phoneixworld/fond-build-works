@@ -169,6 +169,9 @@ Generate a SINGLE complete index.html inside a \`\`\`html-preview code fence.`;
 - NEVER use bracket notation in JSX: <arr[i].icon /> is INVALID — assign to variable first
 - NEVER use \`require()\` — use ES6 imports only
 - NEVER import from packages not in the allowed list above
+- NEVER use react-hot-toast, sonner, or ANY external toast library — build a simple inline Toast component in /components/ui/Toast.jsx instead
+- NEVER use @headlessui/react, @radix-ui, or any UI framework not in the allowed list
+- For toast notifications: create a simple Toast component using useState + setTimeout + Tailwind animations
 
 ## JSX SYNTAX — CRITICAL (violations cause build failures)
 - Every <Route> with an element prop MUST self-close: <Route path="/" element={<Home />} />
