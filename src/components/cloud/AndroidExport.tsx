@@ -16,7 +16,7 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { useProjects } from "@/contexts/ProjectContext";
 import { useToast } from "@/hooks/use-toast";
-import { ImageUploadField } from "@/components/publish/ImageUploadField";
+import ImageUploadField from "@/components/publish/ImageUploadField";
 
 interface AndroidConfig {
   appName: string;
