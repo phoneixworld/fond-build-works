@@ -280,10 +280,14 @@ function parseReactFilesFromOutput(text: string): {
 
   function flush() {
     if (currentFile) {
-      const code = currentLines.join("\n").trim();
+      let code = currentLines.join("\n").trim();
       if (code.length > 0) {
         let fname = currentFile.startsWith("/") ? currentFile : `/${currentFile}`;
         fname = fname.replace(/^\/src\//, "/");
+        // Auto-repair JSX issues in App files and component files
+        if (fname.match(/\.(jsx?|tsx?)$/)) {
+          code = autoRepairJSX(code);
+        }
         files[fname] = code;
       }
     }
