@@ -225,8 +225,8 @@ const WhiteLabelPanel = () => {
             {/* Hide Attribution */}
             <label className="flex items-center justify-between p-3 bg-secondary/50 rounded-xl border border-border cursor-pointer">
               <div>
-                <span className="text-xs font-medium">Hide "Built with Lovable" badge</span>
-                <p className="text-[10px] text-muted-foreground mt-0.5">Remove all Lovable branding from your app</p>
+                <span className="text-xs font-medium">Hide "Built with Phoenix World" badge</span>
+                <p className="text-[10px] text-muted-foreground mt-0.5">Remove all Phoenix World branding from your app</p>
               </div>
               <div className={`w-10 h-5 rounded-full p-0.5 transition-colors ${config.hideAttribution ? "bg-primary" : "bg-muted"}`} onClick={() => update("hideAttribution", !config.hideAttribution)}>
                 <div className={`w-4 h-4 rounded-full bg-white transition-transform ${config.hideAttribution ? "translate-x-5" : ""}`} />
@@ -243,7 +243,7 @@ const WhiteLabelPanel = () => {
                 <Globe className="w-3 h-3" /> Custom Domain
               </label>
               <input value={config.customDomain} onChange={e => update("customDomain", e.target.value)} placeholder="app.yourbrand.com" className="w-full bg-secondary text-sm rounded-lg px-3 py-2 outline-none border border-border focus:border-primary transition-colors" />
-              <p className="text-[10px] text-muted-foreground">Point your domain's CNAME to <code className="px-1 py-0.5 bg-secondary rounded font-mono">cname.lovable.app</code></p>
+              <p className="text-[10px] text-muted-foreground">Point your domain's CNAME to <code className="px-1 py-0.5 bg-secondary rounded font-mono">cname.phoenix.world</code></p>
             </div>
 
             {/* DNS Instructions */}
@@ -260,7 +260,7 @@ const WhiteLabelPanel = () => {
                 </div>
                 <div className="flex items-center gap-3 p-2 bg-background rounded-lg">
                   <span className="text-muted-foreground w-12">Value</span>
-                  <span className="font-mono font-medium">cname.lovable.app</span>
+                  <span className="font-mono font-medium">cname.phoenix.world</span>
                 </div>
               </div>
             </div>

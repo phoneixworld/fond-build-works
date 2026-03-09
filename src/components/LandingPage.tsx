@@ -49,9 +49,7 @@ const LandingPage = ({ onStartProject, onOpenProject }: LandingPageProps) => {
       {/* Navbar */}
       <header className="flex items-center justify-between px-6 py-4 border-b border-border">
         <div className="flex items-center gap-2">
-          <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-primary to-accent flex items-center justify-center">
-            <Zap className="w-4 h-4 text-primary-foreground" />
-          </div>
+          <img src="/logo.png" alt="Phoenix World" className="w-8 h-8 rounded-lg object-cover" />
           <span className="text-base font-bold text-foreground">Phoneix.World</span>
         </div>
         <div className="flex items-center gap-3">
