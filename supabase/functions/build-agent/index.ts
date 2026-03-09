@@ -295,6 +295,7 @@ export default function App() {
 \`\`\`
 
 RULES:
+- ALWAYS use HashRouter (NOT BrowserRouter) — the app runs in an iframe sandbox
 - Each feature = separate Route with its own component file
 - Sidebar/Nav uses NavLink from react-router-dom with active state styling
 - NEVER dump all features on a single page with sections — use ROUTES
