@@ -700,12 +700,14 @@ const CONTEXT_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
       const history = currentProject.chat_history ?? [];
       setMessages(history);
       setPreviewHtml(currentProject.html_content || "");
-      // Reset sandpack state first, then try to restore from DB
+      // ─── FULL RESET: Clear ALL state from previous project ───
       setSandpackFiles(null);
       setSandpackDeps({});
       setPreviewMode("html");
       setPreviewErrors([]);
       setAttachedImages([]);
+      // Clear VirtualFS so old files don't bleed into new project
+      setVirtualFiles({});
       // Reset all build/pipeline state
       setHealAttempts(0);
       setIsHealing(false);
@@ -716,6 +718,13 @@ const CONTEXT_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
       setCurrentAgent(null);
       setPipelineStep(null);
       setBuildRetryCount(0);
+      // Clear follow-up questions from previous project
+      setFollowUpQuestions([]);
+      setFollowUpAnswers({});
+      setPendingFollowUpPrompt("");
+      setAnalysisResult(null);
+      // Invalidate context cache so old schemas/knowledge don't leak
+      projectContextCacheRef.current = null;
       // Abort any in-flight request from previous project
       if (abortControllerRef.current) {
         abortControllerRef.current.abort();
@@ -724,13 +733,16 @@ const CONTEXT_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
       isSendingRef.current = false;
 
       // Restore persisted sandpack state from project_data
+      const restoreProjectId = currentProject.id;
       supabase
         .from("project_data")
         .select("data")
-        .eq("project_id", currentProject.id)
+        .eq("project_id", restoreProjectId)
         .eq("collection", "sandpack_state")
         .maybeSingle()
         .then(({ data: row }) => {
+          // Guard: only apply if still on the same project
+          if (lastProjectIdRef.current !== restoreProjectId) return;
           if (row?.data && typeof row.data === "object") {
             const state = row.data as any;
             if (state.files && Object.keys(state.files).length > 0) {
@@ -751,6 +763,8 @@ const CONTEXT_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
       setPreviewMode("html");
       setPreviewErrors([]);
       setAttachedImages([]);
+      setVirtualFiles({});
+      projectContextCacheRef.current = null;
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentProject?.id, setPreviewHtml]);
