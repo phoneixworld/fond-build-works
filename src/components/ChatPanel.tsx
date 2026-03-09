@@ -1094,6 +1094,99 @@ const CONTEXT_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
           if (htmlCode) setPreviewHtml(postProcessHtml(htmlCode));
 
           finalHtml = htmlCode;
+          
+          // If NO code was generated at all (neither React nor HTML), the AI gave a text-only response.
+          // Auto-retry with an explicit instruction to generate code.
+          if (!htmlCode && buildRetryCount < MAX_BUILD_RETRIES) {
+            console.warn("[ChatPanel:onDone] No code in response — auto-retrying with code generation instruction");
+            setBuildStep("🔄 Re-generating with code output...");
+            setBuildRetryCount(prev => prev + 1);
+            
+            setMessages((prev) => {
+              const last = prev[prev.length - 1];
+              if (last?.role === "assistant") {
+                return prev.map((m, i) => (i === prev.length - 1 ? { ...m, content: "⏳ Generating code... (retry)" } : m));
+              }
+              return prev;
+            });
+            
+            const retryMessages = [
+              ...apiMessages,
+              { role: "assistant" as const, content: fullResponse },
+              { role: "user" as const, content: "Your previous response did not contain any code. You MUST output complete working React code inside ```react-preview fences with --- /App.jsx file markers. Generate the full application code NOW. Do not describe what you plan to build — just output the code." },
+            ];
+            
+            let retryFullResponse = "";
+            await streamBuildAgent({
+              messages: retryMessages,
+              projectId: currentProject.id,
+              techStack: currentProject.tech_stack || "react-cdn",
+              schemas,
+              model: selectedModel,
+              designTheme: themeInfo?.prompt,
+              knowledge,
+              currentCode: currentCodeSummary || undefined,
+              snippetsContext: snippetsContext || undefined,
+              onDelta: (chunk) => {
+                retryFullResponse += chunk;
+                setBuildStreamContent(retryFullResponse);
+              },
+              onDone: (retryText) => {
+                const retryResult = parseReactFiles(retryText);
+                if (retryResult.files) {
+                  setSandpackFiles(retryResult.files);
+                  if (Object.keys(retryResult.deps).length > 0) setSandpackDeps(retryResult.deps);
+                  setPreviewMode("sandpack");
+                  
+                  const retryChatText = retryResult.chatText || "✅ Code generated successfully";
+                  setMessages((prev) => {
+                    const last = prev[prev.length - 1];
+                    if (last?.role === "assistant") {
+                      return prev.map((m, i) => (i === prev.length - 1 ? { ...m, content: retryChatText } : m));
+                    }
+                    return prev;
+                  });
+                } else {
+                  // Still no code — show user-friendly message
+                  setMessages((prev) => {
+                    const last = prev[prev.length - 1];
+                    const msg = "⚠️ The AI returned a planning response instead of code. Please try a more specific request like: \"Build the Dashboard and Student Management modules with sidebar navigation\"";
+                    if (last?.role === "assistant") {
+                      return prev.map((m, i) => (i === prev.length - 1 ? { ...m, content: msg } : m));
+                    }
+                    return [...prev, { role: "assistant" as const, content: msg, timestamp: Date.now() }];
+                  });
+                }
+                
+                setIsLoading(false);
+                setIsBuilding(false);
+                setBuildStep("");
+                setPipelineStep("complete");
+                setCurrentAgent(null);
+                setBuildRetryCount(0);
+                isSendingRef.current = false;
+                setTimeout(() => setBuildStreamContent(""), 3000);
+                
+                const persistMessages = messagesRef.current.map(m => ({
+                  role: m.role,
+                  content: typeof m.content === "string" ? m.content : getTextContent(m.content),
+                }));
+                saveProject({ chat_history: persistMessages });
+              },
+              onError: (err) => {
+                console.error("[ChatPanel:code-retry] Retry failed:", err);
+                setIsLoading(false);
+                setIsBuilding(false);
+                setBuildStep("");
+                setPipelineStep("complete");
+                setCurrentAgent(null);
+                setBuildRetryCount(0);
+                isSendingRef.current = false;
+              },
+            });
+            return;
+          }
+          
           if (htmlCode && htmlCode.length > 200 && currentMessages.length === 0) {
             setBuildStep("Reviewing & polishing...");
             try {
