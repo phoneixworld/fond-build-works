@@ -8,7 +8,7 @@
 export interface ComponentSnippet {
   id: string;
   name: string;
-  category: "hero" | "features" | "pricing" | "testimonials" | "cta" | "footer" | "contact" | "stats" | "faq" | "gallery" | "team" | "navigation";
+  category: "hero" | "features" | "pricing" | "testimonials" | "cta" | "footer" | "contact" | "stats" | "faq" | "gallery" | "team" | "navigation" | "micro-interaction";
   /** Compact structural description */
   structure: string;
 }
@@ -645,6 +645,222 @@ export const COMPONENT_SNIPPETS: ComponentSnippet[] = [
       </div>
     </div>
   </div>
+</section>`,
+  },
+
+  // === MICRO-INTERACTIONS ===
+  {
+    id: "hover-lift-cards",
+    name: "Hover Lift Cards",
+    category: "micro-interaction",
+    structure: `<style>
+  .lift-card {
+    transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.3s ease;
+  }
+  .lift-card:hover {
+    transform: translateY(-8px);
+    box-shadow: 0 20px 40px -12px hsl(var(--primary) / 0.15);
+  }
+  .lift-card:active {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 16px -8px hsl(var(--primary) / 0.2);
+  }
+</style>
+<section class="py-20">
+  <div class="max-w-7xl mx-auto px-4">
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+      <div class="lift-card bg-card rounded-2xl border p-6 cursor-pointer">
+        <div class="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center mb-4">
+          <i data-lucide="rocket" class="w-6 h-6 text-primary"></i>
+        </div>
+        <h3 class="text-lg font-semibold mb-2">Card Title</h3>
+        <p class="text-muted-foreground text-sm">Hover me to see the lift effect with spring easing.</p>
+      </div>
+      <div class="lift-card bg-card rounded-2xl border p-6 cursor-pointer">
+        <div class="w-12 h-12 rounded-xl bg-accent/10 flex items-center justify-center mb-4">
+          <i data-lucide="sparkles" class="w-6 h-6 text-accent-foreground"></i>
+        </div>
+        <h3 class="text-lg font-semibold mb-2">Card Title</h3>
+        <p class="text-muted-foreground text-sm">Smooth spring-based transition with shadow glow.</p>
+      </div>
+      <div class="lift-card bg-card rounded-2xl border p-6 cursor-pointer">
+        <div class="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center mb-4">
+          <i data-lucide="layers" class="w-6 h-6 text-primary"></i>
+        </div>
+        <h3 class="text-lg font-semibold mb-2">Card Title</h3>
+        <p class="text-muted-foreground text-sm">Active state press-down for tactile feedback.</p>
+      </div>
+    </div>
+  </div>
+</section>`,
+  },
+  {
+    id: "staggered-reveal",
+    name: "Staggered Card Reveal",
+    category: "micro-interaction",
+    structure: `<style>
+  .reveal-card {
+    opacity: 0;
+    transform: translateY(40px);
+    transition: opacity 0.6s ease, transform 0.6s cubic-bezier(0.22, 1, 0.36, 1);
+  }
+  .reveal-card.visible {
+    opacity: 1;
+    transform: translateY(0);
+  }
+</style>
+<section class="py-20">
+  <div class="max-w-7xl mx-auto px-4">
+    <div class="text-center mb-12">
+      <h2 class="text-3xl font-bold mb-4">Why choose us</h2>
+      <p class="text-muted-foreground">Features that make us stand out</p>
+    </div>
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6" id="reveal-grid">
+      <div class="reveal-card bg-card rounded-2xl border p-6" data-delay="0">
+        <div class="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center mb-3"><i data-lucide="zap" class="w-5 h-5 text-primary"></i></div>
+        <h3 class="font-semibold mb-1">Fast</h3>
+        <p class="text-muted-foreground text-sm">Blazing fast performance out of the box.</p>
+      </div>
+      <div class="reveal-card bg-card rounded-2xl border p-6" data-delay="100">
+        <div class="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center mb-3"><i data-lucide="shield" class="w-5 h-5 text-primary"></i></div>
+        <h3 class="font-semibold mb-1">Secure</h3>
+        <p class="text-muted-foreground text-sm">Enterprise-grade security built in.</p>
+      </div>
+      <div class="reveal-card bg-card rounded-2xl border p-6" data-delay="200">
+        <div class="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center mb-3"><i data-lucide="globe" class="w-5 h-5 text-primary"></i></div>
+        <h3 class="font-semibold mb-1">Global</h3>
+        <p class="text-muted-foreground text-sm">Available worldwide with edge delivery.</p>
+      </div>
+      <div class="reveal-card bg-card rounded-2xl border p-6" data-delay="300">
+        <div class="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center mb-3"><i data-lucide="heart" class="w-5 h-5 text-primary"></i></div>
+        <h3 class="font-semibold mb-1">Loved</h3>
+        <p class="text-muted-foreground text-sm">Trusted by thousands of happy users.</p>
+      </div>
+    </div>
+  </div>
+  <script>
+    const revealObserver = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          const cards = entry.target.querySelectorAll('.reveal-card');
+          cards.forEach(card => {
+            const delay = parseInt(card.dataset.delay || '0');
+            setTimeout(() => card.classList.add('visible'), delay);
+          });
+          revealObserver.unobserve(entry.target);
+        }
+      });
+    }, { threshold: 0.2 });
+    document.querySelectorAll('#reveal-grid').forEach(g => revealObserver.observe(g));
+  </script>
+</section>`,
+  },
+  {
+    id: "typewriter-hero",
+    name: "Typewriter Text Hero",
+    category: "hero",
+    structure: `<section id="hero" class="py-24 text-center relative overflow-hidden">
+  <div class="max-w-4xl mx-auto px-4 relative z-10">
+    <span class="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-primary/10 text-primary text-sm font-medium mb-6">✨ Welcome</span>
+    <h1 class="text-5xl md:text-6xl font-bold tracking-tight mb-6">
+      Build apps that are
+      <span id="typewriter" class="bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent"></span>
+      <span class="animate-pulse">|</span>
+    </h1>
+    <p class="text-xl text-muted-foreground max-w-2xl mx-auto mb-8">The fastest way to ship beautiful products.</p>
+    <div class="flex gap-4 justify-center">
+      <a href="#cta" class="px-8 py-3 bg-primary text-primary-foreground rounded-xl font-medium shadow-lg shadow-primary/25 hover:-translate-y-0.5 transition-all">Get Started</a>
+    </div>
+  </div>
+  <style>
+    @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0} }
+    #typewriter + span { animation: blink 0.8s step-end infinite; }
+  </style>
+  <script>
+    (function() {
+      const words = ['beautiful', 'powerful', 'fast', 'scalable', 'modern'];
+      const el = document.getElementById('typewriter');
+      if (!el) return;
+      let wordIdx = 0, charIdx = 0, deleting = false;
+      function tick() {
+        const word = words[wordIdx];
+        if (deleting) {
+          el.textContent = word.substring(0, charIdx--);
+          if (charIdx < 0) { deleting = false; wordIdx = (wordIdx + 1) % words.length; setTimeout(tick, 400); return; }
+          setTimeout(tick, 50);
+        } else {
+          el.textContent = word.substring(0, ++charIdx);
+          if (charIdx === word.length) { deleting = true; setTimeout(tick, 2000); return; }
+          setTimeout(tick, 100);
+        }
+      }
+      tick();
+    })();
+  </script>
+</section>`,
+  },
+  {
+    id: "scroll-fade-sections",
+    name: "Scroll-Triggered Fade Sections",
+    category: "micro-interaction",
+    structure: `<style>
+  .scroll-reveal {
+    opacity: 0;
+    transform: translateY(30px);
+    transition: opacity 0.7s ease-out, transform 0.7s cubic-bezier(0.22, 1, 0.36, 1);
+  }
+  .scroll-reveal.visible { opacity: 1; transform: translateY(0); }
+  .scroll-reveal[data-direction="left"] { transform: translateX(-30px) translateY(0); }
+  .scroll-reveal[data-direction="left"].visible { transform: translateX(0); }
+  .scroll-reveal[data-direction="right"] { transform: translateX(30px) translateY(0); }
+  .scroll-reveal[data-direction="right"].visible { transform: translateX(0); }
+  .scroll-reveal[data-direction="scale"] { transform: scale(0.9); }
+  .scroll-reveal[data-direction="scale"].visible { transform: scale(1); }
+</style>
+<section class="py-20">
+  <div class="max-w-7xl mx-auto px-4 space-y-24">
+    <!-- Fade up -->
+    <div class="scroll-reveal text-center">
+      <h2 class="text-3xl font-bold mb-4">Fade Up on Scroll</h2>
+      <p class="text-muted-foreground max-w-xl mx-auto">This section fades in and slides up when scrolled into view.</p>
+    </div>
+    <!-- Slide from left -->
+    <div class="scroll-reveal flex flex-col md:flex-row items-center gap-12" data-direction="left">
+      <div class="flex-1">
+        <h3 class="text-2xl font-bold mb-3">Slide From Left</h3>
+        <p class="text-muted-foreground">Content slides in from the left with smooth easing.</p>
+      </div>
+      <div class="flex-1 h-48 bg-gradient-to-br from-primary/20 to-accent/20 rounded-2xl"></div>
+    </div>
+    <!-- Slide from right -->
+    <div class="scroll-reveal flex flex-col md:flex-row-reverse items-center gap-12" data-direction="right">
+      <div class="flex-1">
+        <h3 class="text-2xl font-bold mb-3">Slide From Right</h3>
+        <p class="text-muted-foreground">Content slides in from the right with smooth easing.</p>
+      </div>
+      <div class="flex-1 h-48 bg-gradient-to-br from-accent/20 to-primary/20 rounded-2xl"></div>
+    </div>
+    <!-- Scale up -->
+    <div class="scroll-reveal text-center" data-direction="scale">
+      <div class="bg-card border rounded-2xl p-12 max-w-2xl mx-auto">
+        <h3 class="text-2xl font-bold mb-3">Scale Reveal</h3>
+        <p class="text-muted-foreground">This card scales up smoothly when it enters the viewport.</p>
+      </div>
+    </div>
+  </div>
+  <script>
+    (function() {
+      const observer = new IntersectionObserver((entries) => {
+        entries.forEach(e => {
+          if (e.isIntersecting) {
+            e.target.classList.add('visible');
+            observer.unobserve(e.target);
+          }
+        });
+      }, { threshold: 0.15, rootMargin: '0px 0px -50px 0px' });
+      document.querySelectorAll('.scroll-reveal').forEach(el => observer.observe(el));
+    })();
+  </script>
 </section>`,
   },
 ];
