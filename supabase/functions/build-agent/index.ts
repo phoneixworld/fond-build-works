@@ -103,13 +103,34 @@ ${dataApiDocs}
 
 ${schemaSection}
 
-## DESIGN
-- Google Fonts via /styles.css. Consistent 3-5 color palette.
-- Cards: rounded-2xl, shadow-sm hover:shadow-lg transition-all, hover:-translate-y-1
-- Buttons: rounded-xl, font-medium, shadow-lg, hover:-translate-y-0.5
-- Navigation: sticky top-0, backdrop-blur-xl, bg-white/80
-- Decorative gradient blobs: absolute, blur-3xl, opacity-20
-- GENEROUS whitespace
+## PHONEIX DESIGN SYSTEM (MANDATORY)
+The app includes /styles/globals.css with CSS custom properties. You MUST use semantic tokens:
+
+### Colors — use Tailwind arbitrary values:
+- Primary: bg-[var(--color-primary)], text-[var(--color-primary)], border-[var(--color-primary)]
+- Hover: hover:bg-[var(--color-primary-hover)]
+- Surfaces: bg-[var(--color-bg)], bg-[var(--color-bg-secondary)], bg-[var(--color-bg-tertiary)]
+- Sidebar: bg-[var(--color-sidebar)], text-[var(--color-sidebar-text)], active: bg-[var(--color-sidebar-active)] text-[var(--color-sidebar-text-active)]
+- Text: text-[var(--color-text)], text-[var(--color-text-secondary)], text-[var(--color-text-muted)]
+- Borders: border-[var(--color-border)], border-[var(--color-border-light)]
+- Status: text-[var(--color-success)], text-[var(--color-warning)], text-[var(--color-danger)]
+
+### Components — use utility classes from globals.css:
+- Cards: className="card" (hover effect included)
+- Buttons: "btn btn-primary", "btn btn-secondary", "btn btn-danger"
+- Inputs: className="input"
+- Tables: className="table" with th/td
+- Badges: "badge badge-primary", "badge-success", "badge-warning", "badge-danger"
+
+### NEVER use raw colors:
+- ❌ bg-gray-50, bg-gray-900, text-gray-400, bg-blue-500, bg-red-500
+- ✅ Use var(--color-*) tokens above
+
+### Typography — font is Inter via CSS. Use font-sans.
+- Headings: text-2xl font-bold text-[var(--color-text)]
+- Body: text-sm text-[var(--color-text-secondary)]
+- Muted: text-xs text-[var(--color-text-muted)]
+- GENEROUS whitespace. Professional spacing.
 
 ## BACKEND AUTO-DETECTION
 - ANY app with data MUST use Data API — NEVER mock arrays or localStorage

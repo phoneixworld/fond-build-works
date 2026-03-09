@@ -38,6 +38,7 @@ import {
 import { buildIncrementalContext, contextReductionRatio } from "@/lib/incrementalContext";
 import { applyAdaptiveSplitting } from "@/lib/adaptiveTaskSplitter";
 import { persistTaskOutput, getPersistedTaskOutput } from "@/lib/persistentCache";
+import { DESIGN_SYSTEM_CSS, lintDesignTokens } from "@/lib/designSystem";
 
 // ─── Base Template (mandatory scaffold for all new builds) ────────────────
 //
@@ -177,9 +178,9 @@ ${sidebarNavItems}
 
 export default function Sidebar() {
   return (
-    <nav className="w-64 bg-gray-900 text-white flex flex-col">
-      <div className="p-4 border-b border-gray-800">
-        <h1 className="text-lg font-bold">${model.templateName}</h1>
+    <nav className="w-64 bg-[var(--color-sidebar)] text-[var(--color-sidebar-text)] flex flex-col">
+      <div className="p-4 border-b border-[var(--color-sidebar-border)]">
+        <h1 className="text-lg font-bold text-[var(--color-sidebar-text-active)]">${model.templateName}</h1>
       </div>
       <div className="flex-1 py-2">
         {navItems.map(({ to, icon: ItemIcon, label }) => (
@@ -189,7 +190,7 @@ export default function Sidebar() {
             end={to === "/"}
             className={({ isActive }) =>
               \`flex items-center gap-3 px-4 py-2.5 text-sm transition-colors \${
-                isActive ? "bg-gray-800 text-white" : "text-gray-400 hover:text-white hover:bg-gray-800/50"
+                isActive ? "bg-[var(--color-sidebar-active)] text-[var(--color-sidebar-text-active)]" : "text-[var(--color-sidebar-text)] hover:text-[var(--color-sidebar-text-active)] hover:bg-[var(--color-sidebar-hover)]"
               }\`
             }
           >
@@ -210,7 +211,7 @@ import Sidebar from "./Sidebar";
 
 export default function AppLayout() {
   return (
-    <div className="flex h-screen bg-gray-50">
+    <div className="flex h-screen bg-[var(--color-bg-secondary)]">
       <Sidebar />
       <main className="flex-1 overflow-auto">
         <Outlet />
@@ -245,9 +246,9 @@ export default function AppLayout() {
 
 function generateDashboardPage(name: string, templateName: string, entities: DomainModel["entities"]): string {
   const statCards = entities.slice(0, 4).map(e =>
-    `        <div className="bg-white rounded-lg border border-gray-100 p-6">
-          <h3 className="text-sm font-medium text-gray-500">${e.pluralName}</h3>
-          <p className="text-2xl font-semibold text-gray-800 mt-1">0</p>
+    `        <div className="card">
+          <h3 className="text-sm font-medium text-[var(--color-text-secondary)]">${e.pluralName}</h3>
+          <p className="text-2xl font-semibold text-[var(--color-text)] mt-1">0</p>
         </div>`
   ).join("\n");
 
@@ -256,11 +257,11 @@ function generateDashboardPage(name: string, templateName: string, entities: Dom
 export default function ${name}() {
   return (
     <div className="p-8">
-      <h1 className="text-2xl font-light tracking-wide text-gray-800 mb-6">${templateName} Dashboard</h1>
+      <h1 className="text-2xl font-light tracking-wide text-[var(--color-text)] mb-6">${templateName} Dashboard</h1>
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
 ${statCards}
       </div>
-      <p className="text-gray-400">Loading content...</p>
+      <p className="text-[var(--color-text-muted)]">Loading content...</p>
     </div>
   );
 }
@@ -602,19 +603,7 @@ export function useApi(collection, projectId) {
 }
 
 function getGlobalStyles(): string {
-  return `@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
-
-:root {
-  --color-primary: #3b82f6;
-  --color-primary-dark: #2563eb;
-  --color-success: #10b981;
-  --color-warning: #f59e0b;
-  --color-danger: #ef4444;
-}
-
-* { margin: 0; padding: 0; box-sizing: border-box; }
-body { font-family: 'Inter', sans-serif; -webkit-font-smoothing: antialiased; }
-`;
+  return DESIGN_SYSTEM_CSS;
 }
 
 /** The original generic scaffold (no domain model) */
@@ -646,7 +635,7 @@ import Sidebar from "./Sidebar";
 
 export default function AppLayout() {
   return (
-    <div className="flex h-screen bg-gray-50">
+    <div className="flex h-screen bg-[var(--color-bg-secondary)]">
       <Sidebar />
       <main className="flex-1 overflow-auto">
         <Outlet />
@@ -666,9 +655,9 @@ const navItems = [
 
 export default function Sidebar() {
   return (
-    <nav className="w-64 bg-gray-900 text-white flex flex-col">
-      <div className="p-4 border-b border-gray-800">
-        <h1 className="text-lg font-bold">App</h1>
+    <nav className="w-64 bg-[var(--color-sidebar)] text-[var(--color-sidebar-text)] flex flex-col">
+      <div className="p-4 border-b border-[var(--color-sidebar-border)]">
+        <h1 className="text-lg font-bold text-[var(--color-sidebar-text-active)]">App</h1>
       </div>
       <div className="flex-1 py-2">
         {navItems.map(({ to, icon: ItemIcon, label }) => (
@@ -678,7 +667,7 @@ export default function Sidebar() {
             end={to === "/"}
             className={({ isActive }) =>
               \`flex items-center gap-3 px-4 py-2.5 text-sm transition-colors \${
-                isActive ? "bg-gray-800 text-white" : "text-gray-400 hover:text-white hover:bg-gray-800/50"
+                isActive ? "bg-[var(--color-sidebar-active)] text-[var(--color-sidebar-text-active)]" : "text-[var(--color-sidebar-text)] hover:text-[var(--color-sidebar-text-active)] hover:bg-[var(--color-sidebar-hover)]"
               }\`
             }
           >
@@ -697,8 +686,8 @@ export default function Sidebar() {
 export default function Dashboard() {
   return (
     <div className="p-8">
-      <h1 className="text-2xl font-light tracking-wide text-gray-800 mb-6">Dashboard</h1>
-      <p className="text-gray-400">Loading content...</p>
+      <h1 className="text-2xl font-light tracking-wide text-[var(--color-text)] mb-6">Dashboard</h1>
+      <p className="text-[var(--color-text-muted)]">Loading content...</p>
     </div>
   );
 }
@@ -1827,6 +1816,13 @@ async function runDirectBuild(
     status: postMergeErrors.length > 0 ? "stubbed" : "success",
   });
   
+  // Design system lint pass — replace raw colors with semantic tokens
+  const linted = lintDesignTokens(finalFiles);
+  finalFiles = linted.files;
+  if (linted.replacements > 0) {
+    console.log(`[BuildEngine:direct] Design lint: ${linted.replacements} raw color(s) → semantic tokens`);
+  }
+
   callbacks.onFilesReady(finalFiles, result.deps);
   autoDetectAndCreateSchemas(finalFiles, config.projectId);
   
@@ -2045,6 +2041,13 @@ ${task.filesAffected.map(f => `- ${f}`).join("\n")}
   if (finalErrors.length > 0) {
     console.warn("[BuildEngine:planned] Stubbing broken files post-assembly:", finalErrors);
     accumulatedFiles = stubBrokenFiles(accumulatedFiles, finalErrors);
+  }
+
+  // Design system lint pass — replace raw colors with semantic tokens
+  const lintResult = lintDesignTokens(accumulatedFiles);
+  accumulatedFiles = lintResult.files;
+  if (lintResult.replacements > 0) {
+    console.log(`[BuildEngine:planned] Design lint: ${lintResult.replacements} raw color(s) → semantic tokens`);
   }
 
   // ── Assembly ──
