@@ -90,7 +90,7 @@ const IDEHeader = ({
   const getInitials = (email: string) => email.slice(0, 2).toUpperCase();
 
   return (
-    <header className="h-11 flex items-center px-3 border-b shrink-0 z-10 relative" style={{ background: '#fff', borderColor: '#e5e7eb', color: '#111', ['--foreground' as any]: '0 0% 7%', ['--muted-foreground' as any]: '220 9% 40%', ['--secondary' as any]: '220 14% 93%', ['--border' as any]: '220 14% 88%' }}>
+    <header className="h-11 flex items-center px-3 border-b border-border shrink-0 z-10 relative bg-ide-panel-header">
       {/* Left: Back + Project dropdown */}
       <div className="flex items-center gap-1.5 min-w-0">
         <Tooltip>
@@ -206,8 +206,8 @@ const IDEHeader = ({
                 onClick={() => setRightPanel(tab.id)}
                 className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-md text-[11px] font-medium transition-all ${
                   isActive
-                    ? "bg-background text-white shadow-sm ring-1 ring-border/50"
-                    : "text-white/70 hover:text-white"
+                    ? "bg-background text-foreground shadow-sm ring-1 ring-border/50"
+                    : "text-muted-foreground hover:text-foreground"
                 }`}
               >
                 <Icon className="w-3.5 h-3.5" />
