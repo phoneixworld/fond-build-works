@@ -951,7 +951,7 @@ const CONTEXT_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
     setBuildStep(images.length > 0 ? "🖼️ Analyzing image..." : "🏗️ Build agent generating code...");
     setPipelineStep("generating");
 
-    // Safety timeout: if build doesn't complete in 90 seconds, force reset
+    // Safety timeout: if build doesn't complete in 120 seconds, force reset
     if (buildSafetyTimeoutRef.current) clearTimeout(buildSafetyTimeoutRef.current);
     buildSafetyTimeoutRef.current = setTimeout(() => {
       console.warn("[ChatPanel] Build safety timeout — forcing isBuilding=false");
@@ -962,14 +962,14 @@ const CONTEXT_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
       setCurrentAgent(null);
       isSendingRef.current = false;
       setMessages((prev) => {
-        const msg = "⚠️ Build timed out. The request may have been too complex. Try breaking it into smaller steps — e.g., \"Build a sidebar with navigation\" first, then add modules one by one.";
+        const msg = "⚠️ Build timed out. Try breaking it into smaller steps.";
         const last = prev[prev.length - 1];
         if (last?.role === "assistant") {
           return prev.map((m, i) => (i === prev.length - 1 ? { ...m, content: msg } : m));
         }
         return [...prev, { role: "assistant", content: msg, timestamp: Date.now() }];
       });
-    }, 180_000);
+    }, 120_000);
 
     // FIX: Create abort controller for this request
     const abortController = new AbortController();
@@ -1006,14 +1006,21 @@ const CONTEXT_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
           hasSetBuilding = true;
         }
         streamParseCount++;
-        // DON'T push incomplete code to Sandpack during streaming — wait for onDone
+        // ─── Optimistic preview streaming: push partial code every 3 parses ───
+        if (streamParseCount % 3 === 0 && Object.keys(reactResult.files).length >= 1) {
+          const hasApp = reactResult.files["/App.jsx"] || reactResult.files["/App.tsx"];
+          if (hasApp) {
+            setSandpackFiles(reactResult.files);
+            syncSandpackToVirtualFS(reactResult.files);
+            if (Object.keys(reactResult.deps).length > 0) setSandpackDeps(reactResult.deps);
+          }
+        }
         setPreviewMode("sandpack");
       } else if (htmlCode) {
         if (!hasSetBuilding) {
           setBuildStep("Building your app...");
           hasSetBuilding = true;
         }
-        // DON'T push incomplete HTML during streaming either
         setPreviewMode("html");
       }
 
@@ -1792,25 +1799,59 @@ const CONTEXT_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
     }
   }, [pendingBuildPrompt, sendMessage]);
 
+  // ─── Client-side fast classification ───
+  // Obvious build intents skip the 1-2s classify-intent round-trip entirely
+  const fastClassifyLocal = useCallback((text: string): AgentIntent | null => {
+    const t = text.trim().toLowerCase();
+    // Clear build commands
+    if (/^(build|create|make|add|generate|design|implement|develop|set up|scaffold|wire up)\b/i.test(t)) return "build";
+    // Descriptive app prompts (e.g., "school ERP with student management")
+    if (/\b(app|website|dashboard|landing page|erp|portal|system|platform|page|form|module|component)\b/i.test(t) && t.length > 20) return "build";
+    // Modification commands
+    if (/^(change|update|fix|modify|replace|remove|delete|move|rename|resize|recolor|restyle)\b/i.test(t)) return "build";
+    // Affirmative confirmations
+    if (/^(yes|go ahead|do it|build it|sounds good|ok|sure|let's go|proceed)/i.test(t)) return "build";
+    // Clear chat intents
+    if (/^(what|how|why|can you|could you|should|is it|tell me|explain|help me understand)\b/i.test(t) && t.endsWith("?")) return "chat";
+    return null; // Ambiguous — fall through to server classification
+  }, []);
+
   const handleSmartSend = useCallback(async (text: string, images: string[] = []) => {
     if (!text && images.length === 0) return;
     if (isSendingRef.current || isLoadingRef.current) return;
     const finalText = text || "Replicate this design";
     
-    // Skip classification for: short prompts, image-only, auto-fix, explicit build confirmations,
-    // or prompts that contain "Additional Requirements" (already answered clarifying questions)
     const isAutoFix = finalText.startsWith("🔧");
     const isShort = finalText.length < 15;
     const hasImages = images.length > 0;
     const isConfirmation = /^(yes|go ahead|do it|build it|sounds good|ok|sure)/i.test(finalText.trim());
     const hasAnswers = finalText.includes("--- Additional Requirements ---");
     
+    // Fast path: skip network classification for obvious intents
     if (!isAutoFix && !isShort && !hasImages && !isConfirmation && !hasAnswers) {
+      const localIntent = fastClassifyLocal(finalText);
+      
+      if (localIntent === "chat") {
+        setCurrentAgent("chat");
+        setPipelineStep("chatting");
+        sendChatMessage(finalText, images);
+        return;
+      }
+      
+      if (localIntent === "build") {
+        // Skip classify-intent call entirely — save 1-2s
+        console.log("[FastClassify] Client-side build detection, skipping server classify");
+        setCurrentAgent("build");
+        setPipelineStep("planning");
+        sendMessage(finalText, images);
+        return;
+      }
+      
+      // Ambiguous: fall through to server classification
       const classification = await classifyUserIntent(finalText);
-      if (classification?.intent === "clarify") return; // Questions shown, wait for answers
+      if (classification?.intent === "clarify") return;
       
       if (classification?.intent === "chat") {
-        // Route to chat agent — no code generation
         setCurrentAgent("chat");
         setPipelineStep("chatting");
         sendChatMessage(finalText, images);
@@ -1822,7 +1863,7 @@ const CONTEXT_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
     setCurrentAgent("build");
     setPipelineStep("planning");
     sendMessage(finalText, images);
-  }, [classifyUserIntent]);
+  }, [classifyUserIntent, fastClassifyLocal]);
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === "Enter" && !e.shiftKey) {
