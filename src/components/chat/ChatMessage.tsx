@@ -449,7 +449,7 @@ const ChatMessage = ({ content, role, timestamp, isLoading, onEdit, onRegenerate
       transition={{ duration: 0.25, ease: [0.25, 0.46, 0.45, 0.94] }}
       className={`group relative ${isUser ? "pl-8" : ""}`}
     >
-      {/* Timestamp above the message - Lovable style */}
+      {/* Timestamp above the message */}
       {isUser && timestamp && (
         <div className="text-center mb-3">
           <span className="text-xs text-muted-foreground/50 font-medium">

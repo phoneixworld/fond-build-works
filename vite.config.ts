@@ -20,8 +20,8 @@ export default defineConfig(({ mode }) => ({
       registerType: "autoUpdate",
       includeAssets: ["favicon.ico", "pwa-192.png", "pwa-512.png"],
       manifest: {
-        name: "Lovable IDE",
-        short_name: "Lovable",
+        name: "Phoenix World",
+        short_name: "Phoenix",
         description: "AI-powered app builder — build, preview, and publish apps from your phone or desktop.",
         theme_color: "#6d28d9",
         background_color: "#0a0a0b",
