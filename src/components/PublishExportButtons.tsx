@@ -158,7 +158,7 @@ const PublishExportButtons = forwardRef<PublishExportHandle>((_, ref) => {
   // Determine the public-facing origin for published URLs
   const getPublishedOrigin = useCallback(() => {
     const origin = window.location.origin;
-    // If we're on a preview domain, use the published lovable.app domain instead
+    // If we're on a preview domain, use the published domain instead
     if (origin.includes("lovableproject.com") || origin.includes("id-preview")) {
       return "https://fond-build-works.lovable.app";
     }
