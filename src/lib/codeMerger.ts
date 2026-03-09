@@ -160,9 +160,30 @@ export function mergeFiles(
       continue;
     }
 
-    // CSS files — concatenate
+    // CSS files — smart merge: use incoming as authoritative, don't concatenate
+    // This prevents the endlessly growing CSS duplication bug
     if (path.endsWith(".css") && result[path]) {
-      result[path] = result[path] + "\n\n/* --- merged from task --- */\n" + code;
+      // If the incoming CSS is substantially different, replace entirely
+      // If it's similar (>50% overlap), just use the newer version
+      const existingLines = new Set(result[path].split("\n").map(l => l.trim()).filter(Boolean));
+      const incomingLines = code.split("\n").map(l => l.trim()).filter(Boolean);
+      const overlapCount = incomingLines.filter(l => existingLines.has(l)).length;
+      const overlapRatio = incomingLines.length > 0 ? overlapCount / incomingLines.length : 0;
+      
+      if (overlapRatio > 0.3) {
+        // Mostly the same CSS — just use the newer version
+        result[path] = code;
+      } else {
+        // Genuinely different CSS — merge but deduplicate @import lines
+        const existingImports = new Set(
+          result[path].split("\n").filter(l => l.trim().startsWith("@import")).map(l => l.trim())
+        );
+        const dedupedIncoming = code.split("\n").filter(l => {
+          const trimmed = l.trim();
+          return !trimmed.startsWith("@import") || !existingImports.has(trimmed);
+        }).join("\n");
+        result[path] = result[path] + "\n\n" + dedupedIncoming;
+      }
       continue;
     }
 
