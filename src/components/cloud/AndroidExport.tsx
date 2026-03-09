@@ -262,6 +262,7 @@ const AndroidExport = () => {
                 value={config.iconUrl}
                 onChange={(url) => updateConfig("iconUrl", url)}
                 label="Upload Icon"
+                icon={<Image className="w-4 h-4" />}
               />
             </div>
             <div>
@@ -270,6 +271,7 @@ const AndroidExport = () => {
                 value={config.splashUrl}
                 onChange={(url) => updateConfig("splashUrl", url)}
                 label="Upload Splash"
+                icon={<Image className="w-4 h-4" />}
               />
             </div>
             <div className="grid grid-cols-2 gap-3">
