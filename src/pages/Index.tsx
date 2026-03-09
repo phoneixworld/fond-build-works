@@ -58,6 +58,7 @@ const PRIMARY_TABS = [
 ];
 
 const SECONDARY_TABS = [
+  { id: "ir" as PanelId, label: "Intent", icon: Layers },
   { id: "planning" as PanelId, label: "Planner", icon: ListChecks },
   { id: "quality" as PanelId, label: "Quality", icon: Shield },
   { id: "search" as PanelId, label: "Search", icon: Search },
