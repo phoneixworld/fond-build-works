@@ -1029,8 +1029,14 @@ const CONTEXT_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
       const { schemas, knowledge } = await fetchProjectContext(currentProject.id);
 
       // ─── Current code context: smart file prioritization ─────────────────────
+      // FIX: For brand new projects (no prior messages), don't send stale sandpack files
+      // from a previous project that may still be in React state (async flush race)
+      const isFirstMessage = messagesRef.current.filter(m => m.role === "user").length <= 1;
+      const hasPersistedHistory = (currentProject.chat_history ?? []).length > 0;
+      const shouldIncludeCurrentCode = !isFirstMessage || hasPersistedHistory;
+      
       let currentCodeSummary = "";
-      if (currentSandpackFiles && Object.keys(currentSandpackFiles).length > 0) {
+      if (shouldIncludeCurrentCode && currentSandpackFiles && Object.keys(currentSandpackFiles).length > 0) {
         const fileEntries = Object.entries(currentSandpackFiles);
         const totalChars = fileEntries.reduce((sum, [, code]) => sum + code.length, 0);
         if (totalChars <= 16000) {
@@ -1053,7 +1059,7 @@ const CONTEXT_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
           }).join("\n\n");
           currentCodeSummary = `${keyCode}\n\n${otherCode}`;
         }
-      } else if (currentPreviewHtml && currentPreviewHtml.length > 0) {
+      } else if (shouldIncludeCurrentCode && currentPreviewHtml && currentPreviewHtml.length > 0) {
         currentCodeSummary = currentPreviewHtml.length < 16000
           ? currentPreviewHtml
           : currentPreviewHtml.slice(0, 12000) + `\n...[truncated — ${Math.round(currentPreviewHtml.length / 1000)}k chars total]`;
