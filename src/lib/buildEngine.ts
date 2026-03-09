@@ -818,8 +818,34 @@ async function runPlannedBuild(
         ? `\n\n## DOMAIN MODEL\n${JSON.stringify(config.domainModel, null, 2).slice(0, 4000)}` 
         : "";
       
+      const taskType = (task as any).taskType || "frontend";
+
+      // ── Route by task type ──
+      if ((taskType === "schema" || taskType === "backend") && config.domainModel) {
+        // Route schema/backend tasks to Backend Agent
+        try {
+          const backendResult = await executeBackendTask(task, config, callbacks.onDelta);
+          const totalSize = Object.values(backendResult.files).reduce((s, c) => s + c.length, 0);
+          completeTask(taskMet, {
+            fileCount: Object.keys(backendResult.files).length,
+            totalFileSize: totalSize,
+            modelLatencyMs: backendResult.modelMs,
+            validationLatencyMs: 0,
+            mergeLatencyMs: 0,
+            retryCount: 0,
+            cached: false,
+            status: Object.keys(backendResult.files).length > 0 ? "success" : "failed",
+          });
+          return { task, result: backendResult };
+        } catch (err) {
+          console.error(`[BuildEngine] Backend task "${task.title}" failed, falling back to build agent:`, err);
+          // Fall through to regular build agent
+        }
+      }
+
+      // ── Frontend tasks (and fallback) go to regular Build Agent ──
       const taskPrompt = `## TASK: ${task.title}
-## TASK TYPE: ${(task as any).taskType || "frontend"}
+## TASK TYPE: ${taskType}
 
 ${task.buildPrompt}
 ${domainContext}
@@ -833,9 +859,9 @@ ${task.filesAffected.map(f => `- ${f}`).join("\n")}
 - If updating /App.jsx, KEEP ALL existing routes and imports — only ADD new ones
 - Output complete, working code in \`\`\`react-preview fences
 - NO descriptions, NO planning text — ONLY code
-- For schema/data tasks: Generate realistic mock data arrays and CRUD hooks
-- For backend tasks: Generate context providers and API integration hooks
-- For frontend tasks: Import data from /data/ and hooks from /hooks/ — do NOT hardcode mock data in pages`;
+- For frontend tasks: Import data from /data/ and hooks from /hooks/ — do NOT hardcode mock data in pages
+- If /hooks/use<Entity>.js exists, IMPORT from it. Do NOT recreate data hooks in pages.
+- If /data/<collection>.js exists, do NOT create inline mock arrays.`;
 
       try {
         const codeContext = buildIncrementalContext(task, accumulatedFiles);
@@ -848,8 +874,8 @@ ${task.filesAffected.map(f => `- ${f}`).join("\n")}
           fileCount: Object.keys(taskResult.files).length,
           totalFileSize: totalSize,
           modelLatencyMs: taskResult.modelMs,
-          validationLatencyMs: 0, // validated inside executeSingleTask
-          mergeLatencyMs: 0, // merge happens below
+          validationLatencyMs: 0,
+          mergeLatencyMs: 0,
           retryCount: 0,
           cached: taskResult.cached,
           status: Object.keys(taskResult.files).length > 0 ? "success" : "failed",
