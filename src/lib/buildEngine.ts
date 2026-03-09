@@ -663,12 +663,54 @@ function findUndefinedJSXReferences(
  * - Flat /pages/X.jsx → /pages/X/X.jsx
  */
 function enforceFileStructure(files: Record<string, string>): Record<string, string> {
+  // ── Step 0: Fix concatenated paths (AI sometimes merges folder/file into one name) ──
+  // e.g. /components/uiBadge.jsx → /components/ui/Badge.jsx
+  //      /stylesglobals.css → /styles/globals.css
+  const normalized: Record<string, string> = {};
+  
+  // Known folder prefixes the AI concatenates with filenames
+  const CONCAT_FIXES: Array<{ pattern: RegExp; replacement: string }> = [
+    // /components/uiX.jsx → /components/ui/X.jsx (lowercase "ui" prefix on PascalCase name)
+    { pattern: /^\/components\/ui([A-Z]\w+)\.(jsx?|tsx?|css)$/, replacement: "/components/ui/$1.$2" },
+    // /componentsX.jsx → /components/X.jsx (missing slash after "components")
+    { pattern: /^\/components([A-Z]\w+)\.(jsx?|tsx?|css)$/, replacement: "/components/$1.$2" },
+    // /componentsuiX.jsx → /components/ui/X.jsx
+    { pattern: /^\/componentsui([A-Z]\w+)\.(jsx?|tsx?|css)$/, replacement: "/components/ui/$1.$2" },
+    // /stylesglobals.css → /styles/globals.css
+    { pattern: /^\/styles(\w+)\.(css)$/, replacement: "/styles/$1.$2" },
+    // /layoutAppLayout.jsx → /layout/AppLayout.jsx
+    { pattern: /^\/layout([A-Z]\w+)\.(jsx?|tsx?)$/, replacement: "/layout/$1.$2" },
+    // /layoutSidebar.jsx → /layout/Sidebar.jsx
+    { pattern: /^\/layout([A-Z]\w+)\.(jsx?|tsx?)$/, replacement: "/layout/$1.$2" },
+    // /hooksuseFetch.js → /hooks/useFetch.js  
+    { pattern: /^\/hooks(use\w+)\.(jsx?|tsx?|js)$/, replacement: "/hooks/$1.$2" },
+    // /hooksuseApi.js → /hooks/useApi.js  
+    { pattern: /^\/hooks(use\w+)\.(jsx?|tsx?|js)$/, replacement: "/hooks/$1.$2" },
+    // /pagesX.jsx → /pages/X/X.jsx
+    { pattern: /^\/pages([A-Z]\w+)\.(jsx?|tsx?)$/, replacement: "/pages/$1/$1.$2" },
+    // /pagesDashboardDashboard.jsx → /pages/Dashboard/Dashboard.jsx
+    { pattern: /^\/pages([A-Z]\w+)([A-Z]\w+)\.(jsx?|tsx?)$/, replacement: "/pages/$1/$2.$3" },
+    // /contextsSomeContext.jsx → /contexts/SomeContext.jsx
+    { pattern: /^\/contexts([A-Z]\w+)\.(jsx?|tsx?)$/, replacement: "/contexts/$1.$2" },
+  ];
+
+  for (const [path, code] of Object.entries(files)) {
+    let fixedPath = path;
+    for (const { pattern, replacement } of CONCAT_FIXES) {
+      if (pattern.test(fixedPath)) {
+        fixedPath = fixedPath.replace(pattern, replacement);
+        break;
+      }
+    }
+    normalized[fixedPath] = code;
+  }
+
   const result: Record<string, string> = {};
   
   // Known page-level suffixes (these stay in /pages/)
   const pagePatterns = /(?:Page|List|Detail|Details|Manager|View|Form|Editor|Settings|Profile|History)\.jsx?$/;
   
-  for (const [path, code] of Object.entries(files)) {
+  for (const [path, code] of Object.entries(normalized)) {
     let newPath = path;
     
     // Rule 1: Flat /pages/X.jsx → /pages/X/X.jsx (already handled in parser, but double-check)
@@ -684,10 +726,7 @@ function enforceFileStructure(files: Record<string, string>): Record<string, str
       const [, moduleName, fileName, ext] = nestedPageFileMatch;
       const isMainPage = fileName === moduleName || pagePatterns.test(`${fileName}.${ext}`);
       if (!isMainPage) {
-        // It's a widget/chart/sub-component — move to /components/
         newPath = `/components/${fileName}.${ext}`;
-        // Update imports in the code that reference this file with relative path
-        // Also update other files that import from the old path
       }
     }
     
@@ -695,10 +734,6 @@ function enforceFileStructure(files: Record<string, string>): Record<string, str
     if (newPath.match(/\/contexts\/Toast/i) && code.includes("toast")) {
       newPath = `/components/ui/Toast.jsx`;
     }
-    
-    // Rule 4: Loose components in /components/X.jsx (not in /ui/) — leave as-is for now
-    // The prompt already says /components/ui/ but we don't force-move since some 
-    // domain-specific components (e.g., OrderCard.jsx) are fine at /components/ level
     
     result[newPath] = code;
   }
