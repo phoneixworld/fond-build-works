@@ -40,6 +40,15 @@ import { applyAdaptiveSplitting } from "@/lib/adaptiveTaskSplitter";
 import { persistTaskOutput, getPersistedTaskOutput } from "@/lib/persistentCache";
 
 // ─── Base Template (mandatory scaffold for all new builds) ────────────────
+//
+// PATH CONVENTION:
+// All generated files use bare "/" paths (e.g., /App.jsx, /components/Hero.jsx).
+// This is required by Sandpack which expects files at root.
+// The pathNormalizer module handles mapping to src/ for:
+//   - VirtualFS display (file tree shows src/App.jsx)
+//   - GitHub push/pull (exports as src/App.jsx)
+//   - Android/ZIP export (bundles under src/)
+// DO NOT change these paths to src/ — it will break preview rendering.
 
 import { type DomainModel } from "@/lib/domainTemplates";
 
