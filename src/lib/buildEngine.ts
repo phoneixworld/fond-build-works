@@ -521,6 +521,12 @@ async function executeSingleTask(
         }
       },
       onError: (err) => {
+        // Don't retry on usage/rate limit errors — surface immediately
+        const isQuotaError = err.includes("Usage limit") || err.includes("Rate limited");
+        if (isQuotaError) {
+          reject(new Error("⚠️ AI usage limit reached. Please add credits in Settings → Workspace → Usage, then try again."));
+          return;
+        }
         if (retryCount < 1) {
           console.warn(`[BuildEngine] Task error, retrying: ${err}`);
           setTimeout(() => {
