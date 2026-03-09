@@ -458,6 +458,21 @@ function findUndefinedJSXReferences(
     localNames.add(m[1]);
   }
   
+  // Destructured renames: { icon: Icon, foo: Bar } — common pattern in .map() callbacks
+  const destructureRenameRegex = /\w+\s*:\s*([A-Z]\w+)/g;
+  while ((m = destructureRenameRegex.exec(code)) !== null) {
+    localNames.add(m[1]);
+  }
+  
+  // Arrow/function parameters with PascalCase (e.g., ({ Icon }) => ...)
+  const paramRegex = /\(\s*\{([^}]+)\}\s*\)/g;
+  while ((m = paramRegex.exec(code)) !== null) {
+    m[1].split(",").forEach(p => {
+      const name = p.trim().split(/\s*:\s*/).pop()?.trim();
+      if (name && /^[A-Z]/.test(name)) localNames.add(name);
+    });
+  }
+  
   // Built-in HTML-like React components to skip
   const builtins = new Set(["React", "Fragment", "Suspense", "StrictMode"]);
   
@@ -759,11 +774,17 @@ async function executeSingleTask(
   return new Promise((resolve, reject) => {
     let fullText = "";
     
+    // Build messages: use chat history but ensure the current prompt isn't duplicated
+    const historyMessages = (config.chatHistory || []).slice(-6).map(m => ({ role: m.role as "user" | "assistant", content: m.content }));
+    // Check if the last history message is already the same prompt to avoid duplication
+    const lastHistoryMsg = historyMessages[historyMessages.length - 1];
+    const promptAlreadyInHistory = lastHistoryMsg && lastHistoryMsg.role === "user" && lastHistoryMsg.content === prompt;
+    const buildMessages = promptAlreadyInHistory
+      ? historyMessages
+      : [...historyMessages, { role: "user" as const, content: prompt }];
+    
     streamBuildAgent({
-      messages: [
-        ...(config.chatHistory || []).slice(-6).map(m => ({ role: m.role as "user" | "assistant", content: m.content })),
-        { role: "user", content: prompt },
-      ],
+      messages: buildMessages,
       projectId: config.projectId,
       techStack: config.techStack,
       schemas: config.schemas,
