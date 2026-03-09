@@ -412,13 +412,22 @@ ROUTING RULES:
 When generating apps with data, you MUST use the Data API with meaningful collection names.
 Each collection in the app becomes a database table automatically. Use these patterns:
 
-- Students → collection: "students" with fields: name, email, phone, grade, section, etc.
-- Fees → collection: "fees" with fields: student_id, amount, due_date, status, payment_date
-- Attendance → collection: "attendance" with fields: student_id, date, status
-- Timetable → collection: "timetable" with fields: day, period, subject, teacher, class
+- Students → collection: "students" with fields: name, email, phone, grade, section, roll_number, parent_name, parent_phone, address, date_of_birth, admission_date, status
+- Fees → collection: "fees" with fields: student_id, student_name, amount, due_date, status, payment_date, receipt_number, fee_type, academic_year
+- Attendance → collection: "attendance" with fields: student_id, student_name, date, status, class, section, marked_by
+- Timetable → collection: "timetable" with fields: day, period, subject, teacher, class, section, room
+- Staff → collection: "staff" with fields: name, email, phone, designation, department, joining_date, salary, status
 
-ALWAYS use the Data API for CRUD operations — NEVER use localStorage or in-memory arrays for persistent data.
-Generate REAL fetch calls to the API, not mock data.
+CRITICAL: ALWAYS use the Data API for ALL data operations. NEVER use:
+- ❌ const students = [{...}, {...}] — mock arrays
+- ❌ localStorage.setItem("students", ...) — local storage
+- ❌ useState([{name: "John"}, ...]) — hardcoded state
+
+ALWAYS use:
+- ✅ fetch("${apiBase}/project-api", { body: JSON.stringify({ project_id: "${projectId}", collection: "students", action: "list" }) })
+- ✅ Create a useFetch hook that wraps Data API calls
+- ✅ Show loading skeletons while data is fetching
+- ✅ Show empty states with "Add first item" CTA when collection is empty
 
 ## AUTHENTICATION — MANDATORY IMPLEMENTATION PATTERN
 When the app needs login/signup/user management, you MUST implement this exact pattern:
