@@ -2107,8 +2107,8 @@ ${Object.entries(files).map(([path, code]) => `--- ${path}\n${code}`).join("\n\n
 
   const handleInputChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     setInput(e.target.value);
-    e.target.style.height = "36px";
-    e.target.style.height = Math.min(e.target.scrollHeight, 120) + "px";
+    e.target.style.height = "60px";
+    e.target.style.height = Math.min(e.target.scrollHeight, 160) + "px";
   };
 
   const handleAutoFix = () => {
