@@ -15,6 +15,7 @@ import {
   Rocket,
   ShieldAlert,
   Mail,
+  Smartphone,
 } from "lucide-react";
 import SchemaBuilder from "./SchemaBuilder";
 import CloudOverview from "./cloud/CloudOverview";
