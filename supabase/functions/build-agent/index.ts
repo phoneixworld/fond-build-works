@@ -391,7 +391,15 @@ export default function AppLayout() {
 }
 \`\`\`
 
-## DATABASE AUTO-CREATION — CRITICAL
+ROUTING RULES:
+- ALWAYS use HashRouter (NOT BrowserRouter) — the app runs in an iframe sandbox
+- Use nested Route with layout pattern: <Route path="/" element={<AppLayout />}> wrapping child routes
+- Each feature = separate Route with its own page component in /pages/[Module]/
+- /layout/Sidebar.jsx uses NavLink from react-router-dom with active state styling
+- NEVER dump all features on a single page with sections — use ROUTES
+- Each route's component has its own full CRUD operations
+- URL changes when navigating between modules
+
 When generating apps with data, you MUST use the Data API with meaningful collection names.
 Each collection in the app becomes a database table automatically. Use these patterns:
 
