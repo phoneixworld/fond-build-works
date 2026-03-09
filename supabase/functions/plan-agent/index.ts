@@ -40,6 +40,13 @@ Use the create_plan tool to return a structured plan.
   - This task should define the collections/tables needed and how the Data API will be used
   - Include auth setup if the app needs user accounts
 
+## CRITICAL — NO PLACEHOLDERS
+- NEVER create tasks that produce "Coming Soon", "Under Construction", or placeholder pages
+- Every task MUST produce a FUNCTIONAL page/component — not a stub
+- If a feature is complex, the task should build an MVP version, not a placeholder
+- Each task's buildPrompt MUST explicitly say: "Build a FULLY FUNCTIONAL page, NOT a placeholder"
+- If you can't fit all features in the task budget, prioritize and build fewer features fully rather than many placeholders
+
 ## COMPLEXITY LEVELS
 - "trivial": Single component change, CSS tweak (1 build step)
 - "simple": New component or minor feature (1-2 build steps)  
@@ -50,10 +57,11 @@ Use the create_plan tool to return a structured plan.
 For a typical app, create tasks in this order:
 1. Layout + Navigation (layout/AppLayout.jsx, layout/Sidebar.jsx)
 2. Dashboard/Home page (pages/Dashboard/)
-3. Feature modules (pages/Students/, pages/Fees/, etc.) - one task per module
+3. Feature modules (pages/Students/, pages/Fees/, etc.) - one task per module, each FULLY FUNCTIONAL
 4. Shared UI components (components/ui/) - if not covered by above
 5. Backend integration (hooks for data fetching, auth context)
 Each task's buildPrompt MUST instruct the agent to use the nested file structure.
+Each task's buildPrompt MUST instruct: "Build a complete, working page — NEVER output a ComingSoon or placeholder component."
 
 ## EXISTING CONTEXT
 Tech Stack: ${techStack || "react"}
