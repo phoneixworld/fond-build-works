@@ -426,20 +426,24 @@ const PublishExportButtons = forwardRef<PublishExportHandle>((_, ref) => {
                   <div className="space-y-4">
                     <div className="grid grid-cols-2 gap-2">
                       {[
-                        { icon: Globe, title: "Public URL", desc: "Hosted on our CDN" },
-                        { icon: Link2, title: "Share anywhere", desc: "Instant access link" },
-                        { icon: Shield, title: "Custom domain", desc: "Use your own .com" },
-                        { icon: History, title: "Version history", desc: "Rollback anytime" },
+                        { icon: Globe, title: "Public URL", desc: "Hosted on our CDN", action: () => publishedUrl && navigator.clipboard.writeText(publishedUrl) },
+                        { icon: Link2, title: "Share anywhere", desc: "Instant access link", action: () => publishedUrl && navigator.clipboard.writeText(publishedUrl) },
+                        { icon: Shield, title: "Custom domain", desc: "Use your own .com", action: () => setActiveTab("domain") },
+                        { icon: History, title: "Version history", desc: "Rollback anytime", action: () => setActiveTab("history") },
                       ].map((item, i) => {
                         const Icon = item.icon;
                         return (
-                          <div key={i} className="flex items-start gap-2.5 p-3 rounded-lg border border-border bg-background">
+                          <button
+                            key={i}
+                            onClick={item.action}
+                            className="flex items-start gap-2.5 p-3 rounded-lg border border-border bg-background hover:border-primary/30 hover:bg-primary/5 transition-all text-left"
+                          >
                             <Icon className="w-4 h-4 text-primary shrink-0 mt-0.5" />
                             <div>
                               <p className="text-xs font-medium text-foreground leading-tight">{item.title}</p>
                               <p className="text-[10px] text-muted-foreground mt-0.5">{item.desc}</p>
                             </div>
-                          </div>
+                          </button>
                         );
                       })}
                     </div>
