@@ -139,7 +139,7 @@ const PreviewPanel = () => {
 
   return (
     <TooltipProvider delayDuration={300}>
-      <div className="flex flex-col bg-[hsl(var(--ide-panel))]" style={{ height: '100%', minHeight: 0 }}>
+      <div className="flex flex-col bg-[hsl(var(--ide-panel))]" style={{ height: '100%', minHeight: 0 }}{{ height: '100%', minHeight: 0 }}>
         {/* URL bar */}
         <div className="flex items-center gap-1.5 px-3 py-2 border-b border-border bg-[hsl(var(--ide-panel-header))]">
           {/* Navigation buttons */}
@@ -371,7 +371,7 @@ const PreviewPanel = () => {
         </AnimatePresence>
 
         {/* Preview content */}
-        <div className="flex-1 relative overflow-hidden bg-background min-h-0">
+        <div className="flex-1 rela" style={{ minHeight: 0 }}flow-hidden bg-background min-h-0">
           {/* Building skeleton overlay */}
           <AnimatePresence>
             {isBuilding && !hasContent && (
