@@ -232,7 +232,7 @@ const IDELayout = () => {
 
         <div className="flex-1 overflow-hidden">
           <ResizablePanelGroup direction="horizontal">
-            <ResizablePanel defaultSize={35} minSize={25} maxSize={50}>
+            <ResizablePanel defaultSize={40} minSize={28} maxSize={55}>
               <ChatPanel ref={chatRef} initialPrompt={initialPrompt} onVersionCreated={handleVersionCreated} />
             </ResizablePanel>
             <ResizableHandle className="w-px bg-border hover:bg-primary transition-colors" />
