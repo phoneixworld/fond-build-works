@@ -43,9 +43,11 @@ CLASSIFICATION RULES:
 
 **BUILD** — Return this when:
 - Direct imperative command: "Build a...", "Create a...", "Add a...", "Make the...", "Change the...", "Fix the...", "Update the..."
+- Describes an app, system, or feature: "ERP", "dashboard", "landing page", "e-commerce", "management system", "student portal"
 - Affirmative response to a previous suggestion: "Yes", "Go ahead", "Do it", "Yes, build it", "Sounds good, go ahead"
 - Short modification request: "Make it darker", "Add animations", "Improve the design"
 - Describes what they want built without asking if it's possible
+- ANY prompt that mentions specific features, modules, pages, or UI elements
 ${hasHistory ? '- Follow-up modifications: "change colors", "add a section", "make it responsive"' : ''}
 
 **CLARIFY** — Return this VERY RARELY:

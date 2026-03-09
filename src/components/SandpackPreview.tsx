@@ -118,9 +118,10 @@ function repairTruncatedCode(code: string, filePath: string): string {
   }
 
   // Also stub if no export statement exists (component file without export = truncated)
-  if (!code.includes('export default') && !code.includes('export {') && !code.includes('module.exports')) {
-    // Only for component-like files (not utility/css)
-    if (filePath.match(/\.(jsx?|tsx?)$/) && !filePath.includes('styles') && !filePath.includes('utils')) {
+  const hasExport = /export\s+(default|const|function|class|let|var|\{)/.test(code) || code.includes('module.exports');
+  if (!hasExport) {
+    // Only for component-like files (not utility/css/data files)
+    if (filePath.match(/\.(jsx?|tsx?)$/) && !filePath.includes('styles') && !filePath.includes('utils') && !filePath.includes('data') && !filePath.includes('config') && !filePath.includes('constants')) {
       return makeStub(filePath);
     }
   }
