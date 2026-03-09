@@ -50,15 +50,19 @@ CLASSIFICATION RULES:
 - ANY prompt that mentions specific features, modules, pages, or UI elements
 ${hasHistory ? '- Follow-up modifications: "change colors", "add a section", "make it responsive"' : ''}
 
-**CLARIFY** — Return this VERY RARELY:
+**CLARIFY** — Return this when the prompt is genuinely vague:
 ${hasHistory
-  ? `- NEVER use clarify when there's existing code — always build
-- When in doubt, choose BUILD`
-  : `- ONLY when the message is extremely vague (under 10 words) with no clear direction
+  ? `- Use clarify for broad/vague enhancement requests that could go many directions: "improve the design", "enhance the ERP", "make it better", "redesign", "optimize"
+- These requests NEED clarification: what specifically to improve? colors? layout? typography? which pages?
+- Direct specific requests should be BUILD: "change the header color to blue", "add a search bar"
+- When in doubt between clarify and build for vague prompts, choose CLARIFY
+- When in doubt for specific prompts, choose BUILD
+- Generate 2-4 clarifying questions as tabs (e.g. "Focus Area", "Style Direction", "Priority Pages")`
+  : `- When the message is vague with no clear direction
 - "Build me a website" → clarify (too vague)
-- BUT "Build me a school ERP with student management" → BUILD (has enough direction)
+- "Build me a school ERP with student management" → BUILD (has enough direction)
 - "Create a dashboard" with specifics → BUILD
-- When in doubt between clarify and build, ALWAYS choose BUILD
+- When in doubt between clarify and build for vague prompts, CHOOSE CLARIFY
 - If the user describes features, modules, or gives any detail → BUILD, never clarify`}
 
 FEW-SHOT EXAMPLES:

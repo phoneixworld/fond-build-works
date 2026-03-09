@@ -1411,84 +1411,10 @@ const CONTEXT_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
         saveProject({ chat_history: persistMessages, html_content: currentProject.html_content || "" });
       };
 
-      // ─── Intent Classification: detect vague/ambiguous prompts ───
-      // For prompts that need clarification, show questions instead of building
-      {
-        const userText = typeof text === "string" ? text : getTextContent(content);
-        
-        // Only classify if not an auto-fix, not a follow-up with answers already, and not explicitly skipped
-        const isAutoFix = userText.startsWith("🔧") || userText.includes("--- Additional Requirements ---");
-        const isShort = userText.length < 15;
-        
-        if (!isAutoFix && !isShort) {
-          try {
-            const classResult = await classifyUserIntent(userText);
-            
-            if (classResult?.intent === "clarify" && classResult.questions?.length) {
-              // Stop the build — show clarifying questions instead
-              setIsLoading(false);
-              setIsBuilding(false);
-              setBuildStep("");
-              setPipelineStep(null);
-              isSendingRef.current = false;
-              if (buildSafetyTimeoutRef.current) {
-                clearTimeout(buildSafetyTimeoutRef.current);
-                buildSafetyTimeoutRef.current = null;
-              }
-              return;
-            }
-            
-            // If classified as "chat" (not a build request), use chat agent
-            if (classResult?.intent === "chat") {
-              setCurrentAgent("chat");
-              setPipelineStep("generating");
-              setBuildStep("💬 Chat agent responding...");
-              
-              try {
-                await streamChatAgent({
-                  messages: apiMessages,
-                  projectId: currentProject.id,
-                  techStack: currentProject.tech_stack || "react-cdn",
-                  knowledge,
-                  onDelta: upsert,
-                  onDone: (responseText) => {
-                    setMessages((prev) => {
-                      const last = prev[prev.length - 1];
-                      if (last?.role === "assistant") {
-                        return prev.map((m, i) => (i === prev.length - 1 ? { ...m, content: responseText } : m));
-                      }
-                      return [...prev, { role: "assistant", content: responseText, timestamp: Date.now() }];
-                    });
-                    setIsLoading(false);
-                    setIsBuilding(false);
-                    setBuildStep("");
-                    setPipelineStep("complete");
-                    setCurrentAgent(null);
-                    isSendingRef.current = false;
-                    if (buildSafetyTimeoutRef.current) {
-                      clearTimeout(buildSafetyTimeoutRef.current);
-                      buildSafetyTimeoutRef.current = null;
-                    }
-                    setTimeout(() => setBuildStreamContent(""), 3000);
-                    const persistMessages = messagesRef.current.map(m => ({
-                      role: m.role,
-                      content: typeof m.content === "string" ? m.content : getTextContent(m.content),
-                    }));
-                    saveProject({ chat_history: persistMessages });
-                  },
-                  onError: handleOnError,
-                });
-              } catch (err) {
-                handleOnError(err instanceof Error ? err.message : "Chat failed");
-              }
-              return;
-            }
-          } catch (err) {
-            console.warn("[ChatPanel] Classification failed, proceeding to build:", err);
-          }
-        }
+      // ─── Intent Classification already handled by handleSmartSend ───
+      // Classification is done before sendMessage is called, so we skip it here.
 
-        // ─── CORE: Build engine for code generation ───
+      // ─── CORE: Build engine for code generation ───
         setCurrentAgent("build");
         setPipelineStep("planning");
         
@@ -1608,7 +1534,6 @@ const CONTEXT_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
             handleOnError(err);
           },
         });
-      }
     } catch (e) {
       console.error("[ChatPanel] sendMessage error:", e);
       setIsLoading(false);
