@@ -214,6 +214,8 @@ const IDELayout = () => {
           validateName={validateName}
         />
 
+        <UserMenuDialogs open={userDialog} onOpenChange={setUserDialog} />
+
         <IDEHeader
           currentProject={currentProject}
           rightPanel={rightPanel}
