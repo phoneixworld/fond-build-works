@@ -26,3 +26,39 @@ verify_jwt = false
 
 [functions.backend-agent]
 verify_jwt = false
+
+[functions.project-api]
+verify_jwt = false
+
+[functions.project-auth]
+verify_jwt = false
+
+[functions.project-exec]
+verify_jwt = false
+
+[functions.chat]
+verify_jwt = false
+
+[functions.track]
+verify_jwt = false
+
+[functions.project-name]
+verify_jwt = false
+
+[functions.review-code]
+verify_jwt = false
+
+[functions.cloudflare-dns]
+verify_jwt = false
+
+[functions.generate-brand-kit]
+verify_jwt = false
+
+[functions.github-api]
+verify_jwt = false
+
+[functions.ui-kit]
+verify_jwt = false
+
+[functions.analyze-prompt]
+verify_jwt = false
