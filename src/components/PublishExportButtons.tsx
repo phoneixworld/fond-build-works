@@ -18,6 +18,7 @@ import {
   DialogDescription,
 } from "@/components/ui/dialog";
 import JSZip from "jszip";
+import ImageUploadField from "@/components/publish/ImageUploadField";
 import { saveAs } from "file-saver";
 
 export interface PublishExportHandle {
