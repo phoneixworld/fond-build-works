@@ -803,6 +803,231 @@ const healthcareTemplate: DomainTemplate = {
   },
 };
 
+// ─── SaaS Landing Page Template ───────────────────────────────────────────
+
+const saasLandingTemplate: DomainTemplate = {
+  id: "saas-landing",
+  name: "SaaS Landing Page",
+  keywords: ["saas", "landing", "pricing", "startup", "subscription", "plan", "feature", "testimonial", "waitlist", "launch", "product", "homepage", "marketing"],
+  model: {
+    templateId: "saas-landing",
+    templateName: "SaaS Landing Page",
+    requiresAuth: false,
+    entities: [
+      {
+        name: "PricingPlan",
+        pluralName: "pricingPlans",
+        seedCount: 3,
+        fields: [
+          { name: "name", type: "text", required: true },
+          { name: "price", type: "number", required: true },
+          { name: "billingPeriod", type: "select", required: true, options: ["monthly", "yearly"], default: "monthly" },
+          { name: "description", type: "textarea", required: true },
+          { name: "features", type: "json", required: true, default: [] },
+          { name: "isPopular", type: "boolean", required: false, default: false },
+          { name: "ctaText", type: "text", required: false, default: "Get Started" },
+          { name: "order", type: "number", required: false, default: 0 },
+        ],
+        relationships: [],
+      },
+      {
+        name: "Feature",
+        pluralName: "features",
+        seedCount: 6,
+        fields: [
+          { name: "title", type: "text", required: true },
+          { name: "description", type: "textarea", required: true },
+          { name: "icon", type: "text", required: false },
+          { name: "order", type: "number", required: false, default: 0 },
+        ],
+        relationships: [],
+      },
+      {
+        name: "Testimonial",
+        pluralName: "testimonials",
+        seedCount: 4,
+        fields: [
+          { name: "name", type: "text", required: true },
+          { name: "role", type: "text", required: true },
+          { name: "company", type: "text", required: false },
+          { name: "content", type: "textarea", required: true },
+          { name: "avatar", type: "url", required: false },
+          { name: "rating", type: "number", required: false, default: 5 },
+        ],
+        relationships: [],
+      },
+      {
+        name: "FAQ",
+        pluralName: "faqs",
+        seedCount: 5,
+        fields: [
+          { name: "question", type: "text", required: true },
+          { name: "answer", type: "textarea", required: true },
+          { name: "order", type: "number", required: false, default: 0 },
+        ],
+        relationships: [],
+      },
+    ],
+    apiEndpoints: [
+      { method: "GET", path: "/pricing", entity: "PricingPlan", action: "list", description: "List pricing plans" },
+      { method: "GET", path: "/features", entity: "Feature", action: "list", description: "List features" },
+      { method: "GET", path: "/testimonials", entity: "Testimonial", action: "list", description: "List testimonials" },
+      { method: "GET", path: "/faqs", entity: "FAQ", action: "list", description: "List FAQs" },
+    ],
+    suggestedPages: [
+      { path: "/", title: "Home", type: "static" },
+      { path: "/pricing", title: "Pricing", entity: "PricingPlan", type: "list" },
+      { path: "/features", title: "Features", entity: "Feature", type: "list" },
+      { path: "/about", title: "About", type: "static" },
+      { path: "/contact", title: "Contact", type: "form" },
+    ],
+    suggestedNavItems: [
+      { label: "Home", path: "/", icon: "Home" },
+      { label: "Features", path: "/features", icon: "Sparkles" },
+      { label: "Pricing", path: "/pricing", icon: "CreditCard" },
+      { label: "About", path: "/about", icon: "Info" },
+      { label: "Contact", path: "/contact", icon: "Mail" },
+    ],
+  },
+};
+
+// ─── Dashboard / Admin Template ───────────────────────────────────────────
+
+const dashboardTemplate: DomainTemplate = {
+  id: "dashboard",
+  name: "Admin Dashboard",
+  keywords: ["dashboard", "admin", "panel", "analytics", "metrics", "monitor", "overview", "stats", "report", "management"],
+  model: {
+    templateId: "dashboard",
+    templateName: "Admin Dashboard",
+    requiresAuth: true,
+    entities: [
+      {
+        name: "User",
+        pluralName: "users",
+        seedCount: 20,
+        fields: [
+          { name: "name", type: "text", required: true },
+          { name: "email", type: "email", required: true },
+          { name: "role", type: "select", required: true, options: ["admin", "editor", "viewer"], default: "viewer" },
+          { name: "status", type: "select", required: true, options: ["active", "inactive", "suspended"], default: "active" },
+          { name: "lastLogin", type: "datetime", required: false },
+        ],
+        relationships: [],
+      },
+      {
+        name: "Metric",
+        pluralName: "metrics",
+        seedCount: 10,
+        fields: [
+          { name: "label", type: "text", required: true },
+          { name: "value", type: "number", required: true },
+          { name: "change", type: "number", required: false },
+          { name: "period", type: "select", required: true, options: ["daily", "weekly", "monthly"], default: "daily" },
+        ],
+        relationships: [],
+      },
+    ],
+    apiEndpoints: [
+      { method: "GET", path: "/users", entity: "User", action: "list", description: "List users" },
+      { method: "POST", path: "/users", entity: "User", action: "create", description: "Create user" },
+      { method: "PUT", path: "/users/:id", entity: "User", action: "update", description: "Update user" },
+      { method: "GET", path: "/metrics", entity: "Metric", action: "list", description: "Get metrics" },
+    ],
+    suggestedPages: [
+      { path: "/dashboard", title: "Dashboard", type: "dashboard" },
+      { path: "/users", title: "Users", entity: "User", type: "list" },
+      { path: "/settings", title: "Settings", type: "static" },
+    ],
+    suggestedNavItems: [
+      { label: "Dashboard", path: "/dashboard", icon: "LayoutDashboard" },
+      { label: "Users", path: "/users", icon: "Users" },
+      { label: "Settings", path: "/settings", icon: "Settings" },
+    ],
+  },
+};
+
+// ─── Inventory / Warehouse Template ───────────────────────────────────────
+
+const inventoryTemplate: DomainTemplate = {
+  id: "inventory",
+  name: "Inventory Management",
+  keywords: ["inventory", "warehouse", "stock", "supply", "product", "sku", "barcode", "shipment", "logistics", "procurement"],
+  model: {
+    templateId: "inventory",
+    templateName: "Inventory Management",
+    requiresAuth: true,
+    entities: [
+      {
+        name: "Item",
+        pluralName: "items",
+        seedCount: 20,
+        fields: [
+          { name: "name", type: "text", required: true },
+          { name: "sku", type: "text", required: true },
+          { name: "quantity", type: "number", required: true, default: 0 },
+          { name: "reorderLevel", type: "number", required: false, default: 10 },
+          { name: "category", type: "select", required: true, options: ["Electronics", "Furniture", "Supplies", "Raw Materials", "Finished Goods"] },
+          { name: "location", type: "text", required: false },
+          { name: "unitPrice", type: "number", required: true },
+          { name: "status", type: "select", required: true, options: ["in-stock", "low-stock", "out-of-stock"], default: "in-stock" },
+        ],
+        relationships: [
+          { target: "StockMovement", type: "hasMany" },
+        ],
+      },
+      {
+        name: "StockMovement",
+        pluralName: "stockMovements",
+        seedCount: 15,
+        fields: [
+          { name: "itemId", type: "text", required: true },
+          { name: "type", type: "select", required: true, options: ["in", "out", "adjustment", "return"] },
+          { name: "quantity", type: "number", required: true },
+          { name: "reason", type: "textarea", required: false },
+          { name: "date", type: "datetime", required: true },
+        ],
+        relationships: [
+          { target: "Item", type: "belongsTo", foreignKey: "itemId" },
+        ],
+      },
+      {
+        name: "Supplier",
+        pluralName: "suppliers",
+        seedCount: 8,
+        fields: [
+          { name: "name", type: "text", required: true },
+          { name: "email", type: "email", required: true },
+          { name: "phone", type: "text", required: false },
+          { name: "address", type: "textarea", required: false },
+          { name: "status", type: "select", required: true, options: ["active", "inactive"], default: "active" },
+        ],
+        relationships: [],
+      },
+    ],
+    apiEndpoints: [
+      { method: "GET", path: "/items", entity: "Item", action: "list", description: "List inventory items" },
+      { method: "POST", path: "/items", entity: "Item", action: "create", description: "Add item" },
+      { method: "PUT", path: "/items/:id", entity: "Item", action: "update", description: "Update item" },
+      { method: "GET", path: "/stock-movements", entity: "StockMovement", action: "list", description: "List movements" },
+      { method: "POST", path: "/stock-movements", entity: "StockMovement", action: "create", description: "Record movement" },
+      { method: "GET", path: "/suppliers", entity: "Supplier", action: "list", description: "List suppliers" },
+    ],
+    suggestedPages: [
+      { path: "/dashboard", title: "Dashboard", type: "dashboard" },
+      { path: "/items", title: "Inventory", entity: "Item", type: "list" },
+      { path: "/movements", title: "Stock Movements", entity: "StockMovement", type: "list" },
+      { path: "/suppliers", title: "Suppliers", entity: "Supplier", type: "list" },
+    ],
+    suggestedNavItems: [
+      { label: "Dashboard", path: "/dashboard", icon: "LayoutDashboard" },
+      { label: "Inventory", path: "/items", icon: "Package" },
+      { label: "Movements", path: "/movements", icon: "ArrowLeftRight" },
+      { label: "Suppliers", path: "/suppliers", icon: "Truck" },
+    ],
+  },
+};
+
 // ─── All Templates Registry ──────────────────────────────────────────────
 
 export const DOMAIN_TEMPLATES: DomainTemplate[] = [
@@ -814,6 +1039,9 @@ export const DOMAIN_TEMPLATES: DomainTemplate[] = [
   socialTemplate,
   restaurantTemplate,
   healthcareTemplate,
+  saasLandingTemplate,
+  dashboardTemplate,
+  inventoryTemplate,
 ];
 
 /**
