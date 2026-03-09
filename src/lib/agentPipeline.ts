@@ -6,8 +6,11 @@
  * 2. Chat Agent (conversational only, no code) — for questions/discussions
  * 3. Build Agent (code generation only) — for creating/modifying apps
  * 4. Sandpack Validation — validates generated code before showing
- * 5. Auto-Retry — if validation fails, retries with error context
+ * 5. Sucrase Syntax Check — catches real parse errors before preview
+ * 6. Auto-Retry — if validation fails, retries with error context (up to 3x)
+ * 7. Runtime Self-Heal — detects preview console errors and auto-fixes
  */
+import { transform } from "sucrase";
 
 type MsgContent = string | Array<{ type: "text"; text: string } | { type: "image_url"; image_url: { url: string } }>;
 type Msg = { role: "user" | "assistant"; content: MsgContent };
