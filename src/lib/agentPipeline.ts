@@ -44,7 +44,7 @@ export interface PipelineEvent {
   retryCount?: number;
 }
 
-export const MAX_BUILD_RETRIES = 2;
+export const MAX_BUILD_RETRIES = 3;
 
 const BASE_URL = import.meta.env.VITE_SUPABASE_URL;
 const AUTH_HEADER = `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`;
