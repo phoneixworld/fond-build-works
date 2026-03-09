@@ -193,6 +193,9 @@ serve(async (req) => {
     if (template_context) {
       systemPrompt += `\n\n## TEMPLATE CONTEXT\n${template_context}`;
     }
+    if (ir_context) {
+      systemPrompt += ir_context;
+    }
     if (current_code) {
       systemPrompt += `\n\n## CURRENT CODE (modify/extend — do NOT regenerate unchanged files)\n${current_code}`;
     }
