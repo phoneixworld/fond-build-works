@@ -208,6 +208,28 @@ const PreviewPanel = () => {
                     srcDoc={`${previewHtml}
 ${DIRECT_TOUCH_SCRIPT}
 <script>
+// === Prevent navigation to parent/top window ===
+(function() {
+  document.addEventListener('click', function(e) {
+    var target = e.target;
+    while (target && target.tagName !== 'A') {
+      target = target.parentElement;
+    }
+    if (target && target.tagName === 'A') {
+      var href = target.getAttribute('href');
+      var targetAttr = target.getAttribute('target');
+      if (targetAttr === '_parent' || targetAttr === '_top') {
+        e.preventDefault();
+        return;
+      }
+      if (href === '/' || href === '' || href === '#') {
+        e.preventDefault();
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      }
+    }
+  }, true);
+})();
+
 // === Enhanced Error Intelligence ===
 (function() {
   var errors = [];
