@@ -1,0 +1,1 @@
+ALTER TABLE public.projects ADD COLUMN IF NOT EXISTS ir_state jsonb NOT NULL DEFAULT '{}'::jsonb;
