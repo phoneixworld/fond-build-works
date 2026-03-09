@@ -1,7 +1,8 @@
 import { useState, useEffect, forwardRef, useImperativeHandle, useCallback } from "react";
 import {
   Globe, Download, Check, Copy, Loader2, ExternalLink, Link2, Shield,
-  ArrowRight, AlertCircle, History, RotateCcw, Rocket, Server, Eye, ChevronDown
+  ArrowRight, AlertCircle, History, RotateCcw, Rocket, Server, Eye, ChevronDown,
+  Image, Type, FileText
 } from "lucide-react";
 import { useProjects } from "@/contexts/ProjectContext";
 import { usePreview } from "@/contexts/PreviewContext";
