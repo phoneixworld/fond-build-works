@@ -29,6 +29,7 @@ import DependencyGraph from "./cloud/DependencyGraph";
 import GovernanceEngine from "./cloud/GovernanceEngine";
 import EnvironmentManager from "./cloud/EnvironmentManager";
 import SecurityDashboard from "./cloud/SecurityDashboard";
+import CloudEmail from "./cloud/CloudEmail";
 
 const PREMIUM_SECTIONS = new Set(["environments"]);
 
@@ -37,6 +38,7 @@ const CLOUD_SECTIONS = [
   { id: "environments", label: "Environments", icon: Rocket },
   { id: "security", label: "Security", icon: ShieldAlert },
   { id: "database", label: "Database", icon: Database },
+  { id: "email", label: "Email", icon: Mail },
   { id: "memory", label: "Project Memory", icon: Brain },
   { id: "dependencies", label: "Dependencies", icon: GitBranch },
   { id: "governance", label: "Governance", icon: ShieldCheck },
