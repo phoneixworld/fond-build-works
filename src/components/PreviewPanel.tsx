@@ -87,7 +87,7 @@ const PreviewPanel = () => {
   const [isEditingUrl, setIsEditingUrl] = useState(false);
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const urlInputRef = useRef<HTMLInputElement>(null);
-  const { previewHtml, isBuilding, buildStep, previewMode, setPreviewMode, sandpackFiles } = usePreview();
+  const { previewHtml, isBuilding, buildStep, previewMode, setPreviewMode, sandpackFiles, buildMetrics } = usePreview();
 
   const toggleDirectTouch = useCallback(() => {
     const next = !directTouchActive;
