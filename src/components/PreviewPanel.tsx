@@ -541,19 +541,20 @@ const PreviewPanel = () => {
                     </div>
                   )}
 
-                  {/* Overall progress bar */}
+                  {/* Overall progress bar + elapsed timer */}
                   <div className="space-y-1.5">
                     <div className="h-1 bg-border rounded-full overflow-hidden">
                       <motion.div
                         className="h-full bg-gradient-to-r from-primary to-primary/60 rounded-full"
                         initial={{ width: "0%" }}
-                        animate={{ width: "85%" }}
-                        transition={{ duration: 15, ease: "easeOut" }}
+                        animate={{ width: "70%" }}
+                        transition={{ duration: 30, ease: "easeOut" }}
                       />
                     </div>
-                    <p className="text-[10px] text-muted-foreground text-center">
-                      {buildStepHistory.length} step{buildStepHistory.length !== 1 ? "s" : ""} completed
-                    </p>
+                    <div className="flex justify-between text-[10px] text-muted-foreground">
+                      <span>{buildStepHistory.length} step{buildStepHistory.length !== 1 ? "s" : ""} completed</span>
+                      <ElapsedTimer />
+                    </div>
                   </div>
                 </div>
               </motion.div>
