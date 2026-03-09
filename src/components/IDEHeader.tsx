@@ -1,4 +1,5 @@
 import { Zap, LogOut, ArrowLeft, ChevronDown, Command as CommandIcon, MessageCircle, Settings, Pencil, GitBranch, Globe, Tag, Clock, Brain, Activity, Users, Palette, FlaskConical, Puzzle, User, CreditCard, HelpCircle, ArrowLeftRight } from "lucide-react";
+import { forwardRef } from "react";
 import { TECH_STACKS, TechStackId } from "@/lib/techStacks";
 import PresenceAvatars from "@/components/PresenceAvatars";
 import PublishExportButtons from "@/components/PublishExportButtons";
