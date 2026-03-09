@@ -1003,6 +1003,86 @@ export const COMPONENT_SNIPPETS: ComponentSnippet[] = [
   </style>
 </section>`,
   },
+  // === TESTIMONIAL CAROUSEL ===
+  {
+    id: "testimonial-carousel",
+    name: "Testimonial Carousel with Auto-Play",
+    category: "testimonials",
+    structure: `<section id="testimonials-carousel" class="py-24" style="background:var(--bg,#fafafa);overflow:hidden;">
+  <div class="max-w-4xl mx-auto px-4 text-center">
+    <span class="inline-flex items-center gap-2 px-4 py-1.5 rounded-full text-sm font-medium mb-4" style="background:rgba(245,158,11,0.1);color:#f59e0b;">⭐ Testimonials</span>
+    <h2 class="text-4xl font-bold tracking-tight mb-4">Loved by thousands</h2>
+    <p class="text-lg mb-12" style="color:#6b7280;">Here's what our customers have to say.</p>
+    <div style="position:relative;">
+      <div id="tc-track" style="display:flex;transition:transform 0.5s cubic-bezier(0.4,0,0.2,1);">
+        <div class="tc-slide" style="min-width:100%;padding:0 20px;box-sizing:border-box;">
+          <div style="background:#fff;border-radius:20px;padding:40px;box-shadow:0 4px 24px rgba(0,0,0,0.06);max-width:600px;margin:0 auto;">
+            <div style="display:flex;gap:4px;justify-content:center;margin-bottom:16px;">
+              <span style="color:#f59e0b;font-size:20px;">★</span><span style="color:#f59e0b;font-size:20px;">★</span><span style="color:#f59e0b;font-size:20px;">★</span><span style="color:#f59e0b;font-size:20px;">★</span><span style="color:#f59e0b;font-size:20px;">★</span>
+            </div>
+            <p style="font-size:18px;line-height:1.7;color:#374151;margin-bottom:24px;font-style:italic;">"This product completely transformed how we work. The team collaboration features alone saved us 20 hours per week."</p>
+            <div style="display:flex;align-items:center;justify-content:center;gap:12px;">
+              <div style="width:48px;height:48px;border-radius:50%;background:linear-gradient(135deg,#6366f1,#8b5cf6);display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;font-size:18px;">S</div>
+              <div style="text-align:left;"><div style="font-weight:600;font-size:15px;">Sarah Chen</div><div style="color:#9ca3af;font-size:13px;">CTO at TechFlow</div></div>
+            </div>
+          </div>
+        </div>
+        <div class="tc-slide" style="min-width:100%;padding:0 20px;box-sizing:border-box;">
+          <div style="background:#fff;border-radius:20px;padding:40px;box-shadow:0 4px 24px rgba(0,0,0,0.06);max-width:600px;margin:0 auto;">
+            <div style="display:flex;gap:4px;justify-content:center;margin-bottom:16px;">
+              <span style="color:#f59e0b;font-size:20px;">★</span><span style="color:#f59e0b;font-size:20px;">★</span><span style="color:#f59e0b;font-size:20px;">★</span><span style="color:#f59e0b;font-size:20px;">★</span><span style="color:#f59e0b;font-size:20px;">★</span>
+            </div>
+            <p style="font-size:18px;line-height:1.7;color:#374151;margin-bottom:24px;font-style:italic;">"The best investment we've made this year. Our conversion rates increased by 40% within the first month."</p>
+            <div style="display:flex;align-items:center;justify-content:center;gap:12px;">
+              <div style="width:48px;height:48px;border-radius:50%;background:linear-gradient(135deg,#10b981,#34d399);display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;font-size:18px;">M</div>
+              <div style="text-align:left;"><div style="font-weight:600;font-size:15px;">Marcus Rivera</div><div style="color:#9ca3af;font-size:13px;">VP Marketing at GrowthLab</div></div>
+            </div>
+          </div>
+        </div>
+        <div class="tc-slide" style="min-width:100%;padding:0 20px;box-sizing:border-box;">
+          <div style="background:#fff;border-radius:20px;padding:40px;box-shadow:0 4px 24px rgba(0,0,0,0.06);max-width:600px;margin:0 auto;">
+            <div style="display:flex;gap:4px;justify-content:center;margin-bottom:16px;">
+              <span style="color:#f59e0b;font-size:20px;">★</span><span style="color:#f59e0b;font-size:20px;">★</span><span style="color:#f59e0b;font-size:20px;">★</span><span style="color:#f59e0b;font-size:20px;">★</span><span style="color:#d1d5db;font-size:20px;">★</span>
+            </div>
+            <p style="font-size:18px;line-height:1.7;color:#374151;margin-bottom:24px;font-style:italic;">"Intuitive design, powerful features, and incredible support. This has become the backbone of our entire operation."</p>
+            <div style="display:flex;align-items:center;justify-content:center;gap:12px;">
+              <div style="width:48px;height:48px;border-radius:50%;background:linear-gradient(135deg,#f59e0b,#fbbf24);display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;font-size:18px;">A</div>
+              <div style="text-align:left;"><div style="font-weight:600;font-size:15px;">Aisha Patel</div><div style="color:#9ca3af;font-size:13px;">Founder at Buildwise</div></div>
+            </div>
+          </div>
+        </div>
+        <div class="tc-slide" style="min-width:100%;padding:0 20px;box-sizing:border-box;">
+          <div style="background:#fff;border-radius:20px;padding:40px;box-shadow:0 4px 24px rgba(0,0,0,0.06);max-width:600px;margin:0 auto;">
+            <div style="display:flex;gap:4px;justify-content:center;margin-bottom:16px;">
+              <span style="color:#f59e0b;font-size:20px;">★</span><span style="color:#f59e0b;font-size:20px;">★</span><span style="color:#f59e0b;font-size:20px;">★</span><span style="color:#f59e0b;font-size:20px;">★</span><span style="color:#f59e0b;font-size:20px;">★</span>
+            </div>
+            <p style="font-size:18px;line-height:1.7;color:#374151;margin-bottom:24px;font-style:italic;">"We evaluated a dozen solutions before choosing this one. Two years later, it's still the best decision we've made."</p>
+            <div style="display:flex;align-items:center;justify-content:center;gap:12px;">
+              <div style="width:48px;height:48px;border-radius:50%;background:linear-gradient(135deg,#ec4899,#f472b6);display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;font-size:18px;">J</div>
+              <div style="text-align:left;"><div style="font-weight:600;font-size:15px;">James Okonkwo</div><div style="color:#9ca3af;font-size:13px;">Director at ScaleOps</div></div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <!-- Nav arrows -->
+      <button onclick="tcGo(-1)" style="position:absolute;left:-20px;top:50%;transform:translateY(-50%);width:44px;height:44px;border-radius:50%;background:#fff;border:1px solid #e5e7eb;box-shadow:0 2px 8px rgba(0,0,0,0.08);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:18px;color:#374151;transition:all 0.2s;" onmouseover="this.style.boxShadow='0 4px 12px rgba(0,0,0,0.12)'" onmouseout="this.style.boxShadow='0 2px 8px rgba(0,0,0,0.08)'">‹</button>
+      <button onclick="tcGo(1)" style="position:absolute;right:-20px;top:50%;transform:translateY(-50%);width:44px;height:44px;border-radius:50%;background:#fff;border:1px solid #e5e7eb;box-shadow:0 2px 8px rgba(0,0,0,0.08);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:18px;color:#374151;transition:all 0.2s;" onmouseover="this.style.boxShadow='0 4px 12px rgba(0,0,0,0.12)'" onmouseout="this.style.boxShadow='0 2px 8px rgba(0,0,0,0.08)'">›</button>
+    </div>
+    <!-- Dot navigation -->
+    <div id="tc-dots" style="display:flex;gap:8px;justify-content:center;margin-top:32px;"></div>
+  </div>
+  <script>
+    (function(){
+      var idx=0, slides=document.querySelectorAll('.tc-slide'), total=slides.length, track=document.getElementById('tc-track'), dots=document.getElementById('tc-dots'), timer;
+      for(var i=0;i<total;i++){var d=document.createElement('button');d.dataset.i=i;d.style.cssText='width:10px;height:10px;border-radius:50%;border:none;cursor:pointer;transition:all 0.3s;background:'+(i===0?'#6366f1':'#d1d5db');d.onclick=function(){goTo(+this.dataset.i)};dots.appendChild(d)}
+      function goTo(n){idx=(n+total)%total;track.style.transform='translateX(-'+idx*100+'%)';dots.querySelectorAll('button').forEach(function(d,i){d.style.background=i===idx?'#6366f1':'#d1d5db';d.style.transform=i===idx?'scale(1.3)':'scale(1)'})}
+      window.tcGo=function(dir){goTo(idx+dir);resetTimer()};
+      function resetTimer(){clearInterval(timer);timer=setInterval(function(){goTo(idx+1)},5000)}
+      resetTimer();
+    })();
+  </script>
+</section>`,
+  },
 ];
 
 /**
