@@ -90,7 +90,7 @@ const IDEHeader = ({
   const getInitials = (email: string) => email.slice(0, 2).toUpperCase();
 
   return (
-    <header className="h-11 flex items-center px-3 border-b border-border bg-white shrink-0 z-10 relative text-black [&_*]:text-black [&_button]:text-black [&_span]:text-black [&_svg]:text-black">
+    <header className="h-11 flex items-center px-3 border-b shrink-0 z-10 relative" style={{ background: '#fff', borderColor: '#e5e7eb', color: '#111', ['--foreground' as any]: '0 0% 7%', ['--muted-foreground' as any]: '220 9% 40%', ['--secondary' as any]: '220 14% 93%', ['--border' as any]: '220 14% 88%' }}>
       {/* Left: Back + Project dropdown */}
       <div className="flex items-center gap-1.5 min-w-0">
         <Tooltip>
