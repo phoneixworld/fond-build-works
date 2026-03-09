@@ -1630,7 +1630,7 @@ ${Object.entries(files).map(([path, code]) => `--- ${path}\n${code}`).join("\n\n
                 console.warn("[ChatPanel] Polish pass failed, keeping instant template:", err);
                 setMessages((prev) => {
                   const last = prev[prev.length - 1];
-                  const msg = `✅ **${template.name} is ready!** (AI customization skipped — your template is still fully functional)`;
+                  const msg = `✅ **${templateName} is ready!** (AI customization skipped — your template is still fully functional)`;
                   if (last?.role === "assistant") {
                     return prev.map((m, i) => (i === prev.length - 1 ? { ...m, content: msg } : m));
                   }
