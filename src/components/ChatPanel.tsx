@@ -2429,26 +2429,7 @@ ${Object.entries(files).map(([path, code]) => `--- ${path}\n${code}`).join("\n\n
             )}
           </AnimatePresence>
 
-          {/* Quick actions */}
-          {messages.length > 0 && !isLoading && followUpQuestions.length === 0 && (
-            <motion.div
-              initial={{ opacity: 0, y: 4 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.1 }}
-              className="flex flex-wrap gap-1.5 pt-2"
-            >
-              {QUICK_ACTIONS.map((a) => (
-                <button
-                  key={a.label}
-                  onClick={() => handleSmartSend(a.prompt)}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-medium border border-border text-muted-foreground hover:text-foreground hover:border-primary/30 hover:bg-secondary/50 transition-all"
-                >
-                  <Wand2 className="w-3 h-3" />
-                  {a.label}
-                </button>
-              ))}
-            </motion.div>
-          )}
+          {/* Quick actions moved to above input area */}
         </div>
 
         {/* Scroll-to-bottom FAB */}
