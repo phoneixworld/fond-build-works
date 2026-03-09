@@ -86,7 +86,7 @@ const IDELayout = () => {
   const [versions, setVersions] = useState<Version[]>([]);
   const [teamChatOpen, setTeamChatOpen] = useState(false);
   const publishRef = useRef<{ openPublish: () => void; handleExport: () => void } | null>(null);
-  const chatRef = useRef<{ clearChat: () => void } | null>(null);
+  const chatRef = useRef<{ clearChat: () => void; sendMessage: (text: string) => void } | null>(null);
   const { toast } = useToast();
   const { onlineUsers, setTyping, myColor } = useRealtimePresence(rightPanel);
 
