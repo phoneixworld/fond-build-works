@@ -302,7 +302,11 @@ async function executeSingleTask(
     let fullText = "";
     
     streamBuildAgent({
-      messages: [{ role: "user", content: prompt }],
+      messages: [
+        // Include chat history for context (so "same", "build users next" etc. work)
+        ...(config.chatHistory || []).slice(-6).map(m => ({ role: m.role as "user" | "assistant", content: m.content })),
+        { role: "user", content: prompt },
+      ],
       projectId: config.projectId,
       techStack: config.techStack,
       schemas: config.schemas,

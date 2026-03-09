@@ -1346,6 +1346,10 @@ const CONTEXT_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
             ? currentSandpackFiles 
             : undefined,
           templateContext: templateCtx || undefined,
+          chatHistory: currentMessages.slice(-8).map(m => ({
+            role: m.role,
+            content: typeof m.content === "string" ? m.content : getTextContent(m.content),
+          })),
         };
 
         await runBuildEngine(userText, engineConfig, {
