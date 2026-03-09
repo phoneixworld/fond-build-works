@@ -42,6 +42,8 @@ import { DESIGN_SYSTEM_CSS, lintDesignTokens } from "@/lib/designSystem";
 import { buildSmartChatHistory } from "@/lib/contextManager";
 import { parseStructuredOutput } from "@/lib/structuredParser";
 import { getPromptConfigKey, getCachedSystemPrompt, setCachedSystemPrompt } from "@/lib/promptCache";
+import { detectTruncation } from "@/lib/truncationRecovery";
+import { resolveImportedDependencies, getDependencyDiff } from "@/lib/dependencyResolver";
 
 // ─── Base Template (mandatory scaffold for all new builds) ────────────────
 //
@@ -1434,12 +1436,33 @@ async function executeSingleTask(
         const parsed = parseReactFilesFromOutput(responseText);
         
         if (parsed.files && Object.keys(parsed.files).length > 0) {
+          // ── Truncation Recovery ──
+          const truncation = detectTruncation(responseText, parsed.files);
+          if (truncation.isTruncated && retryCount < 2) {
+            console.warn(`[BuildEngine] Truncation detected: ${truncation.reason}`);
+            onDelta(`\n[Truncation detected — auto-continuing generation...]\n`);
+            executeSingleTask(
+              truncation.continuationPrompt,
+              config,
+              accumulatedCode,
+              onDelta,
+              retryCount + 1,
+              maxTokens,
+              taskType
+            ).then(continuationResult => {
+              // Merge continuation files with original parsed files
+              const mergedFiles = { ...parsed.files!, ...continuationResult.files };
+              const mergedDeps = { ...parsed.deps, ...continuationResult.deps };
+              resolve({ files: mergedFiles, deps: mergedDeps, chatText: parsed.chatText, modelMs: modelMs + continuationResult.modelMs, cached: false });
+            }).catch(reject);
+            return;
+          }
+
           const validationErrors = validateAllFiles(parsed.files);
           
           if (validationErrors.length > 0 && retryCount < 2) {
             const errorSummary = validationErrors.map(e => `${e.file}: ${e.error}`).join('\n');
             console.warn(`[BuildEngine] Validation errors, retrying (attempt ${retryCount + 1}):\n${errorSummary}`);
-            // Call onDelta to update progress messaging
             onDelta(`\n[Auto-fixing ${validationErrors.length} syntax error(s), attempt ${retryCount + 1}/2...]\n`);
             executeSingleTask(
               prompt + `\n\n⚠️ SYNTAX ERRORS IN YOUR OUTPUT — FIX THESE:\n${errorSummary}\n\nRegenerate ONLY the broken files with correct syntax.`,
@@ -1456,13 +1479,38 @@ async function executeSingleTask(
               console.warn(`[BuildEngine] Max retries reached, stubbing ${validationErrors.length} broken file(s)`);
               finalFiles = stubBrokenFiles(parsed.files, validationErrors);
             }
+
+            // ── Smart Dependency Resolution ──
+            const resolvedDeps = resolveImportedDependencies(finalFiles, parsed.deps);
+            const depDiff = getDependencyDiff(parsed.deps, resolvedDeps);
+            if (depDiff.added.length > 0) {
+              console.log(`[BuildEngine] Auto-resolved ${depDiff.added.length} dependencies: ${depDiff.added.join(", ")}`);
+            }
+
             // Cache successful output (memory + persistent)
-            const output = { files: finalFiles, deps: parsed.deps, chatText: parsed.chatText };
+            const output = { files: finalFiles, deps: resolvedDeps, chatText: parsed.chatText };
             setCachedTaskOutput(cacheKey, { ...output, timestamp: Date.now() });
             persistTaskOutput(cacheKey, output).catch(() => {});
             resolve({ ...output, modelMs, cached: false });
           }
         } else if (retryCount < 2) {
+          // ── Check for truncation even when no files parsed ──
+          const truncation = detectTruncation(responseText, null);
+          if (truncation.isTruncated) {
+            console.warn(`[BuildEngine] Response truncated with no parseable files: ${truncation.reason}`);
+            onDelta(`\n[Response truncated — requesting continuation...]\n`);
+            executeSingleTask(
+              truncation.continuationPrompt,
+              config,
+              accumulatedCode,
+              onDelta,
+              retryCount + 1,
+              maxTokens,
+              taskType
+            ).then(resolve).catch(reject);
+            return;
+          }
+
           console.warn(`[BuildEngine] No code in response, retrying (attempt ${retryCount + 1})`);
           executeSingleTask(
             prompt + "\n\nCRITICAL: Your previous response did not contain code. You MUST output React code inside ```react-preview fences with --- /App.jsx markers. Output the code NOW.",

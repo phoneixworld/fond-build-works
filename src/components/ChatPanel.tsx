@@ -20,6 +20,7 @@ import { useProjects } from "@/contexts/ProjectContext";
 import { useVirtualFS, parseMultiFileOutput } from "@/contexts/VirtualFSContext";
 import { supabase } from "@/integrations/supabase/client";
 import { toExportPath } from "@/lib/pathNormalizer";
+import { StreamingPreviewController } from "@/lib/streamingPreview";
 import ChatMessage from "@/components/chat/ChatMessage";
 import BuildPipelineCard from "@/components/chat/BuildPipelineCard";
 import ClarifyingQuestions from "@/components/chat/ClarifyingQuestions";
@@ -527,6 +528,9 @@ const ChatPanel = forwardRef<ChatPanelHandle, { initialPrompt?: string; onVersio
   // FIX: Track sandpack files via ref to prevent stale closure reads during project switches
   const sandpackFilesRef = useRef<Record<string, string> | null>(null);
   sandpackFilesRef.current = currentSandpackFiles;
+
+  // Streaming preview controller — renders partial output during builds
+  const streamingControllerRef = useRef<StreamingPreviewController | null>(null);
 
   // Undo/Redo system
   const { createCheckpoint, undo, redo, canUndo, canRedo } = useUndoRedo();
@@ -1560,6 +1564,9 @@ const CONTEXT_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
         setPipelineStep("error");
         setCurrentAgent(null);
         isSendingRef.current = false;
+        // Stop streaming preview on error
+        streamingControllerRef.current?.stop();
+        streamingControllerRef.current = null;
       };
 
       // ─── Cleanup helper for plan-based builds ───
@@ -1896,6 +1903,17 @@ ${Object.entries(files).map(([path, code]) => `--- ${path}\n${code}`).join("\n\n
         // Save rollback snapshot before build
         saveSnapshot(`Pre-build: ${userText.slice(0, 50)}`);
 
+        // Start streaming preview controller
+        streamingControllerRef.current = new StreamingPreviewController((files, deps) => {
+          if (lastProjectIdRef.current !== buildProjectId) return;
+          // Merge streaming files with existing
+          const currentFiles = sandpackFilesRef.current || {};
+          setSandpackFiles({ ...currentFiles, ...files });
+          if (Object.keys(deps).length > 0) setSandpackDeps(deps);
+          setPreviewMode("sandpack");
+        }, 500);
+        streamingControllerRef.current.start();
+
         await runBuildEngine(userText, engineConfig, {
           onProgress: (progress: EngineProgress) => {
             setBuildStep(progress.message);
@@ -1931,6 +1949,8 @@ ${Object.entries(files).map(([path, code]) => `--- ${path}\n${code}`).join("\n\n
           },
           onDelta: (chunk) => {
             setBuildStreamContent(prev => prev + chunk);
+            // Feed streaming preview controller
+            streamingControllerRef.current?.addChunk(chunk);
           },
           onFilesReady: (files, deps) => {
             // FIX: Guard against project switch during build
@@ -1973,6 +1993,9 @@ ${Object.entries(files).map(([path, code]) => `--- ${path}\n${code}`).join("\n\n
             isSendingRef.current = false;
             setBuildRetryCount(0);
             if (result.metrics) setBuildMetrics(result.metrics);
+            // Stop streaming preview controller
+            streamingControllerRef.current?.stop();
+            streamingControllerRef.current = null;
             setTimeout(() => setBuildStreamContent(""), 3000);
             
             const persistMessages = messagesRef.current.map(m => ({
