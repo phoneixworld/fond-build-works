@@ -538,6 +538,15 @@ const ChatPanel = forwardRef<ChatPanelHandle, { initialPrompt?: string; onVersio
 
 const healTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 const MAX_HEAL_ATTEMPTS = 3;
+
+// Auto-clear safety timeout when isBuilding goes false
+const isBuildingValue = usePreview().isBuilding;
+useEffect(() => {
+  if (!isBuildingValue && buildSafetyTimeoutRef.current) {
+    clearTimeout(buildSafetyTimeoutRef.current);
+    buildSafetyTimeoutRef.current = null;
+  }
+}, [isBuildingValue]);
 // ─── Project context cache — avoids re-fetching on every message ───────────
 const projectContextCacheRef = useRef<{
   projectId: string;
