@@ -12,7 +12,6 @@ export interface TaskItem {
 interface BuildPipelineCardProps {
   isBuilding: boolean;
   streamContent: string;
-  elapsed: number;
   /** Optional explicit tasks from outside */
   tasks?: TaskItem[];
   /** Current agent pipeline step */
