@@ -51,6 +51,7 @@ const CLOUD_SECTIONS = [
   { id: "functions", label: "Edge Functions", icon: Zap },
   { id: "sql", label: "SQL Editor", icon: Terminal },
   { id: "export", label: "Export & Migrate", icon: Download },
+  { id: "android", label: "Android Export", icon: Smartphone },
   { id: "logs", label: "Logs", icon: ScrollText },
 ] as const;
 
