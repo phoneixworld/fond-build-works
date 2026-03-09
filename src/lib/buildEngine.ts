@@ -184,6 +184,57 @@ export interface EngineResult {
  * Auto-repair common JSX issues from AI-generated code.
  */
 function autoRepairJSX(code: string): string {
+  // ── Fix unterminated strings (truncated AI output) ──
+  // If a line has an odd number of unescaped quotes, close it
+  const lines = code.split("\n");
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    // Count unescaped single quotes and double quotes
+    const singleQuotes = (line.match(/(?<!\\)'/g) || []).length;
+    const doubleQuotes = (line.match(/(?<!\\)"/g) || []).length;
+    const backticks = (line.match(/(?<!\\)`/g) || []).length;
+    
+    if (doubleQuotes % 2 !== 0) {
+      // Unterminated double-quoted string — close it and trim the broken line
+      lines[i] = line + '"';
+      // If we're inside an array/object literal, also close the structure
+      // Look ahead for missing brackets
+    }
+    if (singleQuotes % 2 !== 0) {
+      lines[i] = lines[i] + "'";
+    }
+    if (backticks % 2 !== 0) {
+      lines[i] = lines[i] + "`";
+    }
+  }
+  code = lines.join("\n");
+
+  // ── Truncation recovery: if file ends mid-expression, add closing structures ──
+  const trimmed = code.trimEnd();
+  // Count unmatched brackets/braces/parens
+  let braces = 0, brackets = 0, parens = 0;
+  for (const ch of trimmed) {
+    if (ch === '{') braces++;
+    else if (ch === '}') braces--;
+    else if (ch === '[') brackets++;
+    else if (ch === ']') brackets--;
+    else if (ch === '(') parens++;
+    else if (ch === ')') parens--;
+  }
+  // Close any unclosed structures (up to a reasonable limit)
+  const closers: string[] = [];
+  for (let i = 0; i < Math.min(parens, 10); i++) closers.push(')');
+  for (let i = 0; i < Math.min(brackets, 10); i++) closers.push(']');
+  for (let i = 0; i < Math.min(braces, 10); i++) closers.push('}');
+  if (closers.length > 0) {
+    // Add a semicolon after string termination, then close structures
+    code = code.trimEnd() + ';\n' + closers.join(';\n') + ';\n';
+    // If there's a default export missing, try to add one
+    if (!code.includes('export default') && code.includes('function App')) {
+      code += '\nexport default App;\n';
+    }
+  }
+
   // Fix unclosed <Route ... element={<Comp />}> → self-close
   code = code.replace(
     /(<Route\s+[^>]*element=\{<[^>]+\/>\s*\})\s*>\s*$/gm,
