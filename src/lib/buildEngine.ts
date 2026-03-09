@@ -1676,7 +1676,7 @@ async function runDirectBuild(
   const mergeTimer = timer();
   const baseOrExisting = config.existingFiles && Object.keys(config.existingFiles).length > 0
     ? config.existingFiles
-    : getBaseTemplate();
+    : getBaseTemplate(config.domainModel);
   
   callbacks.onProgress({ phase: "merging", message: "Merging with base template..." });
   const merged = mergeFiles(baseOrExisting, result.files);
