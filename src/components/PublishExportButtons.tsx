@@ -64,10 +64,7 @@ const PublishExportButtons = forwardRef<PublishExportHandle>((_, ref) => {
   useEffect(() => {
     if (showPublish && currentProject?.is_published && currentProject?.published_slug) {
       const slug = currentProject.published_slug;
-      const { data: urlData } = supabase.storage
-        .from("app-assets")
-        .getPublicUrl(`published/${slug}/index.html`);
-      setPublishedUrl(urlData?.publicUrl || `${window.location.origin}/app/${slug}`);
+      setPublishedUrl(`${window.location.origin}/app/${slug}`);
     }
   }, [showPublish, currentProject]);
 
@@ -155,19 +152,7 @@ const PublishExportButtons = forwardRef<PublishExportHandle>((_, ref) => {
       const slug = currentProject.published_slug || generateSlug(currentProject.name, currentProject.id);
       const html = await resolveHtml();
 
-      // Upload HTML to storage
-      const htmlBlob = new Blob([html], { type: "text/html" });
-      const storagePath = `published/${slug}/index.html`;
-
-      const { error: uploadError } = await supabase.storage
-        .from("app-assets")
-        .upload(storagePath, htmlBlob, { upsert: true, contentType: "text/html" });
-
-      if (uploadError) console.error("Storage upload error:", uploadError);
-
-      const { data: urlData } = supabase.storage.from("app-assets").getPublicUrl(storagePath);
-
-      // Update project
+      // Update project - no storage upload needed, PublishedApp component will render from DB
       const { error } = await supabase
         .from("projects")
         .update({ is_published: true, published_slug: slug, html_content: html } as any)
@@ -189,7 +174,7 @@ const PublishExportButtons = forwardRef<PublishExportHandle>((_, ref) => {
         console.error("Failed to log deploy:", e);
       }
 
-      const liveUrl = urlData?.publicUrl || `${window.location.origin}/app/${slug}`;
+      const liveUrl = `${window.location.origin}/app/${slug}`;
       setPublishedUrl(liveUrl);
       setDeployNotes("");
       toast({ title: "Published! 🚀", description: `Deployed to ${deployTarget} successfully.` });
