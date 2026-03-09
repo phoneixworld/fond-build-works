@@ -123,137 +123,14 @@ const PublishExportButtons = forwardRef<PublishExportHandle>((_, ref) => {
   };
 
   const resolveHtml = async (): Promise<string> => {
-    let html = "";
-
-    // Prioritize Sandpack files (React mode) over raw HTML
+    // If we have Sandpack files, save them as JSON with a marker prefix
+    // so PublishedApp can render them with the Sandpack bundler
     if (sandpackFiles && Object.keys(sandpackFiles).length > 0) {
-      // Escape </script> inside JSON to prevent premature HTML tag closing
-      const filesJson = JSON.stringify(sandpackFiles).replace(/<\//g, '<\\/');
-      html = `<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>${currentProject?.name || "My App"}</title>
-  <script src="https://cdn.tailwindcss.com"></script>
-  <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
-  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
-  <script crossorigin src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-  <style>*{margin:0;padding:0;box-sizing:border-box}body{font-family:system-ui,-apple-system,sans-serif}</style>
-</head>
-<body>
-  <div id="root"></div>
-  <script>
-    // Virtual module system
-    const FILES = ${filesJson};
-    const moduleCache = {};
-    const React = window.React;
-    const ReactDOM = window.ReactDOM;
-
-    function resolveModule(from, to) {
-      if (to.startsWith('./') || to.startsWith('../')) {
-        const base = from.split('/').slice(0, -1).join('/');
-        let resolved = base + '/' + to.replace(/^\\.\\/?/, '');
-        resolved = resolved.replace(/\\/[^/]+\\/\\.\\./g, '');
-        const exts = ['', '.jsx', '.js', '.tsx', '.ts'];
-        for (const ext of exts) {
-          if (FILES[resolved + ext]) return resolved + ext;
-        }
-        // Try index files
-        for (const ext of exts) {
-          if (FILES[resolved + '/index' + ext]) return resolved + '/index' + ext;
-        }
-      }
-      return to;
+      return "<!--SANDPACK_JSON-->" + JSON.stringify(sandpackFiles);
     }
 
-    function requireModule(path) {
-      if (path === 'react') return React;
-      if (path === 'react-dom') return ReactDOM;
-      if (path === 'react-dom/client') return { createRoot: ReactDOM.createRoot.bind(ReactDOM) };
-      // Stub common libraries
-      if (path === 'react-router-dom') return createRouterStub();
-      if (path === 'framer-motion') return createMotionStub();
-      if (path === 'lucide-react') return new Proxy({}, { get: (_, name) => createIconStub(name) });
-
-      if (moduleCache[path]) return moduleCache[path];
-      const code = FILES[path];
-      if (!code) { console.warn('Module not found:', path); return {}; }
-
-      const transformed = Babel.transform(code, { presets: ['react'], filename: path }).code;
-      const module = { exports: {} };
-      const exports = module.exports;
-      const wrappedRequire = (dep) => requireModule(resolveModule(path, dep));
-
-      try {
-        const fn = new Function('require', 'module', 'exports', 'React', transformed);
-        fn(wrappedRequire, module, exports, React);
-      } catch(e) { console.error('Error in', path, e); }
-
-      moduleCache[path] = module.exports;
-      return module.exports;
-    }
-
-    function createIconStub(name) {
-      return function IconStub(props) {
-        return React.createElement('svg', {
-          width: props.size || (props.className ? undefined : 24),
-          height: props.size || (props.className ? undefined : 24),
-          className: props.className || '',
-          viewBox: '0 0 24 24',
-          fill: 'none',
-          stroke: 'currentColor',
-          strokeWidth: 2,
-          strokeLinecap: 'round',
-          strokeLinejoin: 'round'
-        });
-      };
-    }
-
-    function createRouterStub() {
-      const RouterContext = React.createContext({ path: window.location.hash.slice(1) || '/' });
-      return {
-        HashRouter: function(props) { return React.createElement(RouterContext.Provider, { value: { path: window.location.hash.slice(1) || '/' } }, props.children); },
-        BrowserRouter: function(props) { return React.createElement(RouterContext.Provider, { value: { path: '/' } }, props.children); },
-        Routes: function(props) { return props.children; },
-        Route: function(props) { return props.element || null; },
-        Link: function(props) { return React.createElement('a', { href: props.to, onClick: function(e) { e.preventDefault(); }, className: props.className }, props.children); },
-        NavLink: function(props) { const cn = typeof props.className === 'function' ? props.className({ isActive: props.to === '/' }) : props.className; return React.createElement('a', { href: props.to, className: cn }, props.children); },
-        Outlet: function() { return null; },
-        useNavigate: function() { return function() {}; },
-        useParams: function() { return {}; },
-        useLocation: function() { return { pathname: '/', hash: '', search: '' }; },
-      };
-    }
-
-    function createMotionStub() {
-      const handler = { get: (_, tag) => function(props) { const p = Object.assign({}, props); delete p.initial; delete p.animate; delete p.exit; delete p.transition; delete p.whileHover; delete p.whileInView; delete p.viewport; delete p.variants; return React.createElement(tag, p); } };
-      return {
-        motion: new Proxy({}, handler),
-        AnimatePresence: function(props) { return props.children; },
-      };
-    }
-
-    // Find and render App
-    const appPaths = ['/App.jsx', '/App.js', '/App.tsx', '/App.tsx'];
-    let AppModule;
-    for (const p of appPaths) {
-      if (FILES[p]) { AppModule = requireModule(p); break; }
-    }
-    const App = AppModule && (AppModule.default || AppModule);
-    if (App) {
-      const root = ReactDOM.createRoot(document.getElementById('root'));
-      root.render(React.createElement(App));
-    } else {
-      document.getElementById('root').innerHTML = '<p style="padding:2rem;color:#666">Could not find App component.</p>';
-    }
-  </script>
-</body>
-</html>`;
-    } else {
-      // Fallback to raw HTML
-      html = previewHtml || currentProject?.html_content || "";
-    }
+    // Fallback to raw HTML
+    let html = previewHtml || currentProject?.html_content || "";
 
     // If deploying to production, try to use the environment snapshot
     if (deployTarget === "production") {
