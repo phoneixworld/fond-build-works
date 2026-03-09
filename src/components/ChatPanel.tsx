@@ -924,6 +924,18 @@ const CONTEXT_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
     setBuildStep(images.length > 0 ? "🖼️ Analyzing image..." : "🏗️ Build agent generating code...");
     setPipelineStep("generating");
 
+    // Safety timeout: if build doesn't complete in 3 minutes, force reset
+    if (buildSafetyTimeoutRef.current) clearTimeout(buildSafetyTimeoutRef.current);
+    buildSafetyTimeoutRef.current = setTimeout(() => {
+      console.warn("[ChatPanel] Build safety timeout — forcing isBuilding=false");
+      setIsBuilding(false);
+      setIsLoading(false);
+      setBuildStep("");
+      setPipelineStep(null);
+      setCurrentAgent(null);
+      isSendingRef.current = false;
+    }, 180_000);
+
     // FIX: Create abort controller for this request
     const abortController = new AbortController();
     abortControllerRef.current = abortController;
