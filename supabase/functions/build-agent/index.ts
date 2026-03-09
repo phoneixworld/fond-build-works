@@ -356,6 +356,15 @@ ${schemaSection}
 - ✅ Dashboard with KPI cards (with real icons, colored backgrounds) and at least one chart
 - ✅ Professional color palette — NOT generic gray/white. Use a strong primary + accent.
 
+## ABSOLUTELY BANNED — NEVER GENERATE THESE
+- ❌ NEVER create "ComingSoon" or "Coming Soon" placeholder pages — build the ACTUAL feature instead
+- ❌ NEVER create stub pages that say "Under Construction", "Work in Progress", or "Feature coming soon"
+- ❌ NEVER route to a generic placeholder component — every route must have a REAL, functional page
+- ❌ NEVER use a shared placeholder component for multiple routes
+- If a module is in the sidebar/navigation, it MUST have a fully implemented page with real UI
+- If you can't build a feature fully, build a FUNCTIONAL MVP version — not a placeholder
+- Example: If "Timetable" is requested, build an actual weekly grid view, NOT a "Coming Soon" card
+
 ## MULTI-PAGE ROUTING — MANDATORY FOR APPS WITH 2+ FEATURES
 Every app with multiple features MUST use React Router with distinct pages in nested folders:
 
