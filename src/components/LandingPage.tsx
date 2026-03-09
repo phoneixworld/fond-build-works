@@ -8,7 +8,7 @@ import { TECH_STACKS } from "@/lib/techStacks";
 import { TEMPLATES, Template } from "@/lib/templates";
 
 interface LandingPageProps {
-  onStartProject: (prompt: string, techStack: TechStackId) => void;
+  onStartProject: (prompt: string, techStack: string) => void;
   onOpenProject: (id: string) => void;
 }
 
