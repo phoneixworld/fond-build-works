@@ -1448,7 +1448,8 @@ const CONTEXT_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
                 await streamChatAgent({
                   messages: apiMessages,
                   projectId: currentProject.id,
-                  model: selectedModel,
+                  techStack: currentProject.tech_stack || "react-cdn",
+                  knowledge,
                   onDelta: upsert,
                   onDone: (responseText) => {
                     setMessages((prev) => {
