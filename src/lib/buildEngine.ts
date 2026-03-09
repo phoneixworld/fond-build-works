@@ -1457,7 +1457,7 @@ async function executeSingleTask(
         if (retryCount < 1) {
           console.warn(`[BuildEngine] Task error, retrying: ${err}`);
           setTimeout(() => {
-            executeSingleTask(prompt, config, accumulatedCode, onDelta, retryCount + 1, maxTokens)
+            executeSingleTask(prompt, config, accumulatedCode, onDelta, retryCount + 1, maxTokens, taskType)
               .then(resolve).catch(reject);
           }, 1000);
         } else {
