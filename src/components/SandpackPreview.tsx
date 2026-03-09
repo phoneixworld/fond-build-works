@@ -126,9 +126,9 @@ function repairTruncatedCode(code: string, filePath: string): string {
 }
 
 /** Second-pass sanitizer applied right before Sandpack receives code */
-function sanitizeCode(code: string): string {
+function sanitizeCode(code: string, filePath: string = ""): string {
   // First repair any truncated code
-  code = repairTruncatedCode(code);
+  code = repairTruncatedCode(code, filePath);
   
   // Strip file separator lines
   code = code.split("\n").filter(line => {
