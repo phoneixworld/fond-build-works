@@ -718,9 +718,12 @@ function parseReactFilesFromOutput(text: string): {
     files["/App.jsx"] = block.trim();
   }
 
+  // Enforce mandatory folder structure (relocate misplaced files)
+  const structuredFiles = Object.keys(files).length > 0 ? enforceFileStructure(files) : files;
+
   return {
     chatText,
-    files: Object.keys(files).length > 0 ? files : null,
+    files: Object.keys(structuredFiles).length > 0 ? structuredFiles : null,
     deps,
   };
 }
