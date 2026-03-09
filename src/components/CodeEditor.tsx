@@ -1,5 +1,6 @@
 import { useState, useMemo, useCallback, useRef, useEffect } from "react";
 import { FileCode, Copy, Check, WrapText, Search, Save, Play, SplitSquareHorizontal, X, Server, Monitor } from "lucide-react";
+import RefactorMenu from "@/components/RefactorMenu";
 import { useVirtualFS } from "@/contexts/VirtualFSContext";
 import { usePreview } from "@/contexts/PreviewContext";
 import { useProjects } from "@/contexts/ProjectContext";
