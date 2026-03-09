@@ -128,8 +128,8 @@ const PublishExportButtons = forwardRef<PublishExportHandle>((_, ref) => {
     // If no raw HTML but we have Sandpack files, build a self-contained HTML page
     // that uses Babel standalone to transpile JSX in the browser
     if (!html && sandpackFiles && Object.keys(sandpackFiles).length > 0) {
-      // Escape </script> inside JSON to prevent premature tag closing
-      const filesJson = JSON.stringify(sandpackFiles).replace(/<\/script>/gi, '<\\/script>');
+      // Escape </script> inside JSON to prevent premature HTML tag closing
+      const filesJson = JSON.stringify(sandpackFiles).replace(/<\//g, '<\\/');
       html = `<!DOCTYPE html>
 <html lang="en">
 <head>
