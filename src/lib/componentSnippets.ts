@@ -212,6 +212,42 @@ export const COMPONENT_SNIPPETS: ComponentSnippet[] = [
 </section>`,
   },
 
+  // === CARDS ===
+  {
+    id: "card-glass",
+    name: "Glassmorphism Card",
+    category: "features",
+    structure: `<div class="relative group">
+  <!-- Glow effect behind card -->
+  <div style="position:absolute;inset:-1px;background:linear-gradient(135deg,rgba(99,102,241,0.5),rgba(236,72,153,0.5));border-radius:24px;filter:blur(20px);opacity:0;transition:opacity 0.3s;" class="group-hover:opacity-100"></div>
+  <!-- Glass card -->
+  <div style="background:rgba(255,255,255,0.7);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);border:1px solid rgba(255,255,255,0.5);border-radius:24px;padding:32px;position:relative;">
+    <div class="w-14 h-14 rounded-2xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center mb-5 shadow-lg">
+      <i data-lucide="sparkles" class="w-7 h-7 text-white"></i>
+    </div>
+    <h3 class="text-xl font-bold mb-3">Glassmorphism</h3>
+    <p class="text-gray-600">Modern frosted glass effect with gradient glow on hover.</p>
+  </div>
+</div>`,
+  },
+  {
+    id: "card-glass-dark",
+    name: "Glassmorphism Card (Dark)",
+    category: "features",
+    structure: `<div class="relative group">
+  <!-- Glow effect -->
+  <div style="position:absolute;inset:-2px;background:linear-gradient(135deg,#6366f1,#ec4899);border-radius:28px;opacity:0.5;filter:blur(24px);transition:opacity 0.3s;" class="group-hover:opacity-80"></div>
+  <!-- Dark glass card -->
+  <div style="background:rgba(15,23,42,0.8);backdrop-filter:blur(24px);-webkit-backdrop-filter:blur(24px);border:1px solid rgba(255,255,255,0.1);border-radius:24px;padding:32px;position:relative;">
+    <div class="w-14 h-14 rounded-2xl bg-gradient-to-br from-indigo-500 to-pink-500 flex items-center justify-center mb-5">
+      <i data-lucide="layers" class="w-7 h-7 text-white"></i>
+    </div>
+    <h3 class="text-xl font-bold text-white mb-3">Dark Glass</h3>
+    <p class="text-gray-400">Sleek dark mode glassmorphism with vibrant glow.</p>
+  </div>
+</div>`,
+  },
+
   // === TESTIMONIALS ===
   {
     id: "testimonials-grid",
