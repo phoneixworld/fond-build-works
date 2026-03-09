@@ -8,7 +8,7 @@
 export interface ComponentSnippet {
   id: string;
   name: string;
-  category: "hero" | "features" | "pricing" | "testimonials" | "cta" | "footer" | "contact" | "stats" | "faq" | "gallery" | "team" | "navigation";
+  category: "hero" | "features" | "pricing" | "testimonials" | "cta" | "footer" | "contact" | "stats" | "faq" | "gallery" | "team" | "navigation" | "micro-interaction";
   /** Compact structural description */
   structure: string;
 }
