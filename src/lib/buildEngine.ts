@@ -644,14 +644,14 @@ async function runDirectBuild(
   autoDetectAndCreateSchemas(finalFiles, config.projectId);
   
   callbacks.onProgress({ phase: "complete", message: "Build complete" });
+  const finalMetrics = finishBuild();
   callbacks.onComplete({
     files: finalFiles,
     deps: result.deps,
     chatText: result.chatText || "✅ App generated successfully",
     mergeConflicts: conflicts,
+    metrics: finalMetrics || undefined,
   });
-
-  finishBuild();
 }
 
 async function runPlannedBuild(
