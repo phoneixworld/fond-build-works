@@ -81,8 +81,8 @@ function makeStub(filePath: string): string {
     .replace(/\.(jsx?|tsx?)$/, '')
     .replace(/[^a-zA-Z0-9]/g, '');
   const safeName = componentName.charAt(0).toUpperCase() + componentName.slice(1) || 'TruncatedPage';
-  console.warn(`[SandpackRepair] File "${filePath}" is truncated. Replacing with stub.`);
-  return `import React from "react";\n\nexport default function ${safeName}() {\n  return (\n    <div className="p-8 text-center">\n      <h2 className="text-lg font-semibold text-slate-800">${safeName}</h2>\n      <p className="text-sm text-slate-500 mt-2">This page is being generated. Please rebuild.</p>\n    </div>\n  );\n}\n`;
+  console.warn(`[SandpackRepair] File "${filePath}" could not be repaired. Using stub.`);
+  return `import React from "react";\n\nexport default function ${safeName}() {\n  return (\n    <div className="p-8 text-center space-y-3">\n      <div className="w-10 h-10 mx-auto rounded-full bg-amber-100 flex items-center justify-center"><span className="text-amber-600 text-xl">\u26A0</span></div>\n      <h2 className="text-lg font-semibold text-slate-800">${safeName}</h2>\n      <p className="text-sm text-slate-500">This module had a build error. Send a follow-up message to fix it.</p>\n    </div>\n  );\n}\n`;
 }
 
 function repairTruncatedCode(code: string, filePath: string): string {
