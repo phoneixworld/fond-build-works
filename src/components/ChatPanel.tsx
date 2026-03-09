@@ -1455,13 +1455,160 @@ const CONTEXT_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
         const liveSandpackFiles = sandpackFilesRef.current;
         const isFirstBuild = !liveSandpackFiles || Object.keys(liveSandpackFiles).length === 0;
 
-        // ─── FAST PATH: Simple template-matched builds skip the heavy engine ───
-        // When a template matched (landing page, portfolio, etc.) and it's the first build,
-        // use a single direct streamBuildAgent call instead of requirements→plan→multi-task.
+        // ─── INSTANT PATH: Pre-built templates render in <1 second ───
+        // When a template matched and we have a pre-built instant template,
+        // render it immediately, then fire an AI polish pass in the background.
         const isSimpleBuild = isFirstBuild && !!template && !userText.toLowerCase().includes("dashboard") && !userText.toLowerCase().includes("crud") && !userText.toLowerCase().includes("admin");
         
         if (isSimpleBuild) {
-          console.log(`[ChatPanel] ⚡ FAST PATH: Direct build with template "${template.name}"`);
+          const { findInstantTemplate, hydrateTemplate } = await import("@/lib/instantTemplates");
+          const instantTemplate = findInstantTemplate(template.id);
+          
+          if (instantTemplate) {
+            console.log(`[ChatPanel] ⚡ INSTANT PATH: Rendering "${template.name}" in <1s`);
+            setBuildStep("⚡ Instant preview loading...");
+            setPipelineStep("bundling");
+            
+            // Extract a description from the user's prompt
+            const promptDesc = userText.replace(/build|create|make|website|app|called|named|beautiful|simple/gi, "").trim();
+            const projectName = currentProject.name || "My App";
+            const { files, deps } = hydrateTemplate(instantTemplate, projectName, promptDesc || "Build applications at the speed of thought");
+            
+            // Instantly render the template
+            setSandpackFiles(files);
+            syncSandpackToVirtualFS(files);
+            if (Object.keys(deps).length > 0) setSandpackDeps(deps);
+            setPreviewMode("sandpack");
+            
+            // Show success message immediately
+            const fileCount = Object.keys(files).length;
+            const instantMsg = `⚡ **Instant Preview** — ${fileCount} files rendered in under 1 second!\n\nYour ${template.name} is ready. I'm now polishing the content based on your prompt...`;
+            setMessages((prev) => {
+              const last = prev[prev.length - 1];
+              if (last?.role === "assistant") {
+                return prev.map((m, i) => (i === prev.length - 1 ? { ...m, content: instantMsg } : m));
+              }
+              return [...prev, { role: "assistant", content: instantMsg, timestamp: Date.now() }];
+            });
+            
+            // Persist the instant template immediately
+            const payload = { files, deps };
+            supabase
+              .from("project_data")
+              .upsert(
+                { project_id: buildProjectId, collection: "sandpack_state", data: payload as any },
+                { onConflict: "project_id,collection" }
+              )
+              .then(({ error }) => {
+                if (error) console.warn("[ChatPanel] Instant template persist failed:", error);
+              });
+
+            // Now fire AI polish pass in the background to customize content
+            setBuildStep("🎨 AI is customizing your content...");
+            setPipelineStep("generating");
+            
+            const polishContext = `## INSTANT TEMPLATE LOADED
+The user already sees a live preview of a ${template.name} template. Your job is to CUSTOMIZE the existing template files with the user's specific content, branding, and requirements.
+
+## USER REQUEST
+"${userText}"
+
+## CURRENT FILES (already rendered)
+${Object.entries(files).map(([path, code]) => `--- ${path}\n${code}`).join("\n\n")}
+
+## INSTRUCTIONS
+1. Keep the EXACT same file structure and component architecture
+2. Customize ALL placeholder text to match the user's specific request
+3. Adjust colors, content, and details to fit their brand/idea
+4. Output ALL files (even unchanged ones) in \`\`\`react-preview format
+5. Do NOT add new files unless necessary — focus on content customization`;
+            
+            await streamBuildAgent({
+              messages: [{ role: "user" as const, content: polishContext }],
+              projectId: buildProjectId,
+              techStack: currentProject.tech_stack || "react-cdn",
+              schemas,
+              model: "google/gemini-3-flash-preview", // Use fastest model for polish
+              designTheme: themeInfo?.prompt,
+              templateContext: templateCtx || undefined,
+              onDelta: upsert,
+              onDone: async (responseText) => {
+                // Parse and apply the polished files
+                const reactResult = parseReactFiles(responseText);
+                if (reactResult.files && Object.keys(reactResult.files).length > 0) {
+                  setSandpackFiles(reactResult.files);
+                  syncSandpackToVirtualFS(reactResult.files);
+                  if (Object.keys(reactResult.deps).length > 0) setSandpackDeps(reactResult.deps);
+                  
+                  // Persist polished version
+                  const polishedPayload = { files: reactResult.files, deps: reactResult.deps || {} };
+                  supabase
+                    .from("project_data")
+                    .upsert(
+                      { project_id: buildProjectId, collection: "sandpack_state", data: polishedPayload as any },
+                      { onConflict: "project_id,collection" }
+                    )
+                    .then(({ error }) => { if (error) console.warn("Polish persist error:", error); });
+                  
+                  const polishedMsg = reactResult.chatText || `✅ **${template.name} customized!** Your site is ready with personalized content.`;
+                  setMessages((prev) => {
+                    const last = prev[prev.length - 1];
+                    if (last?.role === "assistant") {
+                      return prev.map((m, i) => (i === prev.length - 1 ? { ...m, content: polishedMsg } : m));
+                    }
+                    return [...prev, { role: "assistant", content: polishedMsg, timestamp: Date.now() }];
+                  });
+                } else {
+                  // Polish didn't produce files — keep the instant template (it's already good)
+                  setMessages((prev) => {
+                    const last = prev[prev.length - 1];
+                    const msg = `✅ **${template.name} is ready!** Your site is live with all sections.`;
+                    if (last?.role === "assistant") {
+                      return prev.map((m, i) => (i === prev.length - 1 ? { ...m, content: msg } : m));
+                    }
+                    return [...prev, { role: "assistant", content: msg, timestamp: Date.now() }];
+                  });
+                }
+                
+                setIsLoading(false);
+                setIsBuilding(false);
+                setBuildStep("");
+                setPipelineStep("complete");
+                setCurrentAgent(null);
+                isSendingRef.current = false;
+                setBuildRetryCount(0);
+                
+                // Persist chat history
+                const persistMessages = messagesRef.current.map(m => ({
+                  role: m.role,
+                  content: typeof m.content === "string" ? m.content : getTextContent(m.content),
+                }));
+                saveProject({ chat_history: persistMessages, html_content: currentProject.html_content || "" });
+              },
+              onError: (err) => {
+                // Even if polish fails, user already has the instant template
+                console.warn("[ChatPanel] Polish pass failed, keeping instant template:", err);
+                setMessages((prev) => {
+                  const last = prev[prev.length - 1];
+                  const msg = `✅ **${template.name} is ready!** (AI customization skipped — your template is still fully functional)`;
+                  if (last?.role === "assistant") {
+                    return prev.map((m, i) => (i === prev.length - 1 ? { ...m, content: msg } : m));
+                  }
+                  return [...prev, { role: "assistant", content: msg, timestamp: Date.now() }];
+                });
+                setIsLoading(false);
+                setIsBuilding(false);
+                setBuildStep("");
+                setPipelineStep("complete");
+                setCurrentAgent(null);
+                isSendingRef.current = false;
+              },
+            });
+            return;
+          }
+          
+          // No instant template found — fall back to direct AI build
+          console.log(`[ChatPanel] ⚡ FAST PATH: Direct build with template "${template.name}" (no instant template)`);
           setBuildStep("⚡ Fast building with template...");
           setPipelineStep("generating");
           
