@@ -674,15 +674,35 @@ const CONTEXT_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
       const history = currentProject.chat_history ?? [];
       setMessages(history);
       setPreviewHtml(currentProject.html_content || "");
+      // CRITICAL: Reset sandpack state on project switch to prevent cross-contamination
+      setSandpackFiles(null);
+      setSandpackDeps({});
+      setPreviewMode("html");
       setPreviewErrors([]);
       setAttachedImages([]);
-      // Reset healing state on project switch
+      // Reset all build/pipeline state
       setHealAttempts(0);
       setIsHealing(false);
+      setBuildStreamContent("");
+      setCurrentPlan(null);
+      setCurrentTaskIndex(0);
+      setTotalPlanTasks(0);
+      setCurrentAgent(null);
+      setPipelineStep(null);
+      setBuildRetryCount(0);
+      // Abort any in-flight request from previous project
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+        abortControllerRef.current = null;
+      }
+      isSendingRef.current = false;
     } else if (!currentProject) {
       lastProjectIdRef.current = null;
       setMessages([]);
       setPreviewHtml("");
+      setSandpackFiles(null);
+      setSandpackDeps({});
+      setPreviewMode("html");
       setPreviewErrors([]);
       setAttachedImages([]);
     }
