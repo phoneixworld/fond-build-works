@@ -296,7 +296,8 @@ async function executeSingleTask(
   config: EngineConfig,
   accumulatedCode: string,
   onDelta: (chunk: string) => void,
-  retryCount = 0
+  retryCount = 0,
+  maxTokens?: number
 ): Promise<{ files: Record<string, string>; deps: Record<string, string>; chatText: string }> {
   return new Promise((resolve, reject) => {
     let fullText = "";
@@ -316,6 +317,7 @@ async function executeSingleTask(
       snippetsContext: config.snippetsContext,
       templateContext: config.templateContext,
       currentCode: accumulatedCode || undefined,
+      maxTokens,
       onDelta: (chunk) => {
         fullText += chunk;
         onDelta(chunk);
@@ -333,7 +335,8 @@ async function executeSingleTask(
             config,
             accumulatedCode,
             onDelta,
-            retryCount + 1
+            retryCount + 1,
+            maxTokens
           ).then(resolve).catch(reject);
         } else {
           // Give up — return empty
@@ -345,7 +348,7 @@ async function executeSingleTask(
         if (retryCount < 1) {
           console.warn(`[BuildEngine] Task error, retrying: ${err}`);
           setTimeout(() => {
-            executeSingleTask(prompt, config, accumulatedCode, onDelta, retryCount + 1)
+            executeSingleTask(prompt, config, accumulatedCode, onDelta, retryCount + 1, maxTokens)
               .then(resolve).catch(reject);
           }, 1000);
         } else {
@@ -405,7 +408,7 @@ Keep ALL existing routes and imports intact. Only ADD the missing ones.
 ${buildFullCodeContext(files, 24000)}`;
 
   try {
-    const result = await executeSingleTask(assemblyPrompt, config, buildFullCodeContext(files), onDelta);
+    const result = await executeSingleTask(assemblyPrompt, config, buildFullCodeContext(files), onDelta, 0, 12000);
     if (result.files["/App.jsx"] || result.files["/App.tsx"]) {
       // Only take the App file from assembly — don't overwrite components
       const appKey = result.files["/App.jsx"] ? "/App.jsx" : "/App.tsx";
@@ -588,7 +591,7 @@ ${task.filesAffected.map(f => `- ${f}`).join("\n")}
 - NO descriptions, NO planning text — ONLY code`;
 
     try {
-      const taskResult = await executeSingleTask(taskPrompt, config, codeContext, callbacks.onDelta);
+      const taskResult = await executeSingleTask(taskPrompt, config, codeContext, callbacks.onDelta, 0, 16000);
       
       if (Object.keys(taskResult.files).length > 0) {
         // Intelligent merge
