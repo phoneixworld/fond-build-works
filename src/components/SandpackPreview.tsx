@@ -192,9 +192,10 @@ function filesHash(files: SandpackFileSet | null): string {
 interface SandpackPreviewProps {
   viewport?: { width: string; maxWidth: string };
   showConsole?: boolean;
+  initialPath?: string;
 }
 
-const SandpackPreview = ({ viewport, showConsole = false }: SandpackPreviewProps) => {
+const SandpackPreview = ({ viewport, showConsole = false, initialPath }: SandpackPreviewProps) => {
   const { sandpackFiles, sandpackDeps } = usePreview();
 
   const files = useMemo(() => buildSandpackFiles(sandpackFiles), [sandpackFiles]);
