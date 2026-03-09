@@ -60,14 +60,62 @@ DO NOT use \`\`\`html-preview or \`\`\`html fences.
 \`\`\`react-preview
 --- /App.jsx
 import React from "react";
+import { HashRouter, Routes, Route } from "react-router-dom";
+import AppLayout from "./layout/AppLayout";
+import Dashboard from "./pages/Dashboard/Dashboard";
 export default function App() {
-  return <div className="min-h-screen bg-white"><h1>Hello</h1></div>;
+  return (
+    <HashRouter>
+      <Routes>
+        <Route path="/*" element={<AppLayout />}>
+          <Route index element={<Dashboard />} />
+        </Route>
+      </Routes>
+    </HashRouter>
+  );
 }
---- /components/Header.jsx
+--- /layout/AppLayout.jsx
 import React from "react";
-export default function Header() {
-  return <header className="p-6"><h1>Brand</h1></header>;
+import { Outlet } from "react-router-dom";
+import Sidebar from "./Sidebar";
+export default function AppLayout() {
+  return (
+    <div className="flex h-screen">
+      <Sidebar />
+      <main className="flex-1 overflow-auto"><Outlet /></main>
+    </div>
+  );
 }
+--- /layout/Sidebar.jsx
+import React from "react";
+import { NavLink } from "react-router-dom";
+export default function Sidebar() {
+  return <nav className="w-64 bg-gray-900 text-white p-4">...</nav>;
+}
+--- /pages/Dashboard/Dashboard.jsx
+import React from "react";
+export default function Dashboard() {
+  return <div className="p-6"><h1>Dashboard</h1></div>;
+}
+--- /components/ui/Card.jsx
+import React from "react";
+export default function Card({ children, className = "" }) {
+  return <div className={\`bg-white rounded-xl border p-6 \${className}\`}>{children}</div>;
+}
+--- /hooks/useFetch.js
+import { useState, useEffect } from "react";
+export function useFetch(url, options) {
+  const [data, setData] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  useEffect(() => {
+    fetch(url, options).then(r => r.json()).then(setData).catch(setError).finally(() => setLoading(false));
+  }, [url]);
+  return { data, loading, error };
+}
+--- /styles/globals.css
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+body { font-family: 'Inter', sans-serif; }
 --- dependencies
 {
   "lucide-react": "^0.400.0"
@@ -76,11 +124,39 @@ export default function Header() {
 
 FORMAT RULES:
 - "--- /filename.jsx" on ONE line
-- File paths start with / (e.g. --- /App.jsx, --- /components/Hero.jsx)
-- NO /src/ prefix
+- File paths start with / (e.g. --- /App.jsx, --- /pages/Dashboard/Dashboard.jsx)
+- NO /src/ prefix (Sandpack maps / as the src root)
 - /App.jsx is the entry point — MUST export default
-- Break into multiple component files under /components/
-- Maximum 5-8 files for simple apps, 10-15 for complex apps` : `## OUTPUT FORMAT
+- Use PROPER NESTED folder structure:
+
+## MANDATORY FILE STRUCTURE:
+\`\`\`
+/App.jsx                              ← Entry point with router
+/layout/AppLayout.jsx                 ← Main layout with Sidebar + Outlet
+/layout/Sidebar.jsx                   ← Navigation sidebar
+/layout/Navbar.jsx                    ← Top navbar (if needed)
+/pages/Dashboard/Dashboard.jsx        ← Dashboard page
+/pages/Students/StudentList.jsx       ← Student listing page
+/pages/Students/StudentDetails.jsx    ← Student detail page
+/pages/Fees/FeeManager.jsx            ← Fee management page
+/components/ui/Card.jsx               ← Reusable card component
+/components/ui/Modal.jsx              ← Reusable modal component
+/components/ui/Button.jsx             ← Reusable button component
+/components/ui/DataTable.jsx          ← Reusable data table
+/components/ui/Toast.jsx              ← Toast notification component
+/hooks/useFetch.js                    ← Data fetching hook
+/hooks/useAuth.js                     ← Auth state hook (if auth needed)
+/styles/globals.css                   ← Global styles + Google Fonts
+\`\`\`
+
+CRITICAL STRUCTURE RULES:
+- Each page gets its OWN folder under /pages/ (e.g., /pages/Dashboard/, /pages/Students/)
+- Reusable UI components go in /components/ui/
+- Layout components go in /layout/
+- Custom hooks go in /hooks/
+- Styles go in /styles/
+- NEVER put all components flat in /components/ — use proper folder nesting
+- Minimum 10-15 files for simple apps, 15-25 for complex apps` : `## OUTPUT FORMAT
 Generate a SINGLE complete index.html inside a \`\`\`html-preview code fence.`;
 
   const codeRules = `## CODE RULES — ENTERPRISE GRADE
@@ -111,13 +187,19 @@ Before generating code, mentally perform this analysis:
 6. **Indian/regional context**: if user mentions India, use ₹ currency, Indian phone formats, state names, CBSE/ICSE boards, etc.
 
 Example: "School ERP with student management, fees, timetable" should produce:
-- /App.jsx with router + sidebar navigation
-- /components/Sidebar.jsx with icons for each module
-- /components/Dashboard.jsx with KPI cards, charts, recent activity
-- /components/StudentManagement.jsx with full CRUD table, search, filters, add/edit modal
-- /components/FeeManagement.jsx with fee collection, receipts, pending list
-- /components/Timetable.jsx with weekly grid view, period management
-- At minimum 8-15 component files for a comprehensive app
+- /App.jsx with HashRouter + nested Route layout
+- /layout/AppLayout.jsx with sidebar + Outlet
+- /layout/Sidebar.jsx with icons for each module + NavLink active states
+- /pages/Dashboard/Dashboard.jsx with KPI cards, charts, recent activity
+- /pages/Students/StudentList.jsx with full CRUD table, search, filters, add/edit modal
+- /pages/Students/StudentDetails.jsx with detailed student profile view
+- /pages/Fees/FeeManager.jsx with fee collection, receipts, pending list
+- /pages/Fees/FeeHistory.jsx with payment history table
+- /pages/Timetable/Timetable.jsx with weekly grid view, period management
+- /components/ui/Card.jsx, Modal.jsx, DataTable.jsx, Badge.jsx — shared UI
+- /hooks/useFetch.js — reusable data fetching hook
+- /styles/globals.css — global styles with Google Fonts
+- At minimum 12-20 component files for a comprehensive app
 
 ## COMMON MISTAKES TO AVOID
 
@@ -272,44 +354,58 @@ ${schemaSection}
 - ✅ Professional color palette — NOT generic gray/white. Use a strong primary + accent.
 
 ## MULTI-PAGE ROUTING — MANDATORY FOR APPS WITH 2+ FEATURES
-Every app with multiple features MUST use React Router with distinct pages:
+Every app with multiple features MUST use React Router with distinct pages in nested folders:
 
 \`\`\`jsx
-// App.jsx MUST look like this for multi-feature apps:
+// /App.jsx — entry point with router
 import { HashRouter, Routes, Route, Navigate } from "react-router-dom";
-import Sidebar from "./components/Sidebar";
-import Dashboard from "./components/Dashboard";
-import Students from "./components/Students";
-import Settings from "./components/Settings";
+import AppLayout from "./layout/AppLayout";
+import Dashboard from "./pages/Dashboard/Dashboard";
+import StudentList from "./pages/Students/StudentList";
+import FeeManager from "./pages/Fees/FeeManager";
+import Settings from "./pages/Settings/Settings";
 
 export default function App() {
   return (
     <HashRouter>
-      <div className="flex h-screen">
-        <Sidebar />
-        <main className="flex-1 overflow-auto">
-          <Routes>
-            <Route path="/" element={<Dashboard />} />
-            <Route path="/students" element={<Students />} />
-            <Route path="/settings" element={<Settings />} />
-            <Route path="*" element={<Navigate to="/" />} />
-          </Routes>
-        </main>
-      </div>
+      <Routes>
+        <Route path="/" element={<AppLayout />}>
+          <Route index element={<Dashboard />} />
+          <Route path="students" element={<StudentList />} />
+          <Route path="fees" element={<FeeManager />} />
+          <Route path="settings" element={<Settings />} />
+          <Route path="*" element={<Navigate to="/" />} />
+        </Route>
+      </Routes>
     </HashRouter>
+  );
+}
+
+// /layout/AppLayout.jsx — layout shell
+import { Outlet } from "react-router-dom";
+import Sidebar from "./Sidebar";
+
+export default function AppLayout() {
+  return (
+    <div className="flex h-screen">
+      <Sidebar />
+      <main className="flex-1 overflow-auto bg-gray-50">
+        <Outlet />
+      </main>
+    </div>
   );
 }
 \`\`\`
 
-RULES:
+ROUTING RULES:
 - ALWAYS use HashRouter (NOT BrowserRouter) — the app runs in an iframe sandbox
-- Each feature = separate Route with its own component file
-- Sidebar/Nav uses NavLink from react-router-dom with active state styling
+- Use nested Route with layout pattern: <Route path="/" element={<AppLayout />}> wrapping child routes
+- Each feature = separate Route with its own page component in /pages/[Module]/
+- /layout/Sidebar.jsx uses NavLink from react-router-dom with active state styling
 - NEVER dump all features on a single page with sections — use ROUTES
 - Each route's component has its own full CRUD operations
 - URL changes when navigating between modules
 
-## DATABASE AUTO-CREATION — CRITICAL
 When generating apps with data, you MUST use the Data API with meaningful collection names.
 Each collection in the app becomes a database table automatically. Use these patterns:
 
@@ -434,14 +530,18 @@ export default function App() {
 - Add a Logout button in the sidebar that calls logout() and redirects to /login
 - If the app has a public landing page, it goes on "/" and dashboard on "/app" or "/dashboard"
 
-## FILE STRUCTURE — PRODUCTION QUALITY
-- /App.jsx: Router setup, layout shell, sidebar/nav
-- /components/Sidebar.jsx or /components/Navigation.jsx: Main navigation
-- /components/Dashboard.jsx: Overview with KPI cards and charts
-- /components/[Feature].jsx: One file per major feature/module
-- /components/ui/[Widget].jsx: Reusable UI components (Modal, Table, Card, Toast)
-- Minimum 8 files for simple apps, 12-20 for complex/ERP apps
-- NEVER put everything in App.jsx — split into focused components
+## FILE STRUCTURE — PRODUCTION QUALITY (NESTED FOLDERS)
+- /App.jsx: Router setup with HashRouter — imports from /layout/ and /pages/
+- /layout/AppLayout.jsx: Main layout shell with Sidebar + Outlet
+- /layout/Sidebar.jsx: Navigation sidebar with NavLink active states
+- /layout/Navbar.jsx: Top navigation bar (if applicable)
+- /pages/[Module]/[Module].jsx: One folder per page/module (e.g., /pages/Dashboard/Dashboard.jsx)
+- /pages/[Module]/[SubPage].jsx: Sub-pages within module folder (e.g., /pages/Students/StudentDetails.jsx)
+- /components/ui/[Widget].jsx: Reusable UI components (Modal, DataTable, Card, Toast, Badge)
+- /hooks/use[Name].js: Custom hooks (useFetch, useAuth, useDebounce)
+- /styles/globals.css: Global CSS with Google Fonts import
+- Minimum 12 files for simple apps, 18-25 for complex/ERP apps
+- EVERY page module gets its OWN folder — NEVER flat /components/Dashboard.jsx
 
 ${designTheme ? `## DESIGN THEME\n${designTheme}` : ''}
 ${knowledgeSection}

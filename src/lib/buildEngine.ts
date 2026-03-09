@@ -75,7 +75,10 @@ async function autoDetectAndCreateSchemas(files: Record<string, string>, project
       }
     }
     
-    if (collections.size === 0) return;
+    if (collections.size === 0) {
+      console.log("[AutoSchema] No collections detected in generated code");
+      return;
+    }
     
     console.log(`[AutoSchema] Detected ${collections.size} collections:`, [...collections]);
     
@@ -115,6 +118,37 @@ async function autoDetectAndCreateSchemas(files: Record<string, string>, project
         console.log(`[AutoSchema] ✅ Created ${newSchemas.length} schemas:`, newSchemas.map(s => s.collection_name));
       }
     }
+
+    // ── Auto-detect auth usage and create summary ──
+    const usesAuth = allCode.includes("project-auth") || allCode.includes("useAuth") || allCode.includes("AuthProvider") || allCode.includes("AuthContext");
+    const usesDataApi = allCode.includes("project-api") || collections.size > 0;
+    const usesCustomFunctions = allCode.includes("project-exec");
+
+    // Create a summary of backend capabilities for the Cloud panel
+    const backendSummary = {
+      collections: [...collections],
+      usesAuth,
+      usesDataApi,
+      usesCustomFunctions,
+      totalSchemas: collections.size + (existingNames?.size || 0),
+    };
+    console.log("[AutoSchema] Backend summary:", backendSummary);
+
+    // Save backend capabilities to project_data for the Cloud panel to read
+    await supabase
+      .from("project_data")
+      .upsert(
+        {
+          project_id: projectId,
+          collection: "backend_capabilities",
+          data: backendSummary as any,
+        },
+        { onConflict: "project_id,collection" }
+      )
+      .then(({ error }) => {
+        if (error) console.warn("[AutoSchema] Failed to save backend summary:", error);
+      });
+
   } catch (err) {
     console.warn("[AutoSchema] Error during schema detection:", err);
   }

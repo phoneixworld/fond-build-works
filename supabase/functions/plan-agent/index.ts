@@ -27,16 +27,33 @@ Use the create_plan tool to return a structured plan.
 ## RULES
 - Each task should be independently buildable and testable
 - Tasks should be small enough to complete in one AI build step
-- Include file paths that will be created/modified
+- Include file paths that will be created/modified using PROPER NESTED structure:
+  - /App.jsx, /layout/AppLayout.jsx, /layout/Sidebar.jsx
+  - /pages/Dashboard/Dashboard.jsx, /pages/Students/StudentList.jsx
+  - /components/ui/Card.jsx, /components/ui/Modal.jsx
+  - /hooks/useFetch.js, /hooks/useAuth.js
+  - /styles/globals.css
 - Mark tasks that need user input or decisions
 - Consider the existing codebase context
 - Group related tasks logically
+- ALWAYS include a "backend" category task for apps that need data persistence
+  - This task should define the collections/tables needed and how the Data API will be used
+  - Include auth setup if the app needs user accounts
 
 ## COMPLEXITY LEVELS
 - "trivial": Single component change, CSS tweak (1 build step)
 - "simple": New component or minor feature (1-2 build steps)  
 - "medium": Multi-component feature with state (3-5 build steps)
 - "complex": Full feature with backend, auth, multiple views (6+ build steps)
+
+## TASK STRUCTURE PATTERN FOR APPS
+For a typical app, create tasks in this order:
+1. Layout + Navigation (layout/AppLayout.jsx, layout/Sidebar.jsx)
+2. Dashboard/Home page (pages/Dashboard/)
+3. Feature modules (pages/Students/, pages/Fees/, etc.) - one task per module
+4. Shared UI components (components/ui/) - if not covered by above
+5. Backend integration (hooks for data fetching, auth context)
+Each task's buildPrompt MUST instruct the agent to use the nested file structure.
 
 ## EXISTING CONTEXT
 Tech Stack: ${techStack || "react"}
