@@ -578,5 +578,5 @@ const ChatMessage = ({ content, role, timestamp, isLoading, onEdit, onRegenerate
   );
 };
 
-export default ChatMessage;
+export default React.memo(ChatMessage);
 export { getTextContent, getImageUrls, formatTime };
