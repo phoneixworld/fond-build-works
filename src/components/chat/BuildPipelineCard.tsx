@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { CheckCircle2, Circle, Loader2, ChevronRight, FileCode2, Bot, Cpu, Shield, RotateCcw } from "lucide-react";
 import type { PipelineStep } from "@/lib/agentPipeline";
@@ -117,7 +117,7 @@ function detectTasks(content: string, isBuilding: boolean, pipelineStep?: Pipeli
   return tasks;
 }
 
-const StatusIndicator = ({ status }: { status: TaskItem["status"] }) => {
+const StatusIndicator = React.forwardRef<HTMLDivElement, { status: TaskItem["status"] }>(({ status }, ref) => {
   switch (status) {
     case "done":
       return (
@@ -130,7 +130,8 @@ const StatusIndicator = ({ status }: { status: TaskItem["status"] }) => {
     default:
       return <Circle className="w-4 h-4 text-muted-foreground/25" />;
   }
-};
+});
+StatusIndicator.displayName = "StatusIndicator";
 
 const BuildPipelineCard = ({ isBuilding, streamContent, elapsed, tasks: externalTasks, pipelineStep, currentAgent }: BuildPipelineCardProps) => {
   const [collapsed, setCollapsed] = useState(false);

@@ -1,12 +1,65 @@
-import { useMemo } from "react";
+import { useMemo, Component, ReactNode } from "react";
 import {
   SandpackProvider,
   SandpackPreview as SandpackPreviewPane,
   SandpackConsole,
 } from "@codesandbox/sandpack-react";
 import { usePreview, SandpackFileSet } from "@/contexts/PreviewContext";
+import { AlertTriangle, RefreshCw } from "lucide-react";
 
-// Duplicate allowlist for second-pass safety net
+// ─── Error Boundary ───────────────────────────────────────────────────────────
+interface ErrorBoundaryState {
+  hasError: boolean;
+  error: Error | null;
+}
+
+class SandpackErrorBoundary extends Component<
+  { children: ReactNode; onRetry: () => void },
+  ErrorBoundaryState
+> {
+  state: ErrorBoundaryState = { hasError: false, error: null };
+
+  static getDerivedStateFromError(error: Error) {
+    return { hasError: true, error };
+  }
+
+  componentDidCatch(error: Error) {
+    console.error("[SandpackErrorBoundary]", error);
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="h-full w-full flex items-center justify-center bg-background">
+          <div className="text-center space-y-4 max-w-sm px-6">
+            <div className="w-12 h-12 mx-auto rounded-xl bg-destructive/10 flex items-center justify-center">
+              <AlertTriangle className="w-6 h-6 text-destructive" />
+            </div>
+            <div>
+              <h3 className="text-sm font-semibold text-foreground">Preview crashed</h3>
+              <p className="text-xs text-muted-foreground mt-1">
+                {this.state.error?.message || "An unexpected error occurred in the preview."}
+              </p>
+            </div>
+            <button
+              onClick={() => {
+                this.setState({ hasError: false, error: null });
+                this.props.onRetry();
+              }}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 transition-colors"
+            >
+              <RefreshCw className="w-3 h-3" />
+              Retry
+            </button>
+          </div>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+
+// ─── Allowlist ────────────────────────────────────────────────────────────────
 const ALLOWED_PACKAGES = new Set([
   "react", "react-dom", "react/jsx-runtime",
   "lucide-react", "framer-motion", "date-fns", "recharts",
@@ -23,13 +76,10 @@ function isAllowedPkg(pkg: string): boolean {
 
 /** Second-pass sanitizer applied right before Sandpack receives code */
 function sanitizeCode(code: string): string {
-  // Strip file separator lines — match ANY variant of "--- filename ---"
-  // Line-by-line to be absolutely sure
+  // Strip file separator lines
   code = code.split("\n").filter(line => {
     const t = line.trim();
-    // Remove lines like: "--- /src/App.jsx ---", "--- /App.jsx", "--- App.jsx ---"
     if (/^-{3}\s+\/?\w[\w/.-]*\.\w+\s*-{0,3}\s*$/.test(t)) return false;
-    // Remove bare "---" lines at the very start
     return true;
   }).join("\n");
   
@@ -113,14 +163,11 @@ function buildSandpackFiles(files: SandpackFileSet | null): Record<string, strin
   // Map user files into sandpack paths
   for (const [path, code] of Object.entries(files)) {
     const normalized = path.startsWith("/") ? path : `/${path}`;
-    // Keep .jsx as-is — Sandpack react template supports both .js and .jsx
-    // Only convert .tsx/.ts to .js
     const sandpackPath = normalized.replace(/\.tsx?$/, ".js");
-    // Apply second-pass sanitizer on JS/JSX files
     base[sandpackPath] = sandpackPath.match(/\.(jsx?|js)$/) ? sanitizeCode(code) : code;
   }
 
-  // Ensure entry point exists: /App.js or /App.jsx
+  // Ensure entry point exists
   if (!base["/App.js"] && !base["/App.jsx"]) {
     base["/App.js"] = DEFAULT_APP;
   }
@@ -133,6 +180,15 @@ function buildSandpackFiles(files: SandpackFileSet | null): Record<string, strin
   return base;
 }
 
+// ─── Stable hash for files to avoid unnecessary Sandpack remounts ─────────
+function filesHash(files: SandpackFileSet | null): string {
+  if (!files) return "empty";
+  const keys = Object.keys(files).sort();
+  // Use file count + total length as a fast fingerprint
+  const totalLen = keys.reduce((sum, k) => sum + files[k].length, 0);
+  return `${keys.length}-${totalLen}`;
+}
+
 interface SandpackPreviewProps {
   viewport?: { width: string; maxWidth: string };
   showConsole?: boolean;
@@ -142,6 +198,9 @@ const SandpackPreview = ({ viewport, showConsole = false }: SandpackPreviewProps
   const { sandpackFiles, sandpackDeps } = usePreview();
 
   const files = useMemo(() => buildSandpackFiles(sandpackFiles), [sandpackFiles]);
+
+  // Stable key: only remount Sandpack when file structure actually changes
+  const stableKey = useMemo(() => filesHash(sandpackFiles), [sandpackFiles]);
 
   const dependencies = useMemo(() => ({
     "react": "^18.2.0",
@@ -159,34 +218,37 @@ const SandpackPreview = ({ viewport, showConsole = false }: SandpackPreviewProps
 
   return (
     <div className="h-full w-full" style={{ minHeight: 0 }}>
-      <SandpackProvider
-        template="react"
-        theme="auto"
-        files={files}
-        customSetup={{
-          dependencies,
-        }}
-        options={{
-          externalResources: [
-            "https://cdn.tailwindcss.com",
-          ],
-          recompileMode: "delayed",
-          recompileDelay: 500,
-        }}
-      >
-        <div className="h-full flex flex-col" style={viewport ? { width: viewport.width, maxWidth: viewport.maxWidth, height: '100%' } : { height: '100%' }}>
-          <SandpackPreviewPane
-            showOpenInCodeSandbox={false}
-            showRefreshButton={false}
-            style={{ flex: 1, minHeight: 0, height: '100%' }}
-          />
-          {showConsole && (
-            <div className="h-40 border-t border-border overflow-auto">
-              <SandpackConsole />
-            </div>
-          )}
-        </div>
-      </SandpackProvider>
+      <SandpackErrorBoundary onRetry={() => {}}>
+        <SandpackProvider
+          key={stableKey}
+          template="react"
+          theme="auto"
+          files={files}
+          customSetup={{
+            dependencies,
+          }}
+          options={{
+            externalResources: [
+              "https://cdn.tailwindcss.com",
+            ],
+            recompileMode: "delayed",
+            recompileDelay: 500,
+          }}
+        >
+          <div className="h-full flex flex-col" style={viewport ? { width: viewport.width, maxWidth: viewport.maxWidth, height: '100%' } : { height: '100%' }}>
+            <SandpackPreviewPane
+              showOpenInCodeSandbox={false}
+              showRefreshButton={false}
+              style={{ flex: 1, minHeight: 0, height: '100%' }}
+            />
+            {showConsole && (
+              <div className="h-40 border-t border-border overflow-auto">
+                <SandpackConsole />
+              </div>
+            )}
+          </div>
+        </SandpackProvider>
+      </SandpackErrorBoundary>
     </div>
   );
 };

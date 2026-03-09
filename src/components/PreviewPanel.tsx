@@ -181,11 +181,15 @@ const PreviewPanel = () => {
           </AnimatePresence>
 
           {previewMode === "sandpack" ? (
-            <div className="h-full w-full min-h-0" key={`sandpack-${refreshKey}`}>
-              {sandpackFiles ? (
+            <div className="h-full w-full min-h-0" key="sandpack-container">
+              {sandpackFiles && Object.keys(sandpackFiles).length > 0 ? (
                 <SandpackPreview
+                  key={refreshKey}
                   viewport={{ width: currentViewport.width, maxWidth: currentViewport.maxWidth }}
                 />
+              ) : isBuilding ? (
+                /* Show skeleton while building — don't show empty state prematurely */
+                null
               ) : (
                 <EmptyState />
               )}
