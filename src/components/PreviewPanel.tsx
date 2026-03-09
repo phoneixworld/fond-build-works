@@ -121,6 +121,7 @@ const PreviewPanel = () => {
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const urlInputRef = useRef<HTMLInputElement>(null);
   const { previewHtml, isBuilding, buildStep, previewMode, setPreviewMode, sandpackFiles, buildMetrics } = usePreview();
+  const buildStepHistory = useBuildStepHistory(buildStep, isBuilding);
 
   const toggleDirectTouch = useCallback(() => {
     const next = !directTouchActive;
