@@ -16,7 +16,7 @@ const LandingPage = ({ onStartProject, onOpenProject }: LandingPageProps) => {
   const { user, signOut } = useAuth();
   const { projects, loading, deleteProject, cloneProject } = useProjects();
   const [input, setInput] = useState("");
-  const [techStack, setTechStack] = useState<TechStackId>("html-tailwind");
+  const techStack = "html-tailwind";
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
   const handleSubmit = () => {
