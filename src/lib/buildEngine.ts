@@ -32,7 +32,7 @@ import {
 } from "@/lib/buildCache";
 import {
   startBuild, recordPlanningLatency, startTask, completeTask,
-  finishBuild, timer, type TaskMetrics,
+  finishBuild, timer, type TaskMetrics, type BuildMetrics,
 } from "@/lib/buildObservability";
 import { buildIncrementalContext, contextReductionRatio } from "@/lib/incrementalContext";
 import { applyAdaptiveSplitting } from "@/lib/adaptiveTaskSplitter";
@@ -181,6 +181,7 @@ export interface EngineResult {
   plan?: BuildPlan;
   chatText: string;
   mergeConflicts: string[];
+  metrics?: BuildMetrics;
 }
 
 // ─── File Validation (real parsers — single source of truth) ──────────────
@@ -643,14 +644,14 @@ async function runDirectBuild(
   autoDetectAndCreateSchemas(finalFiles, config.projectId);
   
   callbacks.onProgress({ phase: "complete", message: "Build complete" });
+  const finalMetrics = finishBuild();
   callbacks.onComplete({
     files: finalFiles,
     deps: result.deps,
     chatText: result.chatText || "✅ App generated successfully",
     mergeConflicts: conflicts,
+    metrics: finalMetrics || undefined,
   });
-
-  finishBuild();
 }
 
 async function runPlannedBuild(
@@ -833,13 +834,13 @@ ${task.filesAffected.map(f => `- ${f}`).join("\n")}
   const chatText = `✅ **Build Complete** — ${executableTasks.length} tasks in ${parallelGroups.length} parallel groups\n\n${plan.summary}\n\n${taskSummary}`;
 
   callbacks.onProgress({ phase: "complete", message: "Build complete" });
+  const finalMetrics = finishBuild();
   callbacks.onComplete({
     files: accumulatedFiles,
     deps: allDeps,
     plan,
     chatText,
     mergeConflicts: allConflicts,
+    metrics: finalMetrics || undefined,
   });
-
-  finishBuild();
 }

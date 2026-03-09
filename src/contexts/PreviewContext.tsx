@@ -1,4 +1,5 @@
 import { createContext, useContext, useState, ReactNode } from "react";
+import type { BuildMetrics } from "@/lib/buildObservability";
 
 export interface SandpackFileSet {
   [path: string]: string;
@@ -21,6 +22,9 @@ interface PreviewContextType {
   // Mode
   previewMode: "html" | "sandpack";
   setPreviewMode: (mode: "html" | "sandpack") => void;
+  // Build metrics for timeline
+  buildMetrics: BuildMetrics | null;
+  setBuildMetrics: (metrics: BuildMetrics | null) => void;
 }
 
 const PreviewContext = createContext<PreviewContextType | null>(null);
@@ -32,6 +36,7 @@ export const PreviewProvider = ({ children }: { children: ReactNode }) => {
   const [isBuilding, setIsBuilding] = useState(false);
   const [buildStep, setBuildStep] = useState("");
   const [previewMode, setPreviewMode] = useState<"html" | "sandpack">("html");
+  const [buildMetrics, setBuildMetrics] = useState<BuildMetrics | null>(null);
 
   return (
     <PreviewContext.Provider value={{
@@ -41,6 +46,7 @@ export const PreviewProvider = ({ children }: { children: ReactNode }) => {
       isBuilding, setIsBuilding,
       buildStep, setBuildStep,
       previewMode, setPreviewMode,
+      buildMetrics, setBuildMetrics,
     }}>
       {children}
     </PreviewContext.Provider>
