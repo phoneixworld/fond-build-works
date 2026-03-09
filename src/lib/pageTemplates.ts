@@ -295,6 +295,28 @@ DASHBOARD LAYOUT:
 DESIGN: Professional dark sidebar (gray-900), white content area. Cards with hover shadow. Charts using Recharts. Tables with zebra striping + row hover. Status badges (green/yellow/red). Responsive grid.
 ROUTES: /, /users, /analytics, /content, /orders, /reports, /settings`,
   },
+  {
+    id: "todo",
+    name: "Todo App",
+    emoji: "✅",
+    category: "productivity",
+    description: "Task management app with categories, priorities, and filters",
+    keywords: ["todo", "task", "tasks", "checklist", "to-do", "to do", "productivity", "planner", "organizer"],
+    blueprint: `STRUCTURE: Header (app name + date) → Stats bar (total/active/completed) → Task input (text + category + priority) → Filter bar (All/Active/Completed + category pills) → Task list (checkbox + text + priority dot + category + delete)
+DESIGN: Clean, minimal. Indigo accent. Rounded cards. Animated task transitions. Priority dots (red/amber/blue). Category pills. Progress percentage.
+FEATURES: Add/complete/delete tasks, filter by status and category, priority levels, animated transitions.`,
+  },
+  {
+    id: "chat-app",
+    name: "Chat Application",
+    emoji: "💬",
+    category: "messaging",
+    description: "Real-time chat with conversations, messages, and user profiles",
+    keywords: ["chat", "message", "messaging", "conversation", "talk", "communicate", "inbox", "dm", "direct message"],
+    blueprint: `STRUCTURE: Left sidebar (search + conversation list with avatars) → Main chat area (header + messages + input) → Optional right panel (user profile)
+DESIGN: Clean white. Blue accent for sent messages. Online status indicators. Unread badges. Rounded message bubbles. Smooth scroll.
+FEATURES: Conversation list, send/receive messages, online indicators, user profile panel, search.`,
+  },
 ];
 
 /**
