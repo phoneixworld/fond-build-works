@@ -132,8 +132,18 @@ const StatusIndicator = React.forwardRef<HTMLDivElement, { status: TaskItem["sta
 });
 StatusIndicator.displayName = "StatusIndicator";
 
-const BuildPipelineCard = ({ isBuilding, streamContent, elapsed, tasks: externalTasks, pipelineStep, currentAgent }: BuildPipelineCardProps) => {
+const BuildPipelineCard = ({ isBuilding, streamContent, tasks: externalTasks, pipelineStep, currentAgent }: BuildPipelineCardProps) => {
   const [collapsed, setCollapsed] = useState(false);
+
+  // Self-contained elapsed timer — no parent re-renders
+  const [elapsed, setElapsed] = useState(0);
+  useEffect(() => {
+    if (isBuilding) {
+      setElapsed(0);
+      const id = setInterval(() => setElapsed(t => t + 1), 1000);
+      return () => clearInterval(id);
+    }
+  }, [isBuilding]);
 
   const editingFiles = useMemo(() => detectEditingFiles(streamContent), [streamContent]);
   const tasks = useMemo(() => externalTasks || detectTasks(streamContent, isBuilding, pipelineStep, currentAgent), [externalTasks, streamContent, isBuilding, pipelineStep, currentAgent]);
