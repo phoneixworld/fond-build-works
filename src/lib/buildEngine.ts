@@ -34,6 +34,9 @@ import {
   startBuild, recordPlanningLatency, startTask, completeTask,
   finishBuild, timer, type TaskMetrics,
 } from "@/lib/buildObservability";
+import { buildIncrementalContext, contextReductionRatio } from "@/lib/incrementalContext";
+import { applyAdaptiveSplitting } from "@/lib/adaptiveTaskSplitter";
+import { persistTaskOutput, getPersistedTaskOutput } from "@/lib/persistentCache";
 
 // ─── Auto-Schema Detection ────────────────────────────────────────────────
 
