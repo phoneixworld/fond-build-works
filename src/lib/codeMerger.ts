@@ -56,6 +56,7 @@ function extractNavLinks(code: string): string[] {
  */
 function deduplicateImports(imports: string[]): string[] {
   const seen = new Map<string, string>();
+  const seenDefaultNames = new Map<string, string>(); // default import name → module path
   
   for (const imp of imports) {
     // Extract the module path
@@ -66,6 +67,26 @@ function deduplicateImports(imports: string[]): string[] {
     }
     
     const modulePath = fromMatch[1];
+    
+    // Check for duplicate default import names from different paths
+    const defaultName = extractDefaultImport(imp);
+    if (defaultName) {
+      const existingPath = seenDefaultNames.get(defaultName);
+      if (existingPath && existingPath !== modulePath) {
+        // Same default name, different module — keep the longer/more specific path (skip this duplicate)
+        if (modulePath.length > existingPath.length) {
+          // New path is more specific — replace
+          seen.delete(existingPath);
+          seenDefaultNames.set(defaultName, modulePath);
+        } else {
+          // Existing path is more specific — skip this import
+          continue;
+        }
+      } else {
+        seenDefaultNames.set(defaultName, modulePath);
+      }
+    }
+
     const existing = seen.get(modulePath);
     
     if (!existing) {
