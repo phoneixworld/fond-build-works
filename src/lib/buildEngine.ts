@@ -10,6 +10,12 @@
  * 4. Failed tasks are retried with error context before moving on
  * 5. If no code is produced, the engine forces a retry with explicit instructions
  * 6. Validation is parse-only (Sucrase + PostCSS) — no regex repair
+ * 
+ * Performance optimizations:
+ * 7. Independent tasks run in parallel (dependency-aware scheduling)
+ * 8. Task outputs and validation results are cached
+ * 9. Only changed files are sent to preview (file diffing)
+ * 10. Structured observability for every pipeline stage
  */
 
 import { streamBuildAgent, validateReactCode, formatRetryContext, MAX_BUILD_RETRIES } from "@/lib/agentPipeline";
@@ -19,13 +25,18 @@ import { generatePlan, type BuildPlan, type PlanTask } from "@/lib/planningAgent
 import { topologicalSort } from "@/lib/taskExecutor";
 import { mergeFiles, buildFullCodeContext, type MergeResult } from "@/lib/codeMerger";
 import { supabase } from "@/integrations/supabase/client";
+import {
+  getTaskCacheKey, getCachedTaskOutput, setCachedTaskOutput,
+  isFileValidated, markFileValidated, clearValidationCache,
+  computeFileDiff, isDiffEmpty,
+} from "@/lib/buildCache";
+import {
+  startBuild, recordPlanningLatency, startTask, completeTask,
+  finishBuild, timer, type TaskMetrics,
+} from "@/lib/buildObservability";
 
 // ─── Auto-Schema Detection ────────────────────────────────────────────────
 
-/**
- * Scan generated code for collection references (fetch calls to project-api)
- * and auto-create project_schemas entries so the database reflects what the app uses.
- */
 async function autoDetectAndCreateSchemas(files: Record<string, string>, projectId: string): Promise<void> {
   try {
     const allCode = Object.values(files).join("\n");
@@ -106,7 +117,6 @@ async function autoDetectAndCreateSchemas(files: Record<string, string>, project
   }
 }
 
-/** Infer field type from field name patterns */
 function inferFieldType(fieldName: string): string {
   const name = fieldName.toLowerCase();
   if (name.includes('email')) return 'email';
@@ -173,23 +183,26 @@ export interface EngineResult {
 // ─── File Validation (real parsers — single source of truth) ──────────────
 
 /**
- * Validate all generated files using real parsers. No repair, no regex.
- * JSX/TSX → Sucrase, CSS → PostCSS.
- * Returns array of { file, error } for files that failed parsing.
+ * Validate files using real parsers. Skips files already validated via cache.
  */
 function validateAllFiles(files: Record<string, string>): { file: string; error: string }[] {
   const errors: { file: string; error: string }[] = [];
   
   for (const [filePath, code] of Object.entries(files)) {
+    // Skip if this exact content was already validated
+    if (isFileValidated(filePath, code)) continue;
+
     if (filePath.match(/\.(jsx?|tsx?)$/)) {
       try {
         transform(code, { transforms: ["jsx", "imports"], filePath });
+        markFileValidated(filePath, code);
       } catch (e: any) {
         errors.push({ file: filePath, error: (e.message || "JSX parse error").slice(0, 200) });
       }
     } else if (filePath.match(/\.css$/)) {
       try {
         postcss.parse(code);
+        markFileValidated(filePath, code);
       } catch (e: any) {
         errors.push({ file: filePath, error: (e.message || "CSS parse error").slice(0, 200) });
       }
@@ -199,9 +212,6 @@ function validateAllFiles(files: Record<string, string>): { file: string; error:
   return errors;
 }
 
-/**
- * Generate a stub component for a fatally broken file.
- */
 function makeStub(filePath: string): string {
   const componentName = filePath
     .replace(/.*\//, '')
@@ -211,17 +221,10 @@ function makeStub(filePath: string): string {
   return `import React from "react";\n\nexport default function ${safeName}() {\n  return (\n    <div className="p-8 text-center space-y-3">\n      <div className="w-10 h-10 mx-auto rounded-full bg-amber-100 flex items-center justify-center"><span className="text-amber-600 text-xl">\u26A0</span></div>\n      <h2 className="text-lg font-semibold text-slate-800">${safeName}</h2>\n      <p className="text-sm text-slate-500">This module had a build error after retries. Send a follow-up message to fix it.</p>\n    </div>\n  );\n}\n`;
 }
 
-/**
- * Stub broken CSS with safe Tailwind fallback.
- */
 function makeCSSSub(): string {
   return `/* CSS had parse errors after retries — using safe fallback */\n@tailwind base;\n@tailwind components;\n@tailwind utilities;\n`;
 }
 
-/**
- * After validation retries are exhausted, stub out files that still fail.
- * Returns a clean file map where every file is parseable.
- */
 function stubBrokenFiles(files: Record<string, string>, errors: { file: string; error: string }[]): Record<string, string> {
   const result = { ...files };
   for (const { file, error } of errors) {
@@ -237,11 +240,6 @@ function stubBrokenFiles(files: Record<string, string>, errors: { file: string; 
 
 // ─── File Parser ───────────────────────────────────────────────────────────
 
-/**
- * Parse react files from build-agent output.
- * Handles multiple fence formats and file separator styles.
- * NO repair — files are stored as-is from the AI output.
- */
 function parseReactFilesFromOutput(text: string): { 
   chatText: string; 
   files: Record<string, string> | null; 
@@ -299,7 +297,6 @@ function parseReactFilesFromOutput(text: string): {
       if (code.length > 0) {
         let fname = currentFile.startsWith("/") ? currentFile : `/${currentFile}`;
         fname = fname.replace(/^\/src\//, "/");
-        // Store as-is — no repair. Validation happens downstream.
         files[fname] = code;
       }
     }
@@ -341,14 +338,8 @@ function parseReactFilesFromOutput(text: string): {
   };
 }
 
-// ─── Single Task Executor ──────────────────────────────────────────────────
+// ─── Single Task Executor (with caching) ──────────────────────────────────
 
-/**
- * Execute a single build task with validation-driven retry logic.
- * 
- * Flow: Generate → Validate (Sucrase + PostCSS) → if errors, retry with error context
- * After max retries, stub broken files so the pipeline never emits invalid code.
- */
 async function executeSingleTask(
   prompt: string,
   config: EngineConfig,
@@ -356,7 +347,17 @@ async function executeSingleTask(
   onDelta: (chunk: string) => void,
   retryCount = 0,
   maxTokens?: number
-): Promise<{ files: Record<string, string>; deps: Record<string, string>; chatText: string }> {
+): Promise<{ files: Record<string, string>; deps: Record<string, string>; chatText: string; modelMs: number; cached: boolean }> {
+  // ── Check cache first ──
+  const cacheKey = getTaskCacheKey(prompt, accumulatedCode);
+  const cached = getCachedTaskOutput(cacheKey);
+  if (cached && retryCount === 0) {
+    console.log("[BuildEngine] Cache hit — skipping model call");
+    return { ...cached, modelMs: 0, cached: true };
+  }
+
+  const modelTimer = timer();
+
   return new Promise((resolve, reject) => {
     let fullText = "";
     
@@ -380,14 +381,13 @@ async function executeSingleTask(
         onDelta(chunk);
       },
       onDone: (responseText) => {
+        const modelMs = modelTimer.elapsed();
         const parsed = parseReactFilesFromOutput(responseText);
         
         if (parsed.files && Object.keys(parsed.files).length > 0) {
-          // ── Validate all files with real parsers (single source of truth) ──
           const validationErrors = validateAllFiles(parsed.files);
           
           if (validationErrors.length > 0 && retryCount < 2) {
-            // Retry with exact parser errors — no repair attempt
             const errorSummary = validationErrors.map(e => `${e.file}: ${e.error}`).join('\n');
             console.warn(`[BuildEngine] Validation errors, retrying (attempt ${retryCount + 1}):\n${errorSummary}`);
             executeSingleTask(
@@ -399,13 +399,15 @@ async function executeSingleTask(
               maxTokens
             ).then(resolve).catch(reject);
           } else {
-            // Either valid, or max retries reached — stub any remaining broken files
             let finalFiles = parsed.files;
             if (validationErrors.length > 0) {
               console.warn(`[BuildEngine] Max retries reached, stubbing ${validationErrors.length} broken file(s)`);
               finalFiles = stubBrokenFiles(parsed.files, validationErrors);
             }
-            resolve({ files: finalFiles, deps: parsed.deps, chatText: parsed.chatText });
+            // Cache successful output
+            const output = { files: finalFiles, deps: parsed.deps, chatText: parsed.chatText };
+            setCachedTaskOutput(cacheKey, { ...output, timestamp: Date.now() });
+            resolve({ ...output, modelMs, cached: false });
           }
         } else if (retryCount < 2) {
           console.warn(`[BuildEngine] No code in response, retrying (attempt ${retryCount + 1})`);
@@ -419,7 +421,7 @@ async function executeSingleTask(
           ).then(resolve).catch(reject);
         } else {
           console.error("[BuildEngine] No code after retries");
-          resolve({ files: {}, deps: {}, chatText: responseText });
+          resolve({ files: {}, deps: {}, chatText: responseText, modelMs, cached: false });
         }
       },
       onError: (err) => {
@@ -435,6 +437,55 @@ async function executeSingleTask(
       },
     });
   });
+}
+
+// ─── Parallel Task Scheduler ──────────────────────────────────────────────
+
+/**
+ * Group sorted tasks into parallel execution groups.
+ * Tasks in the same group have no dependencies on each other
+ * AND no overlapping filesAffected.
+ */
+function buildParallelGroups(sortedTasks: PlanTask[]): PlanTask[][] {
+  const groups: PlanTask[][] = [];
+  const completed = new Set<string>();
+
+  let remaining = [...sortedTasks];
+
+  while (remaining.length > 0) {
+    const group: PlanTask[] = [];
+    const groupFiles = new Set<string>();
+    const nextRemaining: PlanTask[] = [];
+
+    for (const task of remaining) {
+      // All deps must be completed
+      const depsReady = task.dependsOn.every(dep => completed.has(dep));
+      // No file conflicts with current group
+      const hasFileConflict = task.filesAffected.some(f => groupFiles.has(f));
+      // Don't run App.jsx producers in parallel — they need smart merge
+      const touchesApp = task.filesAffected.some(f => /App\.(jsx?|tsx?)$/.test(f));
+      const groupTouchesApp = group.some(g => g.filesAffected.some(f => /App\.(jsx?|tsx?)$/.test(f)));
+
+      if (depsReady && !hasFileConflict && !(touchesApp && groupTouchesApp)) {
+        group.push(task);
+        task.filesAffected.forEach(f => groupFiles.add(f));
+      } else {
+        nextRemaining.push(task);
+      }
+    }
+
+    if (group.length === 0) {
+      // Deadlock safety — force the first remaining task
+      const forced = nextRemaining.shift()!;
+      group.push(forced);
+    }
+
+    for (const t of group) completed.add(t.id);
+    groups.push(group);
+    remaining = nextRemaining;
+  }
+
+  return groups;
 }
 
 // ─── Assembly Step ─────────────────────────────────────────────────────────
@@ -504,6 +555,9 @@ export async function runBuildEngine(
   
   const hasExistingCode = config.existingFiles && Object.keys(config.existingFiles).length > 0;
   
+  // Clear validation cache for fresh builds
+  clearValidationCache();
+  
   try {
     if (isComplex && !hasExistingCode) {
       await runPlannedBuild(userPrompt, config, callbacks);
@@ -521,6 +575,9 @@ async function runDirectBuild(
   config: EngineConfig,
   callbacks: EngineCallbacks
 ): Promise<void> {
+  const metrics = startBuild(1);
+  const taskMetrics = startTask("direct", "Direct build");
+
   callbacks.onProgress({ phase: "executing", message: "Generating code..." });
   
   const existingCode = config.existingFiles 
@@ -530,6 +587,8 @@ async function runDirectBuild(
   const result = await executeSingleTask(prompt, config, existingCode, callbacks.onDelta);
   
   if (Object.keys(result.files).length === 0) {
+    completeTask(taskMetrics, { fileCount: 0, totalFileSize: 0, modelLatencyMs: result.modelMs, validationLatencyMs: 0, mergeLatencyMs: 0, retryCount: 0, cached: result.cached, status: "failed" });
+    finishBuild();
     callbacks.onError("The AI did not generate any code. Please try a more specific prompt like: \"Build a dashboard with sidebar navigation, user list, and settings page\"");
     return;
   }
@@ -537,23 +596,38 @@ async function runDirectBuild(
   // Merge with existing if applicable
   let finalFiles = result.files;
   let conflicts: string[] = [];
+  const mergeTimer = timer();
   if (config.existingFiles && Object.keys(config.existingFiles).length > 0) {
     callbacks.onProgress({ phase: "merging", message: "Merging with existing code..." });
     const merged = mergeFiles(config.existingFiles, result.files);
     finalFiles = merged.files;
     conflicts = merged.conflicts;
   }
+  const mergeMs = mergeTimer.elapsed();
   
-  // Final validation pass (should pass since executeSingleTask already validates)
+  // Final validation
   callbacks.onProgress({ phase: "validating", message: "Validating code..." });
+  const valTimer = timer();
   const postMergeErrors = validateAllFiles(finalFiles);
   if (postMergeErrors.length > 0) {
     console.warn("[BuildEngine:direct] Post-merge validation issues — stubbing:", postMergeErrors);
     finalFiles = stubBrokenFiles(finalFiles, postMergeErrors);
   }
+  const valMs = valTimer.elapsed();
+
+  const totalSize = Object.values(finalFiles).reduce((s, c) => s + c.length, 0);
+  completeTask(taskMetrics, {
+    fileCount: Object.keys(finalFiles).length,
+    totalFileSize: totalSize,
+    modelLatencyMs: result.modelMs,
+    validationLatencyMs: valMs,
+    mergeLatencyMs: mergeMs,
+    retryCount: 0,
+    cached: result.cached,
+    status: postMergeErrors.length > 0 ? "stubbed" : "success",
+  });
   
   callbacks.onFilesReady(finalFiles, result.deps);
-  
   autoDetectAndCreateSchemas(finalFiles, config.projectId);
   
   callbacks.onProgress({ phase: "complete", message: "Build complete" });
@@ -563,6 +637,8 @@ async function runDirectBuild(
     chatText: result.chatText || "✅ App generated successfully",
     mergeConflicts: conflicts,
   });
+
+  finishBuild();
 }
 
 async function runPlannedBuild(
@@ -570,8 +646,10 @@ async function runPlannedBuild(
   config: EngineConfig,
   callbacks: EngineCallbacks
 ): Promise<void> {
+  // ── Planning ──
   callbacks.onProgress({ phase: "planning", message: "Analyzing requirements and creating build plan..." });
   
+  const planTimer = timer();
   let plan: BuildPlan;
   try {
     plan = await generatePlan(
@@ -581,6 +659,8 @@ async function runPlannedBuild(
       config.schemas,
       config.knowledge
     );
+    
+    recordPlanningLatency(planTimer.elapsed());
     
     callbacks.onProgress({
       phase: "planning",
@@ -595,31 +675,42 @@ async function runPlannedBuild(
   }
 
   const sortedTasks = topologicalSort(plan.tasks);
+  const executableTasks = sortedTasks.filter(t => !t.needsUserInput);
+  const parallelGroups = buildParallelGroups(executableTasks);
+  
+  const metrics = startBuild(executableTasks.length);
+  metrics.parallelGroups = parallelGroups.length;
+  
+  console.log(`[BuildEngine] ${executableTasks.length} tasks in ${parallelGroups.length} parallel groups: ${parallelGroups.map(g => `[${g.map(t => t.title).join(", ")}]`).join(" → ")}`);
+
   let accumulatedFiles: Record<string, string> = config.existingFiles ? { ...config.existingFiles } : {};
+  let previousFiles: Record<string, string> | null = config.existingFiles ? { ...config.existingFiles } : null;
   let allDeps: Record<string, string> = {};
   let allConflicts: string[] = [];
   let lastChatText = "";
+  let globalTaskIndex = 0;
 
-  for (let i = 0; i < sortedTasks.length; i++) {
-    const task = sortedTasks[i];
-    
-    if (task.needsUserInput) {
-      console.log(`[BuildEngine] Skipping task "${task.title}" — needs user input`);
-      continue;
-    }
-
-    callbacks.onProgress({
-      phase: "executing",
-      message: `Building: ${task.title}`,
-      taskIndex: i,
-      totalTasks: sortedTasks.length,
-      currentTask: task.title,
-      plan,
-    });
-
+  // ── Execute groups (parallel within each group, sequential across groups) ──
+  for (const group of parallelGroups) {
     const codeContext = buildFullCodeContext(accumulatedFiles);
-    
-    const taskPrompt = `## TASK ${i + 1}/${sortedTasks.length}: ${task.title}
+
+    // Run all tasks in this group concurrently
+    const taskPromises = group.map(async (task, groupIdx) => {
+      const taskIdx = globalTaskIndex + groupIdx;
+      const taskMet = startTask(task.id, task.title);
+
+      callbacks.onProgress({
+        phase: "executing",
+        message: group.length > 1
+          ? `Building (parallel): ${group.map(t => t.title).join(", ")}`
+          : `Building: ${task.title}`,
+        taskIndex: taskIdx,
+        totalTasks: executableTasks.length,
+        currentTask: task.title,
+        plan,
+      });
+      
+      const taskPrompt = `## TASK: ${task.title}
 
 ${task.buildPrompt}
 
@@ -633,34 +724,68 @@ ${task.filesAffected.map(f => `- ${f}`).join("\n")}
 - Output complete, working code in \`\`\`react-preview fences
 - NO descriptions, NO planning text — ONLY code`;
 
-    try {
-      const taskResult = await executeSingleTask(taskPrompt, config, codeContext, callbacks.onDelta, 0, 16000);
-      
-      if (Object.keys(taskResult.files).length > 0) {
-        const merged = mergeFiles(accumulatedFiles, taskResult.files);
-        accumulatedFiles = merged.files;
-        allConflicts.push(...merged.conflicts);
+      try {
+        const taskResult = await executeSingleTask(taskPrompt, config, codeContext, callbacks.onDelta, 0, 16000);
         
-        Object.assign(allDeps, taskResult.deps);
-        
-        callbacks.onFilesReady(accumulatedFiles, allDeps);
-        
-        if (taskResult.chatText) lastChatText = taskResult.chatText;
-        console.log(`[BuildEngine] Task ${i + 1} done: +${Object.keys(taskResult.files).length} files, total: ${Object.keys(accumulatedFiles).length}`);
-      } else {
-        console.warn(`[BuildEngine] Task "${task.title}" produced no files`);
+        const totalSize = Object.values(taskResult.files).reduce((s, c) => s + c.length, 0);
+        completeTask(taskMet, {
+          fileCount: Object.keys(taskResult.files).length,
+          totalFileSize: totalSize,
+          modelLatencyMs: taskResult.modelMs,
+          validationLatencyMs: 0, // validated inside executeSingleTask
+          mergeLatencyMs: 0, // merge happens below
+          retryCount: 0,
+          cached: taskResult.cached,
+          status: Object.keys(taskResult.files).length > 0 ? "success" : "failed",
+        });
+
+        return { task, result: taskResult };
+      } catch (err) {
+        console.error(`[BuildEngine] Task "${task.title}" failed:`, err);
+        completeTask(taskMet, {
+          fileCount: 0, totalFileSize: 0, modelLatencyMs: 0,
+          validationLatencyMs: 0, mergeLatencyMs: 0, retryCount: 0,
+          cached: false, status: "failed",
+        });
+        return { task, result: null };
       }
-    } catch (err) {
-      console.error(`[BuildEngine] Task "${task.title}" failed:`, err);
+    });
+
+    const results = await Promise.all(taskPromises);
+    globalTaskIndex += group.length;
+
+    // ── Merge results from this group into accumulated files ──
+    const mergeT = timer();
+    for (const { task, result } of results) {
+      if (!result || Object.keys(result.files).length === 0) {
+        console.warn(`[BuildEngine] Task "${task.title}" produced no files`);
+        continue;
+      }
+
+      const merged = mergeFiles(accumulatedFiles, result.files);
+      accumulatedFiles = merged.files;
+      allConflicts.push(...merged.conflicts);
+      Object.assign(allDeps, result.deps);
+      if (result.chatText) lastChatText = result.chatText;
+
+      console.log(`[BuildEngine] Task "${task.title}" done: +${Object.keys(result.files).length} files, total: ${Object.keys(accumulatedFiles).length}`);
+    }
+
+    // ── Batch file update: only send to preview once per group ──
+    const diff = computeFileDiff(previousFiles, accumulatedFiles);
+    if (!isDiffEmpty(diff)) {
+      callbacks.onFilesReady(accumulatedFiles, allDeps);
+      previousFiles = { ...accumulatedFiles };
     }
   }
 
   if (Object.keys(accumulatedFiles).length === 0) {
+    finishBuild();
     callbacks.onError("No code was generated. Please try a simpler, more specific prompt.");
     return;
   }
 
-  // Final validation after all tasks merged
+  // ── Final validation ──
   callbacks.onProgress({ phase: "validating", message: "Validating assembled app..." });
   const finalErrors = validateAllFiles(accumulatedFiles);
   if (finalErrors.length > 0) {
@@ -668,15 +793,22 @@ ${task.filesAffected.map(f => `- ${f}`).join("\n")}
     accumulatedFiles = stubBrokenFiles(accumulatedFiles, finalErrors);
   }
 
+  // ── Assembly ──
   callbacks.onProgress({ phase: "assembling", message: "Connecting all modules..." });
+  const asmTimer = timer();
   accumulatedFiles = await assembleApp(accumulatedFiles, config, callbacks.onDelta);
+  if (metrics) metrics.assemblyLatencyMs = asmTimer.elapsed();
   
-  callbacks.onFilesReady(accumulatedFiles, allDeps);
+  // Final diff-based update
+  const finalDiff = computeFileDiff(previousFiles, accumulatedFiles);
+  if (!isDiffEmpty(finalDiff)) {
+    callbacks.onFilesReady(accumulatedFiles, allDeps);
+  }
   
   autoDetectAndCreateSchemas(accumulatedFiles, config.projectId);
   
-  const taskSummary = sortedTasks.map((t, i) => `✅ ${i + 1}. ${t.title}`).join("\n");
-  const chatText = `✅ **Build Complete** — ${sortedTasks.length} tasks\n\n${plan.summary}\n\n${taskSummary}`;
+  const taskSummary = executableTasks.map((t, i) => `✅ ${i + 1}. ${t.title}`).join("\n");
+  const chatText = `✅ **Build Complete** — ${executableTasks.length} tasks in ${parallelGroups.length} parallel groups\n\n${plan.summary}\n\n${taskSummary}`;
 
   callbacks.onProgress({ phase: "complete", message: "Build complete" });
   callbacks.onComplete({
@@ -686,4 +818,6 @@ ${task.filesAffected.map(f => `- ${f}`).join("\n")}
     chatText,
     mergeConflicts: allConflicts,
   });
+
+  finishBuild();
 }
