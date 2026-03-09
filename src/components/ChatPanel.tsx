@@ -1534,7 +1534,6 @@ const CONTEXT_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
             handleOnError(err);
           },
         });
-      }
     } catch (e) {
       console.error("[ChatPanel] sendMessage error:", e);
       setIsLoading(false);
