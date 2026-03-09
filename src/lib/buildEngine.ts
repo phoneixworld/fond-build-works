@@ -44,16 +44,56 @@ async function autoDetectAndCreateSchemas(files: Record<string, string>, project
   try {
     const allCode = Object.values(files).join("\n");
     
+    // Method 1: Explicit Data API collection references
     const collectionMatches = allCode.matchAll(/collection:\s*["'](\w+)["']/g);
     const collections = new Set<string>();
     for (const match of collectionMatches) {
       collections.add(match[1]);
     }
     
+    // Method 2: Infer entities from page/component file names and mock data patterns
+    // e.g., /pages/Students/StudentList.jsx → "students" collection
+    const fileNames = Object.keys(files);
+    const entityInferenceMap: Record<string, string[]> = {};
+    
+    for (const filePath of fileNames) {
+      const pageMatch = filePath.match(/\/pages\/(\w+)\//);
+      if (pageMatch) {
+        const entity = pageMatch[1].toLowerCase();
+        // Skip generic pages
+        if (!['dashboard', 'home', 'settings', 'profile', 'login', 'signup', 'auth'].includes(entity)) {
+          collections.add(entity);
+          entityInferenceMap[entity] = entityInferenceMap[entity] || [];
+        }
+      }
+    }
+    
+    // Method 3: Detect mock data arrays to infer fields
+    // Patterns like: const students = [...] or useState([{name: "...", class: "..."}])
+    for (const [filePath, code] of Object.entries(files)) {
+      const pageEntity = filePath.match(/\/pages\/(\w+)\//)?.[1]?.toLowerCase();
+      if (!pageEntity || ['dashboard', 'home', 'settings'].includes(pageEntity)) continue;
+      
+      // Find array patterns with object shapes
+      const arrayPatterns = code.matchAll(/(?:const|let)\s+\w+\s*=\s*\[[\s\S]*?\{([^}]{10,300})\}/g);
+      for (const m of arrayPatterns) {
+        const objBlock = m[1];
+        const keyMatches = objBlock.matchAll(/(\w+)\s*:/g);
+        if (!entityInferenceMap[pageEntity]) entityInferenceMap[pageEntity] = [];
+        for (const km of keyMatches) {
+          const key = km[1];
+          if (!['id', 'key', 'icon', 'color', 'className', 'style', 'onClick', 'children'].includes(key)) {
+            entityInferenceMap[pageEntity].push(key);
+          }
+        }
+      }
+    }
+    
     const fieldsByCollection: Record<string, Set<string>> = {};
     
+    // From explicit Data API patterns
     for (const collection of collections) {
-      fieldsByCollection[collection] = new Set<string>();
+      fieldsByCollection[collection] = new Set<string>(entityInferenceMap[collection] || []);
       
       const dataPatterns = [
         new RegExp(`collection:\\s*["']${collection}["'][^}]*data:\\s*\\{([^}]+)\\}`, 'g'),
@@ -335,6 +375,11 @@ function parseReactFilesFromOutput(text: string): {
       if (code.length > 0) {
         let fname = currentFile.startsWith("/") ? currentFile : `/${currentFile}`;
         fname = fname.replace(/^\/src\//, "/");
+        // Enforce nested structure: /pages/Dashboard.jsx → /pages/Dashboard/Dashboard.jsx
+        const pageMatch = fname.match(/^\/pages\/([A-Z]\w+)\.(jsx?|tsx?)$/);
+        if (pageMatch) {
+          fname = `/pages/${pageMatch[1]}/${pageMatch[1]}.${pageMatch[2]}`;
+        }
         files[fname] = code;
       }
     }
