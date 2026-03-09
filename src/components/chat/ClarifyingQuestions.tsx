@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { MessageSquareMore, CheckCircle2, ChevronRight, ChevronLeft, Zap, ShieldCheck, Check, ArrowRight } from "lucide-react";
 
@@ -30,12 +30,83 @@ interface ClarifyingQuestionsProps {
   onSkip: () => void;
 }
 
+/* ── Sub-components ── */
+
+const BadgeRow = ({ badges }: { badges: AnalysisBadges }) => (
+  <div className="flex gap-2 flex-wrap mt-2">
+    {badges.needsBackend && (
+      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-medium bg-primary/10 text-primary/80 border border-primary/15">
+        <Zap className="w-2.5 h-2.5" /> Backend
+      </span>
+    )}
+    {badges.needsAuth && (
+      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-medium bg-accent/10 text-accent/80 border border-accent/15">
+        <ShieldCheck className="w-2.5 h-2.5" /> Auth
+      </span>
+    )}
+    {badges.complexity && (
+      <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-medium bg-muted text-muted-foreground border border-border">
+        {badges.complexity}
+      </span>
+    )}
+  </div>
+);
+
+const OptionButton = ({
+  opt,
+  selected,
+  index,
+  onClick,
+}: {
+  opt: QuestionOption;
+  selected: boolean;
+  index: number;
+  onClick: () => void;
+}) => (
+  <motion.button
+    initial={{ opacity: 0, x: -4 }}
+    animate={{ opacity: 1, x: 0 }}
+    transition={{ delay: index * 0.04, duration: 0.2 }}
+    onClick={onClick}
+    className={`
+      flex items-start gap-3 w-full px-4 py-3 rounded-xl text-left
+      border transition-all duration-200 group
+      ${selected
+        ? "border-primary/50 bg-primary/8"
+        : "border-border/40 bg-card/30 hover:border-primary/25 hover:bg-primary/4"
+      }
+    `}
+  >
+    <div className={`
+      shrink-0 mt-0.5 w-[18px] h-[18px] rounded-md flex items-center justify-center transition-all
+      ${selected
+        ? "bg-primary text-primary-foreground"
+        : "bg-muted/60 border border-border/60 group-hover:border-primary/30"
+      }
+    `}>
+      {selected && <Check className="w-3 h-3" />}
+    </div>
+    <div className="flex-1 min-w-0">
+      <span className={`text-sm font-medium block leading-tight ${selected ? "text-foreground" : "text-foreground/80"}`}>
+        {opt.label}
+      </span>
+      {opt.description && (
+        <span className={`text-xs mt-0.5 block leading-relaxed ${selected ? "text-foreground/60" : "text-muted-foreground/50"}`}>
+          {opt.description}
+        </span>
+      )}
+    </div>
+  </motion.button>
+);
+
+/* ── Main component ── */
+
 const ClarifyingQuestions = ({ questions, badges, onSubmit, onSkip }: ClarifyingQuestionsProps) => {
   const [answers, setAnswers] = useState<Record<string, string | string[]>>({});
   const [otherTexts, setOtherTexts] = useState<Record<string, string>>({});
   const [activeTab, setActiveTab] = useState(0);
 
-  const handleSelect = (questionId: string, value: string, multiSelect?: boolean) => {
+  const handleSelect = useCallback((questionId: string, value: string, multiSelect?: boolean) => {
     setAnswers(prev => {
       if (multiSelect) {
         const current = (prev[questionId] as string[]) || [];
@@ -46,26 +117,57 @@ const ClarifyingQuestions = ({ questions, badges, onSubmit, onSkip }: Clarifying
       }
       return { ...prev, [questionId]: value };
     });
-  };
 
-  const isSelected = (questionId: string, value: string): boolean => {
+    // Auto-advance to next unanswered tab on single-select (after a brief delay for visual feedback)
+    if (!multiSelect) {
+      setTimeout(() => {
+        setActiveTab(prev => {
+          // Find next unanswered tab
+          for (let i = prev + 1; i < questions.length; i++) {
+            // We check the NEW answers state indirectly — if current tab just got answered,
+            // look for the next one that doesn't have an answer yet
+            // Since setAnswers is async, we trust that the current tab (prev) is now answered
+            return i; // Just go to next tab
+          }
+          return prev; // Stay on current if it's the last
+        });
+      }, 250);
+    }
+  }, [questions.length]);
+
+  const isSelected = useCallback((questionId: string, value: string): boolean => {
     const answer = answers[questionId];
     if (Array.isArray(answer)) return answer.includes(value);
     return answer === value;
-  };
+  }, [answers]);
 
   const answeredCount = Object.keys(answers).length;
   const allAnswered = answeredCount === questions.length;
   const currentQ = questions[activeTab];
-  const currentAnswered = !!answers[currentQ?.id];
 
   const goNext = () => {
     if (activeTab < questions.length - 1) setActiveTab(activeTab + 1);
   };
-
   const goPrev = () => {
     if (activeTab > 0) setActiveTab(activeTab - 1);
   };
+
+  // Build final answers including "other" text values
+  const handleSubmit = useCallback(() => {
+    const finalAnswers: Record<string, string | string[]> = {};
+    for (const [qId, answer] of Object.entries(answers)) {
+      if (Array.isArray(answer)) {
+        finalAnswers[qId] = answer.map(v =>
+          v === "__other__" ? (otherTexts[qId] || "Other") : v
+        );
+      } else if (answer === "__other__") {
+        finalAnswers[qId] = otherTexts[qId] || "Other";
+      } else {
+        finalAnswers[qId] = answer;
+      }
+    }
+    onSubmit(finalAnswers);
+  }, [answers, otherTexts, onSubmit]);
 
   return (
     <motion.div
@@ -82,27 +184,7 @@ const ClarifyingQuestions = ({ questions, badges, onSubmit, onSkip }: Clarifying
           </div>
           <span className="text-sm font-medium text-foreground">Quick questions before I build</span>
         </div>
-
-        {/* Analysis badges */}
-        {badges && (
-          <div className="flex gap-2 flex-wrap mt-2">
-            {badges.needsBackend && (
-              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-medium bg-primary/8 text-primary/80 border border-primary/15">
-                <Zap className="w-2.5 h-2.5" /> Backend
-              </span>
-            )}
-            {badges.needsAuth && (
-              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-medium bg-accent/8 text-accent/80 border border-accent/15">
-                <ShieldCheck className="w-2.5 h-2.5" /> Auth
-              </span>
-            )}
-            {badges.complexity && (
-              <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-medium bg-muted text-muted-foreground border border-border">
-                {badges.complexity}
-              </span>
-            )}
-          </div>
-        )}
+        {badges && <BadgeRow badges={badges} />}
       </div>
 
       {/* Tab bar */}
@@ -145,7 +227,6 @@ const ClarifyingQuestions = ({ questions, badges, onSubmit, onSkip }: Clarifying
               transition={{ duration: 0.2 }}
               className="space-y-3"
             >
-              {/* Question text */}
               <p className="text-sm font-medium text-foreground/90 leading-relaxed">{currentQ.text}</p>
               {currentQ.multiSelect && (
                 <span className="inline-flex items-center px-1.5 py-0.5 rounded-md text-[9px] font-medium text-muted-foreground/60 bg-muted/50">
@@ -153,48 +234,16 @@ const ClarifyingQuestions = ({ questions, badges, onSubmit, onSkip }: Clarifying
                 </span>
               )}
 
-              {/* Options */}
               <div className="grid gap-2">
-                {currentQ.options.map((opt, oi) => {
-                  const selected = isSelected(currentQ.id, opt.value);
-                  return (
-                    <motion.button
-                      key={opt.value}
-                      initial={{ opacity: 0, x: -4 }}
-                      animate={{ opacity: 1, x: 0 }}
-                      transition={{ delay: oi * 0.04, duration: 0.2 }}
-                      onClick={() => handleSelect(currentQ.id, opt.value, currentQ.multiSelect)}
-                      className={`
-                        flex items-start gap-3 w-full px-4 py-3 rounded-xl text-left
-                        border transition-all duration-200 group
-                        ${selected
-                          ? "border-primary/50 bg-primary/8"
-                          : "border-border/40 bg-card/30 hover:border-primary/25 hover:bg-primary/4"
-                        }
-                      `}
-                    >
-                      <div className={`
-                        shrink-0 mt-0.5 w-[18px] h-[18px] rounded-md flex items-center justify-center transition-all
-                        ${selected
-                          ? "bg-primary text-primary-foreground"
-                          : "bg-muted/60 border border-border/60 group-hover:border-primary/30"
-                        }
-                      `}>
-                        {selected && <Check className="w-3 h-3" />}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <span className={`text-sm font-medium block leading-tight ${selected ? "text-foreground" : "text-foreground/80"}`}>
-                          {opt.label}
-                        </span>
-                        {opt.description && (
-                          <span className={`text-xs mt-0.5 block leading-relaxed ${selected ? "text-foreground/60" : "text-muted-foreground/50"}`}>
-                            {opt.description}
-                          </span>
-                        )}
-                      </div>
-                    </motion.button>
-                  );
-                })}
+                {currentQ.options.map((opt, oi) => (
+                  <OptionButton
+                    key={opt.value}
+                    opt={opt}
+                    selected={isSelected(currentQ.id, opt.value)}
+                    index={oi}
+                    onClick={() => handleSelect(currentQ.id, opt.value, currentQ.multiSelect)}
+                  />
+                ))}
 
                 {/* Other option */}
                 {currentQ.allowOther !== false && (
@@ -240,9 +289,8 @@ const ClarifyingQuestions = ({ questions, badges, onSubmit, onSkip }: Clarifying
         </div>
       )}
 
-      {/* Footer: navigation + actions */}
+      {/* Footer */}
       <div className="px-4 py-3 border-t border-border/30 flex items-center gap-2">
-        {/* Prev/Next for multi-tab */}
         {questions.length > 1 && (
           <>
             <button
@@ -286,7 +334,7 @@ const ClarifyingQuestions = ({ questions, badges, onSubmit, onSkip }: Clarifying
           Skip
         </button>
         <button
-          onClick={() => onSubmit(answers)}
+          onClick={handleSubmit}
           disabled={answeredCount === 0}
           className={`
             flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-semibold
