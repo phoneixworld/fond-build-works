@@ -23,7 +23,8 @@ import { transform } from "sucrase";
 import postcss from "postcss";
 import { generatePlan, type BuildPlan, type PlanTask } from "@/lib/planningAgent";
 import { topologicalSort } from "@/lib/taskExecutor";
-import { mergeFiles, buildFullCodeContext, type MergeResult } from "@/lib/codeMerger";
+import { mergeFiles, buildFullCodeContext, isBackendProtected, type MergeResult } from "@/lib/codeMerger";
+import { generateMockLayer } from "@/lib/mockLayerGenerator";
 import { supabase } from "@/integrations/supabase/client";
 import {
   getTaskCacheKey, getCachedTaskOutput, setCachedTaskOutput,
