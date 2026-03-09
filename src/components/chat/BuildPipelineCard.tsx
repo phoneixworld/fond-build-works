@@ -94,7 +94,7 @@ StatusIndicator.displayName = "StatusIndicator";
 
 const BuildPipelineCard = ({ isBuilding, streamContent, tasks: externalTasks, pipelineStep, currentAgent, buildTitle, onShowPreview }: BuildPipelineCardProps) => {
   const [collapsed, setCollapsed] = useState(false);
-  const [activeTab, setActiveTab] = useState<"details" | "preview">("details");
+  const [showDetails, setShowDetails] = useState(false);
 
   const [elapsed, setElapsed] = useState(0);
   useEffect(() => {
@@ -112,10 +112,8 @@ const BuildPipelineCard = ({ isBuilding, streamContent, tasks: externalTasks, pi
   const allDone = doneCount === tasks.length && !isBuilding && tasks.length > 0;
   const activeTask = tasks.find(t => t.status === "in_progress");
 
-  // Infer build title from stream content
   const inferredTitle = useMemo(() => {
     if (buildTitle) return buildTitle;
-    // Try to extract a meaningful title from the plan
     const titleMatch = streamContent.match(/##\s*TASK:\s*(.+?)(?:\n|$)/);
     if (titleMatch) return titleMatch[1].trim();
     return allDone ? "Build complete" : "Building...";
@@ -133,7 +131,6 @@ const BuildPipelineCard = ({ isBuilding, streamContent, tasks: externalTasks, pi
         validate: "Validating in Sandpack environment",
         retry: "Auto-fixing validation errors...",
       };
-      // Add file context
       const fileStr = editingFiles.length > 0 ? ` · ${editingFiles.join(", ")}` : "";
       return (descs[activeTask.id] || "Processing...") + fileStr;
     }
@@ -211,34 +208,60 @@ const BuildPipelineCard = ({ isBuilding, streamContent, tasks: externalTasks, pi
               ))}
             </div>
 
-            {/* Details / Preview tabs — shown when build is done */}
-            {allDone && onShowPreview && (
-              <div className="flex border-t border-border/40">
+            {/* Action buttons — shown when build is done */}
+            {allDone && (
+              <div className="flex items-center gap-2 px-4 pb-3 pt-1 border-t border-border/40">
+                {onShowPreview && (
+                  <button
+                    onClick={onShowPreview}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-primary text-primary-foreground hover:bg-primary/90 transition-colors"
+                  >
+                    <Eye className="w-3.5 h-3.5" />
+                    Show Preview
+                  </button>
+                )}
                 <button
-                  onClick={() => setActiveTab("details")}
-                  className={`flex-1 py-2.5 text-sm font-medium text-center transition-colors ${
-                    activeTab === "details"
-                      ? "text-foreground"
-                      : "text-muted-foreground/50 hover:text-foreground"
-                  }`}
+                  onClick={() => setShowDetails(!showDetails)}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors border border-border"
                 >
-                  Details
-                </button>
-                <button
-                  onClick={() => {
-                    setActiveTab("preview");
-                    onShowPreview?.();
-                  }}
-                  className={`flex-1 py-2.5 text-sm font-medium text-center transition-colors rounded-lg mx-2 my-1 ${
-                    activeTab === "preview"
-                      ? "bg-primary/80 text-primary-foreground"
-                      : "bg-primary/20 text-primary hover:bg-primary/30"
-                  }`}
-                >
-                  Preview
+                  <FileCode2 className="w-3.5 h-3.5" />
+                  {showDetails ? "Hide Details" : "Details"}
                 </button>
               </div>
             )}
+
+            {/* Details panel — shows build info when expanded */}
+            <AnimatePresence>
+              {showDetails && allDone && (
+                <motion.div
+                  initial={{ height: 0, opacity: 0 }}
+                  animate={{ height: "auto", opacity: 1 }}
+                  exit={{ height: 0, opacity: 0 }}
+                  className="px-4 pb-3 border-t border-border/30"
+                >
+                  <div className="pt-2 space-y-2">
+                    <div className="flex items-center justify-between text-[11px]">
+                      <span className="text-muted-foreground">Build time</span>
+                      <span className="text-foreground font-mono">{elapsed}s</span>
+                    </div>
+                    <div className="flex items-center justify-between text-[11px]">
+                      <span className="text-muted-foreground">Steps completed</span>
+                      <span className="text-foreground font-mono">{doneCount}/{tasks.length}</span>
+                    </div>
+                    {editingFiles.length > 0 && (
+                      <div className="flex items-center justify-between text-[11px]">
+                        <span className="text-muted-foreground">Files edited</span>
+                        <span className="text-foreground font-mono">{editingFiles.join(", ")}</span>
+                      </div>
+                    )}
+                    <div className="flex items-center justify-between text-[11px]">
+                      <span className="text-muted-foreground">Agent</span>
+                      <span className="text-foreground font-mono capitalize">{currentAgent || "build"}</span>
+                    </div>
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
           </motion.div>
         )}
       </AnimatePresence>

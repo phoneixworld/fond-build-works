@@ -10,7 +10,7 @@ import { runBuildEngine, type EngineConfig, type EngineProgress } from "@/lib/bu
 import { validateAndFixHtml } from "@/lib/htmlValidator";
 import { matchTemplate, PAGE_TEMPLATES, type PageTemplate } from "@/lib/pageTemplates";
 import { COMPONENT_SNIPPETS, getSnippetsPromptContext } from "@/lib/componentSnippets";
-import { AI_MODELS, DEFAULT_MODEL, PROMPT_SUGGESTIONS, QUICK_ACTIONS, DESIGN_THEMES, type AIModelId } from "@/lib/aiModels";
+import { AI_MODELS, DEFAULT_MODEL, PROMPT_SUGGESTIONS, QUICK_ACTIONS, CONTEXT_SUGGESTIONS, DESIGN_THEMES, type AIModelId } from "@/lib/aiModels";
 import { motion, AnimatePresence } from "framer-motion";
 import { usePreview } from "@/contexts/PreviewContext";
 import { useProjects } from "@/contexts/ProjectContext";
@@ -2429,26 +2429,7 @@ ${Object.entries(files).map(([path, code]) => `--- ${path}\n${code}`).join("\n\n
             )}
           </AnimatePresence>
 
-          {/* Quick actions */}
-          {messages.length > 0 && !isLoading && followUpQuestions.length === 0 && (
-            <motion.div
-              initial={{ opacity: 0, y: 4 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.1 }}
-              className="flex flex-wrap gap-1.5 pt-2"
-            >
-              {QUICK_ACTIONS.map((a) => (
-                <button
-                  key={a.label}
-                  onClick={() => handleSmartSend(a.prompt)}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-medium border border-border text-muted-foreground hover:text-foreground hover:border-primary/30 hover:bg-secondary/50 transition-all"
-                >
-                  <Wand2 className="w-3 h-3" />
-                  {a.label}
-                </button>
-              ))}
-            </motion.div>
-          )}
+          {/* Quick actions moved to above input area */}
         </div>
 
         {/* Scroll-to-bottom FAB */}
@@ -2578,6 +2559,30 @@ ${Object.entries(files).map(([path, code]) => `--- ${path}\n${code}`).join("\n\n
             </motion.div>
           )}
         </AnimatePresence>
+
+        {/* Context-aware quick suggestions — above input like Lovable */}
+        {!isLoading && followUpQuestions.length === 0 && !input && (
+          <div className="px-3 pt-2 pb-1">
+            <div className="flex flex-wrap gap-1.5">
+              {(() => {
+                const hasContent = messages.length > 0;
+                const suggestions = hasContent
+                  ? [...QUICK_ACTIONS.slice(0, 2), ...CONTEXT_SUGGESTIONS.filter(s => s.condition === "has-content").slice(0, 2)]
+                  : CONTEXT_SUGGESTIONS.filter(s => s.condition === "empty");
+                return suggestions.map((s) => (
+                  <button
+                    key={s.label}
+                    onClick={() => handleSmartSend(s.prompt)}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-medium border border-border/60 text-muted-foreground hover:text-foreground hover:border-primary/30 hover:bg-primary/5 transition-all group"
+                  >
+                    <span className="text-xs group-hover:scale-110 transition-transform">{s.icon}</span>
+                    {s.label}
+                  </button>
+                ));
+              })()}
+            </div>
+          </div>
+        )}
 
         {/* Input area */}
         <div className="p-3 border-t border-border">

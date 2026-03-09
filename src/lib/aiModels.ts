@@ -21,10 +21,31 @@ export const PROMPT_SUGGESTIONS = [
 ];
 
 export const QUICK_ACTIONS = [
-  { label: "Improve design", prompt: "Improve the overall design — better colors, spacing, typography, and visual hierarchy" },
-  { label: "Fix bugs", prompt: "Review the current app for any bugs or issues and fix them" },
-  { label: "Add loading states", prompt: "Add proper loading states, skeletons, and error handling throughout the app" },
-  { label: "Optimize performance", prompt: "Optimize the app for performance — lazy loading, caching, and efficient rendering" },
+  { label: "Improve design", prompt: "Improve the overall design — better colors, spacing, typography, and visual hierarchy", icon: "✨" },
+  { label: "Fix bugs", prompt: "Review the current app for any bugs or issues and fix them", icon: "🐛" },
+  { label: "Add loading states", prompt: "Add proper loading states, skeletons, and error handling throughout the app", icon: "⏳" },
+  { label: "Make responsive", prompt: "Make the app fully responsive for mobile, tablet and desktop", icon: "📱" },
+];
+
+// Context-aware suggestions based on project state
+export interface QuickSuggestion {
+  label: string;
+  prompt: string;
+  icon: string;
+  condition?: "has-content" | "empty" | "always";
+}
+
+export const CONTEXT_SUGGESTIONS: QuickSuggestion[] = [
+  // Empty project suggestions
+  { label: "Landing page", prompt: "Build a modern landing page with hero section, features grid, and CTA", icon: "🚀", condition: "empty" },
+  { label: "Dashboard", prompt: "Build a data dashboard with sidebar navigation, charts, and summary cards", icon: "📊", condition: "empty" },
+  { label: "E-commerce store", prompt: "Build a modern product listing with shopping cart and checkout", icon: "🛒", condition: "empty" },
+  { label: "Blog", prompt: "Build a clean blog with article list, reading view, and categories", icon: "📝", condition: "empty" },
+  // Has content suggestions
+  { label: "Add auth", prompt: "Add a beautiful login and signup page with form validation and protected routes", icon: "🔐", condition: "has-content" },
+  { label: "Add dark mode", prompt: "Add a dark mode toggle with smooth transitions and persistent preference", icon: "🌙", condition: "has-content" },
+  { label: "Add animations", prompt: "Add smooth entrance animations, hover effects, and micro-interactions", icon: "✨", condition: "has-content" },
+  { label: "Improve UX", prompt: "Improve the user experience with better navigation, feedback, and accessibility", icon: "💎", condition: "has-content" },
 ];
 
 // Design theme presets
