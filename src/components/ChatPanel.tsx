@@ -520,6 +520,9 @@ const ChatPanel = forwardRef<ChatPanelHandle, { initialPrompt?: string; onVersio
   const lastProjectIdRef = useRef<string | null>(null);
   const hasProcessedInitialRef = useRef(false);
   const buildSafetyTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // FIX: Track sandpack files via ref to prevent stale closure reads during project switches
+  const sandpackFilesRef = useRef<Record<string, string> | null>(null);
+  sandpackFilesRef.current = currentSandpackFiles;
 
   // Convert sandpack files (Record<string, string>) to VirtualFile format and sync to VirtualFS
   const syncSandpackToVirtualFS = useCallback((sandpackFiles: Record<string, string>) => {
@@ -1036,8 +1039,10 @@ const CONTEXT_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
       const shouldIncludeCurrentCode = !isFirstMessage || hasPersistedHistory;
       
       let currentCodeSummary = "";
-      if (shouldIncludeCurrentCode && currentSandpackFiles && Object.keys(currentSandpackFiles).length > 0) {
-        const fileEntries = Object.entries(currentSandpackFiles);
+      // FIX: Use ref to read latest sandpack files (avoids stale closure from project switch)
+      const safeSandpackFiles = sandpackFilesRef.current;
+      if (shouldIncludeCurrentCode && safeSandpackFiles && Object.keys(safeSandpackFiles).length > 0) {
+        const fileEntries = Object.entries(safeSandpackFiles);
         const totalChars = fileEntries.reduce((sum, [, code]) => sum + code.length, 0);
         if (totalChars <= 16000) {
           currentCodeSummary = fileEntries.map(([path, code]) => `--- ${path}\n${code}`).join("\n\n");
@@ -1441,7 +1446,11 @@ const CONTEXT_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
         
         // ─── Requirements Agent: Extract domain model ───
         let domainModel: any = undefined;
-        const isFirstBuild = !currentSandpackFiles || Object.keys(currentSandpackFiles).length === 0;
+        // FIX: Read sandpack files from ref to get the latest value (not stale closure)
+        // Also verify the project ID hasn't changed since we started
+        const buildProjectId = currentProject.id;
+        const liveSandpackFiles = sandpackFilesRef.current;
+        const isFirstBuild = !liveSandpackFiles || Object.keys(liveSandpackFiles).length === 0;
         if (isFirstBuild) {
           try {
             setBuildStep("🧠 Analyzing domain requirements...");
@@ -1480,17 +1489,28 @@ const CONTEXT_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
           }
         }
         
+        // FIX: Guard against project switch — if project changed during async ops, abort
+        if (lastProjectIdRef.current !== buildProjectId) {
+          console.warn("[ChatPanel] Project switched during build setup, aborting");
+          setIsLoading(false);
+          setIsBuilding(false);
+          return;
+        }
+        
+        // FIX: Use ref-based files to prevent stale data from previous project
+        const safeExistingFiles = shouldIncludeCurrentCode && liveSandpackFiles && Object.keys(liveSandpackFiles).length > 0
+          ? liveSandpackFiles
+          : undefined;
+        
         const engineConfig: EngineConfig = {
-          projectId: currentProject.id,
+          projectId: buildProjectId,
           techStack: currentProject.tech_stack || "react-cdn",
           schemas: schemas.length > 0 ? schemas : undefined,
           model: selectedModel,
           designTheme: themeInfo?.prompt,
           knowledge: knowledge.length > 0 ? knowledge : undefined,
           snippetsContext: snippetsContext || undefined,
-          existingFiles: shouldIncludeCurrentCode && currentSandpackFiles && Object.keys(currentSandpackFiles).length > 0 
-            ? currentSandpackFiles 
-            : undefined,
+          existingFiles: safeExistingFiles,
           templateContext: templateCtx || undefined,
           chatHistory: currentMessages.slice(-8).map(m => ({
             role: m.role,
@@ -1536,18 +1556,20 @@ const CONTEXT_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
             setBuildStreamContent(prev => prev + chunk);
           },
           onFilesReady: (files, deps) => {
+            // FIX: Guard against project switch during build
+            if (lastProjectIdRef.current !== buildProjectId) return;
             setSandpackFiles(files);
             syncSandpackToVirtualFS(files);
             if (Object.keys(deps).length > 0) setSandpackDeps(deps);
             setPreviewMode("sandpack");
             
             // Persist incrementally during build so navigation away doesn't lose progress
-            if (currentProject && Object.keys(files).length > 0) {
+            if (Object.keys(files).length > 0) {
               const payload = { files, deps: deps || {} };
               supabase
                 .from("project_data")
                 .upsert(
-                  { project_id: currentProject.id, collection: "sandpack_state", data: payload as any },
+                  { project_id: buildProjectId, collection: "sandpack_state", data: payload as any },
                   { onConflict: "project_id,collection" }
                 )
                 .then(({ error }) => {
