@@ -770,7 +770,9 @@ const ChatPanel = forwardRef<ChatPanelHandle, { initialPrompt?: string; onVersio
     saveProject({ chat_history: [], html_content: "" });
   }, [currentProject, isLoading, setPreviewHtml, saveProject]);
 
-  useImperativeHandle(ref, () => ({ clearChat, sendMessage }), [clearChat, sendMessage]);
+  // sendMessage is defined below — use a stable ref so useImperativeHandle doesn't need it in deps
+  const sendMessageRef = useRef<(text: string, images?: string[]) => void>(() => {});
+  useImperativeHandle(ref, () => ({ clearChat, sendMessage: (text: string) => sendMessageRef.current(text) }), [clearChat]);
 
   const sendMessage = useCallback(async (text: string, images: string[] = []) => {
     if (!text || !currentProject) return;
