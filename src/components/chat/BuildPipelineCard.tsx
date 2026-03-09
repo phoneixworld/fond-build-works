@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { CheckCircle2, Circle, Loader2, ChevronRight, FileCode2, Bot, Cpu, Shield, RotateCcw } from "lucide-react";
 import type { PipelineStep } from "@/lib/agentPipeline";
