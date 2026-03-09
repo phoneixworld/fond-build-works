@@ -1,5 +1,5 @@
-import { useState, useCallback, useEffect } from "react";
-import { Pencil, Type, Palette, X, Check, MousePointer2 } from "lucide-react";
+import { useState, useCallback, useEffect, useMemo } from "react";
+import { Pencil, Type, Palette, X, Check, MousePointer2, FileCode } from "lucide-react";
 import { usePreview } from "@/contexts/PreviewContext";
 import { useProjects } from "@/contexts/ProjectContext";
 import { motion, AnimatePresence } from "framer-motion";
@@ -12,10 +12,13 @@ interface SelectedElement {
   bgColor: string;
   fontSize: string;
   fontFamily: string;
+  // Sandpack-mode fields
+  componentName?: string;
+  sourceFile?: string;
 }
 
 const DirectTouch = ({ active, onToggle }: { active: boolean; onToggle: () => void }) => {
-  const { previewHtml, setPreviewHtml } = usePreview();
+  const { previewHtml, setPreviewHtml, sandpackFiles, setSandpackFiles, previewMode } = usePreview();
   const { currentProject, saveProject } = useProjects();
   const [selected, setSelected] = useState<SelectedElement | null>(null);
   const [editText, setEditText] = useState("");

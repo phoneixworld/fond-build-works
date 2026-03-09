@@ -1564,6 +1564,9 @@ const CONTEXT_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
         setPipelineStep("error");
         setCurrentAgent(null);
         isSendingRef.current = false;
+        // Stop streaming preview on error
+        streamingControllerRef.current?.stop();
+        streamingControllerRef.current = null;
       };
 
       // ─── Cleanup helper for plan-based builds ───
