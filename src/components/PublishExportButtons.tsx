@@ -414,7 +414,7 @@ const PublishExportButtons = forwardRef<PublishExportHandle>((_, ref) => {
                       </button>
                       <button
                         onClick={handleUnpublish}
-                        disabled={publishing}
+                        disabled={publishing || isBuilding}
                         className="px-3 py-2.5 rounded-lg text-xs font-medium text-muted-foreground hover:text-destructive hover:bg-destructive/10 border border-transparent hover:border-destructive/20 transition-all"
                       >
                         Unpublish
