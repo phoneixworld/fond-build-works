@@ -8,7 +8,7 @@
 export interface ComponentSnippet {
   id: string;
   name: string;
-  category: "hero" | "features" | "pricing" | "testimonials" | "cta" | "footer" | "contact" | "stats" | "faq" | "gallery" | "team" | "navigation" | "micro-interaction";
+  category: "hero" | "features" | "pricing" | "testimonials" | "cta" | "footer" | "contact" | "stats" | "faq" | "gallery" | "team" | "navigation" | "micro-interaction" | "newsletter";
   /** Compact structural description */
   structure: string;
 }
@@ -861,6 +861,146 @@ export const COMPONENT_SNIPPETS: ComponentSnippet[] = [
       document.querySelectorAll('.scroll-reveal').forEach(el => observer.observe(el));
     })();
   </script>
+</section>`,
+  },
+  // === PRICING COMPARISON TABLE ===
+  {
+    id: "pricing-comparison-table",
+    name: "Pricing Comparison Table",
+    category: "pricing",
+    structure: `<section id="pricing-comparison" class="py-24" style="background:var(--bg,#fafafa)">
+  <div class="max-w-6xl mx-auto px-4">
+    <div class="text-center mb-16">
+      <span class="inline-flex items-center gap-2 px-4 py-1.5 rounded-full text-sm font-medium mb-4" style="background:rgba(99,102,241,0.1);color:#6366f1;">💎 Compare Plans</span>
+      <h2 class="text-4xl font-bold tracking-tight mb-4">Find the perfect plan</h2>
+      <p class="text-lg max-w-xl mx-auto" style="color:#6b7280;">Every feature you need, at a price that works for you.</p>
+      <div class="inline-flex mt-6 rounded-xl p-1" style="background:#e5e7eb;">
+        <button class="px-5 py-2 rounded-lg text-sm font-medium transition-all" style="background:#fff;box-shadow:0 1px 3px rgba(0,0,0,0.1);" onclick="this.style.background='#fff';this.nextElementSibling.style.background='transparent'">Monthly</button>
+        <button class="px-5 py-2 rounded-lg text-sm font-medium transition-all" style="background:transparent;" onclick="this.style.background='#fff';this.previousElementSibling.style.background='transparent'">Annual <span style="color:#16a34a;font-size:12px;font-weight:600;">Save 20%</span></button>
+      </div>
+    </div>
+    <div class="overflow-x-auto rounded-2xl border" style="border-color:#e5e7eb;">
+      <table style="width:100%;border-collapse:collapse;text-align:left;">
+        <thead>
+          <tr style="border-bottom:2px solid #e5e7eb;">
+            <th style="padding:20px 24px;font-size:14px;font-weight:600;color:#6b7280;min-width:200px;">Features</th>
+            <th style="padding:20px 24px;text-align:center;min-width:160px;">
+              <div style="font-size:18px;font-weight:700;">Starter</div>
+              <div style="font-size:28px;font-weight:800;margin:4px 0;">$9<span style="font-size:14px;font-weight:400;color:#6b7280;">/mo</span></div>
+            </th>
+            <th style="padding:20px 24px;text-align:center;min-width:160px;background:linear-gradient(180deg,rgba(99,102,241,0.05),transparent);position:relative;">
+              <span style="position:absolute;top:-12px;left:50%;transform:translateX(-50%);background:#6366f1;color:#fff;font-size:11px;font-weight:600;padding:2px 12px;border-radius:99px;">POPULAR</span>
+              <div style="font-size:18px;font-weight:700;">Pro</div>
+              <div style="font-size:28px;font-weight:800;margin:4px 0;">$29<span style="font-size:14px;font-weight:400;color:#6b7280;">/mo</span></div>
+            </th>
+            <th style="padding:20px 24px;text-align:center;min-width:160px;">
+              <div style="font-size:18px;font-weight:700;">Enterprise</div>
+              <div style="font-size:28px;font-weight:800;margin:4px 0;">Custom</div>
+            </th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr style="border-bottom:1px solid #f3f4f6;"><td style="padding:14px 24px;font-size:14px;">Users</td><td style="padding:14px 24px;text-align:center;font-size:14px;">Up to 5</td><td style="padding:14px 24px;text-align:center;font-size:14px;background:rgba(99,102,241,0.02);">Up to 25</td><td style="padding:14px 24px;text-align:center;font-size:14px;">Unlimited</td></tr>
+          <tr style="border-bottom:1px solid #f3f4f6;"><td style="padding:14px 24px;font-size:14px;">Storage</td><td style="padding:14px 24px;text-align:center;font-size:14px;">5 GB</td><td style="padding:14px 24px;text-align:center;font-size:14px;background:rgba(99,102,241,0.02);">50 GB</td><td style="padding:14px 24px;text-align:center;font-size:14px;">Unlimited</td></tr>
+          <tr style="border-bottom:1px solid #f3f4f6;"><td style="padding:14px 24px;font-size:14px;">API Access</td><td style="padding:14px 24px;text-align:center;font-size:14px;">—</td><td style="padding:14px 24px;text-align:center;font-size:14px;background:rgba(99,102,241,0.02);">✓</td><td style="padding:14px 24px;text-align:center;font-size:14px;">✓</td></tr>
+          <tr style="border-bottom:1px solid #f3f4f6;"><td style="padding:14px 24px;font-size:14px;">Priority Support</td><td style="padding:14px 24px;text-align:center;font-size:14px;">—</td><td style="padding:14px 24px;text-align:center;font-size:14px;background:rgba(99,102,241,0.02);">✓</td><td style="padding:14px 24px;text-align:center;font-size:14px;">✓</td></tr>
+          <tr style="border-bottom:1px solid #f3f4f6;"><td style="padding:14px 24px;font-size:14px;">Custom Integrations</td><td style="padding:14px 24px;text-align:center;font-size:14px;">—</td><td style="padding:14px 24px;text-align:center;font-size:14px;background:rgba(99,102,241,0.02);">—</td><td style="padding:14px 24px;text-align:center;font-size:14px;">✓</td></tr>
+          <tr><td style="padding:14px 24px;font-size:14px;">SLA</td><td style="padding:14px 24px;text-align:center;font-size:14px;">—</td><td style="padding:14px 24px;text-align:center;font-size:14px;background:rgba(99,102,241,0.02);">99.9%</td><td style="padding:14px 24px;text-align:center;font-size:14px;">99.99%</td></tr>
+        </tbody>
+        <tfoot>
+          <tr style="border-top:2px solid #e5e7eb;">
+            <td style="padding:20px 24px;"></td>
+            <td style="padding:20px 24px;text-align:center;"><a href="#" style="display:inline-block;padding:10px 24px;border:2px solid #e5e7eb;border-radius:12px;font-size:14px;font-weight:600;color:#374151;text-decoration:none;transition:all 0.2s;" onmouseover="this.style.borderColor='#6366f1';this.style.color='#6366f1'" onmouseout="this.style.borderColor='#e5e7eb';this.style.color='#374151'">Get Started</a></td>
+            <td style="padding:20px 24px;text-align:center;background:rgba(99,102,241,0.02);"><a href="#" style="display:inline-block;padding:10px 24px;background:#6366f1;border-radius:12px;font-size:14px;font-weight:600;color:#fff;text-decoration:none;box-shadow:0 4px 14px rgba(99,102,241,0.35);transition:all 0.2s;" onmouseover="this.style.transform='translateY(-1px)'" onmouseout="this.style.transform='translateY(0)'">Get Started</a></td>
+            <td style="padding:20px 24px;text-align:center;"><a href="#" style="display:inline-block;padding:10px 24px;border:2px solid #e5e7eb;border-radius:12px;font-size:14px;font-weight:600;color:#374151;text-decoration:none;transition:all 0.2s;" onmouseover="this.style.borderColor='#6366f1';this.style.color='#6366f1'" onmouseout="this.style.borderColor='#e5e7eb';this.style.color='#374151'">Contact Sales</a></td>
+          </tr>
+        </tfoot>
+      </table>
+    </div>
+  </div>
+</section>`,
+  },
+
+  // === FAQ WITH SEARCH ===
+  {
+    id: "faq-searchable",
+    name: "FAQ with Search",
+    category: "faq",
+    structure: `<section id="faq-search" class="py-24" style="background:var(--bg,#fff)">
+  <div class="max-w-3xl mx-auto px-4">
+    <div class="text-center mb-12">
+      <span class="inline-flex items-center gap-2 px-4 py-1.5 rounded-full text-sm font-medium mb-4" style="background:rgba(16,185,129,0.1);color:#10b981;">❓ Support</span>
+      <h2 class="text-4xl font-bold tracking-tight mb-4">Frequently Asked Questions</h2>
+      <p class="text-lg mb-8" style="color:#6b7280;">Can't find what you're looking for? Search below.</p>
+      <div style="position:relative;max-width:480px;margin:0 auto;">
+        <svg style="position:absolute;left:16px;top:50%;transform:translateY(-50%);width:20px;height:20px;color:#9ca3af;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+        <input id="faq-search-input" type="text" placeholder="Search questions..." style="width:100%;padding:14px 16px 14px 48px;border:2px solid #e5e7eb;border-radius:16px;font-size:16px;outline:none;transition:border-color 0.2s;" onfocus="this.style.borderColor='#10b981'" onblur="this.style.borderColor='#e5e7eb'" oninput="document.querySelectorAll('.faq-item').forEach(el=>{const match=el.dataset.q.toLowerCase().includes(this.value.toLowerCase());el.style.display=match?'block':'none'});document.getElementById('faq-no-results').style.display=document.querySelectorAll('.faq-item[style*=block]').length||!this.value?'none':'block'">
+      </div>
+    </div>
+    <div id="faq-list">
+      <div class="faq-item" data-q="What is your refund policy?" style="display:block;border-bottom:1px solid #f3f4f6;">
+        <button style="width:100%;display:flex;justify-content:space-between;align-items:center;padding:20px 0;font-size:16px;font-weight:600;background:none;border:none;cursor:pointer;text-align:left;" onclick="const a=this.nextElementSibling;const open=a.style.maxHeight!=='0px';a.style.maxHeight=open?'0px':a.scrollHeight+'px';a.style.opacity=open?'0':'1';this.querySelector('span').textContent=open?'+':'−'">What is your refund policy?<span style="font-size:20px;color:#9ca3af;transition:transform 0.2s;">+</span></button>
+        <div style="max-height:0px;overflow:hidden;transition:all 0.3s ease;opacity:0;"><p style="padding:0 0 20px;color:#6b7280;line-height:1.7;font-size:15px;">We offer a full 30-day money-back guarantee. No questions asked. Simply contact our support team and we'll process your refund within 3-5 business days.</p></div>
+      </div>
+      <div class="faq-item" data-q="How do I cancel my subscription?" style="display:block;border-bottom:1px solid #f3f4f6;">
+        <button style="width:100%;display:flex;justify-content:space-between;align-items:center;padding:20px 0;font-size:16px;font-weight:600;background:none;border:none;cursor:pointer;text-align:left;" onclick="const a=this.nextElementSibling;const open=a.style.maxHeight!=='0px';a.style.maxHeight=open?'0px':a.scrollHeight+'px';a.style.opacity=open?'0':'1';this.querySelector('span').textContent=open?'+':'−'">How do I cancel my subscription?<span style="font-size:20px;color:#9ca3af;">+</span></button>
+        <div style="max-height:0px;overflow:hidden;transition:all 0.3s ease;opacity:0;"><p style="padding:0 0 20px;color:#6b7280;line-height:1.7;font-size:15px;">You can cancel anytime from your account settings. Your access continues until the end of the billing period.</p></div>
+      </div>
+      <div class="faq-item" data-q="Do you offer team discounts?" style="display:block;border-bottom:1px solid #f3f4f6;">
+        <button style="width:100%;display:flex;justify-content:space-between;align-items:center;padding:20px 0;font-size:16px;font-weight:600;background:none;border:none;cursor:pointer;text-align:left;" onclick="const a=this.nextElementSibling;const open=a.style.maxHeight!=='0px';a.style.maxHeight=open?'0px':a.scrollHeight+'px';a.style.opacity=open?'0':'1';this.querySelector('span').textContent=open?'+':'−'">Do you offer team discounts?<span style="font-size:20px;color:#9ca3af;">+</span></button>
+        <div style="max-height:0px;overflow:hidden;transition:all 0.3s ease;opacity:0;"><p style="padding:0 0 20px;color:#6b7280;line-height:1.7;font-size:15px;">Yes! Teams of 5+ get 15% off, and teams of 20+ get 25% off. Contact sales for custom enterprise pricing.</p></div>
+      </div>
+      <div class="faq-item" data-q="What integrations do you support?" style="display:block;border-bottom:1px solid #f3f4f6;">
+        <button style="width:100%;display:flex;justify-content:space-between;align-items:center;padding:20px 0;font-size:16px;font-weight:600;background:none;border:none;cursor:pointer;text-align:left;" onclick="const a=this.nextElementSibling;const open=a.style.maxHeight!=='0px';a.style.maxHeight=open?'0px':a.scrollHeight+'px';a.style.opacity=open?'0':'1';this.querySelector('span').textContent=open?'+':'−'">What integrations do you support?<span style="font-size:20px;color:#9ca3af;">+</span></button>
+        <div style="max-height:0px;overflow:hidden;transition:all 0.3s ease;opacity:0;"><p style="padding:0 0 20px;color:#6b7280;line-height:1.7;font-size:15px;">We integrate with Slack, GitHub, Jira, Notion, Figma, and 50+ other tools. Check our integrations page for the full list.</p></div>
+      </div>
+      <div class="faq-item" data-q="Is my data secure?" style="display:block;">
+        <button style="width:100%;display:flex;justify-content:space-between;align-items:center;padding:20px 0;font-size:16px;font-weight:600;background:none;border:none;cursor:pointer;text-align:left;" onclick="const a=this.nextElementSibling;const open=a.style.maxHeight!=='0px';a.style.maxHeight=open?'0px':a.scrollHeight+'px';a.style.opacity=open?'0':'1';this.querySelector('span').textContent=open?'+':'−'">Is my data secure?<span style="font-size:20px;color:#9ca3af;">+</span></button>
+        <div style="max-height:0px;overflow:hidden;transition:all 0.3s ease;opacity:0;"><p style="padding:0 0 20px;color:#6b7280;line-height:1.7;font-size:15px;">Absolutely. We use AES-256 encryption at rest, TLS 1.3 in transit, and are SOC 2 Type II certified. Your data is never shared with third parties.</p></div>
+      </div>
+    </div>
+    <div id="faq-no-results" style="display:none;text-align:center;padding:40px 0;">
+      <div style="font-size:48px;margin-bottom:12px;">🔍</div>
+      <p style="font-size:16px;font-weight:600;margin-bottom:4px;">No results found</p>
+      <p style="color:#9ca3af;font-size:14px;">Try a different search term or <a href="#contact" style="color:#10b981;text-decoration:underline;">contact support</a>.</p>
+    </div>
+  </div>
+</section>`,
+  },
+
+  // === NEWSLETTER WITH SUCCESS ANIMATION ===
+  {
+    id: "newsletter-animated",
+    name: "Newsletter with Success Animation",
+    category: "newsletter",
+    structure: `<section id="newsletter" class="py-24" style="background:linear-gradient(135deg,#0f172a,#1e293b)">
+  <div class="max-w-2xl mx-auto px-4 text-center">
+    <div id="nl-form-state">
+      <span class="inline-flex items-center gap-2 px-4 py-1.5 rounded-full text-sm font-medium mb-6" style="background:rgba(99,102,241,0.15);color:#a5b4fc;">📬 Stay Updated</span>
+      <h2 class="text-3xl md:text-4xl font-bold mb-4" style="color:#f8fafc;">Get insights delivered weekly</h2>
+      <p class="text-lg mb-8" style="color:#94a3b8;">Join 12,000+ subscribers. No spam, unsubscribe anytime.</p>
+      <form id="nl-form" style="display:flex;gap:12px;max-width:440px;margin:0 auto;" onsubmit="event.preventDefault();this.parentElement.style.display='none';document.getElementById('nl-success-state').style.display='block';document.getElementById('nl-success-state').classList.add('nl-animate-in')">
+        <input type="email" placeholder="Enter your email" required style="flex:1;padding:14px 20px;border-radius:12px;border:2px solid rgba(148,163,184,0.2);background:rgba(255,255,255,0.05);color:#f8fafc;font-size:16px;outline:none;transition:border-color 0.2s;" onfocus="this.style.borderColor='#6366f1'" onblur="this.style.borderColor='rgba(148,163,184,0.2)'">
+        <button type="submit" style="padding:14px 28px;background:linear-gradient(135deg,#6366f1,#8b5cf6);color:#fff;border-radius:12px;font-weight:600;font-size:15px;border:none;cursor:pointer;white-space:nowrap;box-shadow:0 4px 14px rgba(99,102,241,0.4);transition:all 0.2s;" onmouseover="this.style.transform='translateY(-1px)';this.style.boxShadow='0 6px 20px rgba(99,102,241,0.5)'" onmouseout="this.style.transform='translateY(0)';this.style.boxShadow='0 4px 14px rgba(99,102,241,0.4)'">Subscribe</button>
+      </form>
+      <p style="margin-top:16px;font-size:13px;color:#64748b;">🔒 We respect your privacy. Read our <a href="#" style="color:#818cf8;text-decoration:underline;">privacy policy</a>.</p>
+    </div>
+    <div id="nl-success-state" style="display:none;">
+      <div class="nl-check-circle" style="width:80px;height:80px;margin:0 auto 20px;border-radius:50%;background:linear-gradient(135deg,#10b981,#34d399);display:flex;align-items:center;justify-content:center;">
+        <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" class="nl-check-icon"><polyline points="20 6 9 17 4 12"/></svg>
+      </div>
+      <h3 class="text-2xl font-bold mb-2" style="color:#f8fafc;">You're all set! 🎉</h3>
+      <p style="color:#94a3b8;font-size:16px;">Check your inbox for a confirmation email. Welcome aboard!</p>
+    </div>
+  </div>
+  <style>
+    .nl-animate-in { animation: nlFadeUp 0.5s ease-out forwards; }
+    .nl-animate-in .nl-check-circle { animation: nlPop 0.6s cubic-bezier(0.34,1.56,0.64,1) 0.2s both; }
+    .nl-animate-in .nl-check-icon { animation: nlDraw 0.5s ease-out 0.5s both; stroke-dasharray: 30; stroke-dashoffset: 30; }
+    @keyframes nlFadeUp { from { opacity:0; transform:translateY(20px); } to { opacity:1; transform:translateY(0); } }
+    @keyframes nlPop { from { transform:scale(0); opacity:0; } to { transform:scale(1); opacity:1; } }
+    @keyframes nlDraw { to { stroke-dashoffset: 0; } }
+  </style>
 </section>`,
   },
 ];
