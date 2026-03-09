@@ -1965,6 +1965,11 @@ const CONTEXT_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
               streamContent={buildStreamContent}
               pipelineStep={pipelineStep}
               currentAgent={currentAgent === "clarify" ? null : currentAgent}
+              onShowPreview={() => {
+                // Switch to preview panel when Preview tab is clicked
+                const event = new CustomEvent("switch-panel", { detail: "preview" });
+                window.dispatchEvent(event);
+              }}
             />
           )}
 
