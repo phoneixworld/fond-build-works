@@ -336,6 +336,7 @@ const PublishExportButtons = forwardRef<PublishExportHandle>((_, ref) => {
 
   const tabs: { id: DialogTab; label: string; icon: any }[] = [
     { id: "deploy", label: "Deploy", icon: Rocket },
+    { id: "siteinfo", label: "Site Info", icon: Image },
     { id: "history", label: "History", icon: History },
     { id: "domain", label: "Domain", icon: Shield },
   ];
