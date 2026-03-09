@@ -40,7 +40,7 @@ type DialogTab = "deploy" | "history" | "domain";
 
 const PublishExportButtons = forwardRef<PublishExportHandle>((_, ref) => {
   const { currentProject, saveProject } = useProjects();
-  const { previewHtml } = usePreview();
+  const { previewHtml, sandpackFiles } = usePreview();
   const { files } = useVirtualFS();
   const { user } = useAuth();
   const { toast } = useToast();
@@ -124,6 +124,40 @@ const PublishExportButtons = forwardRef<PublishExportHandle>((_, ref) => {
 
   const resolveHtml = async (): Promise<string> => {
     let html = previewHtml || currentProject?.html_content || "";
+
+    // If no raw HTML but we have Sandpack files, build a self-contained HTML page
+    if (!html && sandpackFiles && Object.keys(sandpackFiles).length > 0) {
+      const fileEntries = Object.entries(sandpackFiles)
+        .map(([path, code]) => `// ── ${path}\n${code}`)
+        .join("\n\n");
+      html = `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>${currentProject?.name || "My App"}</title>
+  <script src="https://cdn.tailwindcss.com"><\/script>
+  <script type="importmap">
+  {
+    "imports": {
+      "react": "https://esm.sh/react@18",
+      "react-dom": "https://esm.sh/react-dom@18",
+      "react-dom/client": "https://esm.sh/react-dom@18/client",
+      "react-router-dom": "https://esm.sh/react-router-dom@6",
+      "framer-motion": "https://esm.sh/framer-motion@11",
+      "lucide-react": "https://esm.sh/lucide-react@0.400"
+    }
+  }
+  <\/script>
+</head>
+<body>
+  <div id="root"></div>
+  <script type="module">
+${fileEntries}
+  <\/script>
+</body>
+</html>`;
+    }
 
     // If deploying to production, try to use the environment snapshot
     if (deployTarget === "production") {
