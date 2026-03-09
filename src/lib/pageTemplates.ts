@@ -137,6 +137,56 @@ DESIGN: Clean, readable. Sidebar with tree indentation. Code blocks with syntax 
 LAYOUT: 3-column: sidebar 240px + content flex-1 + TOC 200px. Responsive: sidebars collapse on mobile.
 NAV: Sidebar tree navigation + top search`,
   },
+
+  // === INDUSTRY-SPECIFIC TEMPLATES ===
+  {
+    id: "healthcare",
+    name: "Healthcare Clinic",
+    emoji: "🏥",
+    category: "healthcare",
+    description: "Medical clinic with services, doctors, appointments, and patient resources",
+    keywords: ["healthcare", "clinic", "medical", "doctor", "hospital", "health", "patient", "appointment", "dentist", "therapy", "wellness"],
+    blueprint: `STRUCTURE: Nav (clinic logo + links + Book Appointment CTA) → Hero (caring headline + subtitle + appointment CTA + trust badges: "10k+ patients", "15+ doctors") → Services grid (4-6 cards: General Care, Pediatrics, Cardiology, etc. with icons) → About section (mission + clinic photo placeholder) → Doctors grid (photo circles + name + specialty + credentials) → Testimonials (patient reviews with star ratings) → Insurance accepted logos → Appointment form (name, phone, date, service dropdown) → Location/hours + contact → Footer
+DESIGN: Calming palette (teal-500, sky-blue accents). Clean, trustworthy feel. Rounded corners on cards. Doctor cards with subtle shadows. Service icons in colored circles. Soft gradients. Accessibility-first design.
+SECTIONS: #hero, #services, #about, #doctors, #testimonials, #insurance, #appointment, #contact
+NAV: Services, Our Doctors, About, Insurance, Contact | Book Appointment (primary)`,
+  },
+  {
+    id: "fitness",
+    name: "Fitness Gym",
+    emoji: "💪",
+    category: "fitness",
+    description: "Gym/fitness center with classes, trainers, membership plans, and schedules",
+    keywords: ["fitness", "gym", "workout", "exercise", "training", "health", "muscle", "crossfit", "yoga", "personal trainer", "membership"],
+    blueprint: `STRUCTURE: Nav (gym logo + links + Join Now CTA) → Hero (bold motivational headline + dark overlay + Join CTA + Free Trial CTA) → Stats bar (members, classes/week, trainers, years) → Classes grid (6 cards: HIIT, Yoga, Strength, Cardio, etc. with duration + difficulty level) → Schedule table (weekly class timetable) → Trainers section (large cards with photo placeholder, name, specialty, certifications) → Membership tiers (3 plans: Basic, Premium, Elite with features list) → Transformation gallery (before/after gradient placeholders) → CTA banner (dark bg, bold text) → Footer
+DESIGN: High-energy palette (orange/red accents on dark grays). Bold typography. High contrast. Cards with sharp corners or slight radius. Gradient overlays. Strong CTAs. Energetic, powerful aesthetic.
+SECTIONS: #hero, #stats, #classes, #schedule, #trainers, #pricing, #transformations, #cta
+NAV: Classes, Schedule, Trainers, Membership, Contact | Free Trial (ghost) + Join Now (primary)`,
+  },
+  {
+    id: "real-estate",
+    name: "Real Estate Agency",
+    emoji: "🏠",
+    category: "real-estate",
+    description: "Property listings, agent profiles, property search, and contact forms",
+    keywords: ["real estate", "property", "house", "home", "apartment", "rent", "buy", "sell", "agent", "realtor", "listing", "mortgage"],
+    blueprint: `STRUCTURE: Nav (agency logo + links + List Property CTA) → Hero (search bar prominent: location, type dropdown, price range + Search button) → Featured listings grid (3-4 property cards: gradient image placeholder + price + beds/baths/sqft + address + favorite heart) → Property types row (Houses, Apartments, Condos, Commercial with icons) → Why choose us (4 value props: Market Expertise, Trusted Agents, etc.) → Agents grid (photo + name + phone + email + listings count) → Testimonials (client reviews) → Stats (properties sold, happy clients, years experience) → Contact form (buying/selling dropdown, property type, message) → Footer with license info
+DESIGN: Sophisticated palette (slate-800, gold/amber accents). Elegant typography. Property cards with hover zoom effect. Clean filters UI. Professional, trustworthy aesthetic. High-quality placeholder gradients.
+SECTIONS: #hero, #featured, #property-types, #why-us, #agents, #testimonials, #stats, #contact
+NAV: Buy, Rent, Sell, Agents, About | List Property (primary)`,
+  },
+  {
+    id: "online-course",
+    name: "Online Course Platform",
+    emoji: "🎓",
+    category: "education",
+    description: "Course landing with curriculum, instructor, testimonials, and enrollment",
+    keywords: ["course", "online", "learn", "education", "training", "tutorial", "class", "skill", "certificate", "bootcamp", "workshop", "masterclass"],
+    blueprint: `STRUCTURE: Nav (platform logo + links + Enroll Now CTA) → Hero (course title + subtitle + instructor avatar + rating stars + student count + Enroll CTA + price with strikethrough) → What you'll learn (4-6 outcome checkmarks) → Course stats bar (hours, modules, projects, certificate) → Curriculum accordion (modules with lessons list + duration) → Instructor section (large photo placeholder + bio + credentials + social links) → Student testimonials (video placeholders + text reviews) → Pricing card (featured, includes list, guarantee badge) → FAQ accordion → Final CTA (urgency: "Join 5,000+ students") → Footer
+DESIGN: Modern education palette (indigo/violet primary). Clean, focused design. Progress-style elements. Checkmarks in green. Curriculum with expandable sections. Certificate badge styling. Trust elements prominent.
+SECTIONS: #hero, #outcomes, #curriculum, #instructor, #testimonials, #pricing, #faq, #cta
+NAV: Curriculum, Instructor, Reviews, Pricing, FAQ | Enroll Now (primary)`,
+  },
 ];
 
 /**
