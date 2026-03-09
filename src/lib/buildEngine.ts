@@ -402,6 +402,8 @@ async function executeSingleTask(
           if (validationErrors.length > 0 && retryCount < 2) {
             const errorSummary = validationErrors.map(e => `${e.file}: ${e.error}`).join('\n');
             console.warn(`[BuildEngine] Validation errors, retrying (attempt ${retryCount + 1}):\n${errorSummary}`);
+            // Call onDelta to update progress messaging
+            onDelta(`\n[Auto-fixing ${validationErrors.length} syntax error(s), attempt ${retryCount + 1}/2...]\n`);
             executeSingleTask(
               prompt + `\n\n⚠️ SYNTAX ERRORS IN YOUR OUTPUT — FIX THESE:\n${errorSummary}\n\nRegenerate ONLY the broken files with correct syntax.`,
               config,
