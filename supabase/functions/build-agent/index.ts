@@ -330,11 +330,14 @@ ${schemaSection}
 - Smooth transitions on ALL interactive elements: transition-all duration-300
 - GENEROUS whitespace — when in doubt, add more padding
 
-## BACKEND AUTO-DETECTION
-- CRUD apps → use Data API automatically with full loading/error/empty states
+## BACKEND AUTO-DETECTION — CRITICAL
+- ANY app with data (students, products, tasks, etc.) MUST use the Data API — NEVER use mock arrays or localStorage
+- CRUD apps → use Data API automatically with full loading/error/empty states  
 - User-specific data → use Auth API + Data API with login/signup flow
 - Pure visual (landing pages) → no backend needed
-- Dashboard → fetch real data shape, show skeleton loading
+- Dashboard → fetch real data from Data API, show skeleton loading
+- If the user mentions ANY data entity (students, fees, inventory, etc.), create fetch calls to the Data API
+- EVERY page that displays a list MUST fetch from the Data API, not hardcoded arrays
 
 ## APP COMPLETENESS CHECKLIST — EVERY app must have ALL of these
 - ✅ Multiple views with React Router (BrowserRouter, Routes, Route) — NOT single-page dumps
