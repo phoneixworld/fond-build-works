@@ -38,7 +38,8 @@ export async function generatePlan(
   existingFiles?: string[],
   techStack?: string,
   schemas?: any[],
-  knowledge?: string[]
+  knowledge?: string[],
+  domainModel?: any
 ): Promise<BuildPlan> {
   const resp = await fetch(`${BASE_URL}/functions/v1/plan-agent`, {
     method: "POST",
@@ -46,7 +47,7 @@ export async function generatePlan(
       "Content-Type": "application/json",
       Authorization: AUTH_HEADER,
     },
-    body: JSON.stringify({ prompt, existingFiles, techStack, schemas, knowledge }),
+    body: JSON.stringify({ prompt, existingFiles, techStack, schemas, knowledge, domainModel }),
   });
 
   if (!resp.ok) {
@@ -56,8 +57,12 @@ export async function generatePlan(
   }
 
   const plan = await resp.json();
-  // Add status to each task
-  plan.tasks = (plan.tasks || []).map((t: any) => ({ ...t, status: "pending" as TaskStatus }));
+  // Add status and default taskType to each task
+  plan.tasks = (plan.tasks || []).map((t: any) => ({
+    ...t,
+    status: "pending" as TaskStatus,
+    taskType: t.taskType || "frontend" as TaskType,
+  }));
   return plan;
 }
 
