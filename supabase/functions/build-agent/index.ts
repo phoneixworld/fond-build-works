@@ -243,23 +243,36 @@ ${schemaSection}
 - Pure visual (landing pages) → no backend needed
 - Dashboard → fetch real data shape, show skeleton loading
 
-## APP COMPLETENESS CHECKLIST
-- ✅ Multiple views with React Router (BrowserRouter, Routes, Route)
-- ✅ Full CRUD with forms, validation, loading states, success feedback
-- ✅ Search, filter, sort for data lists
-- ✅ Empty states with illustrations and CTAs
+## APP COMPLETENESS CHECKLIST — EVERY app must have ALL of these
+- ✅ Multiple views with React Router (BrowserRouter, Routes, Route) — NOT single-page dumps
+- ✅ Sidebar or tab navigation connecting ALL modules/views
+- ✅ Full CRUD with forms, validation, loading states, success feedback (toast notifications)
+- ✅ Search, filter, sort for ALL data lists
+- ✅ Empty states with illustrations and CTAs for EVERY list view
 - ✅ Error handling on ALL API calls with user-visible feedback
-- ✅ Responsive: mobile-first, sm:, md:, lg: breakpoints tested
-- ✅ Real content — no "Lorem ipsum" or placeholder text
+- ✅ Responsive: mobile-first, sm:, md:, lg: breakpoints
+- ✅ Real, contextual content — NO "Lorem ipsum", NO generic placeholders like "Feature 1"
 - ✅ Consistent hover/focus states on all interactive elements
 - ✅ Page transitions with AnimatePresence
-- ✅ Toast notifications for user actions (use a simple toast component)
-- ✅ 404 page with navigation back to home
+- ✅ Toast notifications for user actions
+- ✅ Data tables with proper columns, pagination indicators, action buttons
+- ✅ Modal forms for add/edit operations with proper validation
+- ✅ Dashboard with KPI cards (with real icons, colored backgrounds) and at least one chart
+- ✅ Professional color palette — NOT generic gray/white. Use a strong primary + accent.
+
+## FILE STRUCTURE — PRODUCTION QUALITY
+- /App.jsx: Router setup, layout shell, sidebar/nav
+- /components/Sidebar.jsx or /components/Navigation.jsx: Main navigation
+- /components/Dashboard.jsx: Overview with KPI cards and charts
+- /components/[Feature].jsx: One file per major feature/module
+- /components/ui/[Widget].jsx: Reusable UI components (Modal, Table, Card, Toast)
+- Minimum 8 files for simple apps, 12-20 for complex/ERP apps
+- NEVER put everything in App.jsx — split into focused components
 
 ${designTheme ? `## DESIGN THEME\n${designTheme}` : ''}
 ${knowledgeSection}
 
-CRITICAL: Generate the FULL, COMPLETE code. Not snippets. Not partial. The entire working application. Every file must be importable and functional.`;
+CRITICAL: Generate the FULL, COMPLETE code. Not snippets. Not partial. The entire working application with EVERY feature the user requested. Every file must be importable and functional. If the user asks for 10 modules, build ALL 10 — don't skip any.`;
 }
 
 serve(async (req) => {
