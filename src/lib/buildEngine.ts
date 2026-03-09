@@ -711,7 +711,7 @@ async function runPlannedBuild(
 
   // ── Execute groups (parallel within each group, sequential across groups) ──
   for (const group of parallelGroups) {
-    const codeContext = buildFullCodeContext(accumulatedFiles);
+    // Use incremental context per task instead of full codebase
 
     // Run all tasks in this group concurrently
     const taskPromises = group.map(async (task, groupIdx) => {
