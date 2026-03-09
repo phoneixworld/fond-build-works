@@ -75,7 +75,47 @@ function isAllowedPkg(pkg: string): boolean {
 }
 
 /** Second-pass sanitizer applied right before Sandpack receives code */
+function repairTruncatedCode(code: string): string {
+  // Fix unterminated strings line-by-line
+  const lines = code.split("\n");
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    const dq = (line.match(/(?<!\\)"/g) || []).length;
+    const sq = (line.match(/(?<!\\)'/g) || []).length;
+    const bt = (line.match(/(?<!\\)`/g) || []).length;
+    if (dq % 2 !== 0) lines[i] = line + '" },';
+    else if (sq % 2 !== 0) lines[i] = line + "' },";
+    else if (bt % 2 !== 0) lines[i] = line + '`';
+  }
+  code = lines.join("\n");
+
+  // Close unmatched brackets/braces/parens
+  let braces = 0, brackets = 0, parens = 0;
+  for (const ch of code) {
+    if (ch === '{') braces++; else if (ch === '}') braces--;
+    if (ch === '[') brackets++; else if (ch === ']') brackets--;
+    if (ch === '(') parens++; else if (ch === ')') parens--;
+  }
+  const closers: string[] = [];
+  for (let i = 0; i < Math.min(parens, 15); i++) closers.push(')');
+  for (let i = 0; i < Math.min(brackets, 15); i++) closers.push(']');
+  for (let i = 0; i < Math.min(braces, 15); i++) closers.push('}');
+  if (closers.length > 0) {
+    code = code.trimEnd() + ';\n' + closers.join(';\n') + ';\n';
+    if (!code.includes('export default')) {
+      // Try to find the main component name
+      const compMatch = code.match(/function\s+(\w+)\s*\(/);
+      if (compMatch) code += `\nexport default ${compMatch[1]};\n`;
+    }
+  }
+  return code;
+}
+
+/** Second-pass sanitizer applied right before Sandpack receives code */
 function sanitizeCode(code: string): string {
+  // First repair any truncated code
+  code = repairTruncatedCode(code);
+  
   // Strip file separator lines
   code = code.split("\n").filter(line => {
     const t = line.trim();
