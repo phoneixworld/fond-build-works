@@ -726,12 +726,12 @@ const CONTEXT_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
             if (state.files && Object.keys(state.files).length > 0) {
               console.log("[ChatPanel] ✅ Restored sandpack state:", Object.keys(state.files).length, "files");
               setSandpackFiles(state.files);
+              syncSandpackToVirtualFS(state.files);
               if (state.deps) setSandpackDeps(state.deps);
               setPreviewMode("sandpack");
             }
           }
         });
-    } else if (!currentProject) {
     } else if (!currentProject) {
       lastProjectIdRef.current = null;
       setMessages([]);
