@@ -63,6 +63,8 @@ const CloudPanel = () => {
         return <CloudOverview onNavigate={setActiveSection} />;
       case "database":
         return <SchemaBuilder />;
+      case "email":
+        return <CloudEmail />;
       case "environments":
         return <EnvironmentManager />;
       case "security":
