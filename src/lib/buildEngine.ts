@@ -140,6 +140,8 @@ export interface EngineConfig {
   snippetsContext?: string;
   existingFiles?: Record<string, string>;
   templateContext?: string;
+  /** Previous chat messages for context (so short prompts like "same" or "build users next" make sense) */
+  chatHistory?: Array<{ role: string; content: string }>;
 }
 
 export type EnginePhase = 
