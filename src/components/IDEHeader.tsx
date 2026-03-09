@@ -22,7 +22,7 @@ import {
 import { LucideIcon } from "lucide-react";
 import { RefObject } from "react";
 
-export type PanelId = "code" | "preview" | "cloud" | "history" | "brain" | "pulse" | "crew" | "brandkit" | "abtesting" | "plugins" | "whitelabel" | "github" | "domains" | "planning" | "quality" | "search";
+export type PanelId = "code" | "preview" | "cloud" | "history" | "brain" | "pulse" | "crew" | "brandkit" | "abtesting" | "plugins" | "whitelabel" | "github" | "domains" | "planning" | "quality" | "search" | "ir";
 
 interface TabDef {
   id: PanelId;
