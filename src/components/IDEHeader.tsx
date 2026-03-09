@@ -85,6 +85,8 @@ const IDEHeader = ({
   onlineUsers,
   userEmail,
   myColor,
+  layoutSwapped = false,
+  onSwapLayout,
 }: IDEHeaderProps) => {
   const currentStack = (currentProject as any)?.tech_stack || "html-tailwind";
   const currentStackInfo = TECH_STACKS.find(s => s.id === currentStack);
