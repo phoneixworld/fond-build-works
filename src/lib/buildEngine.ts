@@ -626,6 +626,9 @@ ${task.filesAffected.map(f => `- ${f}`).join("\n")}
   // Final preview
   callbacks.onFilesReady(accumulatedFiles, allDeps);
   
+  // Auto-detect and create database schemas from generated code
+  autoDetectAndCreateSchemas(accumulatedFiles, config.projectId);
+  
   // Build completion summary
   const taskSummary = sortedTasks.map((t, i) => `✅ ${i + 1}. ${t.title}`).join("\n");
   const chatText = `✅ **Build Complete** — ${sortedTasks.length} tasks\n\n${plan.summary}\n\n${taskSummary}`;
