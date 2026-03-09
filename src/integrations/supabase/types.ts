@@ -357,6 +357,135 @@ export type Database = {
           },
         ]
       }
+      project_email_config: {
+        Row: {
+          config: Json
+          created_at: string
+          from_email: string
+          from_name: string
+          id: string
+          project_id: string
+          provider: string
+          updated_at: string
+        }
+        Insert: {
+          config?: Json
+          created_at?: string
+          from_email?: string
+          from_name?: string
+          id?: string
+          project_id: string
+          provider?: string
+          updated_at?: string
+        }
+        Update: {
+          config?: Json
+          created_at?: string
+          from_email?: string
+          from_name?: string
+          id?: string
+          project_id?: string
+          provider?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "project_email_config_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: true
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      project_email_log: {
+        Row: {
+          created_at: string
+          error: string | null
+          id: string
+          project_id: string
+          provider: string
+          status: string
+          subject: string
+          template_name: string
+          to_email: string
+        }
+        Insert: {
+          created_at?: string
+          error?: string | null
+          id?: string
+          project_id: string
+          provider?: string
+          status?: string
+          subject?: string
+          template_name?: string
+          to_email: string
+        }
+        Update: {
+          created_at?: string
+          error?: string | null
+          id?: string
+          project_id?: string
+          provider?: string
+          status?: string
+          subject?: string
+          template_name?: string
+          to_email?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "project_email_log_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      project_email_templates: {
+        Row: {
+          created_at: string
+          html_body: string
+          id: string
+          name: string
+          project_id: string
+          subject: string
+          text_body: string
+          updated_at: string
+          variables: Json
+        }
+        Insert: {
+          created_at?: string
+          html_body?: string
+          id?: string
+          name?: string
+          project_id: string
+          subject?: string
+          text_body?: string
+          updated_at?: string
+          variables?: Json
+        }
+        Update: {
+          created_at?: string
+          html_body?: string
+          id?: string
+          name?: string
+          project_id?: string
+          subject?: string
+          text_body?: string
+          updated_at?: string
+          variables?: Json
+        }
+        Relationships: [
+          {
+            foreignKeyName: "project_email_templates_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       project_environments: {
         Row: {
           config: Json
