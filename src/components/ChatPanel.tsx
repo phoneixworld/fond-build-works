@@ -1039,8 +1039,10 @@ const CONTEXT_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
       const shouldIncludeCurrentCode = !isFirstMessage || hasPersistedHistory;
       
       let currentCodeSummary = "";
-      if (shouldIncludeCurrentCode && currentSandpackFiles && Object.keys(currentSandpackFiles).length > 0) {
-        const fileEntries = Object.entries(currentSandpackFiles);
+      // FIX: Use ref to read latest sandpack files (avoids stale closure from project switch)
+      const safeSandpackFiles = sandpackFilesRef.current;
+      if (shouldIncludeCurrentCode && safeSandpackFiles && Object.keys(safeSandpackFiles).length > 0) {
+        const fileEntries = Object.entries(safeSandpackFiles);
         const totalChars = fileEntries.reduce((sum, [, code]) => sum + code.length, 0);
         if (totalChars <= 16000) {
           currentCodeSummary = fileEntries.map(([path, code]) => `--- ${path}\n${code}`).join("\n\n");
