@@ -1932,6 +1932,8 @@ ${Object.entries(files).map(([path, code]) => `--- ${path}\n${code}`).join("\n\n
           },
           onDelta: (chunk) => {
             setBuildStreamContent(prev => prev + chunk);
+            // Feed streaming preview controller
+            streamingControllerRef.current?.addChunk(chunk);
           },
           onFilesReady: (files, deps) => {
             // FIX: Guard against project switch during build
