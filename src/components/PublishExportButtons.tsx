@@ -403,7 +403,7 @@ const PublishExportButtons = forwardRef<PublishExportHandle>((_, ref) => {
                     <div className="flex gap-2 pt-1">
                       <button
                         onClick={handlePublish}
-                        disabled={publishing}
+                        disabled={publishing || isBuilding}
                         className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-xs font-semibold bg-primary text-primary-foreground hover:bg-primary/90 transition-colors disabled:opacity-50"
                       >
                         {publishing ? (
