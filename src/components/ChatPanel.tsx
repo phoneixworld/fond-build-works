@@ -581,13 +581,34 @@ const CONTEXT_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
   useEffect(() => {
     const el = scrollRef.current;
     if (!el) return;
+    let ticking = false;
     const onScroll = () => {
-      const atBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 80;
-      setShowScrollBtn(!atBottom);
+      if (!ticking) {
+        requestAnimationFrame(() => {
+          if (el) {
+            const atBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 80;
+            setShowScrollBtn(!atBottom);
+          }
+          ticking = false;
+        });
+        ticking = true;
+      }
     };
-    el.addEventListener("scroll", onScroll);
+    el.addEventListener("scroll", onScroll, { passive: true });
     return () => el.removeEventListener("scroll", onScroll);
   }, []);
+
+  // Auto-scroll to bottom on new messages
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    const atBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 150;
+    if (atBottom || isLoading) {
+      requestAnimationFrame(() => {
+        el.scrollTo({ top: el.scrollHeight, behavior: "smooth" });
+      });
+    }
+  }, [messages.length, buildStreamContent, isLoading]);
 
   useEffect(() => {
     const handler = (event: MessageEvent) => {
