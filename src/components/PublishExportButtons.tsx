@@ -123,11 +123,10 @@ const PublishExportButtons = forwardRef<PublishExportHandle>((_, ref) => {
   };
 
   const resolveHtml = async (): Promise<string> => {
-    let html = previewHtml || currentProject?.html_content || "";
+    let html = "";
 
-    // If no raw HTML but we have Sandpack files, build a self-contained HTML page
-    // that uses Babel standalone to transpile JSX in the browser
-    if (!html && sandpackFiles && Object.keys(sandpackFiles).length > 0) {
+    // Prioritize Sandpack files (React mode) over raw HTML
+    if (sandpackFiles && Object.keys(sandpackFiles).length > 0) {
       // Escape </script> inside JSON to prevent premature HTML tag closing
       const filesJson = JSON.stringify(sandpackFiles).replace(/<\//g, '<\\/');
       html = `<!DOCTYPE html>
@@ -251,6 +250,9 @@ const PublishExportButtons = forwardRef<PublishExportHandle>((_, ref) => {
   </script>
 </body>
 </html>`;
+    } else {
+      // Fallback to raw HTML
+      html = previewHtml || currentProject?.html_content || "";
     }
 
     // If deploying to production, try to use the environment snapshot
