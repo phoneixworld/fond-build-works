@@ -72,12 +72,25 @@ const LandingPage = ({ onStartProject, onOpenProject }: LandingPageProps) => {
           className="w-full max-w-2xl space-y-6"
         >
           <div className="text-center space-y-3">
-            <h1 className="text-4xl font-bold text-foreground tracking-tight">
-              What do you want to <span className="text-primary">build</span>?
-            </h1>
-            <p className="text-muted-foreground text-base">
-              Describe your idea, pick a tech stack, and watch it come to life.
-            </p>
+            {user ? (
+              <>
+                <h1 className="text-4xl font-bold text-foreground tracking-tight">
+                  Welcome back, <span className="text-primary">{user.user_metadata?.display_name || user.email?.split("@")[0] || "Builder"}</span> 👋
+                </h1>
+                <p className="text-muted-foreground text-base">
+                  Ready to bring your next idea to life?
+                </p>
+              </>
+            ) : (
+              <>
+                <h1 className="text-4xl font-bold text-foreground tracking-tight">
+                  Phoenix World helps you build your next <span className="text-primary">Unicorn</span> idea
+                </h1>
+                <p className="text-muted-foreground text-base">
+                  Describe it, and watch it come to life — powered by AI.
+                </p>
+              </>
+            )}
           </div>
 
 
