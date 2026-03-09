@@ -6,8 +6,11 @@
  * 2. Chat Agent (conversational only, no code) — for questions/discussions
  * 3. Build Agent (code generation only) — for creating/modifying apps
  * 4. Sandpack Validation — validates generated code before showing
- * 5. Auto-Retry — if validation fails, retries with error context
+ * 5. Sucrase Syntax Check — catches real parse errors before preview
+ * 6. Auto-Retry — if validation fails, retries with error context (up to 3x)
+ * 7. Runtime Self-Heal — detects preview console errors and auto-fixes
  */
+import { transform } from "sucrase";
 
 type MsgContent = string | Array<{ type: "text"; text: string } | { type: "image_url"; image_url: { url: string } }>;
 type Msg = { role: "user" | "assistant"; content: MsgContent };
@@ -44,7 +47,7 @@ export interface PipelineEvent {
   retryCount?: number;
 }
 
-export const MAX_BUILD_RETRIES = 2;
+export const MAX_BUILD_RETRIES = 3;
 
 const BASE_URL = import.meta.env.VITE_SUPABASE_URL;
 const AUTH_HEADER = `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`;
@@ -260,7 +263,7 @@ async function readSSEStream(
 }
 
 /**
- * Validate generated React code with comprehensive checks
+ * Validate generated React code with comprehensive checks + Sucrase syntax verification
  */
 export function validateReactCode(files: Record<string, string>): { valid: boolean; errors: string[] } {
   const errors: string[] = [];
@@ -291,11 +294,6 @@ export function validateReactCode(files: Record<string, string>): { valid: boole
       errors.push(`${path}: Missing default export — App component must use 'export default'`);
     }
 
-    // Check for missing React import (needed for JSX in some environments)
-    if (path.match(/\.jsx$/) && !code.includes("import React") && !code.includes("from 'react'") && !code.includes('from "react"')) {
-      // Soft warning — Sandpack may handle this
-    }
-
     // Check for require() usage
     if (/\brequire\s*\(/.test(code)) {
       errors.push(`${path}: Uses require() — must use ES6 import syntax instead`);
@@ -311,6 +309,23 @@ export function validateReactCode(files: Record<string, string>): { valid: boole
     const closeBraces = (code.match(/}/g) || []).length;
     if (Math.abs(openBraces - closeBraces) > 2) {
       errors.push(`${path}: Mismatched curly braces (${openBraces} open, ${closeBraces} close)`);
+    }
+
+    // ─── Sucrase Syntax Validation ─────────────────────────────────────
+    // This catches REAL parse errors (unterminated strings, bad JSX, etc.)
+    try {
+      const isTs = path.endsWith(".tsx") || path.endsWith(".ts");
+      transform(code, {
+        transforms: isTs ? ["typescript", "jsx"] : ["jsx"],
+        jsxRuntime: "automatic",
+        production: true,
+      });
+    } catch (parseErr: any) {
+      const msg = parseErr?.message || String(parseErr);
+      // Extract line number if available
+      const lineMatch = msg.match(/(\d+):(\d+)/);
+      const location = lineMatch ? ` (line ${lineMatch[1]}, col ${lineMatch[2]})` : "";
+      errors.push(`${path}: Syntax error${location} — ${msg.split("\n")[0]}`);
     }
   }
 
