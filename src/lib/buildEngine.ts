@@ -1348,7 +1348,8 @@ async function executeSingleTask(
   accumulatedCode: string,
   onDelta: (chunk: string) => void,
   retryCount = 0,
-  maxTokens?: number
+  maxTokens?: number,
+  taskType?: string
 ): Promise<{ files: Record<string, string>; deps: Record<string, string>; chatText: string; modelMs: number; cached: boolean }> {
   // ── Check in-memory cache first, then persistent cache ──
   const cacheKey = getTaskCacheKey(prompt, accumulatedCode);
@@ -1392,6 +1393,7 @@ async function executeSingleTask(
       templateContext: config.templateContext,
       currentCode: accumulatedCode || undefined,
       maxTokens,
+      taskType,
       onDelta: (chunk) => {
         fullText += chunk;
         onDelta(chunk);
