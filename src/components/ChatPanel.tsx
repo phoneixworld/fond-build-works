@@ -1419,6 +1419,21 @@ const CONTEXT_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
             }));
             saveProject({ chat_history: persistMessages, html_content: currentProject.html_content || "" });
             
+            // Persist sandpack files to project_data for session restoration
+            if (result.files && Object.keys(result.files).length > 0) {
+              const payload = { files: result.files, deps: result.deps || {} };
+              supabase
+                .from("project_data")
+                .upsert(
+                  { project_id: currentProject.id, collection: "sandpack_state", data: payload as any },
+                  { onConflict: "project_id,collection" }
+                )
+                .then(({ error }) => {
+                  if (error) console.warn("[ChatPanel] Failed to persist sandpack state:", error);
+                  else console.log("[ChatPanel] ✅ Sandpack state persisted");
+                });
+            }
+            
             if (onVersionCreated) {
               onVersionCreated({
                 id: crypto.randomUUID(),
