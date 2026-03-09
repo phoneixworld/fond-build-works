@@ -834,13 +834,13 @@ ${task.filesAffected.map(f => `- ${f}`).join("\n")}
   const chatText = `✅ **Build Complete** — ${executableTasks.length} tasks in ${parallelGroups.length} parallel groups\n\n${plan.summary}\n\n${taskSummary}`;
 
   callbacks.onProgress({ phase: "complete", message: "Build complete" });
+  const finalMetrics = finishBuild();
   callbacks.onComplete({
     files: accumulatedFiles,
     deps: allDeps,
     plan,
     chatText,
     mergeConflicts: allConflicts,
+    metrics: finalMetrics || undefined,
   });
-
-  finishBuild();
 }
