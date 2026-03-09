@@ -263,7 +263,7 @@ async function readSSEStream(
 }
 
 /**
- * Validate generated React code with comprehensive checks
+ * Validate generated React code with comprehensive checks + Sucrase syntax verification
  */
 export function validateReactCode(files: Record<string, string>): { valid: boolean; errors: string[] } {
   const errors: string[] = [];
@@ -294,11 +294,6 @@ export function validateReactCode(files: Record<string, string>): { valid: boole
       errors.push(`${path}: Missing default export — App component must use 'export default'`);
     }
 
-    // Check for missing React import (needed for JSX in some environments)
-    if (path.match(/\.jsx$/) && !code.includes("import React") && !code.includes("from 'react'") && !code.includes('from "react"')) {
-      // Soft warning — Sandpack may handle this
-    }
-
     // Check for require() usage
     if (/\brequire\s*\(/.test(code)) {
       errors.push(`${path}: Uses require() — must use ES6 import syntax instead`);
@@ -314,6 +309,23 @@ export function validateReactCode(files: Record<string, string>): { valid: boole
     const closeBraces = (code.match(/}/g) || []).length;
     if (Math.abs(openBraces - closeBraces) > 2) {
       errors.push(`${path}: Mismatched curly braces (${openBraces} open, ${closeBraces} close)`);
+    }
+
+    // ─── Sucrase Syntax Validation ─────────────────────────────────────
+    // This catches REAL parse errors (unterminated strings, bad JSX, etc.)
+    try {
+      const isTs = path.endsWith(".tsx") || path.endsWith(".ts");
+      transform(code, {
+        transforms: isTs ? ["typescript", "jsx"] : ["jsx"],
+        jsxRuntime: "automatic",
+        production: true,
+      });
+    } catch (parseErr: any) {
+      const msg = parseErr?.message || String(parseErr);
+      // Extract line number if available
+      const lineMatch = msg.match(/(\d+):(\d+)/);
+      const location = lineMatch ? ` (line ${lineMatch[1]}, col ${lineMatch[2]})` : "";
+      errors.push(`${path}: Syntax error${location} — ${msg.split("\n")[0]}`);
     }
   }
 
