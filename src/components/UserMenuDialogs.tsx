@@ -175,14 +175,14 @@ const UserMenuDialogs = ({ open, onOpenChange }: UserMenuDialogsProps) => {
               <HelpCircle className="w-4 h-4 text-primary" />
               Help & Support
             </DialogTitle>
-            <DialogDescription className="text-xs">Get help with Phoenix Builder</DialogDescription>
+            <DialogDescription className="text-xs">Get help with Phoneix Builder</DialogDescription>
           </DialogHeader>
           <div className="space-y-2 pt-2">
             {[
               { icon: BookOpen, label: "Documentation", desc: "Guides, API reference & tutorials", href: "#" },
               { icon: MessageCircle, label: "Community", desc: "Join our Discord community", href: "#" },
               { icon: Bug, label: "Report a Bug", desc: "Found something broken? Let us know", href: "#" },
-              { icon: Mail, label: "Contact Support", desc: "Email us at support@phoenix.world", href: "#" },
+              { icon: Mail, label: "Contact Support", desc: "Email us at support@phoneix.world", href: "#" },
             ].map(({ icon: Icon, label, desc, href }) => (
               <button
                 key={label}
@@ -203,7 +203,7 @@ const UserMenuDialogs = ({ open, onOpenChange }: UserMenuDialogsProps) => {
 
           <Separator className="my-2" />
           <div className="text-center">
-            <p className="text-[10px] text-muted-foreground">Phoenix Builder v2.0 · Made with ⚡</p>
+            <p className="text-[10px] text-muted-foreground">Phoneix Builder v2.0 · Made with ⚡</p>
           </div>
         </DialogContent>
       </Dialog>

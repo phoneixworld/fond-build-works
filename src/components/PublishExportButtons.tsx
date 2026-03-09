@@ -894,7 +894,7 @@ const PublishExportButtons = forwardRef<PublishExportHandle>((_, ref) => {
                       <div className="font-mono text-[10px] text-muted-foreground space-y-1 bg-secondary/50 rounded p-2">
                         <p><span className="text-primary font-semibold">A</span> {"   "}@ → 185.158.133.1</p>
                         <p><span className="text-primary font-semibold">A</span> {"   "}www → 185.158.133.1</p>
-                        <p><span className="text-primary font-semibold">TXT</span> _phoenix → phoenix_verify={currentProject?.id?.slice(0, 12)}</p>
+                        <p><span className="text-primary font-semibold">TXT</span> _phoneix → phoneix_verify={currentProject?.id?.slice(0, 12)}</p>
                       </div>
                     </div>
 

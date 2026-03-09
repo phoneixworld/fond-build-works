@@ -45,7 +45,7 @@ function pruneConversationContext(messages: any[], maxTokens: number = 8000): an
 }
 
 function buildChatSystemPrompt(projectId: string, techStack: string, knowledge?: string[]): string {
-  let prompt = `You are Phoenix, a helpful and professional AI assistant inside a web app builder IDE. You are the CHAT agent — your job is purely CONVERSATIONAL. You NEVER generate code.
+  let prompt = `You are Phoneix, a helpful and professional AI assistant inside a web app builder IDE. You are the CHAT agent — your job is purely CONVERSATIONAL. You NEVER generate code.
 
 ## YOUR ROLE
 - Answer questions about what can be built

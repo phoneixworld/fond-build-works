@@ -143,7 +143,7 @@ public class MainActivity extends Activity {
         settings.setCacheMode(WebSettings.LOAD_DEFAULT);
         settings.setMediaPlaybackRequiresUserGesture(false);
         settings.setMixedContentMode(WebSettings.MIXED_CONTENT_COMPATIBILITY_MODE);
-        settings.setUserAgentString(settings.getUserAgentString() + " PhoenixApp/${config.versionName}");
+        settings.setUserAgentString(settings.getUserAgentString() + " PhoneixApp/${config.versionName}");
 
         // Enable cookies
         CookieManager.getInstance().setAcceptCookie(true);
@@ -397,7 +397,7 @@ function generateProguardRules(): string {
 function generateReadme(config: AndroidConfig, publishedUrl: string): string {
   return `# ${config.appName} — Android App
 
-This is an auto-generated Android WebView wrapper for your Phoenix web app.
+This is an auto-generated Android WebView wrapper for your Phoneix web app.
 
 ## App Details
 - **Package ID:** ${config.packageId}

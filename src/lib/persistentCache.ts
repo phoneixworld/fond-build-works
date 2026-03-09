@@ -8,7 +8,7 @@
  * Falls back gracefully to in-memory-only if IndexedDB is unavailable.
  */
 
-const DB_NAME = "phoenix-build-cache";
+const DB_NAME = "phoneix-build-cache";
 const DB_VERSION = 1;
 const STORE_TASKS = "task-outputs";
 const STORE_VALIDATIONS = "validated-files";

@@ -165,7 +165,7 @@ const CloudEmail = () => {
           project_id: currentProject.id,
           action: "send",
           to: configFromEmail || "test@example.com",
-          subject: "Test email from Phoenix Builder",
+          subject: "Test email from Phoneix Builder",
           html: "<h1>It works!</h1><p>Your email service is configured correctly.</p>",
           text: "It works! Your email service is configured correctly.",
         },

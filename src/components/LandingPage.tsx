@@ -59,7 +59,7 @@ const LandingPage = ({ onStartProject, onOpenProject }: LandingPageProps) => {
   };
 
   const HOW_IT_WORKS = [
-    { step: "01", title: "Describe your app", description: "Tell Phoenix what you want in plain English. Be as detailed or brief as you like.", icon: MessageSquare, gradient: "from-[hsl(210,100%,56%)] to-[hsl(210,100%,40%)]" },
+    { step: "01", title: "Describe your app", description: "Tell Phoneix what you want in plain English. Be as detailed or brief as you like.", icon: MessageSquare, gradient: "from-[hsl(210,100%,56%)] to-[hsl(210,100%,40%)]" },
     { step: "02", title: "Instant preview loads", description: "Your app renders in under 1 second. A live, interactive preview — not a mockup.", icon: Eye, gradient: "from-[hsl(265,89%,62%)] to-[hsl(265,89%,48%)]" },
     { step: "03", title: "AI customizes in real time", description: "Iterate with chat. The AI refines code, adds features, and fixes bugs automatically.", icon: Wand2, gradient: "from-[hsl(142,71%,45%)] to-[hsl(142,71%,32%)]" },
   ];
@@ -109,8 +109,8 @@ const LandingPage = ({ onStartProject, onOpenProject }: LandingPageProps) => {
       {/* Navbar */}
       <header className="sticky top-0 z-50 flex items-center justify-between px-6 py-4 border-b border-border bg-background/80 backdrop-blur-xl">
         <div className="flex items-center gap-2">
-          <img src="/logo.png" alt="Phoenix World" className="w-8 h-8 rounded-lg object-cover" />
-          <span className="text-base font-bold text-foreground">Phoenix.World</span>
+          <img src="/logo.png" alt="Phoneix World" className="w-8 h-8 rounded-lg object-cover" />
+          <span className="text-base font-bold text-foreground">Phoneix.World</span>
         </div>
         <div className="flex items-center gap-3">
           {user && <span className="text-sm text-muted-foreground hidden sm:inline">{user.email}</span>}
@@ -224,7 +224,7 @@ const LandingPage = ({ onStartProject, onOpenProject }: LandingPageProps) => {
                 ) : (
                   <>
                     <h1 className="text-4xl md:text-5xl font-bold text-foreground tracking-tight leading-tight">
-                      Phoenix World helps you build your next{" "}
+                      Phoneix World helps you build your next{" "}
                       <span className="bg-gradient-to-r from-[hsl(var(--primary))] to-[hsl(var(--accent))] bg-clip-text text-transparent">Unicorn</span> idea
                     </h1>
                     <p className="text-muted-foreground text-base md:text-lg max-w-lg mx-auto">
@@ -337,7 +337,7 @@ const LandingPage = ({ onStartProject, onOpenProject }: LandingPageProps) => {
             <motion.div initial="hidden" whileInView="visible" viewport={{ once: true, margin: "-80px" }} variants={stagger} className="max-w-5xl mx-auto relative z-10">
               <motion.div variants={fadeUp} className="text-center mb-14">
                 <p className="text-xs font-semibold uppercase tracking-widest text-[hsl(var(--ide-warning))] mb-2">What No One Else Offers</p>
-                <h2 className="text-3xl md:text-4xl font-bold text-foreground">Features that set Phoenix apart</h2>
+                <h2 className="text-3xl md:text-4xl font-bold text-foreground">Features that set Phoneix apart</h2>
                 <p className="text-muted-foreground text-base mt-3 max-w-lg mx-auto">
                   Real collaboration, real environments, real mobile export. Not marketing fluff.
                 </p>
@@ -445,7 +445,7 @@ const LandingPage = ({ onStartProject, onOpenProject }: LandingPageProps) => {
               <motion.div variants={fadeUp} className="text-center mb-14">
                 <p className="text-xs font-semibold uppercase tracking-widest text-[hsl(var(--ide-success))] mb-2">What You Can Build</p>
                 <h2 className="text-3xl md:text-4xl font-bold text-foreground">From landing pages to full apps</h2>
-                <p className="text-muted-foreground text-base mt-3 max-w-lg mx-auto">Phoenix World generates production-ready apps — not templates, not mockups.</p>
+                <p className="text-muted-foreground text-base mt-3 max-w-lg mx-auto">Phoneix World generates production-ready apps — not templates, not mockups.</p>
               </motion.div>
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                 {SHOWCASE_APPS.map((app, i) => {
@@ -465,14 +465,14 @@ const LandingPage = ({ onStartProject, onOpenProject }: LandingPageProps) => {
             </motion.div>
           </section>
 
-          {/* ─── WHY PHOENIX IS DIFFERENT ─── */}
+          {/* ─── WHY PHONEIX IS DIFFERENT ─── */}
           <section className="px-6 py-20 bg-card/30 relative overflow-hidden">
             <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[400px] pointer-events-none">
               <div className="absolute inset-0 bg-[hsl(210,100%,56%/0.06)] rounded-full blur-[150px]" />
             </div>
             <motion.div initial="hidden" whileInView="visible" viewport={{ once: true, margin: "-80px" }} variants={stagger} className="max-w-5xl mx-auto relative z-10">
               <motion.div variants={fadeUp} className="text-center mb-14">
-                <p className="text-xs font-semibold uppercase tracking-widest text-[hsl(var(--primary))] mb-2">Why Phoenix World</p>
+                <p className="text-xs font-semibold uppercase tracking-widest text-[hsl(var(--primary))] mb-2">Why Phoneix World</p>
                 <h2 className="text-3xl md:text-4xl font-bold text-foreground">Not just another AI builder</h2>
                 <p className="text-muted-foreground text-base mt-3 max-w-lg mx-auto">Multi-agent orchestration, auto-fix, and instant previews. This is a different kind of tool.</p>
               </motion.div>
@@ -516,10 +516,10 @@ const LandingPage = ({ onStartProject, onOpenProject }: LandingPageProps) => {
           {/* ─── FOOTER ─── */}
           <footer className="px-6 py-8 text-center">
             <div className="flex items-center justify-center gap-2 mb-3">
-              <img src="/logo.png" alt="Phoenix World" className="w-6 h-6 rounded-md object-cover" />
-              <span className="text-sm font-semibold text-foreground">Phoenix.World</span>
+              <img src="/logo.png" alt="Phoneix World" className="w-6 h-6 rounded-md object-cover" />
+              <span className="text-sm font-semibold text-foreground">Phoneix.World</span>
             </div>
-            <p className="text-xs text-muted-foreground">Built with Phoenix World • © {new Date().getFullYear()} All rights reserved.</p>
+            <p className="text-xs text-muted-foreground">Built with Phoneix World • © {new Date().getFullYear()} All rights reserved.</p>
           </footer>
         </main>
       </div>

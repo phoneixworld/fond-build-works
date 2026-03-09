@@ -61,7 +61,7 @@ const Auth = () => {
             <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary to-accent flex items-center justify-center shadow-lg shadow-primary/25">
               <Zap className="w-5 h-5 text-white" />
             </div>
-            <span className="text-xl font-bold text-white tracking-tight">Phoenix World</span>
+            <span className="text-xl font-bold text-white tracking-tight">Phoneix World</span>
           </div>
 
           {/* Center: Hero content */}
@@ -121,7 +121,7 @@ const Auth = () => {
             <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-primary to-accent flex items-center justify-center shadow-lg shadow-primary/25">
               <Zap className="w-6 h-6 text-white" />
             </div>
-            <h1 className="text-xl font-bold text-foreground">Phoenix World</h1>
+            <h1 className="text-xl font-bold text-foreground">Phoneix World</h1>
           </div>
 
           {/* Header */}

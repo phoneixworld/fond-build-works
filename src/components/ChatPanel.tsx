@@ -2343,7 +2343,7 @@ ${Object.entries(files).map(([path, code]) => `--- ${path}\n${code}`).join("\n\n
                 className="w-full max-w-sm"
               >
                 <div className="rounded-xl border border-border/50 bg-card/50 p-3">
-                  <p className="text-[10px] font-semibold text-muted-foreground/60 uppercase tracking-wider mb-2 text-center">What Phoenix Builder can do</p>
+                  <p className="text-[10px] font-semibold text-muted-foreground/60 uppercase tracking-wider mb-2 text-center">What Phoneix Builder can do</p>
                   <div className="grid grid-cols-2 gap-1.5">
                     {[
                       { icon: "🧠", label: "Multi-model AI", desc: "GPT-5, Gemini 2.5 & more" },
@@ -2531,7 +2531,7 @@ ${Object.entries(files).map(([path, code]) => `--- ${path}\n${code}`).join("\n\n
                   <Sparkles className="w-3.5 h-3.5 text-primary-foreground" />
                 </div>
                 <div className="flex flex-col gap-1.5 pt-0.5">
-                  <span className="text-xs font-semibold text-foreground/80">Phoenix is thinking...</span>
+                  <span className="text-xs font-semibold text-foreground/80">Phoneix is thinking...</span>
                   <div className="flex items-center gap-1.5">
                     <motion.span
                       animate={{ scale: [1, 1.3, 1], opacity: [0.4, 1, 0.4] }}

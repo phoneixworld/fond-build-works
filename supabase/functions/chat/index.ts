@@ -342,7 +342,7 @@ You CAN create visual diagrams to explain complex concepts! Use Mermaid markdown
 
 \`\`\`mermaid
 graph TD
-    A[User Request] --> B[Phoenix AI]
+    A[User Request] --> B[Phoneix AI]
     B --> C[Generated App]
     C --> D[Live Preview]
 \`\`\`

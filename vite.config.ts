@@ -20,8 +20,8 @@ export default defineConfig(({ mode }) => ({
       registerType: "autoUpdate",
       includeAssets: ["favicon.ico", "pwa-192.png", "pwa-512.png"],
       manifest: {
-        name: "Phoenix World",
-        short_name: "Phoenix",
+        name: "Phoneix World",
+        short_name: "Phoneix",
         description: "AI-powered app builder — build, preview, and publish apps from your phone or desktop.",
         theme_color: "#6d28d9",
         background_color: "#0a0a0b",
