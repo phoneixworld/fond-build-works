@@ -432,7 +432,23 @@ async function executeSingleTask(
         const parsed = parseReactFilesFromOutput(responseText);
         
         if (parsed.files && Object.keys(parsed.files).length > 0) {
-          resolve({ files: parsed.files, deps: parsed.deps, chatText: parsed.chatText });
+          // ── Validate all files with real parsers ──
+          const validationErrors = validateAllFiles(parsed.files);
+          
+          if (validationErrors.length > 0 && retryCount < 2) {
+            const errorSummary = validationErrors.map(e => `${e.file}: ${e.error}`).join('\n');
+            console.warn(`[BuildEngine] Parse errors found, retrying (attempt ${retryCount + 1}):\n${errorSummary}`);
+            executeSingleTask(
+              prompt + `\n\n⚠️ SYNTAX ERRORS IN YOUR OUTPUT — FIX THESE:\n${errorSummary}\n\nRegenerate ONLY the broken files with correct syntax.`,
+              config,
+              accumulatedCode,
+              onDelta,
+              retryCount + 1,
+              maxTokens
+            ).then(resolve).catch(reject);
+          } else {
+            resolve({ files: parsed.files, deps: parsed.deps, chatText: parsed.chatText });
+          }
         } else if (retryCount < 2) {
           // No code produced — force retry
           console.warn(`[BuildEngine] No code in response, retrying (attempt ${retryCount + 1})`);
