@@ -145,6 +145,7 @@ export async function streamBuildAgent({
   snippetsContext,
   retryContext,
   maxTokens,
+  taskType,
   onDelta,
   onDone,
   onError,
@@ -161,6 +162,7 @@ export async function streamBuildAgent({
   snippetsContext?: string;
   retryContext?: string;
   maxTokens?: number;
+  taskType?: string;
   onDelta: (text: string) => void;
   onDone: (fullText: string) => void;
   onError: (error: string) => void;
@@ -187,6 +189,7 @@ export async function streamBuildAgent({
           snippets_context: snippetsContext,
           retry_context: retryContext,
           max_tokens: maxTokens,
+          task_type: taskType,
         }),
       });
       break;
