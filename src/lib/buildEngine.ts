@@ -521,6 +521,12 @@ async function executeSingleTask(
         }
       },
       onError: (err) => {
+        // Don't retry on usage/rate limit errors — surface immediately
+        const isQuotaError = err.includes("Usage limit") || err.includes("Rate limited");
+        if (isQuotaError) {
+          reject(new Error("⚠️ AI usage limit reached. Please add credits in Settings → Workspace → Usage, then try again."));
+          return;
+        }
         if (retryCount < 1) {
           console.warn(`[BuildEngine] Task error, retrying: ${err}`);
           setTimeout(() => {
@@ -817,6 +823,11 @@ async function runPlannedBuild(
       plan,
     });
   } catch (err) {
+    const errMsg = err instanceof Error ? err.message : String(err);
+    // Don't fallback on quota errors — surface them directly
+    if (errMsg.includes("Usage limit") || errMsg.includes("Rate limited")) {
+      throw new Error("⚠️ AI usage limit reached. Please add credits in Settings → Workspace → Usage, then try again.");
+    }
     console.warn("[BuildEngine] Planning failed, falling back to direct build:", err);
     await runDirectBuild(prompt, config, callbacks);
     return;
