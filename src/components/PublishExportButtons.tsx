@@ -155,14 +155,25 @@ const PublishExportButtons = forwardRef<PublishExportHandle>((_, ref) => {
     } catch {}
   }, [currentProject]);
 
+  // Determine the public-facing origin for published URLs
+  const getPublishedOrigin = useCallback(() => {
+    const origin = window.location.origin;
+    // If we're on a preview domain, use the published lovable.app domain instead
+    if (origin.includes("lovableproject.com") || origin.includes("id-preview")) {
+      return "https://fond-build-works.lovable.app";
+    }
+    return origin;
+  }, []);
+
   useEffect(() => {
     if (showPublish && currentProject?.is_published && currentProject?.published_slug) {
       const slug = currentProject.published_slug;
-      setPublishedUrl(`${window.location.origin}/app/${slug}`);
-      setStagingUrl(`${window.location.origin}/app/staging-${slug}`);
+      const pubOrigin = getPublishedOrigin();
+      setPublishedUrl(`${pubOrigin}/app/${slug}`);
+      setStagingUrl(`${pubOrigin}/app/staging-${slug}`);
     }
     if (showPublish) fetchEnvStatus();
-  }, [showPublish, currentProject, fetchEnvStatus]);
+  }, [showPublish, currentProject, fetchEnvStatus, getPublishedOrigin]);
 
   // Load deploy history
   const fetchHistory = useCallback(async () => {
