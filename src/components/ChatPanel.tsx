@@ -1988,6 +1988,9 @@ ${Object.entries(files).map(([path, code]) => `--- ${path}\n${code}`).join("\n\n
             isSendingRef.current = false;
             setBuildRetryCount(0);
             if (result.metrics) setBuildMetrics(result.metrics);
+            // Stop streaming preview controller
+            streamingControllerRef.current?.stop();
+            streamingControllerRef.current = null;
             setTimeout(() => setBuildStreamContent(""), 3000);
             
             const persistMessages = messagesRef.current.map(m => ({
