@@ -224,7 +224,7 @@ const LandingPage = ({ onStartProject, onOpenProject }: LandingPageProps) => {
                 ) : (
                   <>
                     <h1 className="text-4xl md:text-5xl font-bold text-foreground tracking-tight leading-tight">
-                      Phoenix World helps you build your next{" "}
+                      Phoneix World helps you build your next{" "}
                       <span className="bg-gradient-to-r from-[hsl(var(--primary))] to-[hsl(var(--accent))] bg-clip-text text-transparent">Unicorn</span> idea
                     </h1>
                     <p className="text-muted-foreground text-base md:text-lg max-w-lg mx-auto">
