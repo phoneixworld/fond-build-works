@@ -46,6 +46,8 @@ interface IDEHeaderProps {
   onlineUsers: any[];
   userEmail: string;
   myColor: string;
+  layoutSwapped?: boolean;
+  onSwapLayout?: () => void;
 }
 
 // Tools that go under project menu
