@@ -247,16 +247,16 @@ function autoRepairJSX(code: string): string {
 
   // Remove duplicate Route entries (same path appearing twice)
   const routePaths = new Map<string, boolean>();
-  const lines = code.split("\n");
+  const routeLines = code.split("\n");
   const cleanedLines: string[] = [];
-  for (let i = 0; i < lines.length; i++) {
-    const routeMatch = lines[i].match(/<Route\s+path=["']([^"']+)["']/);
+  for (let i = 0; i < routeLines.length; i++) {
+    const routeMatch = routeLines[i].match(/<Route\s+path=["']([^"']+)["']/);
     if (routeMatch) {
       const path = routeMatch[1];
       if (routePaths.has(path)) continue;
       routePaths.set(path, true);
     }
-    cleanedLines.push(lines[i]);
+    cleanedLines.push(routeLines[i]);
   }
   code = cleanedLines.join("\n");
 
