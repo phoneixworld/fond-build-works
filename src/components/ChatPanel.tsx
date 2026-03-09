@@ -1142,6 +1142,7 @@ const CONTEXT_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
           const fileNames = Object.keys(reactResult.files);
           console.log(`[ChatPanel:onDone] ✅ React files:`, fileNames);
           setSandpackFiles(reactResult.files);
+          syncSandpackToVirtualFS(reactResult.files);
           if (Object.keys(reactResult.deps).length > 0) setSandpackDeps(reactResult.deps);
           setPreviewMode("sandpack");
           setBuildRetryCount(0);
