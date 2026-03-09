@@ -920,11 +920,12 @@ const CONTEXT_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
       return { schemas: cache.schemas, knowledge: cache.knowledge };
     }
 
-    const [schemasRes, knowledgeRes, decisionsRes, governanceRes] = await Promise.allSettled([
+    const [schemasRes, knowledgeRes, decisionsRes, governanceRes, irRes] = await Promise.allSettled([
       supabase.from("project_schemas" as any).select("collection_name, schema").eq("project_id", projectId),
       supabase.from("project_knowledge" as any).select("title, content").eq("project_id", projectId).eq("is_active", true),
       supabase.from("project_decisions" as any).select("category, title, description").eq("project_id", projectId).eq("is_active", true),
       supabase.from("project_governance_rules" as any).select("category, name, description, severity").eq("project_id", projectId).eq("is_active", true),
+      supabase.from("projects").select("ir_state").eq("id", projectId).single(),
     ]);
 
     const schemas = schemasRes.status === "fulfilled" ? (schemasRes.value.data || []) : [];
@@ -945,8 +946,15 @@ const CONTEXT_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
       });
     }
 
-    projectContextCacheRef.current = { projectId, schemas, knowledge, fetchedAt: Date.now() };
-    return { schemas, knowledge };
+    // Serialize IR state if present
+    let irContext = "";
+    if (irRes.status === "fulfilled" && irRes.value.data) {
+      const { serializeIR } = await import("@/lib/irSerializer");
+      irContext = serializeIR((irRes.value.data as any).ir_state);
+    }
+
+    projectContextCacheRef.current = { projectId, schemas, knowledge, irContext, fetchedAt: Date.now() };
+    return { schemas, knowledge, irContext };
   }, []);
 
   // Prefetch context when a project is loaded — so the FIRST message has zero DB wait
