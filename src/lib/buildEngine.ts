@@ -931,15 +931,18 @@ async function runDirectBuild(
   }
 
   // Merge with existing if applicable
+  // Merge with existing or base template
   let finalFiles = result.files;
   let conflicts: string[] = [];
   const mergeTimer = timer();
-  if (config.existingFiles && Object.keys(config.existingFiles).length > 0) {
-    callbacks.onProgress({ phase: "merging", message: "Merging with existing code..." });
-    const merged = mergeFiles(config.existingFiles, result.files);
-    finalFiles = merged.files;
-    conflicts = merged.conflicts;
-  }
+  const baseOrExisting = config.existingFiles && Object.keys(config.existingFiles).length > 0
+    ? config.existingFiles
+    : getBaseTemplate();
+  
+  callbacks.onProgress({ phase: "merging", message: "Merging with base template..." });
+  const merged = mergeFiles(baseOrExisting, result.files);
+  finalFiles = merged.files;
+  conflicts = merged.conflicts;
   const mergeMs = mergeTimer.elapsed();
   
   // Final validation
