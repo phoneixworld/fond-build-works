@@ -925,22 +925,16 @@ const CONTEXT_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
 
     try {
       // ─── Context: served from in-memory cache (populated at project load) ───────
-      // fetchProjectContext uses Promise.allSettled internally so 4 queries run
-      // in parallel. On repeated messages the cache is hit and no DB query fires.
       const { schemas, knowledge } = await fetchProjectContext(currentProject.id);
 
       // ─── Current code context: smart file prioritization ─────────────────────
-      // The build agent receives the FULL current project so it never regresses or
-      // overwrites features the user already has.
       let currentCodeSummary = "";
       if (currentSandpackFiles && Object.keys(currentSandpackFiles).length > 0) {
         const fileEntries = Object.entries(currentSandpackFiles);
         const totalChars = fileEntries.reduce((sum, [, code]) => sum + code.length, 0);
         if (totalChars <= 16000) {
-          // Small project — send everything in full
           currentCodeSummary = fileEntries.map(([path, code]) => `--- ${path}\n${code}`).join("\n\n");
         } else {
-          // Large project — always include App entry point fully, then fill remaining budget
           const ENTRY_PATTERNS = ["/App.jsx", "/App.tsx", "/App.js"];
           const keyFiles = fileEntries.filter(([p]) => ENTRY_PATTERNS.some(k => p.endsWith(k)));
           const otherFiles = fileEntries.filter(([p]) => !ENTRY_PATTERNS.some(k => p.endsWith(k)));
@@ -984,19 +978,56 @@ const CONTEXT_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
         console.log(`[Template Matched] ${template.emoji} ${template.name}`);
         setSelectedTemplate(null);
       }
+
+      // ─── CORE FIX: Use build-agent for code generation (lower temperature, focused prompts) ───
+      // The chat function was a hybrid (chat+code) with temp=0.7 producing primitive output.
+      // The build-agent is purpose-built for code gen with temp=0.3 and enterprise-grade prompts.
+      const isReactStack = ["react-cdn", "react-node", "react-python", "react-go", "nextjs"].includes(currentProject.tech_stack || "react-cdn");
       
-      await streamChat({
-        messages: apiMessages,
-        projectId: currentProject.id,
-        techStack: currentProject.tech_stack || "html-tailwind",
-        schemas,
-        model: selectedModel,
-        designTheme: themeInfo?.prompt,
-        knowledge,
-        templateContext: templateCtx || undefined,
-        currentCode: currentCodeSummary || undefined,
-        snippetsContext: snippetsContext || undefined,
-        onDelta: upsert,
+      if (isReactStack) {
+        // Route through dedicated build-agent for higher quality code generation
+        await streamBuildAgent({
+          messages: apiMessages,
+          projectId: currentProject.id,
+          techStack: currentProject.tech_stack || "react-cdn",
+          schemas,
+          model: selectedModel,
+          designTheme: themeInfo?.prompt,
+          knowledge,
+          templateContext: templateCtx || undefined,
+          currentCode: currentCodeSummary || undefined,
+          snippetsContext: snippetsContext || undefined,
+          onDelta: upsert,
+          onDone: (fullText) => {
+            fullResponse = fullText;
+            // Trigger onDone processing (handled below via shared finalizer)
+            handleBuildComplete(fullResponse, abortController, apiMessages, schemas, knowledge, currentCodeSummary, snippetsContext, themeInfo, userMsg, currentMessages, streamParseCount, hasSetBuilding);
+          },
+          onError: (err) => {
+            if (abortController.signal.aborted) return;
+            setMessages((prev) => [...prev, { role: "assistant", content: `⚠️ ${err}`, timestamp: Date.now() }]);
+            setIsLoading(false);
+            setIsBuilding(false);
+            setBuildStep("");
+            setPipelineStep("error");
+            setCurrentAgent(null);
+            isSendingRef.current = false;
+          },
+        });
+      } else {
+        // Fallback to chat function for HTML stacks
+        await streamChat({
+          messages: apiMessages,
+          projectId: currentProject.id,
+          techStack: currentProject.tech_stack || "html-tailwind",
+          schemas,
+          model: selectedModel,
+          designTheme: themeInfo?.prompt,
+          knowledge,
+          templateContext: templateCtx || undefined,
+          currentCode: currentCodeSummary || undefined,
+          snippetsContext: snippetsContext || undefined,
+          onDelta: upsert,
         onDone: async () => {
           if (abortController.signal.aborted) return;
           
