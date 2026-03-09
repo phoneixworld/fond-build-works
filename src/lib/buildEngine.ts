@@ -42,6 +42,8 @@ import { DESIGN_SYSTEM_CSS, lintDesignTokens } from "@/lib/designSystem";
 import { buildSmartChatHistory } from "@/lib/contextManager";
 import { parseStructuredOutput } from "@/lib/structuredParser";
 import { getPromptConfigKey, getCachedSystemPrompt, setCachedSystemPrompt } from "@/lib/promptCache";
+import { detectTruncation } from "@/lib/truncationRecovery";
+import { resolveImportedDependencies, getDependencyDiff } from "@/lib/dependencyResolver";
 
 // ─── Base Template (mandatory scaffold for all new builds) ────────────────
 //
