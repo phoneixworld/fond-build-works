@@ -1785,7 +1785,6 @@ const CONTEXT_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
             <BuildPipelineCard
               isBuilding={isLoading}
               streamContent={buildStreamContent}
-              elapsed={elapsedTime}
               pipelineStep={pipelineStep}
               currentAgent={currentAgent === "clarify" ? null : currentAgent}
             />
