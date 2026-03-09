@@ -572,7 +572,6 @@ const ChatPanel = forwardRef<ChatPanelHandle, { initialPrompt?: string; onVersio
     for (const [path, content] of Object.entries(sandpackFiles)) {
       const cleanPath = path.startsWith("/") ? path.slice(1) : path;
       // Map sandpack paths to src/ structure for display
-      const { toExportPath } = require("@/lib/pathNormalizer");
       const displayPath = toExportPath(cleanPath);
       const ext = displayPath.split(".").pop()?.toLowerCase() || "";
       const langMap: Record<string, string> = {
