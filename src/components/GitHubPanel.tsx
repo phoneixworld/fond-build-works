@@ -207,7 +207,7 @@ const GitHubPanel = () => {
         owner,
         repo,
         branch: connectedRepo.default_branch,
-        files: fileEntries.map(([path, file]) => ({ path, content: file.content })),
+        files: fileEntries.map(([path, file]) => ({ path: toExportPath(path), content: file.content })),
         message: `Update from IDE – ${currentProject?.name || "project"}`,
       });
       const commitsData = await callGitHub({ action: "commits", owner, repo, branch: connectedRepo.default_branch });
