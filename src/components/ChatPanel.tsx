@@ -1602,7 +1602,7 @@ ${Object.entries(files).map(([path, code]) => `--- ${path}\n${code}`).join("\n\n
                   // Polish didn't produce files — keep the instant template (it's already good)
                   setMessages((prev) => {
                     const last = prev[prev.length - 1];
-                    const msg = `✅ **${template.name} is ready!** Your site is live with all sections.`;
+                    const msg = `✅ **${templateName} is ready!** Your site is live with all sections.`;
                     if (last?.role === "assistant") {
                       return prev.map((m, i) => (i === prev.length - 1 ? { ...m, content: msg } : m));
                     }
