@@ -812,9 +812,15 @@ async function runPlannedBuild(
         plan,
       });
       
+      const domainContext = config.domainModel 
+        ? `\n\n## DOMAIN MODEL\n${JSON.stringify(config.domainModel, null, 2).slice(0, 4000)}` 
+        : "";
+      
       const taskPrompt = `## TASK: ${task.title}
+## TASK TYPE: ${(task as any).taskType || "frontend"}
 
 ${task.buildPrompt}
+${domainContext}
 
 ## FILES TO CREATE/MODIFY:
 ${task.filesAffected.map(f => `- ${f}`).join("\n")}
@@ -824,7 +830,10 @@ ${task.filesAffected.map(f => `- ${f}`).join("\n")}
 - Make sure imports reference existing component files correctly
 - If updating /App.jsx, KEEP ALL existing routes and imports — only ADD new ones
 - Output complete, working code in \`\`\`react-preview fences
-- NO descriptions, NO planning text — ONLY code`;
+- NO descriptions, NO planning text — ONLY code
+- For schema/data tasks: Generate realistic mock data arrays and CRUD hooks
+- For backend tasks: Generate context providers and API integration hooks
+- For frontend tasks: Import data from /data/ and hooks from /hooks/ — do NOT hardcode mock data in pages`;
 
       try {
         const codeContext = buildIncrementalContext(task, accumulatedFiles);
