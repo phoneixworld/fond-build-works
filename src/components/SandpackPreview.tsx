@@ -162,6 +162,11 @@ function attemptRepair(code: string, error: string): string | null {
 function repairTruncatedCode(code: string, filePath: string): string {
   if (code.trim().length < 30) return makeStub(filePath);
   
+  // CSS files: basic repair (fix missing semicolons at end of property lines)
+  if (filePath.match(/\.css$/)) {
+    return repairCSS(code);
+  }
+
   // Skip non-JSX files
   if (!filePath.match(/\.(jsx?|tsx?)$/)) return code;
 
