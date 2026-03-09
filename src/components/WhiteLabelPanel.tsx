@@ -243,7 +243,7 @@ const WhiteLabelPanel = () => {
                 <Globe className="w-3 h-3" /> Custom Domain
               </label>
               <input value={config.customDomain} onChange={e => update("customDomain", e.target.value)} placeholder="app.yourbrand.com" className="w-full bg-secondary text-sm rounded-lg px-3 py-2 outline-none border border-border focus:border-primary transition-colors" />
-              <p className="text-[10px] text-muted-foreground">Point your domain's CNAME to <code className="px-1 py-0.5 bg-secondary rounded font-mono">cname.lovable.app</code></p>
+              <p className="text-[10px] text-muted-foreground">Point your domain's CNAME to <code className="px-1 py-0.5 bg-secondary rounded font-mono">cname.phoenix.world</code></p>
             </div>
 
             {/* DNS Instructions */}
