@@ -390,7 +390,7 @@ const PublishExportButtons = forwardRef<PublishExportHandle>((_, ref) => {
         notes: deployNotes || "Promoted staging to production",
       } as any);
 
-      const liveUrl = `${window.location.origin}/app/${slug}`;
+      const liveUrl = `${getPublishedOrigin()}/app/${slug}`;
       setPublishedUrl(liveUrl);
       setDeployNotes("");
       setConfirmPromote(false);
