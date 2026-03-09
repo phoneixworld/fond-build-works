@@ -40,6 +40,8 @@ import { applyAdaptiveSplitting } from "@/lib/adaptiveTaskSplitter";
 import { persistTaskOutput, getPersistedTaskOutput } from "@/lib/persistentCache";
 import { DESIGN_SYSTEM_CSS, lintDesignTokens } from "@/lib/designSystem";
 import { buildSmartChatHistory } from "@/lib/contextManager";
+import { parseStructuredOutput } from "@/lib/structuredParser";
+import { getPromptConfigKey, getCachedSystemPrompt, setCachedSystemPrompt } from "@/lib/promptCache";
 
 // ─── Base Template (mandatory scaffold for all new builds) ────────────────
 //
@@ -1339,111 +1341,33 @@ function stubBrokenFiles(files: Record<string, string>, errors: { file: string; 
   return result;
 }
 
-// ─── File Parser ───────────────────────────────────────────────────────────
+// ─── File Parser (delegates to structured parser) ─────────────────────────
 
 function parseReactFilesFromOutput(text: string): { 
   chatText: string; 
   files: Record<string, string> | null; 
   deps: Record<string, string>;
 } {
-  const files: Record<string, string> = {};
-  const deps: Record<string, string> = {};
-
-  const fencePatterns = ["```react-preview", "```jsx-preview", "```react", "```jsx"];
-  let fenceStart = -1;
-  for (const pattern of fencePatterns) {
-    fenceStart = text.indexOf(pattern);
-    if (fenceStart !== -1) break;
+  const result = parseStructuredOutput(text);
+  
+  if (result.parseStrategy !== "none") {
+    console.log(`[BuildEngine:parser] Strategy: ${result.parseStrategy}, files: ${result.files ? Object.keys(result.files).length : 0}`);
   }
   
-  if (fenceStart === -1) {
-    const genericFence = text.match(/```\w*\n[\s\S]*?---\s+\/?(src\/)?App\.jsx?\s*-{0,3}/);
-    if (genericFence) fenceStart = text.indexOf(genericFence[0]);
-  }
-  
-  if (fenceStart === -1) {
-    return { chatText: text, files: null, deps };
-  }
-
-  const chatText = text.slice(0, fenceStart).trim();
-  const codeStart = text.indexOf("\n", fenceStart) + 1;
-  
-  let fenceEnd = -1;
-  let searchFrom = codeStart;
-  while (searchFrom < text.length) {
-    const candidate = text.indexOf("\n```", searchFrom);
-    if (candidate === -1) break;
-    const afterFence = candidate + 4;
-    if (afterFence >= text.length || /[\s\n\r]/.test(text[afterFence])) {
-      fenceEnd = candidate;
-      break;
-    }
-    searchFrom = candidate + 4;
-  }
-  
-  const block = fenceEnd === -1 ? text.slice(codeStart) : text.slice(codeStart, fenceEnd);
-  if (block.trim().length === 0) return { chatText: text, files: null, deps };
-
-  const separatorRegex = /^-{3}\s+(\/?\w[\w/.-]*\.(?:jsx?|tsx?|css))\s*-{0,3}\s*$/;
-  const depsRegex = /^-{3}\s+dependencies\s*-{0,3}\s*$/;
-  const lines = block.split("\n");
-  let currentFile: string | null = null;
-  let currentLines: string[] = [];
-  let inDeps = false;
-  let depsLines: string[] = [];
-
-  function flush() {
-    if (currentFile) {
-      let code = currentLines.join("\n").trim();
-      if (code.length > 0) {
-        let fname = currentFile.startsWith("/") ? currentFile : `/${currentFile}`;
-        fname = fname.replace(/^\/src\//, "/");
-        // Enforce nested structure: /pages/Dashboard.jsx → /pages/Dashboard/Dashboard.jsx
-        const pageMatch = fname.match(/^\/pages\/([A-Z]\w+)\.(jsx?|tsx?)$/);
-        if (pageMatch) {
-          fname = `/pages/${pageMatch[1]}/${pageMatch[1]}.${pageMatch[2]}`;
-        }
-        files[fname] = code;
-      }
-    }
-    if (inDeps) {
-      try { Object.assign(deps, JSON.parse(depsLines.join("\n").trim())); } catch {}
-      inDeps = false;
-      depsLines = [];
-    }
-    currentFile = null;
-    currentLines = [];
-  }
-
-  for (const line of lines) {
-    const trimmed = line.trim();
-    const sepMatch = trimmed.match(separatorRegex);
-    if (sepMatch) {
-      flush();
-      currentFile = sepMatch[1];
-      continue;
-    }
-    if (depsRegex.test(trimmed)) {
-      flush();
-      inDeps = true;
-      continue;
-    }
-    if (inDeps) depsLines.push(line);
-    else if (currentFile) currentLines.push(line);
-  }
-  flush();
-
-  if (Object.keys(files).length === 0 && block.trim().length > 20) {
-    files["/App.jsx"] = block.trim();
-  }
-
   // Enforce mandatory folder structure (relocate misplaced files)
-  const structuredFiles = Object.keys(files).length > 0 ? enforceFileStructure(files) : files;
+  if (result.files && Object.keys(result.files).length > 0) {
+    const structuredFiles = enforceFileStructure(result.files);
+    return {
+      chatText: result.chatText,
+      files: Object.keys(structuredFiles).length > 0 ? structuredFiles : null,
+      deps: result.deps,
+    };
+  }
 
   return {
-    chatText,
-    files: Object.keys(structuredFiles).length > 0 ? structuredFiles : null,
-    deps,
+    chatText: result.chatText,
+    files: null,
+    deps: result.deps,
   };
 }
 
