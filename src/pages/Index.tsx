@@ -226,6 +226,10 @@ const IDELayout = () => {
           onCmdOpen={() => setCmdOpen(true)}
           onTeamChatToggle={() => setTeamChatOpen(!teamChatOpen)}
           onSignOut={signOut}
+          onProfileClick={() => setUserDialog("profile")}
+          onSettingsClick={() => setUserDialog("settings")}
+          onBillingClick={() => setUserDialog("billing")}
+          onHelpClick={() => setUserDialog("help")}
           publishRef={publishRef}
           primaryTabs={PRIMARY_TABS}
           secondaryTabs={SECONDARY_TABS}
