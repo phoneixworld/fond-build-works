@@ -1,9 +1,20 @@
-import { createContext, useContext, useState, ReactNode } from "react";
+import { createContext, useContext, useState, useCallback, ReactNode } from "react";
 import type { BuildMetrics } from "@/lib/buildObservability";
 
 export interface SandpackFileSet {
   [path: string]: string;
 }
+
+// ─── Rollback Snapshots ───────────────────────────────────────────────────
+
+export interface BuildSnapshot {
+  files: SandpackFileSet;
+  deps: Record<string, string>;
+  timestamp: number;
+  label: string;
+}
+
+const MAX_SNAPSHOTS = 10;
 
 interface PreviewContextType {
   // Legacy HTML preview
@@ -25,6 +36,10 @@ interface PreviewContextType {
   // Build metrics for timeline
   buildMetrics: BuildMetrics | null;
   setBuildMetrics: (metrics: BuildMetrics | null) => void;
+  // Rollback snapshots
+  snapshots: BuildSnapshot[];
+  saveSnapshot: (label: string) => void;
+  restoreSnapshot: (index: number) => void;
 }
 
 const PreviewContext = createContext<PreviewContextType | null>(null);
@@ -37,6 +52,32 @@ export const PreviewProvider = ({ children }: { children: ReactNode }) => {
   const [buildStep, setBuildStep] = useState("");
   const [previewMode, setPreviewMode] = useState<"html" | "sandpack">("html");
   const [buildMetrics, setBuildMetrics] = useState<BuildMetrics | null>(null);
+  const [snapshots, setSnapshots] = useState<BuildSnapshot[]>([]);
+
+  const saveSnapshot = useCallback((label: string) => {
+    if (!sandpackFiles) return;
+    setSnapshots(prev => {
+      const snapshot: BuildSnapshot = {
+        files: { ...sandpackFiles },
+        deps: { ...sandpackDeps },
+        timestamp: Date.now(),
+        label,
+      };
+      const updated = [...prev, snapshot];
+      // Keep only last N snapshots
+      return updated.slice(-MAX_SNAPSHOTS);
+    });
+  }, [sandpackFiles, sandpackDeps]);
+
+  const restoreSnapshot = useCallback((index: number) => {
+    setSnapshots(prev => {
+      const snapshot = prev[index];
+      if (!snapshot) return prev;
+      setSandpackFiles({ ...snapshot.files });
+      setSandpackDeps({ ...snapshot.deps });
+      return prev;
+    });
+  }, []);
 
   return (
     <PreviewContext.Provider value={{
@@ -47,6 +88,7 @@ export const PreviewProvider = ({ children }: { children: ReactNode }) => {
       buildStep, setBuildStep,
       previewMode, setPreviewMode,
       buildMetrics, setBuildMetrics,
+      snapshots, saveSnapshot, restoreSnapshot,
     }}>
       {children}
     </PreviewContext.Provider>
