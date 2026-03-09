@@ -1313,6 +1313,21 @@ const CONTEXT_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
           }
 
           saveProject({ chat_history: persistMessages, html_content: finalHtml || currentProject.html_content || "" });
+          
+          // Persist sandpack files for session restoration (direct chat build path)
+          if (reactResult.files && Object.keys(reactResult.files).length > 0) {
+            const payload = { files: reactResult.files, deps: reactResult.deps || {} };
+            supabase
+              .from("project_data")
+              .upsert(
+                { project_id: currentProject.id, collection: "sandpack_state", data: payload as any },
+                { onConflict: "project_id,collection" }
+              )
+              .then(({ error }) => {
+                if (error) console.warn("[ChatPanel] Failed to persist sandpack state:", error);
+              });
+          }
+          
           return final;
         });
       };
