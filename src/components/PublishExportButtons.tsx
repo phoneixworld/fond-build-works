@@ -450,9 +450,9 @@ const PublishExportButtons = forwardRef<PublishExportHandle>((_, ref) => {
                       className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-sm font-semibold bg-primary text-primary-foreground hover:bg-primary/90 transition-colors disabled:opacity-50"
                     >
                       {publishing ? (
-                        <><Loader2 className="w-4 h-4 animate-spin" /> Deploying...</>
+                        <><Loader2 className="w-4 h-4 animate-spin" /> Publishing...</>
                       ) : (
-                        <><Rocket className="w-4 h-4" /> Deploy to {deployTarget}</>
+                        <><Rocket className="w-4 h-4" /> Publish &amp; Deploy to {deployTarget}</>
                       )}
                     </button>
                   </div>
