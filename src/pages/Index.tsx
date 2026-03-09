@@ -171,6 +171,16 @@ const IDELayout = () => {
     if (rightPanel === "history") {
       return <VersionHistory versions={versions} onRevert={handleRevert} onClose={() => setRightPanel("preview")} />;
     }
+    if (rightPanel === "planning") {
+      return (
+        <PlanningPanel
+          onExecuteTask={(prompt) => {
+            chatRef.current?.sendMessage(prompt);
+            setRightPanel("preview");
+          }}
+        />
+      );
+    }
     const Component = PANEL_COMPONENTS[rightPanel];
     return Component ? <Component /> : <PreviewPanel />;
   };
