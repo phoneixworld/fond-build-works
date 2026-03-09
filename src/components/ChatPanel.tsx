@@ -512,9 +512,17 @@ const ChatPanel = forwardRef<ChatPanelHandle, { initialPrompt?: string; onVersio
   const { setFiles: setVirtualFiles } = useVirtualFS();
   const lastProjectIdRef = useRef<string | null>(null);
   const hasProcessedInitialRef = useRef(false);
-  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const healTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const MAX_HEAL_ATTEMPTS = 3;
+const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+const healTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+const MAX_HEAL_ATTEMPTS = 3;
+// ─── Project context cache — avoids re-fetching on every message ───────────
+const projectContextCacheRef = useRef<{
+  projectId: string;
+  schemas: any[];
+  knowledge: string[];
+  fetchedAt: number;
+} | null>(null);
+const CONTEXT_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
   // Edit/regenerate state
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
   const [editText, setEditText] = useState("");
