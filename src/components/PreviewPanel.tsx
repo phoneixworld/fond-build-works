@@ -52,7 +52,7 @@ const PreviewPanel = () => {
 
           <div className="flex items-center gap-2 flex-1 bg-secondary rounded-md px-3 py-1">
             <Globe className="w-3 h-3 text-muted-foreground" />
-            <span className="text-xs text-muted-foreground">my-app.lovable.app</span>
+            <span className="text-xs text-muted-foreground">phoenixworld.app</span>
           </div>
 
           {/* Preview mode toggle */}
