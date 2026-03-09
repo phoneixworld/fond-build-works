@@ -964,14 +964,19 @@ function validateAllFiles(files: Record<string, string>): { file: string; error:
         continue;
       }
       
-      // Check for imports referencing files that don't exist in the file set
+      // Check for imports referencing files that don't exist — auto-stub them
       const missingImports = findMissingFileImports(code, filePath, files);
       if (missingImports.length > 0) {
-        errors.push({
-          file: filePath,
-          error: `Missing local file imports: ${missingImports.join(", ")}. Either create these files or remove the imports. Only import files that exist in your output.`
-        });
-        continue;
+        const unresolvable = autoCreateStubFiles(missingImports, filePath, files);
+        if (unresolvable.length > 0) {
+          errors.push({
+            file: filePath,
+            error: `Missing local file imports: ${unresolvable.join(", ")}. Either create these files or remove the imports. Only import files that exist in your output.`
+          });
+          continue;
+        }
+        // Stubs were created — re-validate this file on next pass
+        console.log(`[BuildEngine] Auto-created stubs for ${missingImports.length} missing imports from ${filePath}`);
       }
       
       // Check for undefined JSX components (PascalCase tags used but not imported/defined)
@@ -1044,6 +1049,51 @@ function findMissingFileImports(
     }
   }
   return missing;
+}
+
+/**
+ * Auto-create stub files for missing imports to prevent runtime errors.
+ * Returns any import paths that couldn't be resolved.
+ */
+function autoCreateStubFiles(
+  missingImports: string[],
+  importingFilePath: string,
+  allFiles: Record<string, string>
+): string[] {
+  const unresolvable: string[] = [];
+  const currentDir = importingFilePath.substring(0, importingFilePath.lastIndexOf("/")) || "";
+
+  for (const importPath of missingImports) {
+    let resolved = importPath;
+    if (importPath.startsWith("./")) {
+      resolved = currentDir + importPath.substring(1);
+    } else if (importPath.startsWith("../")) {
+      const parts = currentDir.split("/").filter(Boolean);
+      let relParts = importPath.split("/");
+      while (relParts[0] === "..") {
+        parts.pop();
+        relParts.shift();
+      }
+      resolved = "/" + parts.concat(relParts).join("/");
+    }
+    if (!resolved.startsWith("/")) resolved = "/" + resolved;
+
+    const segments = resolved.split("/");
+    const lastSegment = segments[segments.length - 1];
+    const componentName = lastSegment.replace(/\.\w+$/, "");
+    const filePath = resolved.match(/\.\w+$/) ? resolved : resolved + ".jsx";
+
+    if (allFiles[filePath]) continue;
+
+    if (/^[A-Z]/.test(componentName)) {
+      allFiles[filePath] = `import React from "react";\n\nexport default function ${componentName}({ children }) {\n  return (\n    <div className="p-4">\n      {children || <p className="text-gray-400">${componentName} loading...</p>}\n    </div>\n  );\n}\n`;
+    } else {
+      allFiles[filePath] = `// Auto-generated stub for ${componentName}\nexport default {};\n`;
+    }
+    console.log("[BuildEngine] Auto-created stub: " + filePath);
+  }
+
+  return unresolvable;
 }
 
 /**

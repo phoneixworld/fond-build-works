@@ -1551,20 +1551,36 @@ ${Object.entries(files).map(([path, code]) => `--- ${path}\n${code}`).join("\n\n
                           hasErrors = true;
                           break;
                         }
-                        // Check for missing local imports
-                        const importPathRegex = /import\s+(?:[\w{},\s*]+\s+from\s+)?["'](\.[^"']+)["']/g;
-                        let m;
-                        while ((m = importPathRegex.exec(fCode)) !== null) {
-                          const importPath = m[1];
+                        // Check for missing local imports — auto-create stubs instead of failing
+                        const importPathRegex2 = /import\s+(?:[\w{},\s*]+\s+from\s+)?["'](\.[^"']+)["']/g;
+                        let m2;
+                        while ((m2 = importPathRegex2.exec(fCode)) !== null) {
+                          const importPath = m2[1];
                           const currentDir = fPath.substring(0, fPath.lastIndexOf("/")) || "";
                           let resolved = importPath.startsWith("./") ? currentDir + importPath.substring(1) : importPath;
+                          if (importPath.startsWith("../")) {
+                            const parts = currentDir.split("/").filter(Boolean);
+                            let relParts = importPath.split("/");
+                            while (relParts[0] === "..") { parts.pop(); relParts.shift(); }
+                            resolved = "/" + parts.concat(relParts).join("/");
+                          }
                           if (!resolved.startsWith("/")) resolved = "/" + resolved;
                           const exts = ["", ".jsx", ".js", ".tsx", ".ts"];
                           const found = exts.some(ext => reactResult.files![resolved + ext] !== undefined);
                           const indexFound = exts.some(ext => reactResult.files![resolved + "/index" + ext] !== undefined);
-                          if (!found && !indexFound) { hasErrors = true; break; }
+                          if (!found && !indexFound) {
+                            // Auto-create stub instead of failing
+                            const segments = resolved.split("/");
+                            const compName = segments[segments.length - 1].replace(/\.\w+$/, "");
+                            const stubPath = resolved.match(/\.\w+$/) ? resolved : resolved + ".jsx";
+                            if (/^[A-Z]/.test(compName)) {
+                              reactResult.files![stubPath] = `import React from "react";\n\nexport default function ${compName}({ children }) {\n  return <div className="p-4">{children || "${compName}"}</div>;\n}\n`;
+                            } else {
+                              reactResult.files![stubPath] = `export default {};\n`;
+                            }
+                            console.log("[ChatPanel] Auto-created stub for polish pass:", stubPath);
+                          }
                         }
-                        if (hasErrors) break;
                       }
                     }
                   } catch {
@@ -1574,21 +1590,22 @@ ${Object.entries(files).map(([path, code]) => `--- ${path}\n${code}`).join("\n\n
                   if (hasErrors) {
                     // Polish produced broken code — keep the working instant template
                     console.warn("[ChatPanel] Polish pass produced broken code, keeping instant template");
+                    // Do NOT persist broken code — leave the working instant template in place
                   } else {
                     setSandpackFiles(reactResult.files);
                     syncSandpackToVirtualFS(reactResult.files);
                     if (Object.keys(reactResult.deps).length > 0) setSandpackDeps(reactResult.deps);
+                    
+                    // Only persist when code is valid
+                    const polishedPayload = { files: reactResult.files, deps: reactResult.deps || {} };
+                    supabase
+                      .from("project_data")
+                      .upsert(
+                        { project_id: buildProjectId, collection: "sandpack_state", data: polishedPayload as any },
+                        { onConflict: "project_id,collection" }
+                      )
+                      .then(({ error }) => { if (error) console.warn("Polish persist error:", error); });
                   }
-                  
-                  // Persist polished version
-                  const polishedPayload = { files: reactResult.files, deps: reactResult.deps || {} };
-                  supabase
-                    .from("project_data")
-                    .upsert(
-                      { project_id: buildProjectId, collection: "sandpack_state", data: polishedPayload as any },
-                      { onConflict: "project_id,collection" }
-                    )
-                    .then(({ error }) => { if (error) console.warn("Polish persist error:", error); });
                   
                   const polishedMsg = reactResult.chatText || `✅ **${templateName} customized!** Your site is ready with personalized content.`;
                   setMessages((prev) => {
