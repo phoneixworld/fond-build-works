@@ -1439,7 +1439,8 @@ async function executeSingleTask(
             accumulatedCode,
             onDelta,
             retryCount + 1,
-            maxTokens
+            maxTokens,
+            taskType
           ).then(resolve).catch(reject);
         } else {
           console.error("[BuildEngine] No code after retries");
