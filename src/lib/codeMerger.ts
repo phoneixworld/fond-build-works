@@ -218,13 +218,28 @@ export function mergeFiles(
   for (const [path, code] of Object.entries(incoming)) {
     if (code.trim().length === 0) continue;
 
-    // If protectBackend is on, skip overwriting backend files
-    if (protectBackend && result[path]) {
-      const isProtected = BACKEND_PROTECTED_PATTERNS.some(p => p.test(path));
-      if (isProtected) {
-        conflicts.push(`${path}: protected backend file — skipped overwrite`);
-        continue;
+    // If protectBackend is on, skip overwriting backend files from frontend tasks
+    if (protectBackend && result[path] && isBackendProtected(path)) {
+      conflicts.push(`${path}: protected backend file — skipped overwrite by frontend task`);
+      continue;
+    }
+
+    // Append-only files — never replace, only append new content
+    if (result[path] && isAppendOnly(path)) {
+      const existingContent = result[path];
+      // Only append if incoming has genuinely new content
+      if (!existingContent.includes(code.trim())) {
+        result[path] = existingContent + "\n\n" + code;
+        conflicts.push(`${path}: append-only — new content appended`);
       }
+      continue;
+    }
+
+    // Backend-to-backend merge (when protectBackend is OFF, i.e., backend task)
+    if (!protectBackend && result[path] && isBackendProtected(path)) {
+      result[path] = mergeBackendFiles(result[path], code, path);
+      conflicts.push(`${path}: backend files merged`);
+      continue;
     }
 
     // App.jsx — smart merge
