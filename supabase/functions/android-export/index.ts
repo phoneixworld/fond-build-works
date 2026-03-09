@@ -143,7 +143,7 @@ public class MainActivity extends Activity {
         settings.setCacheMode(WebSettings.LOAD_DEFAULT);
         settings.setMediaPlaybackRequiresUserGesture(false);
         settings.setMixedContentMode(WebSettings.MIXED_CONTENT_COMPATIBILITY_MODE);
-        settings.setUserAgentString(settings.getUserAgentString() + " PhoenixApp/${config.versionName}");
+        settings.setUserAgentString(settings.getUserAgentString() + " PhoneixApp/${config.versionName}");
 
         // Enable cookies
         CookieManager.getInstance().setAcceptCookie(true);
