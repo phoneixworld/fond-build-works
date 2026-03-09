@@ -1451,13 +1451,39 @@ const CONTEXT_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
         setCurrentAgent("build");
         setPipelineStep("planning");
         
-        // ─── Requirements Agent: Extract domain model ───
-        let domainModel: any = undefined;
-        // FIX: Read sandpack files from ref to get the latest value (not stale closure)
-        // Also verify the project ID hasn't changed since we started
         const buildProjectId = currentProject.id;
         const liveSandpackFiles = sandpackFilesRef.current;
         const isFirstBuild = !liveSandpackFiles || Object.keys(liveSandpackFiles).length === 0;
+
+        // ─── FAST PATH: Simple template-matched builds skip the heavy engine ───
+        // When a template matched (landing page, portfolio, etc.) and it's the first build,
+        // use a single direct streamBuildAgent call instead of requirements→plan→multi-task.
+        const isSimpleBuild = isFirstBuild && !!template && !userText.toLowerCase().includes("dashboard") && !userText.toLowerCase().includes("crud") && !userText.toLowerCase().includes("admin");
+        
+        if (isSimpleBuild) {
+          console.log(`[ChatPanel] ⚡ FAST PATH: Direct build with template "${template.name}"`);
+          setBuildStep("⚡ Fast building with template...");
+          setPipelineStep("generating");
+          
+          await streamBuildAgent({
+            messages: apiMessages,
+            projectId: buildProjectId,
+            techStack: currentProject.tech_stack || "react-cdn",
+            schemas,
+            model: selectedModel,
+            designTheme: themeInfo?.prompt,
+            knowledge,
+            templateContext: templateCtx || undefined,
+            snippetsContext: snippetsContext || undefined,
+            onDelta: upsert,
+            onDone: handleOnDone,
+            onError: handleOnError,
+          });
+          return;
+        }
+
+        // ─── FULL PATH: Requirements Agent + Build Engine ───
+        let domainModel: any = undefined;
         if (isFirstBuild) {
           try {
             setBuildStep("🧠 Analyzing domain requirements...");
