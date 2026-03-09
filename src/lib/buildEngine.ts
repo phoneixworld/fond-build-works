@@ -280,6 +280,35 @@ function autoRepairJSX(code: string): string {
   return code;
 }
 
+// ─── File Validation (real parsers) ───────────────────────────────────────
+
+/**
+ * Validate all generated files using real parsers.
+ * JSX/TSX → Sucrase, CSS → PostCSS.
+ * Returns array of { file, error } for files that failed parsing.
+ */
+function validateAllFiles(files: Record<string, string>): { file: string; error: string }[] {
+  const errors: { file: string; error: string }[] = [];
+  
+  for (const [filePath, code] of Object.entries(files)) {
+    if (filePath.match(/\.(jsx?|tsx?)$/)) {
+      try {
+        transform(code, { transforms: ["jsx", "imports"], filePath });
+      } catch (e: any) {
+        errors.push({ file: filePath, error: (e.message || "JSX parse error").slice(0, 200) });
+      }
+    } else if (filePath.match(/\.css$/)) {
+      try {
+        postcss.parse(code);
+      } catch (e: any) {
+        errors.push({ file: filePath, error: (e.message || "CSS parse error").slice(0, 200) });
+      }
+    }
+  }
+  
+  return errors;
+}
+
 // ─── File Parser ───────────────────────────────────────────────────────────
 
 /**
