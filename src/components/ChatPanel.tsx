@@ -1478,7 +1478,6 @@ const CONTEXT_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
             onDelta: upsert,
             onDone: handleOnDone,
             onError: handleOnError,
-            signal: abortController.signal,
           });
           return;
         }
