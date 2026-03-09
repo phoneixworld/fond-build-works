@@ -876,7 +876,9 @@ ${task.filesAffected.map(f => `- ${f}`).join("\n")}
         continue;
       }
 
-      const merged = mergeFiles(accumulatedFiles, result.files);
+      // Protect backend files from being overwritten by frontend tasks
+      const isFrontendTask = (task as any).taskType === "frontend";
+      const merged = mergeFiles(accumulatedFiles, result.files, isFrontendTask);
       accumulatedFiles = merged.files;
       allConflicts.push(...merged.conflicts);
       Object.assign(allDeps, result.deps);
