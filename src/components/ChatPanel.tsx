@@ -1413,58 +1413,8 @@ const CONTEXT_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
 
       // ─── Intent Classification already handled by handleSmartSend ───
       // Classification is done before sendMessage is called, so we skip it here.
-            
-            // If classified as "chat" (not a build request), use chat agent
-            if (classResult?.intent === "chat") {
-              setCurrentAgent("chat");
-              setPipelineStep("generating");
-              setBuildStep("💬 Chat agent responding...");
-              
-              try {
-                await streamChatAgent({
-                  messages: apiMessages,
-                  projectId: currentProject.id,
-                  techStack: currentProject.tech_stack || "react-cdn",
-                  knowledge,
-                  onDelta: upsert,
-                  onDone: (responseText) => {
-                    setMessages((prev) => {
-                      const last = prev[prev.length - 1];
-                      if (last?.role === "assistant") {
-                        return prev.map((m, i) => (i === prev.length - 1 ? { ...m, content: responseText } : m));
-                      }
-                      return [...prev, { role: "assistant", content: responseText, timestamp: Date.now() }];
-                    });
-                    setIsLoading(false);
-                    setIsBuilding(false);
-                    setBuildStep("");
-                    setPipelineStep("complete");
-                    setCurrentAgent(null);
-                    isSendingRef.current = false;
-                    if (buildSafetyTimeoutRef.current) {
-                      clearTimeout(buildSafetyTimeoutRef.current);
-                      buildSafetyTimeoutRef.current = null;
-                    }
-                    setTimeout(() => setBuildStreamContent(""), 3000);
-                    const persistMessages = messagesRef.current.map(m => ({
-                      role: m.role,
-                      content: typeof m.content === "string" ? m.content : getTextContent(m.content),
-                    }));
-                    saveProject({ chat_history: persistMessages });
-                  },
-                  onError: handleOnError,
-                });
-              } catch (err) {
-                handleOnError(err instanceof Error ? err.message : "Chat failed");
-              }
-              return;
-            }
-          } catch (err) {
-            console.warn("[ChatPanel] Classification failed, proceeding to build:", err);
-          }
-        }
 
-        // ─── CORE: Build engine for code generation ───
+      // ─── CORE: Build engine for code generation ───
         setCurrentAgent("build");
         setPipelineStep("planning");
         
