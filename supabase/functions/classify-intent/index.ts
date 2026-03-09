@@ -20,7 +20,8 @@ serve(async (req) => {
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "google/gemini-2.5-flash-lite",
+        model: "google/gemini-2.5-flash", // Upgraded for better classification
+        temperature: 0.1, // Low temperature for deterministic classification
         messages: [
           {
             role: "system",
@@ -56,66 +57,166 @@ ${hasHistory
 - "Build me a website" (what kind? what style?)
 - "Create a dashboard" (what data? what layout?)`}
 
-RESPONSE FORMAT — Return ONLY valid JSON:
-{
-  "intent": "chat" | "build" | "clarify",
-  "confidence": 0.0-1.0,
-  "reasoning": "one sentence why",
-  "analysis": {
-    "needsBackend": boolean,
-    "needsAuth": boolean,
-    "complexity": "simple" | "medium" | "complex"
-  },
-  "questions": [
-    {
-      "id": "style",
-      "header": "Design Style",
-      "text": "What visual style are you going for?",
-      "multiSelect": false,
-      "options": [
-        {"label": "Minimal & Clean", "value": "minimal", "description": "Lots of whitespace, subtle colors"},
-        {"label": "Bold & Vibrant", "value": "bold", "description": "Strong colors, large headings"}
-      ]
-    }
-  ]
-}
+FEW-SHOT EXAMPLES:
 
-Only include "questions" array when intent is "clarify". Keep it empty otherwise.
-Return ONLY the JSON object. No markdown, no explanation.`
+Example 1 - CHAT:
+User: "Can we add user authentication to this app?"
+Intent: "chat" (asking if it's possible, not commanding to build)
+Confidence: 0.95
+
+Example 2 - BUILD:
+User: "Add user authentication with login and signup"
+Intent: "build" (direct imperative command)
+Confidence: 0.98
+
+Example 3 - BUILD (follow-up):
+User: "Make the buttons bigger"
+Intent: "build" (clear modification request)
+Confidence: 0.97
+
+Example 4 - CHAT:
+User: "What kind of animations can we add?"
+Intent: "chat" (exploring options, not ready to build)
+Confidence: 0.93
+
+Example 5 - BUILD:
+User: "Yes, go ahead"
+Intent: "build" (affirmative response to previous suggestion)
+Confidence: 0.99
+
+Use the classify_intent tool to return your classification.`
           },
           { role: "user", content: prompt }
         ],
+        tools: [
+          {
+            type: "function",
+            function: {
+              name: "classify_intent",
+              description: "Classify the user's intent and provide analysis",
+              parameters: {
+                type: "object",
+                properties: {
+                  intent: {
+                    type: "string",
+                    enum: ["chat", "build", "clarify"],
+                    description: "The classified intent"
+                  },
+                  confidence: {
+                    type: "number",
+                    minimum: 0,
+                    maximum: 1,
+                    description: "Confidence score between 0 and 1"
+                  },
+                  reasoning: {
+                    type: "string",
+                    description: "One sentence explaining why this intent was chosen"
+                  },
+                  analysis: {
+                    type: "object",
+                    properties: {
+                      needsBackend: {
+                        type: "boolean",
+                        description: "Whether the request needs backend/database"
+                      },
+                      needsAuth: {
+                        type: "boolean",
+                        description: "Whether the request needs authentication"
+                      },
+                      complexity: {
+                        type: "string",
+                        enum: ["simple", "medium", "complex"],
+                        description: "Complexity level of the request"
+                      }
+                    },
+                    required: ["needsBackend", "needsAuth", "complexity"]
+                  },
+                  questions: {
+                    type: "array",
+                    description: "Clarifying questions (only for clarify intent)",
+                    items: {
+                      type: "object",
+                      properties: {
+                        id: { type: "string" },
+                        header: { type: "string" },
+                        text: { type: "string" },
+                        multiSelect: { type: "boolean" },
+                        options: {
+                          type: "array",
+                          items: {
+                            type: "object",
+                            properties: {
+                              label: { type: "string" },
+                              value: { type: "string" },
+                              description: { type: "string" }
+                            },
+                            required: ["label", "value", "description"]
+                          }
+                        }
+                      },
+                      required: ["id", "header", "text", "multiSelect", "options"]
+                    }
+                  }
+                },
+                required: ["intent", "confidence", "reasoning", "analysis"],
+                additionalProperties: false
+              }
+            }
+          }
+        ],
+        tool_choice: { type: "function", function: { name: "classify_intent" } }
       }),
     });
 
     if (!response.ok) {
-      // Default to build on error
-      return new Response(JSON.stringify({ intent: "build", confidence: 0.5, questions: [], analysis: { needsBackend: false, needsAuth: false, complexity: "medium" } }), {
+      return new Response(JSON.stringify({ 
+        intent: "build", 
+        confidence: 0.5, 
+        questions: [], 
+        analysis: { needsBackend: false, needsAuth: false, complexity: "medium" } 
+      }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
     const data = await response.json();
-    const content = data.choices?.[0]?.message?.content?.trim() || "";
-
-    try {
-      const cleaned = content.replace(/```json?\s*/g, "").replace(/```/g, "").trim();
-      const parsed = JSON.parse(cleaned);
-      // Ensure valid intent
-      if (!["chat", "build", "clarify"].includes(parsed.intent)) {
-        parsed.intent = "build";
+    const toolCall = data.choices?.[0]?.message?.tool_calls?.[0];
+    
+    if (toolCall?.function?.arguments) {
+      try {
+        const parsed = JSON.parse(toolCall.function.arguments);
+        // Ensure valid intent
+        if (!["chat", "build", "clarify"].includes(parsed.intent)) {
+          parsed.intent = "build";
+        }
+        // Ensure questions array exists
+        if (!parsed.questions) {
+          parsed.questions = [];
+        }
+        return new Response(JSON.stringify(parsed), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      } catch (e) {
+        console.error("Failed to parse tool call arguments:", e);
       }
-      return new Response(JSON.stringify(parsed), {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    } catch {
-      return new Response(JSON.stringify({ intent: "build", confidence: 0.5, questions: [], analysis: { needsBackend: false, needsAuth: false, complexity: "medium" } }), {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
     }
+
+    // Fallback to build
+    return new Response(JSON.stringify({ 
+      intent: "build", 
+      confidence: 0.5, 
+      questions: [], 
+      analysis: { needsBackend: false, needsAuth: false, complexity: "medium" } 
+    }), {
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
   } catch (e) {
     console.error("classify-intent error:", e);
-    return new Response(JSON.stringify({ intent: "build", confidence: 0.5, questions: [] }), {
+    return new Response(JSON.stringify({ 
+      intent: "build", 
+      confidence: 0.5, 
+      questions: [] 
+    }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }

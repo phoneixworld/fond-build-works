@@ -20,7 +20,8 @@ serve(async (req) => {
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "google/gemini-2.5-flash-lite",
+        model: "google/gemini-2.5-flash", // Upgraded from flash-lite for better reasoning
+        temperature: 0.1, // Low temperature for consistent classification
         messages: [
           {
             role: "system",
@@ -43,6 +44,82 @@ ${hasHistory
 - Rule of thumb: if the request could reasonably be interpreted without ambiguity, just build it.`
   : `This is the FIRST message in a new conversation. Ask questions for non-trivial prompts that are vague about style, scope, or features.`}
 
+FEW-SHOT EXAMPLES:
+
+Example 1 (FIRST message, needs questions):
+User: "Build me a restaurant website"
+Response: {
+  "action": "ask",
+  "analysis": {"needsBackend": false, "needsAuth": false, "complexity": "medium"},
+  "questions": [
+    {
+      "id": "style",
+      "header": "Design Style",
+      "text": "What visual style would you like for the restaurant website?",
+      "multiSelect": false,
+      "options": [
+        {"label": "Elegant Fine Dining", "value": "elegant", "description": "Dark tones, serif fonts, premium feel"},
+        {"label": "Modern Casual", "value": "modern", "description": "Bright colors, sans-serif, friendly atmosphere"},
+        {"label": "Traditional Rustic", "value": "rustic", "description": "Warm colors, handwritten fonts, cozy feel"}
+      ]
+    },
+    {
+      "id": "features",
+      "header": "Key Features",
+      "text": "What features should the website include?",
+      "multiSelect": true,
+      "options": [
+        {"label": "Menu Display", "value": "menu", "description": "Showcase dishes with photos and prices"},
+        {"label": "Online Reservations", "value": "reservations", "description": "Let customers book tables online"},
+        {"label": "Location & Hours", "value": "location", "description": "Map, address, opening hours"}
+      ]
+    }
+  ]
+}
+
+Example 2 (FIRST message, just build):
+User: "Create a minimal landing page with hero section and contact form"
+Response: {
+  "action": "build",
+  "analysis": {"needsBackend": false, "needsAuth": false, "complexity": "simple"},
+  "questions": []
+}
+
+Example 3 (FOLLOW-UP, major feature needs questions):
+User: "Add a full e-commerce system with product management"
+Response: {
+  "action": "ask",
+  "analysis": {"needsBackend": true, "needsAuth": true, "complexity": "complex"},
+  "questions": [
+    {
+      "id": "payment",
+      "header": "Payment",
+      "text": "How should customers pay?",
+      "multiSelect": false,
+      "options": [
+        {"label": "Mock Checkout", "value": "mock", "description": "Demo flow without real payments"},
+        {"label": "Stripe Integration", "value": "stripe", "description": "Accept real credit card payments"}
+      ]
+    }
+  ]
+}
+
+Example 4 (FOLLOW-UP, just build):
+User: "Make the hero section bigger and add animations"
+Response: {
+  "action": "build",
+  "analysis": {"needsBackend": false, "needsAuth": false, "complexity": "simple"},
+  "questions": []
+}
+
+Example 5 (FOLLOW-UP, just build):
+User: "Add a faculty section with team member cards"
+Response: {
+  "action": "build",
+  "analysis": {"needsBackend": false, "needsAuth": false, "complexity": "simple"},
+  "questions": []
+}
+
 Response format:
 {
   "action": "ask" | "build",
@@ -51,43 +128,8 @@ Response format:
     "needsAuth": boolean,
     "complexity": "simple" | "medium" | "complex"
   },
-  "questions": [
-    {
-      "id": "style",
-      "header": "Design Style",
-      "text": "What visual style are you going for?",
-      "multiSelect": false,
-      "options": [
-        {"label": "Minimal & Clean", "value": "minimal", "description": "Lots of whitespace, subtle colors, elegant typography"},
-        {"label": "Bold & Vibrant", "value": "bold", "description": "Strong colors, large headings, eye-catching visuals"},
-        {"label": "Dark & Premium", "value": "dark", "description": "Dark backgrounds, glowing accents, luxury feel"},
-        {"label": "Warm & Organic", "value": "warm", "description": "Earthy tones, serif fonts, artisanal quality"}
-      ]
-    }
-  ]
-}
-
-Examples — FIRST message, NEEDS questions:
-- "Build me a restaurant website" → ask about style, sections, features
-- "Create a dashboard" → ask about what data, layout preference
-- "Make me a portfolio" → ask about style, sections
-
-Examples — FOLLOW-UP, NEEDS questions:
-- "Add a full e-commerce system" → ask about product types, payment, features
-- "Add a blog with CMS" → ask about content types, layout
-- "Completely redesign the site" → ask about new style direction
-
-Examples — FOLLOW-UP, just BUILD (no questions):
-- "Improve the design" → build
-- "Make the hero section bigger" → build
-- "Add a contact form" → build
-- "Change colors to blue" → build
-- "Add a faculty section" → build
-- "Fix the navigation" → build
-- "Add dark mode" → build
-- "Make it more modern" → build
-- "Add animations" → build
-- "Improve spacing and typography" → build`
+  "questions": [...]
+}`
           },
           { role: "user", content: prompt }
         ],

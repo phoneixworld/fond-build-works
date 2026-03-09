@@ -326,7 +326,36 @@ export function stripBuildMarker(text: string): string {
 
 /**
  * Format validation errors as retry context for the build agent
+ * Enhanced with code snippets and specific guidance
  */
-export function formatRetryContext(errors: string[], attemptNumber: number): string {
-  return `Attempt ${attemptNumber} of ${MAX_BUILD_RETRIES + 1} — Previous build had ${errors.length} validation error(s):\n${errors.map((e, i) => `  ${i + 1}. ${e}`).join("\n")}`;
+export function formatRetryContext(errors: string[], attemptNumber: number, files?: Record<string, string>): string {
+  let context = `🔴 BUILD VALIDATION FAILED — Attempt ${attemptNumber} of ${MAX_BUILD_RETRIES + 1}
+
+${errors.length} critical error(s) detected:
+
+`;
+
+  errors.forEach((error, i) => {
+    context += `${i + 1}. ${error}\n`;
+    
+    // Extract file path from error message
+    const fileMatch = error.match(/^(\/[\w\/\-\.]+):/);
+    if (fileMatch && files) {
+      const filePath = fileMatch[1];
+      const fileCode = files[filePath];
+      
+      if (fileCode) {
+        // Show relevant snippet around the error
+        const lines = fileCode.split('\n');
+        const previewLines = lines.slice(0, Math.min(15, lines.length));
+        context += `\n   📄 Current code in ${filePath} (first 15 lines):\n`;
+        context += previewLines.map((line, idx) => `   ${idx + 1}: ${line}`).join('\n');
+        context += `\n   ... (${lines.length} total lines)\n\n`;
+      }
+    }
+  });
+
+  context += `\n⚠️ These errors MUST be fixed in this attempt. Review carefully and correct ALL issues.`;
+  
+  return context;
 }
