@@ -123,10 +123,15 @@ const PublishExportButtons = forwardRef<PublishExportHandle>((_, ref) => {
   };
 
   const resolveHtml = async (): Promise<string> => {
-    // If we have Sandpack files, save them as JSON with a marker prefix
+    // Prefer Sandpack files from preview context, then fall back to VirtualFS files
+    const filesToPublish = (sandpackFiles && Object.keys(sandpackFiles).length > 0)
+      ? sandpackFiles
+      : (files && Object.keys(files).length > 0 ? files : null);
+
+    // If we have project files, save them as JSON with a marker prefix
     // so PublishedApp can render them with the Sandpack bundler
-    if (sandpackFiles && Object.keys(sandpackFiles).length > 0) {
-      return "<!--SANDPACK_JSON-->" + JSON.stringify(sandpackFiles);
+    if (filesToPublish) {
+      return "<!--SANDPACK_JSON-->" + JSON.stringify(filesToPublish);
     }
 
     // Fallback to raw HTML
