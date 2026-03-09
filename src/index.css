@@ -97,6 +97,15 @@
 .sp-wrapper {
   display: flex !important;
   flex-direction: column !important;
+  min-height: 0 !important;
+}
+.sp-layout {
+  flex: 1 !important;
+  min-height: 0 !important;
+}
+.sp-stack {
+  flex: 1 !important;
+  min-height: 0 !important;
 }
 .sp-preview-container {
   flex: 1 !important;
@@ -104,4 +113,14 @@
 }
 .sp-preview-iframe {
   border: none !important;
+  min-height: 200px !important;
+}
+/* Ensure ResizablePanel children fill height */
+[data-panel] {
+  display: flex !important;
+  flex-direction: column !important;
+}
+[data-panel] > * {
+  flex: 1 !important;
+  min-height: 0 !important;
 }
