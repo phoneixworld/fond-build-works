@@ -16,7 +16,7 @@ const LandingPage = ({ onStartProject, onOpenProject }: LandingPageProps) => {
   const { user, signOut } = useAuth();
   const { projects, loading, deleteProject, cloneProject } = useProjects();
   const [input, setInput] = useState("");
-  const techStack = "html-tailwind";
+  const techStack = "react-cdn";
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
   const handleSubmit = () => {
