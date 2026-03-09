@@ -246,9 +246,9 @@ export default function AppLayout() {
 
 function generateDashboardPage(name: string, templateName: string, entities: DomainModel["entities"]): string {
   const statCards = entities.slice(0, 4).map(e =>
-    `        <div className="bg-white rounded-lg border border-gray-100 p-6">
-          <h3 className="text-sm font-medium text-gray-500">${e.pluralName}</h3>
-          <p className="text-2xl font-semibold text-gray-800 mt-1">0</p>
+    `        <div className="card">
+          <h3 className="text-sm font-medium text-[var(--color-text-secondary)]">${e.pluralName}</h3>
+          <p className="text-2xl font-semibold text-[var(--color-text)] mt-1">0</p>
         </div>`
   ).join("\n");
 
@@ -257,11 +257,11 @@ function generateDashboardPage(name: string, templateName: string, entities: Dom
 export default function ${name}() {
   return (
     <div className="p-8">
-      <h1 className="text-2xl font-light tracking-wide text-gray-800 mb-6">${templateName} Dashboard</h1>
+      <h1 className="text-2xl font-light tracking-wide text-[var(--color-text)] mb-6">${templateName} Dashboard</h1>
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
 ${statCards}
       </div>
-      <p className="text-gray-400">Loading content...</p>
+      <p className="text-[var(--color-text-muted)]">Loading content...</p>
     </div>
   );
 }
