@@ -472,7 +472,7 @@ const LandingPage = ({ onStartProject, onOpenProject }: LandingPageProps) => {
             </div>
             <motion.div initial="hidden" whileInView="visible" viewport={{ once: true, margin: "-80px" }} variants={stagger} className="max-w-5xl mx-auto relative z-10">
               <motion.div variants={fadeUp} className="text-center mb-14">
-                <p className="text-xs font-semibold uppercase tracking-widest text-[hsl(var(--primary))] mb-2">Why Phoenix World</p>
+                <p className="text-xs font-semibold uppercase tracking-widest text-[hsl(var(--primary))] mb-2">Why Phoneix World</p>
                 <h2 className="text-3xl md:text-4xl font-bold text-foreground">Not just another AI builder</h2>
                 <p className="text-muted-foreground text-base mt-3 max-w-lg mx-auto">Multi-agent orchestration, auto-fix, and instant previews. This is a different kind of tool.</p>
               </motion.div>
