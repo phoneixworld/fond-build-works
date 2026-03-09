@@ -2836,6 +2836,29 @@ ${Object.entries(files).map(([path, code]) => `--- ${path}\n${code}`).join("\n\n
                 </DropdownMenuContent>
               </DropdownMenu>
 
+              {/* Undo/Redo */}
+              {(canUndo || canRedo) && (
+                <>
+                  <div className="w-px h-3 bg-border" />
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <button onClick={handleUndo} disabled={!canUndo || isLoading} className="text-muted-foreground/50 hover:text-foreground disabled:opacity-20 transition-colors">
+                        <Undo2 className="w-3 h-3" />
+                      </button>
+                    </TooltipTrigger>
+                    <TooltipContent side="top" className="text-xs">Undo (⌘Z)</TooltipContent>
+                  </Tooltip>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <button onClick={handleRedo} disabled={!canRedo || isLoading} className="text-muted-foreground/50 hover:text-foreground disabled:opacity-20 transition-colors">
+                        <Redo2 className="w-3 h-3" />
+                      </button>
+                    </TooltipTrigger>
+                    <TooltipContent side="top" className="text-xs">Redo (⌘⇧Z)</TooltipContent>
+                  </Tooltip>
+                </>
+              )}
+
               {messages.length > 0 && (
                 <>
                   <div className="w-px h-3 bg-border" />
