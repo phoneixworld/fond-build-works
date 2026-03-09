@@ -237,6 +237,20 @@ const IDEHeader = ({
           <TooltipContent side="bottom" className="text-xs">Team Chat</TooltipContent>
         </Tooltip>
 
+        {/* Swap Layout */}
+        {onSwapLayout && (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <button onClick={onSwapLayout} className={`p-1.5 rounded-md transition-colors ${layoutSwapped ? "text-primary bg-primary/10" : "text-muted-foreground hover:text-foreground hover:bg-secondary"}`}>
+                <ArrowLeftRight className="w-3.5 h-3.5" />
+              </button>
+            </TooltipTrigger>
+            <TooltipContent side="bottom" className="text-xs">
+              {layoutSwapped ? "Chat on left" : "Chat on right"}
+            </TooltipContent>
+          </Tooltip>
+        )}
+
         {/* Cmd K */}
         <Tooltip>
           <TooltipTrigger asChild>
