@@ -1900,6 +1900,15 @@ ${Object.entries(files).map(([path, code]) => `--- ${path}\n${code}`).join("\n\n
         // Save rollback snapshot before build
         saveSnapshot(`Pre-build: ${userText.slice(0, 50)}`);
 
+        // Start streaming preview controller
+        streamingControllerRef.current = new StreamingPreviewController((files, deps) => {
+          if (lastProjectIdRef.current !== buildProjectId) return;
+          setSandpackFiles(prev => ({ ...(prev || {}), ...files }));
+          if (Object.keys(deps).length > 0) setSandpackDeps(prev => ({ ...prev, ...deps }));
+          setPreviewMode("sandpack");
+        }, 500);
+        streamingControllerRef.current.start();
+
         await runBuildEngine(userText, engineConfig, {
           onProgress: (progress: EngineProgress) => {
             setBuildStep(progress.message);
