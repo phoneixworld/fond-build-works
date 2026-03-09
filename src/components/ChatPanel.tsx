@@ -1903,8 +1903,10 @@ ${Object.entries(files).map(([path, code]) => `--- ${path}\n${code}`).join("\n\n
         // Start streaming preview controller
         streamingControllerRef.current = new StreamingPreviewController((files, deps) => {
           if (lastProjectIdRef.current !== buildProjectId) return;
-          setSandpackFiles(prev => ({ ...(prev || {}), ...files }));
-          if (Object.keys(deps).length > 0) setSandpackDeps(prev => ({ ...prev, ...deps }));
+          // Merge streaming files with existing
+          const currentFiles = sandpackFilesRef.current || {};
+          setSandpackFiles({ ...currentFiles, ...files });
+          if (Object.keys(deps).length > 0) setSandpackDeps(deps);
           setPreviewMode("sandpack");
         }, 500);
         streamingControllerRef.current.start();
