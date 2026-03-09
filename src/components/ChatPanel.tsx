@@ -1445,6 +1445,7 @@ const CONTEXT_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
           },
           onFilesReady: (files, deps) => {
             setSandpackFiles(files);
+            syncSandpackToVirtualFS(files);
             if (Object.keys(deps).length > 0) setSandpackDeps(deps);
             setPreviewMode("sandpack");
           },
