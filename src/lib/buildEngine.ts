@@ -178,9 +178,9 @@ ${sidebarNavItems}
 
 export default function Sidebar() {
   return (
-    <nav className="w-64 bg-gray-900 text-white flex flex-col">
-      <div className="p-4 border-b border-gray-800">
-        <h1 className="text-lg font-bold">${model.templateName}</h1>
+    <nav className="w-64 bg-[var(--color-sidebar)] text-[var(--color-sidebar-text)] flex flex-col">
+      <div className="p-4 border-b border-[var(--color-sidebar-border)]">
+        <h1 className="text-lg font-bold text-[var(--color-sidebar-text-active)]">${model.templateName}</h1>
       </div>
       <div className="flex-1 py-2">
         {navItems.map(({ to, icon: ItemIcon, label }) => (
@@ -190,7 +190,7 @@ export default function Sidebar() {
             end={to === "/"}
             className={({ isActive }) =>
               \`flex items-center gap-3 px-4 py-2.5 text-sm transition-colors \${
-                isActive ? "bg-gray-800 text-white" : "text-gray-400 hover:text-white hover:bg-gray-800/50"
+                isActive ? "bg-[var(--color-sidebar-active)] text-[var(--color-sidebar-text-active)]" : "text-[var(--color-sidebar-text)] hover:text-[var(--color-sidebar-text-active)] hover:bg-[var(--color-sidebar-hover)]"
               }\`
             }
           >
