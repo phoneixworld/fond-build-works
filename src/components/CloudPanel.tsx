@@ -15,6 +15,7 @@ import {
   Rocket,
   ShieldAlert,
   Mail,
+  Smartphone,
 } from "lucide-react";
 import SchemaBuilder from "./SchemaBuilder";
 import CloudOverview from "./cloud/CloudOverview";
@@ -31,6 +32,7 @@ import GovernanceEngine from "./cloud/GovernanceEngine";
 import EnvironmentManager from "./cloud/EnvironmentManager";
 import SecurityDashboard from "./cloud/SecurityDashboard";
 import CloudEmail from "./cloud/CloudEmail";
+import AndroidExport from "./cloud/AndroidExport";
 
 const PREMIUM_SECTIONS = new Set(["environments"]);
 
@@ -49,6 +51,7 @@ const CLOUD_SECTIONS = [
   { id: "functions", label: "Edge Functions", icon: Zap },
   { id: "sql", label: "SQL Editor", icon: Terminal },
   { id: "export", label: "Export & Migrate", icon: Download },
+  { id: "android", label: "Android Export", icon: Smartphone },
   { id: "logs", label: "Logs", icon: ScrollText },
 ] as const;
 
@@ -87,6 +90,8 @@ const CloudPanel = () => {
         return <CloudSqlEditor />;
       case "export":
         return <CloudExport />;
+      case "android":
+        return <AndroidExport />;
       case "logs":
         return <CloudLogs />;
       default:
