@@ -61,13 +61,19 @@ const PublishExportButtons = forwardRef<PublishExportHandle>((_, ref) => {
   const [showPublish, setShowPublish] = useState(false);
   const [activeTab, setActiveTab] = useState<DialogTab>("deploy");
   const [publishing, setPublishing] = useState(false);
-  const [deployTarget, setDeployTarget] = useState<DeployTarget>("production");
+  const [promotingToProd, setPromotingToProd] = useState(false);
   const [publishedUrl, setPublishedUrl] = useState<string | null>(null);
+  const [stagingUrl, setStagingUrl] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
   const [deployNotes, setDeployNotes] = useState("");
   const [deployHistory, setDeployHistory] = useState<DeployRecord[]>([]);
   const [loadingHistory, setLoadingHistory] = useState(false);
   const [rollingBack, setRollingBack] = useState<string | null>(null);
+  const [envStatus, setEnvStatus] = useState<EnvStatus>({
+    staging: { deployed: false, deployedAt: null, snapshotSize: 0 },
+    production: { deployed: false, deployedAt: null, snapshotSize: 0 },
+  });
+  const [confirmPromote, setConfirmPromote] = useState(false);
 
   // Domain state
   const [domainInput, setDomainInput] = useState("");
