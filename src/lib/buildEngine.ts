@@ -494,6 +494,10 @@ async function runDirectBuild(
   }
   
   callbacks.onFilesReady(finalFiles, result.deps);
+  
+  // Auto-detect and create database schemas from generated code
+  autoDetectAndCreateSchemas(finalFiles, config.projectId);
+  
   callbacks.onProgress({ phase: "complete", message: "Build complete" });
   callbacks.onComplete({
     files: finalFiles,
