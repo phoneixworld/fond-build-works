@@ -408,7 +408,7 @@ Keep ALL existing routes and imports intact. Only ADD the missing ones.
 ${buildFullCodeContext(files, 24000)}`;
 
   try {
-    const result = await executeSingleTask(assemblyPrompt, config, buildFullCodeContext(files), onDelta);
+    const result = await executeSingleTask(assemblyPrompt, config, buildFullCodeContext(files), onDelta, 0, 12000);
     if (result.files["/App.jsx"] || result.files["/App.tsx"]) {
       // Only take the App file from assembly — don't overwrite components
       const appKey = result.files["/App.jsx"] ? "/App.jsx" : "/App.tsx";
