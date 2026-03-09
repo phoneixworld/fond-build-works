@@ -2634,7 +2634,7 @@ ${Object.entries(files).map(([path, code]) => `--- ${path}\n${code}`).join("\n\n
               onKeyDown={handleKeyDown}
               placeholder={attachedImages.length > 0 ? "Describe what to build from this image..." : "Describe what you want to build..."}
               className="flex-1 bg-transparent text-sm text-foreground placeholder:text-muted-foreground/60 outline-none resize-none leading-[1.4]"
-              style={{ height: "36px", maxHeight: "120px" }}
+              style={{ minHeight: "60px", maxHeight: "160px" }}
               disabled={isLoading}
               rows={1}
             />
