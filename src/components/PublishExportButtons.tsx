@@ -1,7 +1,8 @@
 import { useState, useEffect, forwardRef, useImperativeHandle, useCallback } from "react";
 import {
   Globe, Download, Check, Copy, Loader2, ExternalLink, Link2, Shield,
-  ArrowRight, AlertCircle, History, RotateCcw, Rocket, Server, Eye, ChevronDown
+  ArrowRight, AlertCircle, History, RotateCcw, Rocket, Server, Eye, ChevronDown,
+  Image, Type, FileText
 } from "lucide-react";
 import { useProjects } from "@/contexts/ProjectContext";
 import { usePreview } from "@/contexts/PreviewContext";
@@ -36,7 +37,15 @@ interface DeployRecord {
   created_at: string;
 }
 
-type DialogTab = "deploy" | "history" | "domain";
+type DialogTab = "deploy" | "history" | "domain" | "siteinfo";
+
+interface SiteInfo {
+  siteTitle: string;
+  siteDescription: string;
+  faviconUrl: string;
+  logoUrl: string;
+  ogImageUrl: string;
+}
 
 const PublishExportButtons = forwardRef<PublishExportHandle>((_, ref) => {
   const { currentProject, saveProject } = useProjects();
@@ -59,6 +68,55 @@ const PublishExportButtons = forwardRef<PublishExportHandle>((_, ref) => {
   // Domain state
   const [domainInput, setDomainInput] = useState("");
   const [domainStatus, setDomainStatus] = useState<"none" | "pending" | "verifying" | "active">("none");
+
+  // Site info state
+  const [siteInfo, setSiteInfo] = useState<SiteInfo>({
+    siteTitle: currentProject?.name || "",
+    siteDescription: "",
+    faviconUrl: "",
+    logoUrl: "",
+    ogImageUrl: "",
+  });
+  const [siteInfoSaved, setSiteInfoSaved] = useState(false);
+
+  const updateSiteInfo = <K extends keyof SiteInfo>(key: K, value: SiteInfo[K]) => {
+    setSiteInfo(prev => ({ ...prev, [key]: value }));
+    setSiteInfoSaved(false);
+  };
+
+  const handleSaveSiteInfo = async () => {
+    if (!currentProject) return;
+    try {
+      await supabase.from("project_data").upsert({
+        project_id: currentProject.id,
+        collection: "site_info",
+        data: siteInfo as any,
+      } as any, { onConflict: "project_id,collection" });
+      setSiteInfoSaved(true);
+      toast({ title: "Site info saved", description: "Favicon, logo & meta updated." });
+      setTimeout(() => setSiteInfoSaved(false), 2000);
+    } catch {
+      toast({ title: "Failed to save", variant: "destructive" });
+    }
+  };
+
+  // Load site info on open
+  useEffect(() => {
+    if (!showPublish || !currentProject) return;
+    (async () => {
+      try {
+        const { data } = await supabase
+          .from("project_data")
+          .select("data")
+          .eq("project_id", currentProject.id)
+          .eq("collection", "site_info")
+          .maybeSingle();
+        if (data?.data) {
+          setSiteInfo(prev => ({ ...prev, ...(data.data as any) }));
+        }
+      } catch {}
+    })();
+  }, [showPublish, currentProject]);
 
   // Check if already published on open
   useEffect(() => {
@@ -278,6 +336,7 @@ const PublishExportButtons = forwardRef<PublishExportHandle>((_, ref) => {
 
   const tabs: { id: DialogTab; label: string; icon: any }[] = [
     { id: "deploy", label: "Deploy", icon: Rocket },
+    { id: "siteinfo", label: "Site Info", icon: Image },
     { id: "history", label: "History", icon: History },
     { id: "domain", label: "Domain", icon: Shield },
   ];
@@ -539,6 +598,123 @@ const PublishExportButtons = forwardRef<PublishExportHandle>((_, ref) => {
                     ))}
                   </div>
                 )}
+              </div>
+            )}
+
+            {/* ========= SITE INFO TAB ========= */}
+            {activeTab === "siteinfo" && (
+              <div className="space-y-4">
+                <div className="text-center py-1">
+                  <h3 className="text-sm font-semibold text-foreground">Website Info</h3>
+                  <p className="text-xs text-muted-foreground mt-0.5">Set favicon, logo & meta for your published app</p>
+                </div>
+
+                {/* Site Title */}
+                <div className="space-y-1.5">
+                  <label className="text-[11px] font-medium text-muted-foreground flex items-center gap-1">
+                    <Type className="w-3 h-3" /> Site Title
+                  </label>
+                  <input
+                    type="text"
+                    value={siteInfo.siteTitle}
+                    onChange={e => updateSiteInfo("siteTitle", e.target.value)}
+                    placeholder="My Awesome App"
+                    className="w-full px-3 py-2 rounded-lg border border-border bg-background text-xs text-foreground placeholder:text-muted-foreground/40 focus:outline-none focus:ring-1 focus:ring-primary transition-shadow"
+                  />
+                </div>
+
+                {/* Site Description */}
+                <div className="space-y-1.5">
+                  <label className="text-[11px] font-medium text-muted-foreground flex items-center gap-1">
+                    <FileText className="w-3 h-3" /> Meta Description
+                  </label>
+                  <textarea
+                    value={siteInfo.siteDescription}
+                    onChange={e => updateSiteInfo("siteDescription", e.target.value)}
+                    placeholder="A short description for search engines and social previews"
+                    rows={2}
+                    className="w-full px-3 py-2 rounded-lg border border-border bg-background text-xs text-foreground placeholder:text-muted-foreground/40 focus:outline-none focus:ring-1 focus:ring-primary transition-shadow resize-none"
+                  />
+                </div>
+
+                {/* Favicon URL */}
+                <div className="space-y-1.5">
+                  <label className="text-[11px] font-medium text-muted-foreground flex items-center gap-1">
+                    <Globe className="w-3 h-3" /> Favicon URL
+                  </label>
+                  <div className="flex items-center gap-2">
+                    {siteInfo.faviconUrl && (
+                      <img src={siteInfo.faviconUrl} alt="Favicon" className="w-5 h-5 rounded object-cover border border-border shrink-0" />
+                    )}
+                    <input
+                      type="text"
+                      value={siteInfo.faviconUrl}
+                      onChange={e => updateSiteInfo("faviconUrl", e.target.value)}
+                      placeholder="https://example.com/favicon.ico"
+                      className="flex-1 px-3 py-2 rounded-lg border border-border bg-background text-xs text-foreground placeholder:text-muted-foreground/40 focus:outline-none focus:ring-1 focus:ring-primary transition-shadow"
+                    />
+                  </div>
+                </div>
+
+                {/* Logo URL */}
+                <div className="space-y-1.5">
+                  <label className="text-[11px] font-medium text-muted-foreground flex items-center gap-1">
+                    <Image className="w-3 h-3" /> Logo URL
+                  </label>
+                  <div className="flex items-center gap-2">
+                    {siteInfo.logoUrl && (
+                      <img src={siteInfo.logoUrl} alt="Logo" className="w-6 h-6 rounded object-cover border border-border shrink-0" />
+                    )}
+                    <input
+                      type="text"
+                      value={siteInfo.logoUrl}
+                      onChange={e => updateSiteInfo("logoUrl", e.target.value)}
+                      placeholder="https://example.com/logo.png"
+                      className="flex-1 px-3 py-2 rounded-lg border border-border bg-background text-xs text-foreground placeholder:text-muted-foreground/40 focus:outline-none focus:ring-1 focus:ring-primary transition-shadow"
+                    />
+                  </div>
+                </div>
+
+                {/* OG Image URL */}
+                <div className="space-y-1.5">
+                  <label className="text-[11px] font-medium text-muted-foreground flex items-center gap-1">
+                    <Image className="w-3 h-3" /> OG / Social Image
+                  </label>
+                  <input
+                    type="text"
+                    value={siteInfo.ogImageUrl}
+                    onChange={e => updateSiteInfo("ogImageUrl", e.target.value)}
+                    placeholder="https://example.com/og-image.png"
+                    className="w-full px-3 py-2 rounded-lg border border-border bg-background text-xs text-foreground placeholder:text-muted-foreground/40 focus:outline-none focus:ring-1 focus:ring-primary transition-shadow"
+                  />
+                  <p className="text-[10px] text-muted-foreground">Recommended: 1200×630px. Shown when shared on social media.</p>
+                </div>
+
+                {/* Preview card */}
+                {(siteInfo.siteTitle || siteInfo.faviconUrl || siteInfo.logoUrl) && (
+                  <div className="rounded-lg border border-border bg-secondary/30 p-3 space-y-2">
+                    <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Preview</p>
+                    <div className="flex items-center gap-2">
+                      {siteInfo.faviconUrl && <img src={siteInfo.faviconUrl} alt="" className="w-4 h-4 rounded" />}
+                      <span className="text-xs font-medium text-foreground">{siteInfo.siteTitle || "Untitled"}</span>
+                    </div>
+                    {siteInfo.siteDescription && (
+                      <p className="text-[10px] text-muted-foreground line-clamp-2">{siteInfo.siteDescription}</p>
+                    )}
+                  </div>
+                )}
+
+                {/* Save */}
+                <button
+                  onClick={handleSaveSiteInfo}
+                  className={`w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-xs font-semibold transition-colors ${
+                    siteInfoSaved
+                      ? "bg-emerald-500/10 text-emerald-500 border border-emerald-500/20"
+                      : "bg-primary text-primary-foreground hover:bg-primary/90"
+                  }`}
+                >
+                  {siteInfoSaved ? <><Check className="w-3.5 h-3.5" /> Saved</> : "Save Site Info"}
+                </button>
               </div>
             )}
 
