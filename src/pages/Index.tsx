@@ -84,6 +84,7 @@ const IDELayout = () => {
   const [renameOpen, setRenameOpen] = useState(false);
   const [versions, setVersions] = useState<Version[]>([]);
   const [teamChatOpen, setTeamChatOpen] = useState(false);
+  const [layoutSwapped, setLayoutSwapped] = useState(false);
   const publishRef = useRef<{ openPublish: () => void; handleExport: () => void } | null>(null);
   const chatRef = useRef<{ clearChat: () => void; sendMessage: (text: string) => void } | null>(null);
   const { toast } = useToast();
@@ -228,19 +229,37 @@ const IDELayout = () => {
           onlineUsers={onlineUsers}
           userEmail={user?.email || ""}
           myColor={myColor}
+          layoutSwapped={layoutSwapped}
+          onSwapLayout={() => setLayoutSwapped(prev => !prev)}
         />
 
         <div className="flex-1 overflow-hidden">
           <ResizablePanelGroup direction="horizontal">
-            <ResizablePanel defaultSize={50} minSize={30} maxSize={65}>
-              <ChatPanel ref={chatRef} initialPrompt={initialPrompt} onVersionCreated={handleVersionCreated} />
-            </ResizablePanel>
-            <ResizableHandle className="w-px bg-border hover:bg-primary transition-colors" />
-            <ResizablePanel defaultSize={50} className="!overflow-hidden">
-              <div className="h-full w-full overflow-hidden">
-                {renderPanel()}
-              </div>
-            </ResizablePanel>
+            {layoutSwapped ? (
+              <>
+                <ResizablePanel defaultSize={50} className="!overflow-hidden">
+                  <div className="h-full w-full overflow-hidden">
+                    {renderPanel()}
+                  </div>
+                </ResizablePanel>
+                <ResizableHandle className="w-px bg-border hover:bg-primary transition-colors" />
+                <ResizablePanel defaultSize={50} minSize={30} maxSize={65}>
+                  <ChatPanel ref={chatRef} initialPrompt={initialPrompt} onVersionCreated={handleVersionCreated} />
+                </ResizablePanel>
+              </>
+            ) : (
+              <>
+                <ResizablePanel defaultSize={50} minSize={30} maxSize={65}>
+                  <ChatPanel ref={chatRef} initialPrompt={initialPrompt} onVersionCreated={handleVersionCreated} />
+                </ResizablePanel>
+                <ResizableHandle className="w-px bg-border hover:bg-primary transition-colors" />
+                <ResizablePanel defaultSize={50} className="!overflow-hidden">
+                  <div className="h-full w-full overflow-hidden">
+                    {renderPanel()}
+                  </div>
+                </ResizablePanel>
+              </>
+            )}
           </ResizablePanelGroup>
 
           <AnimatePresence>

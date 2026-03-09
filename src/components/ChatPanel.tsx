@@ -944,7 +944,7 @@ const CONTEXT_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
     setInput("");
     setAttachedImages([]);
     setPreviewErrors([]);
-    if (inputRef.current) inputRef.current.style.height = "36px";
+    if (inputRef.current) inputRef.current.style.height = "60px";
     setMessages((prev) => [...prev, userMsg]);
     setIsLoading(true);
     setBuildStreamContent("");
@@ -2240,6 +2240,36 @@ ${Object.entries(files).map(([path, code]) => `--- ${path}\n${code}`).join("\n\n
                 </div>
               </motion.div>
 
+              {/* Capabilities showcase */}
+              <motion.div
+                initial={{ opacity: 0, y: 6 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.4 }}
+                className="w-full max-w-sm"
+              >
+                <div className="rounded-xl border border-border/50 bg-card/50 p-3">
+                  <p className="text-[10px] font-semibold text-muted-foreground/60 uppercase tracking-wider mb-2 text-center">What Phoenix Builder can do</p>
+                  <div className="grid grid-cols-2 gap-1.5">
+                    {[
+                      { icon: "🧠", label: "Multi-model AI", desc: "GPT-5, Gemini 2.5 & more" },
+                      { icon: "🎨", label: "Design themes", desc: "10+ curated styles" },
+                      { icon: "📸", label: "Image-to-code", desc: "Paste screenshot → app" },
+                      { icon: "🔧", label: "Auto-fix errors", desc: "Self-healing builds" },
+                      { icon: "⚡", label: "Live preview", desc: "Instant Sandpack render" },
+                      { icon: "🧩", label: "Smart suggestions", desc: "Context-aware actions" },
+                    ].map((cap, i) => (
+                      <div key={i} className="flex items-start gap-2 px-2 py-1.5 rounded-lg hover:bg-secondary/50 transition-colors">
+                        <span className="text-sm shrink-0">{cap.icon}</span>
+                        <div className="min-w-0">
+                          <p className="text-[11px] font-medium text-foreground leading-tight">{cap.label}</p>
+                          <p className="text-[9px] text-muted-foreground/60 leading-tight">{cap.desc}</p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </motion.div>
+
               {/* Keyboard hint */}
               <motion.p
                 initial={{ opacity: 0 }}
@@ -2634,9 +2664,9 @@ ${Object.entries(files).map(([path, code]) => `--- ${path}\n${code}`).join("\n\n
               onKeyDown={handleKeyDown}
               placeholder={attachedImages.length > 0 ? "Describe what to build from this image..." : "Describe what you want to build..."}
               className="flex-1 bg-transparent text-sm text-foreground placeholder:text-muted-foreground/60 outline-none resize-none leading-[1.4]"
-              style={{ height: "36px", maxHeight: "120px" }}
+              style={{ minHeight: "60px", maxHeight: "160px" }}
               disabled={isLoading}
-              rows={1}
+              rows={3}
             />
             {isLoading ? (
               <Tooltip>

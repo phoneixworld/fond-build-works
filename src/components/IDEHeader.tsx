@@ -1,4 +1,4 @@
-import { Zap, LogOut, ArrowLeft, ChevronDown, Command as CommandIcon, MessageCircle, Settings, Pencil, GitBranch, Globe, Tag, Clock, Brain, Activity, Users, Palette, FlaskConical, Puzzle, User, CreditCard, HelpCircle } from "lucide-react";
+import { Zap, LogOut, ArrowLeft, ChevronDown, Command as CommandIcon, MessageCircle, Settings, Pencil, GitBranch, Globe, Tag, Clock, Brain, Activity, Users, Palette, FlaskConical, Puzzle, User, CreditCard, HelpCircle, ArrowLeftRight } from "lucide-react";
 import { TECH_STACKS, TechStackId } from "@/lib/techStacks";
 import PresenceAvatars from "@/components/PresenceAvatars";
 import PublishExportButtons from "@/components/PublishExportButtons";
@@ -46,6 +46,8 @@ interface IDEHeaderProps {
   onlineUsers: any[];
   userEmail: string;
   myColor: string;
+  layoutSwapped?: boolean;
+  onSwapLayout?: () => void;
 }
 
 // Tools that go under project menu
@@ -83,6 +85,8 @@ const IDEHeader = ({
   onlineUsers,
   userEmail,
   myColor,
+  layoutSwapped = false,
+  onSwapLayout,
 }: IDEHeaderProps) => {
   const currentStack = (currentProject as any)?.tech_stack || "html-tailwind";
   const currentStackInfo = TECH_STACKS.find(s => s.id === currentStack);
@@ -232,6 +236,20 @@ const IDEHeader = ({
           </TooltipTrigger>
           <TooltipContent side="bottom" className="text-xs">Team Chat</TooltipContent>
         </Tooltip>
+
+        {/* Swap Layout */}
+        {onSwapLayout && (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <button onClick={onSwapLayout} className={`p-1.5 rounded-md transition-colors ${layoutSwapped ? "text-primary bg-primary/10" : "text-muted-foreground hover:text-foreground hover:bg-secondary"}`}>
+                <ArrowLeftRight className="w-3.5 h-3.5" />
+              </button>
+            </TooltipTrigger>
+            <TooltipContent side="bottom" className="text-xs">
+              {layoutSwapped ? "Chat on left" : "Chat on right"}
+            </TooltipContent>
+          </Tooltip>
+        )}
 
         {/* Cmd K */}
         <Tooltip>
