@@ -519,6 +519,22 @@ const ChatPanel = forwardRef<ChatPanelHandle, { initialPrompt?: string; onVersio
   const { setFiles: setVirtualFiles } = useVirtualFS();
   const lastProjectIdRef = useRef<string | null>(null);
   const hasProcessedInitialRef = useRef(false);
+  const buildSafetyTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Convert sandpack files (Record<string, string>) to VirtualFile format and sync to VirtualFS
+  const syncSandpackToVirtualFS = useCallback((sandpackFiles: Record<string, string>) => {
+    const virtualFiles: Record<string, { path: string; content: string; language: string }> = {};
+    for (const [path, content] of Object.entries(sandpackFiles)) {
+      const cleanPath = path.startsWith("/") ? path.slice(1) : path;
+      const ext = cleanPath.split(".").pop()?.toLowerCase() || "";
+      const langMap: Record<string, string> = {
+        tsx: "typescript", ts: "typescript", jsx: "javascript", js: "javascript",
+        css: "css", html: "html", json: "json",
+      };
+      virtualFiles[cleanPath] = { path: cleanPath, content, language: langMap[ext] || "text" };
+    }
+    setVirtualFiles(virtualFiles);
+  }, [setVirtualFiles]);
 
 const healTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 const MAX_HEAL_ATTEMPTS = 3;
