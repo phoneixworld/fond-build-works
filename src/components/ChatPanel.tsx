@@ -644,8 +644,11 @@ const CONTEXT_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
     setFollowUpAnswers({});
     setPendingFollowUpPrompt("");
     setAnalysisResult(null);
+    // IMPORTANT: Go directly to build agent — skip classification since user already answered
+    setCurrentAgent("build");
+    setPipelineStep("planning");
     sendMessage(enrichedPrompt);
-  }, [followUpQuestions, followUpAnswers, pendingFollowUpPrompt]);
+  }, [followUpQuestions, followUpAnswers, pendingFollowUpPrompt, sendMessage]);
 
   const skipFollowUpQuestions = useCallback(() => {
     const prompt = pendingFollowUpPrompt;
@@ -653,8 +656,11 @@ const CONTEXT_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
     setFollowUpAnswers({});
     setPendingFollowUpPrompt("");
     setAnalysisResult(null);
+    // Skip classification — user explicitly chose to skip, go straight to build
+    setCurrentAgent("build");
+    setPipelineStep("planning");
     sendMessage(prompt);
-  }, [pendingFollowUpPrompt]);
+  }, [pendingFollowUpPrompt, sendMessage]);
 
   useEffect(() => {
     if (initialPrompt && !hasProcessedInitialRef.current) {
