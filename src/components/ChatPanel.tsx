@@ -520,6 +520,9 @@ const ChatPanel = forwardRef<ChatPanelHandle, { initialPrompt?: string; onVersio
   const lastProjectIdRef = useRef<string | null>(null);
   const hasProcessedInitialRef = useRef(false);
   const buildSafetyTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // FIX: Track sandpack files via ref to prevent stale closure reads during project switches
+  const sandpackFilesRef = useRef<Record<string, string> | null>(null);
+  sandpackFilesRef.current = currentSandpackFiles;
 
   // Convert sandpack files (Record<string, string>) to VirtualFile format and sync to VirtualFS
   const syncSandpackToVirtualFS = useCallback((sandpackFiles: Record<string, string>) => {
