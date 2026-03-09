@@ -60,14 +60,62 @@ DO NOT use \`\`\`html-preview or \`\`\`html fences.
 \`\`\`react-preview
 --- /App.jsx
 import React from "react";
+import { HashRouter, Routes, Route } from "react-router-dom";
+import AppLayout from "./layout/AppLayout";
+import Dashboard from "./pages/Dashboard/Dashboard";
 export default function App() {
-  return <div className="min-h-screen bg-white"><h1>Hello</h1></div>;
+  return (
+    <HashRouter>
+      <Routes>
+        <Route path="/*" element={<AppLayout />}>
+          <Route index element={<Dashboard />} />
+        </Route>
+      </Routes>
+    </HashRouter>
+  );
 }
---- /components/Header.jsx
+--- /layout/AppLayout.jsx
 import React from "react";
-export default function Header() {
-  return <header className="p-6"><h1>Brand</h1></header>;
+import { Outlet } from "react-router-dom";
+import Sidebar from "./Sidebar";
+export default function AppLayout() {
+  return (
+    <div className="flex h-screen">
+      <Sidebar />
+      <main className="flex-1 overflow-auto"><Outlet /></main>
+    </div>
+  );
 }
+--- /layout/Sidebar.jsx
+import React from "react";
+import { NavLink } from "react-router-dom";
+export default function Sidebar() {
+  return <nav className="w-64 bg-gray-900 text-white p-4">...</nav>;
+}
+--- /pages/Dashboard/Dashboard.jsx
+import React from "react";
+export default function Dashboard() {
+  return <div className="p-6"><h1>Dashboard</h1></div>;
+}
+--- /components/ui/Card.jsx
+import React from "react";
+export default function Card({ children, className = "" }) {
+  return <div className={\`bg-white rounded-xl border p-6 \${className}\`}>{children}</div>;
+}
+--- /hooks/useFetch.js
+import { useState, useEffect } from "react";
+export function useFetch(url, options) {
+  const [data, setData] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  useEffect(() => {
+    fetch(url, options).then(r => r.json()).then(setData).catch(setError).finally(() => setLoading(false));
+  }, [url]);
+  return { data, loading, error };
+}
+--- /styles/globals.css
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+body { font-family: 'Inter', sans-serif; }
 --- dependencies
 {
   "lucide-react": "^0.400.0"
@@ -76,11 +124,39 @@ export default function Header() {
 
 FORMAT RULES:
 - "--- /filename.jsx" on ONE line
-- File paths start with / (e.g. --- /App.jsx, --- /components/Hero.jsx)
-- NO /src/ prefix
+- File paths start with / (e.g. --- /App.jsx, --- /pages/Dashboard/Dashboard.jsx)
+- NO /src/ prefix (Sandpack maps / as the src root)
 - /App.jsx is the entry point — MUST export default
-- Break into multiple component files under /components/
-- Maximum 5-8 files for simple apps, 10-15 for complex apps` : `## OUTPUT FORMAT
+- Use PROPER NESTED folder structure:
+
+## MANDATORY FILE STRUCTURE:
+\`\`\`
+/App.jsx                              ← Entry point with router
+/layout/AppLayout.jsx                 ← Main layout with Sidebar + Outlet
+/layout/Sidebar.jsx                   ← Navigation sidebar
+/layout/Navbar.jsx                    ← Top navbar (if needed)
+/pages/Dashboard/Dashboard.jsx        ← Dashboard page
+/pages/Students/StudentList.jsx       ← Student listing page
+/pages/Students/StudentDetails.jsx    ← Student detail page
+/pages/Fees/FeeManager.jsx            ← Fee management page
+/components/ui/Card.jsx               ← Reusable card component
+/components/ui/Modal.jsx              ← Reusable modal component
+/components/ui/Button.jsx             ← Reusable button component
+/components/ui/DataTable.jsx          ← Reusable data table
+/components/ui/Toast.jsx              ← Toast notification component
+/hooks/useFetch.js                    ← Data fetching hook
+/hooks/useAuth.js                     ← Auth state hook (if auth needed)
+/styles/globals.css                   ← Global styles + Google Fonts
+\`\`\`
+
+CRITICAL STRUCTURE RULES:
+- Each page gets its OWN folder under /pages/ (e.g., /pages/Dashboard/, /pages/Students/)
+- Reusable UI components go in /components/ui/
+- Layout components go in /layout/
+- Custom hooks go in /hooks/
+- Styles go in /styles/
+- NEVER put all components flat in /components/ — use proper folder nesting
+- Minimum 10-15 files for simple apps, 15-25 for complex apps` : `## OUTPUT FORMAT
 Generate a SINGLE complete index.html inside a \`\`\`html-preview code fence.`;
 
   const codeRules = `## CODE RULES — ENTERPRISE GRADE
