@@ -69,6 +69,55 @@ const PublishExportButtons = forwardRef<PublishExportHandle>((_, ref) => {
   const [domainInput, setDomainInput] = useState("");
   const [domainStatus, setDomainStatus] = useState<"none" | "pending" | "verifying" | "active">("none");
 
+  // Site info state
+  const [siteInfo, setSiteInfo] = useState<SiteInfo>({
+    siteTitle: currentProject?.name || "",
+    siteDescription: "",
+    faviconUrl: "",
+    logoUrl: "",
+    ogImageUrl: "",
+  });
+  const [siteInfoSaved, setSiteInfoSaved] = useState(false);
+
+  const updateSiteInfo = <K extends keyof SiteInfo>(key: K, value: SiteInfo[K]) => {
+    setSiteInfo(prev => ({ ...prev, [key]: value }));
+    setSiteInfoSaved(false);
+  };
+
+  const handleSaveSiteInfo = async () => {
+    if (!currentProject) return;
+    try {
+      await supabase.from("project_data").upsert({
+        project_id: currentProject.id,
+        collection: "site_info",
+        data: siteInfo as any,
+      } as any, { onConflict: "project_id,collection" });
+      setSiteInfoSaved(true);
+      toast({ title: "Site info saved", description: "Favicon, logo & meta updated." });
+      setTimeout(() => setSiteInfoSaved(false), 2000);
+    } catch {
+      toast({ title: "Failed to save", variant: "destructive" });
+    }
+  };
+
+  // Load site info on open
+  useEffect(() => {
+    if (!showPublish || !currentProject) return;
+    (async () => {
+      try {
+        const { data } = await supabase
+          .from("project_data")
+          .select("data")
+          .eq("project_id", currentProject.id)
+          .eq("collection", "site_info")
+          .maybeSingle();
+        if (data?.data) {
+          setSiteInfo(prev => ({ ...prev, ...(data.data as any) }));
+        }
+      } catch {}
+    })();
+  }, [showPublish, currentProject]);
+
   // Check if already published on open
   useEffect(() => {
     if (showPublish && currentProject?.is_published && currentProject?.published_slug) {
