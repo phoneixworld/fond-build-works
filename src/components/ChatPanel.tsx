@@ -891,9 +891,12 @@ const CONTEXT_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
     return parts;
   };
 
-  const scrollToBottom = () => {
-    scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
-  };
+  const scrollToBottom = useCallback(() => {
+    if (!scrollRef.current) return;
+    requestAnimationFrame(() => {
+      scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
+    });
+  }, []);
 
   const clearChat = useCallback(() => {
     if (!currentProject || isLoading) return;
