@@ -1036,8 +1036,9 @@ async function runPlannedBuild(
   
   console.log(`[BuildEngine] ${executableTasks.length} tasks in ${parallelGroups.length} parallel groups: ${parallelGroups.map(g => `[${g.map(t => t.title).join(", ")}]`).join(" → ")}`);
 
-  let accumulatedFiles: Record<string, string> = config.existingFiles ? { ...config.existingFiles } : {};
-  let previousFiles: Record<string, string> | null = config.existingFiles ? { ...config.existingFiles } : null;
+  const baseTemplate = getBaseTemplate();
+  let accumulatedFiles: Record<string, string> = config.existingFiles ? { ...config.existingFiles } : { ...baseTemplate };
+  let previousFiles: Record<string, string> | null = config.existingFiles ? { ...config.existingFiles } : { ...baseTemplate };
   let allDeps: Record<string, string> = {};
   let allConflicts: string[] = [];
   let lastChatText = "";
