@@ -11,3 +11,12 @@ verify_jwt = false
 
 [functions.build-agent]
 verify_jwt = false
+
+[functions.plan-agent]
+verify_jwt = false
+
+[functions.analyze-code-quality]
+verify_jwt = false
+
+[functions.semantic-search]
+verify_jwt = false
