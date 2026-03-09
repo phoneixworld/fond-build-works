@@ -674,7 +674,7 @@ const CONTEXT_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
       const history = currentProject.chat_history ?? [];
       setMessages(history);
       setPreviewHtml(currentProject.html_content || "");
-      // CRITICAL: Reset sandpack state on project switch to prevent cross-contamination
+      // Reset sandpack state first, then try to restore from DB
       setSandpackFiles(null);
       setSandpackDeps({});
       setPreviewMode("html");
@@ -696,6 +696,26 @@ const CONTEXT_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
         abortControllerRef.current = null;
       }
       isSendingRef.current = false;
+
+      // Restore persisted sandpack state from project_data
+      supabase
+        .from("project_data")
+        .select("data")
+        .eq("project_id", currentProject.id)
+        .eq("collection", "sandpack_state")
+        .maybeSingle()
+        .then(({ data: row }) => {
+          if (row?.data && typeof row.data === "object") {
+            const state = row.data as any;
+            if (state.files && Object.keys(state.files).length > 0) {
+              console.log("[ChatPanel] ✅ Restored sandpack state:", Object.keys(state.files).length, "files");
+              setSandpackFiles(state.files);
+              if (state.deps) setSandpackDeps(state.deps);
+              setPreviewMode("sandpack");
+            }
+          }
+        });
+    } else if (!currentProject) {
     } else if (!currentProject) {
       lastProjectIdRef.current = null;
       setMessages([]);
