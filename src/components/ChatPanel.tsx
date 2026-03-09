@@ -1327,10 +1327,11 @@ const CONTEXT_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
         saveProject({ chat_history: persistMessages, html_content: currentProject.html_content || "" });
       };
 
-      // ─── CORE: Use build engine for React stacks ───
-      const isReactStack = ["react-cdn", "react-node", "react-python", "react-go", "nextjs"].includes(currentProject.tech_stack || "react-cdn");
-      
-      if (isReactStack) {
+      // ─── CORE: ALWAYS use build engine for code generation ───
+      // The build engine handles React code generation via build-agent.
+      // Even "html-tailwind" projects should use build-agent for reliable code output.
+      // The old streamChat path was unreliable — it returns planning text instead of code.
+      {
         const userText = typeof text === "string" ? text : getTextContent(content);
         
         const engineConfig: EngineConfig = {
@@ -1427,22 +1428,6 @@ const CONTEXT_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
           onError: (err) => {
             handleOnError(err);
           },
-        });
-      } else {
-        await streamChat({
-          messages: apiMessages,
-          projectId: currentProject.id,
-          techStack: currentProject.tech_stack || "html-tailwind",
-          schemas,
-          model: selectedModel,
-          designTheme: themeInfo?.prompt,
-          knowledge,
-          templateContext: templateCtx || undefined,
-          currentCode: currentCodeSummary || undefined,
-          snippetsContext: snippetsContext || undefined,
-          onDelta: upsert,
-          onDone: () => handleOnDone(fullResponse),
-          onError: handleOnError,
         });
       }
     } catch (e) {
