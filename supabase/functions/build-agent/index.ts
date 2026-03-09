@@ -338,7 +338,7 @@ Review the error details above carefully and fix ALL issues. Do not repeat the s
         ],
         stream: true,
         temperature,
-        max_tokens: 32000,
+        max_tokens: 64000,
       }),
     });
 
