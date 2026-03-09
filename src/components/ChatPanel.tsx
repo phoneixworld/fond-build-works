@@ -489,7 +489,7 @@ const ChatPanel = forwardRef<ChatPanelHandle, { initialPrompt?: string; onVersio
   const [attachedImages, setAttachedImages] = useState<string[]>([]);
   const [isDragOver, setIsDragOver] = useState(false);
   const [showScrollBtn, setShowScrollBtn] = useState(false);
-  const [elapsedTime] = useState(0); // kept for compatibility but timer moved to BuildPipelineCard
+  
   const [buildStreamContent, setBuildStreamContent] = useState("");
   // Self-healing state
   const [healAttempts, setHealAttempts] = useState(0);
