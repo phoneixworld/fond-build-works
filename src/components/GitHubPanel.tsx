@@ -4,6 +4,7 @@ import { useProjects } from "@/contexts/ProjectContext";
 import { useVirtualFS } from "@/contexts/VirtualFSContext";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { toExportPath, toSandpackPath } from "@/lib/pathNormalizer";
 
 type Step = "connect" | "select-account" | "select-repo" | "connected";
 
