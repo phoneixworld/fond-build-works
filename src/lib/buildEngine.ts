@@ -1860,7 +1860,7 @@ ${task.filesAffected.map(f => `- ${f}`).join("\n")}
         const codeContext = buildIncrementalContext(task, accumulatedFiles);
         const { reductionPercent } = contextReductionRatio(task, accumulatedFiles);
         if (reductionPercent > 0) console.log(`[BuildEngine] Task "${task.title}" context reduced by ${reductionPercent}%`);
-        const taskResult = await executeSingleTask(taskPrompt, config, codeContext, callbacks.onDelta, 0, 16000);
+        const taskResult = await executeSingleTask(taskPrompt, config, codeContext, callbacks.onDelta, 0, 16000, taskType);
         
         const totalSize = Object.values(taskResult.files).reduce((s, c) => s + c.length, 0);
         completeTask(taskMet, {
