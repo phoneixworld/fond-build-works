@@ -13,6 +13,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import DirectTouch, { DIRECT_TOUCH_SCRIPT } from "@/components/DirectTouch";
 import SandpackPreview from "@/components/SandpackPreview";
+import BuildTimeline from "@/components/BuildTimeline";
 
 const VIEWPORTS = [
   { id: "desktop", label: "Desktop", icon: Monitor, width: "100%", maxWidth: "none" },
