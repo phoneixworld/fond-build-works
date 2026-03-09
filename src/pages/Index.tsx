@@ -84,6 +84,7 @@ const IDELayout = () => {
   const [renameOpen, setRenameOpen] = useState(false);
   const [versions, setVersions] = useState<Version[]>([]);
   const [teamChatOpen, setTeamChatOpen] = useState(false);
+  const [layoutSwapped, setLayoutSwapped] = useState(false);
   const publishRef = useRef<{ openPublish: () => void; handleExport: () => void } | null>(null);
   const chatRef = useRef<{ clearChat: () => void; sendMessage: (text: string) => void } | null>(null);
   const { toast } = useToast();
