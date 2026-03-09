@@ -23,7 +23,8 @@ import { transform } from "sucrase";
 import postcss from "postcss";
 import { generatePlan, type BuildPlan, type PlanTask } from "@/lib/planningAgent";
 import { topologicalSort } from "@/lib/taskExecutor";
-import { mergeFiles, buildFullCodeContext, type MergeResult } from "@/lib/codeMerger";
+import { mergeFiles, buildFullCodeContext, isBackendProtected, type MergeResult } from "@/lib/codeMerger";
+import { generateMockLayer } from "@/lib/mockLayerGenerator";
 import { supabase } from "@/integrations/supabase/client";
 import {
   getTaskCacheKey, getCachedTaskOutput, setCachedTaskOutput,
@@ -638,6 +639,57 @@ ${buildFullCodeContext(files, 24000)}`;
   return files;
 }
 
+// ─── Backend Task Executor ────────────────────────────────────────────────
+
+async function executeBackendTask(
+  task: PlanTask,
+  config: EngineConfig,
+  onDelta: (chunk: string) => void
+): Promise<{ files: Record<string, string>; deps: Record<string, string>; chatText: string; modelMs: number }> {
+  const modelT = timer();
+  const taskType = (task as any).taskType || "backend";
+  
+  onDelta(`\n[Backend Agent] Generating ${taskType} layer...\n`);
+
+  try {
+    const BASE_URL = import.meta.env.VITE_SUPABASE_URL;
+    const AUTH_HEADER = `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`;
+
+    const resp = await fetch(`${BASE_URL}/functions/v1/backend-agent`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: AUTH_HEADER },
+      body: JSON.stringify({
+        task,
+        domainModel: config.domainModel,
+        projectId: config.projectId,
+        techStack: config.techStack,
+        existingFiles: config.existingFiles ? Object.keys(config.existingFiles) : [],
+      }),
+    });
+
+    if (resp.ok) {
+      const json = await resp.json();
+      const generatedFiles: Record<string, string> = json.files || {};
+      const chatText: string = json.chatText || `✅ ${taskType} layer generated`;
+      const modelMs = modelT.elapsed();
+      onDelta(`\n[Backend Agent] Generated ${Object.keys(generatedFiles).length} files\n`);
+      return { files: generatedFiles, deps: {}, chatText, modelMs };
+    }
+    throw new Error(`Backend agent returned ${resp.status}`);
+  } catch (err) {
+    console.warn(`[BuildEngine] Backend Agent failed, using local generator:`, err);
+    if (config.domainModel) {
+      const apiBase = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1`;
+      const anonKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+      const generatedFiles = generateMockLayer(config.domainModel, config.projectId, apiBase, anonKey);
+      const modelMs = modelT.elapsed();
+      onDelta(`\n[Local Generator] Generated ${Object.keys(generatedFiles).length} mock layer files\n`);
+      return { files: generatedFiles, deps: {}, chatText: `✅ ${taskType} layer generated locally`, modelMs };
+    }
+    throw err;
+  }
+}
+
 // ─── Main Engine ───────────────────────────────────────────────────────────
 
 export async function runBuildEngine(
@@ -817,8 +869,34 @@ async function runPlannedBuild(
         ? `\n\n## DOMAIN MODEL\n${JSON.stringify(config.domainModel, null, 2).slice(0, 4000)}` 
         : "";
       
+      const taskType = (task as any).taskType || "frontend";
+
+      // ── Route by task type ──
+      if ((taskType === "schema" || taskType === "backend") && config.domainModel) {
+        // Route schema/backend tasks to Backend Agent
+        try {
+          const backendResult = await executeBackendTask(task, config, callbacks.onDelta);
+          const totalSize = Object.values(backendResult.files).reduce((s, c) => s + c.length, 0);
+          completeTask(taskMet, {
+            fileCount: Object.keys(backendResult.files).length,
+            totalFileSize: totalSize,
+            modelLatencyMs: backendResult.modelMs,
+            validationLatencyMs: 0,
+            mergeLatencyMs: 0,
+            retryCount: 0,
+            cached: false,
+            status: Object.keys(backendResult.files).length > 0 ? "success" : "failed",
+          });
+          return { task, result: backendResult };
+        } catch (err) {
+          console.error(`[BuildEngine] Backend task "${task.title}" failed, falling back to build agent:`, err);
+          // Fall through to regular build agent
+        }
+      }
+
+      // ── Frontend tasks (and fallback) go to regular Build Agent ──
       const taskPrompt = `## TASK: ${task.title}
-## TASK TYPE: ${(task as any).taskType || "frontend"}
+## TASK TYPE: ${taskType}
 
 ${task.buildPrompt}
 ${domainContext}
@@ -832,9 +910,9 @@ ${task.filesAffected.map(f => `- ${f}`).join("\n")}
 - If updating /App.jsx, KEEP ALL existing routes and imports — only ADD new ones
 - Output complete, working code in \`\`\`react-preview fences
 - NO descriptions, NO planning text — ONLY code
-- For schema/data tasks: Generate realistic mock data arrays and CRUD hooks
-- For backend tasks: Generate context providers and API integration hooks
-- For frontend tasks: Import data from /data/ and hooks from /hooks/ — do NOT hardcode mock data in pages`;
+- For frontend tasks: Import data from /data/ and hooks from /hooks/ — do NOT hardcode mock data in pages
+- If /hooks/use<Entity>.js exists, IMPORT from it. Do NOT recreate data hooks in pages.
+- If /data/<collection>.js exists, do NOT create inline mock arrays.`;
 
       try {
         const codeContext = buildIncrementalContext(task, accumulatedFiles);
@@ -847,8 +925,8 @@ ${task.filesAffected.map(f => `- ${f}`).join("\n")}
           fileCount: Object.keys(taskResult.files).length,
           totalFileSize: totalSize,
           modelLatencyMs: taskResult.modelMs,
-          validationLatencyMs: 0, // validated inside executeSingleTask
-          mergeLatencyMs: 0, // merge happens below
+          validationLatencyMs: 0,
+          mergeLatencyMs: 0,
           retryCount: 0,
           cached: taskResult.cached,
           status: Object.keys(taskResult.files).length > 0 ? "success" : "failed",
