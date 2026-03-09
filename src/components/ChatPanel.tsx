@@ -1200,10 +1200,137 @@ const CONTEXT_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
         isSendingRef.current = false;
       };
 
-      // ─── CORE FIX: Use build-agent for React stacks (lower temperature, focused prompts) ───
+      // ─── Cleanup helper for plan-based builds ───
+      const handleOnDone_cleanup = () => {
+        setIsLoading(false);
+        setIsBuilding(false);
+        setBuildStep("");
+        setPipelineStep("complete");
+        setCurrentAgent(null);
+        isSendingRef.current = false;
+        setBuildRetryCount(0);
+        setCurrentPlan(null);
+        setTimeout(() => setBuildStreamContent(""), 3000);
+
+        const persistMessages = messagesRef.current.map(m => ({
+          role: m.role,
+          content: typeof m.content === "string" ? m.content : getTextContent(m.content),
+        }));
+        saveProject({ chat_history: persistMessages, html_content: currentProject.html_content || "" });
+      };
+
+      // ─── CORE: Use build-agent for React stacks ───
       const isReactStack = ["react-cdn", "react-node", "react-python", "react-go", "nextjs"].includes(currentProject.tech_stack || "react-cdn");
       
       if (isReactStack) {
+        // ─── PLANNING AGENT: decompose → execute per-task for complex prompts ───
+        const userText = typeof text === "string" ? text : getTextContent(content);
+        const isComplex = userText.length > 80 || /\b(with|and|include|add|create|build)\b.*\b(with|and|include|add|create|build)\b/gi.test(userText);
+        const isFirstMessage = currentMessages.length === 0;
+        
+        if ((isComplex || isFirstMessage) && !userText.startsWith("🔧")) {
+          setPipelineStep("planning");
+          setBuildStep("📋 Planning build tasks...");
+          
+          try {
+            const existingFiles = currentSandpackFiles ? Object.keys(currentSandpackFiles) : undefined;
+            const plan = await generatePlan(
+              userText,
+              existingFiles,
+              currentProject.tech_stack || "react-cdn",
+              schemas.length > 0 ? schemas : undefined,
+              knowledge.length > 0 ? knowledge : undefined
+            );
+            
+            setCurrentPlan(plan);
+            setTotalPlanTasks(plan.tasks.length);
+            setCurrentTaskIndex(0);
+            
+            console.log(`[ChatPanel] Plan generated: ${plan.tasks.length} tasks, complexity=${plan.overallComplexity}`);
+            setBuildStep(`📋 Plan: ${plan.tasks.length} tasks (${plan.overallComplexity})`);
+            
+            // Show plan summary in chat
+            const planSummary = `📋 **Build Plan** (${plan.overallComplexity})\n${plan.summary}\n\n${plan.tasks.map((t, i) => `${i + 1}. ${t.title}`).join("\n")}`;
+            setMessages((prev) => {
+              const last = prev[prev.length - 1];
+              if (last?.role === "assistant") {
+                return prev.map((m, i) => (i === prev.length - 1 ? { ...m, content: planSummary } : m));
+              }
+              return [...prev, { role: "assistant", content: planSummary, timestamp: Date.now() }];
+            });
+            
+            // Execute plan task-by-task
+            setPipelineStep("generating");
+            
+            await executePlan(plan, {
+              projectId: currentProject.id,
+              techStack: currentProject.tech_stack || "react-cdn",
+              schemas: schemas.length > 0 ? schemas : undefined,
+              model: selectedModel,
+              designTheme: themeInfo?.prompt,
+              knowledge: knowledge.length > 0 ? knowledge : undefined,
+              snippetsContext: snippetsContext || undefined,
+            }, {
+              onTaskStart: (task, index, total) => {
+                setCurrentTaskIndex(index);
+                setBuildStep(`🔨 Task ${index + 1}/${total}: ${task.title}`);
+                
+                setMessages((prev) => {
+                  const progress = `📋 **Build Plan** (${plan.overallComplexity})\n${plan.summary}\n\n${plan.tasks.map((t, i) => {
+                    const status = i < index ? "✅" : i === index ? "🔨" : "⏳";
+                    return `${status} ${i + 1}. ${t.title}`;
+                  }).join("\n")}`;
+                  const last = prev[prev.length - 1];
+                  if (last?.role === "assistant") {
+                    return prev.map((m, i) => (i === prev.length - 1 ? { ...m, content: progress } : m));
+                  }
+                  return prev;
+                });
+              },
+              onTaskDelta: () => {},
+              onTaskDone: (task, _fullText, files) => {
+                console.log(`[ChatPanel] Task "${task.title}" done: ${Object.keys(files).length} files`);
+              },
+              onTaskError: (task, error) => {
+                console.error(`[ChatPanel] Task "${task.title}" failed:`, error);
+              },
+              onPlanComplete: (accumulatedFiles, finalPlan) => {
+                setCurrentPlan(finalPlan);
+                
+                if (Object.keys(accumulatedFiles).length > 0) {
+                  const validation = validateReactCode(accumulatedFiles);
+                  if (!validation.valid) {
+                    console.warn("[ChatPanel] Plan validation warnings:", validation.errors);
+                  }
+                  
+                  setSandpackFiles(accumulatedFiles);
+                  setPreviewMode("sandpack");
+                  
+                  const doneTasks = finalPlan.tasks.filter(t => t.status === "done").length;
+                  const completionMsg = `✅ **Build Complete** — ${doneTasks}/${finalPlan.tasks.length} tasks done\n\n${finalPlan.tasks.map((t, i) => {
+                    const icon = t.status === "done" ? "✅" : t.status === "failed" ? "❌" : "⏭️";
+                    return `${icon} ${i + 1}. ${t.title}`;
+                  }).join("\n")}`;
+                  
+                  setMessages((prev) => {
+                    const last = prev[prev.length - 1];
+                    if (last?.role === "assistant") {
+                      return prev.map((m, i) => (i === prev.length - 1 ? { ...m, content: completionMsg } : m));
+                    }
+                    return [...prev, { role: "assistant", content: completionMsg, timestamp: Date.now() }];
+                  });
+                }
+                
+                handleOnDone_cleanup();
+              },
+            });
+            return; // executePlan handles everything
+          } catch (planError) {
+            console.warn("[ChatPanel] Plan failed, falling back to direct build:", planError);
+          }
+        }
+        
+        // ─── Direct build (simple prompts or plan fallback) ───
         await streamBuildAgent({
           messages: apiMessages,
           projectId: currentProject.id,
