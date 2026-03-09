@@ -951,7 +951,7 @@ const CONTEXT_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
     setBuildStep(images.length > 0 ? "🖼️ Analyzing image..." : "🏗️ Build agent generating code...");
     setPipelineStep("generating");
 
-    // Safety timeout: if build doesn't complete in 90 seconds, force reset
+    // Safety timeout: if build doesn't complete in 120 seconds, force reset
     if (buildSafetyTimeoutRef.current) clearTimeout(buildSafetyTimeoutRef.current);
     buildSafetyTimeoutRef.current = setTimeout(() => {
       console.warn("[ChatPanel] Build safety timeout — forcing isBuilding=false");
@@ -962,14 +962,14 @@ const CONTEXT_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
       setCurrentAgent(null);
       isSendingRef.current = false;
       setMessages((prev) => {
-        const msg = "⚠️ Build timed out. The request may have been too complex. Try breaking it into smaller steps — e.g., \"Build a sidebar with navigation\" first, then add modules one by one.";
+        const msg = "⚠️ Build timed out. Try breaking it into smaller steps.";
         const last = prev[prev.length - 1];
         if (last?.role === "assistant") {
           return prev.map((m, i) => (i === prev.length - 1 ? { ...m, content: msg } : m));
         }
         return [...prev, { role: "assistant", content: msg, timestamp: Date.now() }];
       });
-    }, 180_000);
+    }, 120_000);
 
     // FIX: Create abort controller for this request
     const abortController = new AbortController();
