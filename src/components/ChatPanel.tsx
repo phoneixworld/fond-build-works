@@ -2560,6 +2560,30 @@ ${Object.entries(files).map(([path, code]) => `--- ${path}\n${code}`).join("\n\n
           )}
         </AnimatePresence>
 
+        {/* Context-aware quick suggestions — above input like Lovable */}
+        {!isLoading && followUpQuestions.length === 0 && !input && (
+          <div className="px-3 pt-2 pb-1">
+            <div className="flex flex-wrap gap-1.5">
+              {(() => {
+                const hasContent = messages.length > 0;
+                const suggestions = hasContent
+                  ? [...QUICK_ACTIONS.slice(0, 2), ...CONTEXT_SUGGESTIONS.filter(s => s.condition === "has-content").slice(0, 2)]
+                  : CONTEXT_SUGGESTIONS.filter(s => s.condition === "empty");
+                return suggestions.map((s) => (
+                  <button
+                    key={s.label}
+                    onClick={() => handleSmartSend(s.prompt)}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-medium border border-border/60 text-muted-foreground hover:text-foreground hover:border-primary/30 hover:bg-primary/5 transition-all group"
+                  >
+                    <span className="text-xs group-hover:scale-110 transition-transform">{s.icon}</span>
+                    {s.label}
+                  </button>
+                ));
+              })()}
+            </div>
+          </div>
+        )}
+
         {/* Input area */}
         <div className="p-3 border-t border-border">
           <div className={`flex items-end gap-2 bg-secondary/80 rounded-xl px-3 py-2.5 ring-1 transition-all ${
