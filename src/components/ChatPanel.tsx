@@ -626,11 +626,12 @@ const CONTEXT_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
     
     const hasHistory = messagesRef.current.length > 0;
     const hasExistingCode = !!(currentSandpackFiles && Object.keys(currentSandpackFiles).length > 0) || !!(currentPreviewHtml && currentPreviewHtml.length > 0);
+    const existingFileNames = currentSandpackFiles ? Object.keys(currentSandpackFiles) : [];
     
     setIsAnalyzing(true);
     setPipelineStep("classifying");
     try {
-      const result = await classifyIntent(prompt, hasHistory, hasExistingCode);
+      const result = await classifyIntent(prompt, hasHistory, hasExistingCode, existingFileNames);
       setAnalysisResult(result);
       
       if (result.intent === "clarify" && result.questions?.length) {
