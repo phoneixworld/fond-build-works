@@ -465,6 +465,188 @@ export const COMPONENT_SNIPPETS: ComponentSnippet[] = [
   </div>
 </nav>`,
   },
+
+  // === FLOATING NAVBAR ===
+  {
+    id: "nav-floating",
+    name: "Floating Navbar with Blur",
+    category: "navigation",
+    structure: `<nav class="fixed top-4 left-1/2 -translate-x-1/2 z-50 w-[calc(100%-2rem)] max-w-4xl">
+  <div class="backdrop-blur-xl bg-white/70 dark:bg-gray-900/70 rounded-2xl border border-gray-200/50 dark:border-white/10 shadow-lg shadow-black/5 px-6 py-3 flex items-center justify-between">
+    <a href="#hero" class="flex items-center gap-2 font-bold">
+      <div style="width:28px;height:28px;border-radius:8px;background:linear-gradient(135deg,hsl(var(--primary)),hsl(var(--accent)));display:flex;align-items:center;justify-content:center;">
+        <i data-lucide="sparkles" style="width:14px;height:14px;color:white;"></i>
+      </div>
+      <span class="hidden sm:inline">Brand</span>
+    </a>
+    <div class="hidden md:flex items-center gap-1">
+      <a href="#features" class="px-3 py-1.5 text-sm text-muted-foreground hover:text-foreground hover:bg-muted rounded-lg transition-all">Features</a>
+      <a href="#pricing" class="px-3 py-1.5 text-sm text-muted-foreground hover:text-foreground hover:bg-muted rounded-lg transition-all">Pricing</a>
+      <a href="#about" class="px-3 py-1.5 text-sm text-muted-foreground hover:text-foreground hover:bg-muted rounded-lg transition-all">About</a>
+    </div>
+    <div class="flex items-center gap-2">
+      <a href="#login" class="text-sm text-muted-foreground hover:text-foreground font-medium hidden md:inline-flex">Sign in</a>
+      <a href="#signup" class="px-4 py-2 bg-primary text-primary-foreground text-sm rounded-xl font-medium hover:opacity-90 transition-all">Get Started</a>
+    </div>
+  </div>
+</nav>
+<!-- Spacer for fixed nav -->
+<div class="h-20"></div>`,
+  },
+
+  // === TESTIMONIAL CAROUSEL ===
+  {
+    id: "testimonial-carousel",
+    name: "Testimonial Carousel",
+    category: "testimonials",
+    structure: `<section id="testimonials" class="py-20 bg-muted/30 overflow-hidden">
+  <div class="max-w-7xl mx-auto px-4">
+    <div class="text-center mb-12">
+      <h2 class="text-3xl font-bold mb-4">Loved by thousands</h2>
+      <p class="text-muted-foreground max-w-2xl mx-auto">See what our customers are saying</p>
+    </div>
+    <!-- Carousel container -->
+    <div class="relative">
+      <div class="flex gap-6 overflow-x-auto snap-x snap-mandatory scrollbar-hide pb-4" style="scroll-behavior:smooth;">
+        <!-- Testimonial card 1 -->
+        <div class="snap-center shrink-0 w-[350px] bg-card rounded-2xl p-6 border shadow-sm">
+          <div class="flex gap-1 mb-4">
+            <i data-lucide="star" class="w-4 h-4 fill-amber-400 text-amber-400"></i>
+            <i data-lucide="star" class="w-4 h-4 fill-amber-400 text-amber-400"></i>
+            <i data-lucide="star" class="w-4 h-4 fill-amber-400 text-amber-400"></i>
+            <i data-lucide="star" class="w-4 h-4 fill-amber-400 text-amber-400"></i>
+            <i data-lucide="star" class="w-4 h-4 fill-amber-400 text-amber-400"></i>
+          </div>
+          <p class="text-foreground mb-6">"This product has completely transformed how we work. The results speak for themselves."</p>
+          <div class="flex items-center gap-3">
+            <div style="width:40px;height:40px;border-radius:50%;background:linear-gradient(135deg,hsl(var(--primary)),hsl(var(--accent)));"></div>
+            <div>
+              <p class="font-semibold text-sm">Sarah Johnson</p>
+              <p class="text-xs text-muted-foreground">CEO, TechCorp</p>
+            </div>
+          </div>
+        </div>
+        <!-- Testimonial card 2 -->
+        <div class="snap-center shrink-0 w-[350px] bg-card rounded-2xl p-6 border shadow-sm">
+          <div class="flex gap-1 mb-4">
+            <i data-lucide="star" class="w-4 h-4 fill-amber-400 text-amber-400"></i>
+            <i data-lucide="star" class="w-4 h-4 fill-amber-400 text-amber-400"></i>
+            <i data-lucide="star" class="w-4 h-4 fill-amber-400 text-amber-400"></i>
+            <i data-lucide="star" class="w-4 h-4 fill-amber-400 text-amber-400"></i>
+            <i data-lucide="star" class="w-4 h-4 fill-amber-400 text-amber-400"></i>
+          </div>
+          <p class="text-foreground mb-6">"Incredible value for money. The support team is responsive and the product just works."</p>
+          <div class="flex items-center gap-3">
+            <div style="width:40px;height:40px;border-radius:50%;background:linear-gradient(135deg,#f472b6,#a855f7);"></div>
+            <div>
+              <p class="font-semibold text-sm">Michael Chen</p>
+              <p class="text-xs text-muted-foreground">Founder, StartupXYZ</p>
+            </div>
+          </div>
+        </div>
+        <!-- Testimonial card 3 -->
+        <div class="snap-center shrink-0 w-[350px] bg-card rounded-2xl p-6 border shadow-sm">
+          <div class="flex gap-1 mb-4">
+            <i data-lucide="star" class="w-4 h-4 fill-amber-400 text-amber-400"></i>
+            <i data-lucide="star" class="w-4 h-4 fill-amber-400 text-amber-400"></i>
+            <i data-lucide="star" class="w-4 h-4 fill-amber-400 text-amber-400"></i>
+            <i data-lucide="star" class="w-4 h-4 fill-amber-400 text-amber-400"></i>
+            <i data-lucide="star" class="w-4 h-4 fill-amber-400 text-amber-400"></i>
+          </div>
+          <p class="text-foreground mb-6">"We've tried many solutions but this one stands out. Highly recommend to any team."</p>
+          <div class="flex items-center gap-3">
+            <div style="width:40px;height:40px;border-radius:50%;background:linear-gradient(135deg,#34d399,#0ea5e9);"></div>
+            <div>
+              <p class="font-semibold text-sm">Emily Davis</p>
+              <p class="text-xs text-muted-foreground">CTO, InnovateCo</p>
+            </div>
+          </div>
+        </div>
+        <!-- Add more cards as needed -->
+      </div>
+      <!-- Navigation arrows -->
+      <button class="absolute left-0 top-1/2 -translate-y-1/2 -translate-x-4 w-10 h-10 rounded-full bg-background border shadow-lg flex items-center justify-center hover:bg-muted transition-colors" onclick="this.parentElement.querySelector('.overflow-x-auto').scrollBy({left:-370,behavior:'smooth'})">
+        <i data-lucide="chevron-left" class="w-5 h-5"></i>
+      </button>
+      <button class="absolute right-0 top-1/2 -translate-y-1/2 translate-x-4 w-10 h-10 rounded-full bg-background border shadow-lg flex items-center justify-center hover:bg-muted transition-colors" onclick="this.parentElement.querySelector('.overflow-x-auto').scrollBy({left:370,behavior:'smooth'})">
+        <i data-lucide="chevron-right" class="w-5 h-5"></i>
+      </button>
+    </div>
+  </div>
+  <style>
+    .scrollbar-hide::-webkit-scrollbar { display: none; }
+    .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
+  </style>
+</section>`,
+  },
+
+  // === GRADIENT BORDER CARDS ===
+  {
+    id: "card-gradient-border",
+    name: "Gradient Border Card",
+    category: "features",
+    structure: `<div class="relative group">
+  <!-- Gradient border background -->
+  <div class="absolute -inset-0.5 bg-gradient-to-r from-primary via-accent to-primary rounded-2xl opacity-75 group-hover:opacity-100 blur-sm transition-all duration-500 group-hover:blur-md"></div>
+  <!-- Card content -->
+  <div class="relative bg-card rounded-xl p-6 h-full">
+    <div class="w-12 h-12 rounded-xl bg-gradient-to-br from-primary/20 to-accent/20 flex items-center justify-center mb-4">
+      <i data-lucide="sparkles" class="w-6 h-6 text-primary"></i>
+    </div>
+    <h3 class="text-xl font-semibold mb-2">Feature Title</h3>
+    <p class="text-muted-foreground">Compelling feature description that explains the value proposition clearly.</p>
+  </div>
+</div>`,
+  },
+  {
+    id: "features-gradient-grid",
+    name: "Features Grid with Gradient Borders",
+    category: "features",
+    structure: `<section id="features" class="py-20">
+  <div class="max-w-7xl mx-auto px-4">
+    <div class="text-center mb-12">
+      <span class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-primary/10 text-primary text-sm font-medium mb-4">Features</span>
+      <h2 class="text-3xl md:text-4xl font-bold mb-4">Everything you need</h2>
+      <p class="text-muted-foreground max-w-2xl mx-auto">Built for modern teams with powerful features</p>
+    </div>
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+      <!-- Card 1 -->
+      <div class="relative group">
+        <div class="absolute -inset-0.5 bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500 rounded-2xl opacity-60 group-hover:opacity-100 blur-sm transition-all duration-500"></div>
+        <div class="relative bg-card rounded-xl p-6 h-full border-0">
+          <div class="w-12 h-12 rounded-xl bg-gradient-to-br from-indigo-500/20 to-purple-500/20 flex items-center justify-center mb-4">
+            <i data-lucide="zap" class="w-6 h-6 text-indigo-500"></i>
+          </div>
+          <h3 class="text-lg font-semibold mb-2">Lightning Fast</h3>
+          <p class="text-muted-foreground text-sm">Optimized for speed with sub-second response times.</p>
+        </div>
+      </div>
+      <!-- Card 2 -->
+      <div class="relative group">
+        <div class="absolute -inset-0.5 bg-gradient-to-r from-emerald-500 via-teal-500 to-cyan-500 rounded-2xl opacity-60 group-hover:opacity-100 blur-sm transition-all duration-500"></div>
+        <div class="relative bg-card rounded-xl p-6 h-full border-0">
+          <div class="w-12 h-12 rounded-xl bg-gradient-to-br from-emerald-500/20 to-teal-500/20 flex items-center justify-center mb-4">
+            <i data-lucide="shield" class="w-6 h-6 text-emerald-500"></i>
+          </div>
+          <h3 class="text-lg font-semibold mb-2">Secure by Default</h3>
+          <p class="text-muted-foreground text-sm">Enterprise-grade security with end-to-end encryption.</p>
+        </div>
+      </div>
+      <!-- Card 3 -->
+      <div class="relative group">
+        <div class="absolute -inset-0.5 bg-gradient-to-r from-amber-500 via-orange-500 to-red-500 rounded-2xl opacity-60 group-hover:opacity-100 blur-sm transition-all duration-500"></div>
+        <div class="relative bg-card rounded-xl p-6 h-full border-0">
+          <div class="w-12 h-12 rounded-xl bg-gradient-to-br from-amber-500/20 to-orange-500/20 flex items-center justify-center mb-4">
+            <i data-lucide="users" class="w-6 h-6 text-amber-500"></i>
+          </div>
+          <h3 class="text-lg font-semibold mb-2">Team Collaboration</h3>
+          <p class="text-muted-foreground text-sm">Real-time collaboration features for your entire team.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>`,
+  },
 ];
 
 /**
