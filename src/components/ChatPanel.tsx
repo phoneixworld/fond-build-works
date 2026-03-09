@@ -1411,32 +1411,8 @@ const CONTEXT_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
         saveProject({ chat_history: persistMessages, html_content: currentProject.html_content || "" });
       };
 
-      // ─── Intent Classification: detect vague/ambiguous prompts ───
-      // For prompts that need clarification, show questions instead of building
-      {
-        const userText = typeof text === "string" ? text : getTextContent(content);
-        
-        // Only classify if not an auto-fix, not a follow-up with answers already, and not explicitly skipped
-        const isAutoFix = userText.startsWith("🔧") || userText.includes("--- Additional Requirements ---");
-        const isShort = userText.length < 15;
-        
-        if (!isAutoFix && !isShort) {
-          try {
-            const classResult = await classifyUserIntent(userText);
-            
-            if (classResult?.intent === "clarify" && classResult.questions?.length) {
-              // Stop the build — show clarifying questions instead
-              setIsLoading(false);
-              setIsBuilding(false);
-              setBuildStep("");
-              setPipelineStep(null);
-              isSendingRef.current = false;
-              if (buildSafetyTimeoutRef.current) {
-                clearTimeout(buildSafetyTimeoutRef.current);
-                buildSafetyTimeoutRef.current = null;
-              }
-              return;
-            }
+      // ─── Intent Classification already handled by handleSmartSend ───
+      // Classification is done before sendMessage is called, so we skip it here.
             
             // If classified as "chat" (not a build request), use chat agent
             if (classResult?.intent === "chat") {
