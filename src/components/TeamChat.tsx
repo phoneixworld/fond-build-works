@@ -185,7 +185,7 @@ const TeamChat = ({ onlineUsers, isOpen, onClose }: TeamChatProps) => {
                   }`}>
                     {msg.content}
                   </div>
-                  <p className="text-[9px] text-muted-foreground/50 mt-0.5">
+                  <p className="text-[10px] text-muted-foreground mt-1">
                     {new Date(msg.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
                   </p>
                 </div>
