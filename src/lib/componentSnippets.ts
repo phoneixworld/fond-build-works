@@ -350,6 +350,64 @@ export const COMPONENT_SNIPPETS: ComponentSnippet[] = [
   </div>
 </section>`,
   },
+  {
+    id: "stats-animated",
+    name: "Animated Stats Counter",
+    category: "stats",
+    structure: `<section id="stats" class="py-20 bg-gray-900 text-white relative overflow-hidden">
+  <!-- Background glow -->
+  <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:800px;height:400px;background:radial-gradient(ellipse,rgba(99,102,241,0.15),transparent 70%);"></div>
+  <div class="max-w-7xl mx-auto px-4 relative z-10">
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-8">
+      <!-- Stat card with animated counter -->
+      <div class="text-center p-6 rounded-2xl bg-white/5 backdrop-blur-sm border border-white/10">
+        <p class="text-4xl md:text-5xl font-bold bg-gradient-to-r from-indigo-400 to-purple-400 bg-clip-text text-transparent mb-2" data-counter="10000" data-suffix="+">0</p>
+        <p class="text-sm text-gray-400 uppercase tracking-wider">Active Users</p>
+      </div>
+      <div class="text-center p-6 rounded-2xl bg-white/5 backdrop-blur-sm border border-white/10">
+        <p class="text-4xl md:text-5xl font-bold bg-gradient-to-r from-emerald-400 to-cyan-400 bg-clip-text text-transparent mb-2" data-counter="99.9" data-suffix="%">0</p>
+        <p class="text-sm text-gray-400 uppercase tracking-wider">Uptime</p>
+      </div>
+      <div class="text-center p-6 rounded-2xl bg-white/5 backdrop-blur-sm border border-white/10">
+        <p class="text-4xl md:text-5xl font-bold bg-gradient-to-r from-amber-400 to-orange-400 bg-clip-text text-transparent mb-2" data-counter="150" data-suffix="M">0</p>
+        <p class="text-sm text-gray-400 uppercase tracking-wider">Requests/Day</p>
+      </div>
+      <div class="text-center p-6 rounded-2xl bg-white/5 backdrop-blur-sm border border-white/10">
+        <p class="text-4xl md:text-5xl font-bold bg-gradient-to-r from-pink-400 to-rose-400 bg-clip-text text-transparent mb-2" data-counter="4.9" data-suffix="/5">0</p>
+        <p class="text-sm text-gray-400 uppercase tracking-wider">User Rating</p>
+      </div>
+    </div>
+  </div>
+  <script>
+    // Animate counters on scroll into view
+    const counters = document.querySelectorAll('[data-counter]');
+    const observer = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          const el = entry.target;
+          const target = parseFloat(el.dataset.counter);
+          const suffix = el.dataset.suffix || '';
+          const isDecimal = target % 1 !== 0;
+          let current = 0;
+          const increment = target / 60;
+          const animate = () => {
+            current += increment;
+            if (current < target) {
+              el.textContent = (isDecimal ? current.toFixed(1) : Math.floor(current)) + suffix;
+              requestAnimationFrame(animate);
+            } else {
+              el.textContent = (isDecimal ? target.toFixed(1) : target) + suffix;
+            }
+          };
+          animate();
+          observer.unobserve(el);
+        }
+      });
+    }, { threshold: 0.5 });
+    counters.forEach(c => observer.observe(c));
+  </script>
+</section>`,
+  },
 
   // === FAQ ===
   {
