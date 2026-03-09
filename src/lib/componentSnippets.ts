@@ -8,7 +8,7 @@
 export interface ComponentSnippet {
   id: string;
   name: string;
-  category: "hero" | "features" | "pricing" | "testimonials" | "cta" | "footer" | "contact" | "stats" | "faq" | "gallery" | "team" | "navigation" | "micro-interaction" | "newsletter";
+  category: "hero" | "features" | "pricing" | "testimonials" | "cta" | "footer" | "contact" | "stats" | "faq" | "gallery" | "team" | "navigation" | "micro-interaction" | "newsletter" | "logo-cloud" | "blog" | "timeline" | "auth" | "banner" | "tabs" | "error" | "dashboard" | "progress" | "social-proof" | "cookie" | "sidebar" | "video";
   /** Compact structural description */
   structure: string;
 }
