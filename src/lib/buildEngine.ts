@@ -458,6 +458,21 @@ function findUndefinedJSXReferences(
     localNames.add(m[1]);
   }
   
+  // Destructured renames: { icon: Icon, foo: Bar } — common pattern in .map() callbacks
+  const destructureRenameRegex = /\w+\s*:\s*([A-Z]\w+)/g;
+  while ((m = destructureRenameRegex.exec(code)) !== null) {
+    localNames.add(m[1]);
+  }
+  
+  // Arrow/function parameters with PascalCase (e.g., ({ Icon }) => ...)
+  const paramRegex = /\(\s*\{([^}]+)\}\s*\)/g;
+  while ((m = paramRegex.exec(code)) !== null) {
+    m[1].split(",").forEach(p => {
+      const name = p.trim().split(/\s*:\s*/).pop()?.trim();
+      if (name && /^[A-Z]/.test(name)) localNames.add(name);
+    });
+  }
+  
   // Built-in HTML-like React components to skip
   const builtins = new Set(["React", "Fragment", "Suspense", "StrictMode"]);
   
