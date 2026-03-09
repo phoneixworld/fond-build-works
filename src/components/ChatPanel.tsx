@@ -1458,7 +1458,7 @@ const CONTEXT_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
         // ─── INSTANT PATH: Pre-built templates render in <1 second ───
         // When a template matched and we have a pre-built instant template,
         // render it immediately, then fire an AI polish pass in the background.
-        const isSimpleBuild = isFirstBuild && !!template && !userText.toLowerCase().includes("dashboard") && !userText.toLowerCase().includes("crud") && !userText.toLowerCase().includes("admin");
+        const isSimpleBuild = isFirstBuild && !!template;
         
         if (isSimpleBuild) {
           const { findInstantTemplate, hydrateTemplate } = await import("@/lib/instantTemplates");

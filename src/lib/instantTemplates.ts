@@ -550,8 +550,24 @@ export default function Home() {
   },
 };
 
+// ─── Import additional templates ───
+import { ECOMMERCE } from "./instantTemplates/ecommerce";
+import { BLOG } from "./instantTemplates/blog";
+import { DASHBOARD } from "./instantTemplates/dashboard";
+import { CHAT_APP } from "./instantTemplates/chatApp";
+import { CRM } from "./instantTemplates/crm";
+import { PROJECT_MGMT } from "./instantTemplates/projectMgmt";
+import { TODO } from "./instantTemplates/todo";
+
 // ─── All instant templates ───
 export const INSTANT_TEMPLATES: InstantTemplate[] = [
   SAAS_LANDING,
   PORTFOLIO,
+  ECOMMERCE,
+  BLOG,
+  DASHBOARD,
+  CHAT_APP,
+  CRM,
+  PROJECT_MGMT,
+  TODO,
 ];
