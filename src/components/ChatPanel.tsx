@@ -1120,6 +1120,7 @@ const CONTEXT_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
               onError: (err) => {
                 console.error("[ChatPanel:retry] Retry failed:", err);
                 setSandpackFiles(reactResult.files!);
+                syncSandpackToVirtualFS(reactResult.files!);
                 if (Object.keys(reactResult.deps).length > 0) setSandpackDeps(reactResult.deps);
                 setPreviewMode("sandpack");
                 setIsLoading(false);
