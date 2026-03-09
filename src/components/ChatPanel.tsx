@@ -527,7 +527,45 @@ const ChatPanel = forwardRef<ChatPanelHandle, { initialPrompt?: string; onVersio
   const sandpackFilesRef = useRef<Record<string, string> | null>(null);
   sandpackFilesRef.current = currentSandpackFiles;
 
-  // Convert sandpack files (Record<string, string>) to VirtualFile format and sync to VirtualFS
+  // Undo/Redo system
+  const { createCheckpoint, undo, redo, canUndo, canRedo } = useUndoRedo();
+
+  // Listen for refactor actions from CodeEditor
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const detail = (e as CustomEvent).detail;
+      if (detail?.prompt) {
+        handleSmartSend(detail.prompt);
+      }
+    };
+    window.addEventListener("refactor-action", handler);
+    return () => window.removeEventListener("refactor-action", handler);
+  }, []);
+
+  const handleUndo = useCallback(() => {
+    const checkpoint = undo();
+    if (!checkpoint) return;
+    if (checkpoint.sandpackFiles) {
+      setSandpackFiles(checkpoint.sandpackFiles);
+      setPreviewMode("react");
+    } else {
+      setPreviewHtml(checkpoint.html);
+      setPreviewMode("html");
+    }
+  }, [undo, setSandpackFiles, setPreviewHtml, setPreviewMode]);
+
+  const handleRedo = useCallback(() => {
+    const checkpoint = redo();
+    if (!checkpoint) return;
+    if (checkpoint.sandpackFiles) {
+      setSandpackFiles(checkpoint.sandpackFiles);
+      setPreviewMode("react");
+    } else {
+      setPreviewHtml(checkpoint.html);
+      setPreviewMode("html");
+    }
+  }, [redo, setSandpackFiles, setPreviewHtml, setPreviewMode]);
+
   const syncSandpackToVirtualFS = useCallback((sandpackFiles: Record<string, string>) => {
     const virtualFiles: Record<string, { path: string; content: string; language: string }> = {};
     for (const [path, content] of Object.entries(sandpackFiles)) {
