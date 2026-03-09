@@ -371,7 +371,7 @@ const PreviewPanel = () => {
         </AnimatePresence>
 
         {/* Preview content */}
-        <div className="flex-1 relative flex items-stretch justify-center overflow-auto bg-background min-h-0">
+        <div className="flex-1 relative flex flex-col overflow-hidden bg-background min-h-0">
           {/* Building skeleton overlay */}
           <AnimatePresence>
             {isBuilding && !hasContent && (
