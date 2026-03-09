@@ -1977,6 +1977,7 @@ const CONTEXT_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
           <AnimatePresence>
             {followUpQuestions.length > 0 && (
               <ClarifyingQuestions
+                key="clarify-questions-stable"
                 questions={followUpQuestions.map((q: any) => ({
                   id: q.id,
                   header: q.header || q.id,
