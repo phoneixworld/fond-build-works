@@ -1556,18 +1556,20 @@ const CONTEXT_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
             setBuildStreamContent(prev => prev + chunk);
           },
           onFilesReady: (files, deps) => {
+            // FIX: Guard against project switch during build
+            if (lastProjectIdRef.current !== buildProjectId) return;
             setSandpackFiles(files);
             syncSandpackToVirtualFS(files);
             if (Object.keys(deps).length > 0) setSandpackDeps(deps);
             setPreviewMode("sandpack");
             
             // Persist incrementally during build so navigation away doesn't lose progress
-            if (currentProject && Object.keys(files).length > 0) {
+            if (Object.keys(files).length > 0) {
               const payload = { files, deps: deps || {} };
               supabase
                 .from("project_data")
                 .upsert(
-                  { project_id: currentProject.id, collection: "sandpack_state", data: payload as any },
+                  { project_id: buildProjectId, collection: "sandpack_state", data: payload as any },
                   { onConflict: "project_id,collection" }
                 )
                 .then(({ error }) => {
