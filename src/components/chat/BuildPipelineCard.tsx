@@ -117,7 +117,7 @@ function detectTasks(content: string, isBuilding: boolean, pipelineStep?: Pipeli
   return tasks;
 }
 
-const StatusIndicator = ({ status }: { status: TaskItem["status"] }) => {
+const StatusIndicator = React.forwardRef<HTMLDivElement, { status: TaskItem["status"] }>(({ status }, ref) => {
   switch (status) {
     case "done":
       return (
