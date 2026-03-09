@@ -55,7 +55,8 @@ const AUTH_HEADER = `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`;
 export async function classifyIntent(
   prompt: string,
   hasHistory: boolean,
-  hasExistingCode: boolean
+  hasExistingCode: boolean,
+  existingFileNames?: string[]
 ): Promise<ClassifyResult> {
   try {
     const resp = await fetch(`${BASE_URL}/functions/v1/classify-intent`, {
@@ -64,7 +65,7 @@ export async function classifyIntent(
         "Content-Type": "application/json",
         Authorization: AUTH_HEADER,
       },
-      body: JSON.stringify({ prompt, hasHistory, hasExistingCode }),
+      body: JSON.stringify({ prompt, hasHistory, hasExistingCode, existingFileNames }),
     });
 
     if (!resp.ok) {
