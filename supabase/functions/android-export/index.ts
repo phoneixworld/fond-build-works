@@ -397,7 +397,7 @@ function generateProguardRules(): string {
 function generateReadme(config: AndroidConfig, publishedUrl: string): string {
   return `# ${config.appName} — Android App
 
-This is an auto-generated Android WebView wrapper for your Phoenix web app.
+This is an auto-generated Android WebView wrapper for your Phoneix web app.
 
 ## App Details
 - **Package ID:** ${config.packageId}

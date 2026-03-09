@@ -2531,7 +2531,7 @@ ${Object.entries(files).map(([path, code]) => `--- ${path}\n${code}`).join("\n\n
                   <Sparkles className="w-3.5 h-3.5 text-primary-foreground" />
                 </div>
                 <div className="flex flex-col gap-1.5 pt-0.5">
-                  <span className="text-xs font-semibold text-foreground/80">Phoenix is thinking...</span>
+                  <span className="text-xs font-semibold text-foreground/80">Phoneix is thinking...</span>
                   <div className="flex items-center gap-1.5">
                     <motion.span
                       animate={{ scale: [1, 1.3, 1], opacity: [0.4, 1, 0.4] }}

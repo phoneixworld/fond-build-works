@@ -337,7 +337,7 @@ const LandingPage = ({ onStartProject, onOpenProject }: LandingPageProps) => {
             <motion.div initial="hidden" whileInView="visible" viewport={{ once: true, margin: "-80px" }} variants={stagger} className="max-w-5xl mx-auto relative z-10">
               <motion.div variants={fadeUp} className="text-center mb-14">
                 <p className="text-xs font-semibold uppercase tracking-widest text-[hsl(var(--ide-warning))] mb-2">What No One Else Offers</p>
-                <h2 className="text-3xl md:text-4xl font-bold text-foreground">Features that set Phoenix apart</h2>
+                <h2 className="text-3xl md:text-4xl font-bold text-foreground">Features that set Phoneix apart</h2>
                 <p className="text-muted-foreground text-base mt-3 max-w-lg mx-auto">
                   Real collaboration, real environments, real mobile export. Not marketing fluff.
                 </p>

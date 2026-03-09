@@ -486,12 +486,12 @@ const ChatMessage = ({ content, role, timestamp, isLoading, onEdit, onRegenerate
       ) : (
         /* Assistant messages */
         <div className="flex flex-col gap-0">
-          {/* Phoenix label */}
+           {/* Phoneix label */}
           <div className="flex items-center gap-2 mb-2">
             <div className="w-6 h-6 rounded-lg bg-gradient-to-br from-primary to-accent flex items-center justify-center shadow-sm">
               <Sparkles className="w-3.5 h-3.5 text-primary-foreground" />
             </div>
-            <span className="text-xs font-semibold text-foreground/80 tracking-wide">Phoenix says</span>
+            <span className="text-xs font-semibold text-foreground/80 tracking-wide">Phoneix says</span>
           </div>
           {/* Content */}
           <div className="min-w-0 pl-8">

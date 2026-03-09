@@ -260,7 +260,7 @@ const WhiteLabelPanel = () => {
                 </div>
                 <div className="flex items-center gap-3 p-2 bg-background rounded-lg">
                   <span className="text-muted-foreground w-12">Value</span>
-                  <span className="font-mono font-medium">cname.phoenix.world</span>
+                  <span className="font-mono font-medium">cname.phoneix.world</span>
                 </div>
               </div>
             </div>

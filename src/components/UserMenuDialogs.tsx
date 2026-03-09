@@ -203,7 +203,7 @@ const UserMenuDialogs = ({ open, onOpenChange }: UserMenuDialogsProps) => {
 
           <Separator className="my-2" />
           <div className="text-center">
-            <p className="text-[10px] text-muted-foreground">Phoenix Builder v2.0 · Made with ⚡</p>
+            <p className="text-[10px] text-muted-foreground">Phoneix Builder v2.0 · Made with ⚡</p>
           </div>
         </DialogContent>
       </Dialog>

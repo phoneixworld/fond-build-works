@@ -81,7 +81,7 @@ const AndroidExport = () => {
   const [config, setConfig] = useState<AndroidConfig>({
     ...DEFAULT_CONFIG,
     appName: currentProject?.name || "My App",
-    packageId: `com.phoenix.${(currentProject?.name || "app").replace(/[^a-zA-Z0-9]/g, "").toLowerCase()}`,
+    packageId: `com.phoneix.${(currentProject?.name || "app").replace(/[^a-zA-Z0-9]/g, "").toLowerCase()}`,
   });
   const [currentStep, setCurrentStep] = useState<StepId>("config");
   const [generating, setGenerating] = useState(false);
