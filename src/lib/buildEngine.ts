@@ -38,6 +38,7 @@ import {
 import { buildIncrementalContext, contextReductionRatio } from "@/lib/incrementalContext";
 import { applyAdaptiveSplitting } from "@/lib/adaptiveTaskSplitter";
 import { persistTaskOutput, getPersistedTaskOutput } from "@/lib/persistentCache";
+import { DESIGN_SYSTEM_CSS, lintDesignTokens } from "@/lib/designSystem";
 
 // ─── Base Template (mandatory scaffold for all new builds) ────────────────
 //
