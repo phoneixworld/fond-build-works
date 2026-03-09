@@ -94,6 +94,50 @@ Generate a SINGLE complete index.html inside a \`\`\`html-preview code fence.`;
 - NEVER use \`require()\` — use ES6 imports only
 - NEVER import from packages not in the allowed list above
 
+## COMMON MISTAKES TO AVOID — CORRECTION EXAMPLES
+
+❌ WRONG - Bracket notation in JSX:
+{items.map((item, i) => <arr[i].icon className="w-6 h-6" />)}
+
+✅ CORRECT - Assign to variable first:
+{items.map((item, i) => {
+  const IconComponent = arr[i].icon;
+  return <IconComponent className="w-6 h-6" />;
+})}
+
+❌ WRONG - Missing default export in App.jsx:
+export function App() { return <div>Hello</div>; }
+
+✅ CORRECT - Always use default export:
+export default function App() { return <div>Hello</div>; }
+
+❌ WRONG - Unclosed JSX tags:
+<div className="container">
+  <h1>Title
+  <p>Text</p>
+
+✅ CORRECT - All tags properly closed:
+<div className="container">
+  <h1>Title</h1>
+  <p>Text</p>
+</div>
+
+❌ WRONG - External image URLs:
+<img src="https://example.com/image.jpg" alt="Hero" />
+
+✅ CORRECT - Use gradients or icons:
+<div className="w-64 h-64 rounded-lg bg-gradient-to-br from-blue-400 to-purple-600" />
+{/* OR */}
+<Image className="w-64 h-64" />
+
+❌ WRONG - Importing unavailable packages:
+import axios from "axios";
+import _ from "lodash";
+
+✅ CORRECT - Use native fetch and built-in methods:
+const response = await fetch(url);
+const data = await response.json();
+
 ## ERROR HANDLING — MANDATORY
 - ALL fetch calls wrapped in try/catch with user-visible error states
 - Loading states for ALL async operations (skeleton UI, not just spinners)
@@ -229,12 +273,32 @@ serve(async (req) => {
       systemPrompt += `\n\n## COMPONENT BLUEPRINTS\n${snippets_context}`;
     }
 
-    // Retry context — when previous build had validation errors
+    // Enhanced retry context with specific error details
     if (retry_context) {
-      systemPrompt += `\n\n## ⚠️ RETRY — PREVIOUS BUILD FAILED VALIDATION\nThe previous code output had these errors. You MUST fix ALL of them:\n${retry_context}\n\nDo NOT repeat the same mistakes. Ensure:\n- /App.jsx exists with a default export\n- All JSX tags are properly closed\n- No bracket notation in JSX (<arr[i].icon /> is INVALID)\n- All imports are from allowed packages only\n- Every component file has a default export`;
+      systemPrompt += `\n\n## ⚠️ RETRY — PREVIOUS BUILD FAILED VALIDATION
+      
+${retry_context}
+
+CRITICAL FIXES REQUIRED:
+1. Ensure /App.jsx exists with 'export default function App()'
+2. Close ALL JSX tags properly (every <tag> needs </tag> or self-close with />)
+3. NEVER use bracket notation in JSX - assign to variable first
+4. Use only ES6 imports (no require())
+5. Import only from allowed packages
+6. Every component file needs a default export
+
+Review the error details above carefully and fix ALL issues. Do not repeat the same mistakes.`;
     }
 
     const selectedModel = model || "google/gemini-2.5-pro";
+    
+    // Smart temperature based on context
+    let temperature = 0.3; // Default for code generation (consistent, focused)
+    if (retry_context) {
+      temperature = 0.2; // Even lower on retry for maximum determinism
+    } else if (current_code) {
+      temperature = 0.25; // Slightly lower when modifying existing code
+    }
 
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
@@ -249,7 +313,7 @@ serve(async (req) => {
           ...messages,
         ],
         stream: true,
-        temperature: retry_context ? 0.4 : 0.7, // Lower temperature on retry for more deterministic output
+        temperature,
         max_tokens: 32000,
       }),
     });
