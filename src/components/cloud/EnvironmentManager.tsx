@@ -325,7 +325,7 @@ const EnvironmentManager = () => {
                 </div>
 
                 {/* Promote button */}
-                {nextEnv && hasSnapshot && (
+                {nextEnv && (
                   <div className="mt-3 pt-3 border-t border-border/50">
                     {confirmPromote?.from === envConfig.name && confirmPromote?.to === nextEnv.name ? (
                       <div className="space-y-2">
