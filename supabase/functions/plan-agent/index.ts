@@ -9,9 +9,29 @@ serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
-    const { prompt, existingFiles, techStack, schemas, knowledge } = await req.json();
+    const { prompt, existingFiles, techStack, schemas, knowledge, domainModel } = await req.json();
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY not configured");
+
+    // Build domain model context if available
+    const domainContext = domainModel ? `
+## DOMAIN MODEL (from Requirements Agent)
+Template: ${domainModel.templateName}
+Auth Required: ${domainModel.requiresAuth}
+Entities: ${domainModel.entities?.map((e: any) => `${e.name} (${e.fields?.length || 0} fields)`).join(", ")}
+Pages: ${domainModel.suggestedPages?.map((p: any) => `${p.path} (${p.type})`).join(", ")}
+Navigation: ${domainModel.suggestedNavItems?.map((n: any) => n.label).join(", ")}
+
+### ENTITY DETAILS
+${domainModel.entities?.map((e: any) => {
+  const fields = e.fields?.map((f: any) => `  - ${f.name}: ${f.type}${f.required ? ' (required)' : ''}${f.options ? ` [${f.options.join(',')}]` : ''}`).join('\n') || '';
+  const rels = e.relationships?.map((r: any) => `  - ${r.type} ${r.target}`).join('\n') || '';
+  return `#### ${e.name} (collection: "${e.pluralName}", seed: ${e.seedCount || 0} records)
+Fields:
+${fields}
+${rels ? `Relationships:\n${rels}` : ''}`;
+}).join('\n\n') || 'No entities defined'}
+` : "";
 
     const systemPrompt = `You are a Planning Agent for an AI web app builder. Your job is to break down complex feature requests into a sequenced build plan.
 
@@ -21,6 +41,19 @@ serve(async (req) => {
 - Estimate complexity and suggest the optimal build order
 - Flag potential risks or decisions needed
 
+## TASK TYPES — CRITICAL
+Each task MUST have a \`taskType\` field with one of:
+- "schema": Creates data layer files (mock data, hooks, contexts for data access)
+- "backend": Creates API integration, auth context, data persistence hooks
+- "frontend": Creates UI pages and components
+
+## TASK ORDERING — CRITICAL  
+Tasks MUST be ordered: schema → backend → frontend
+- Schema tasks have NO dependencies (they come first)
+- Backend tasks depend on schema tasks
+- Frontend tasks depend on backend tasks (so they can import data hooks)
+${domainContext ? `\n## DOMAIN MODEL AVAILABLE\nA Requirements Agent has already analyzed this request and produced a structured domain model. Use it to generate precise tasks.\n${domainContext}` : ''}
+
 ## OUTPUT FORMAT
 Use the create_plan tool to return a structured plan.
 
@@ -28,24 +61,28 @@ Use the create_plan tool to return a structured plan.
 - Each task should be independently buildable and testable
 - Tasks should be small enough to complete in one AI build step
 - Include file paths that will be created/modified using PROPER NESTED structure:
-  - /App.jsx, /layout/AppLayout.jsx, /layout/Sidebar.jsx
+  - /App.jsx, /layout/AppLayout.jsx, /layout/Sidebar.jsx or /layout/Navbar.jsx
   - /pages/Dashboard/Dashboard.jsx, /pages/Students/StudentList.jsx
   - /components/ui/Card.jsx, /components/ui/Modal.jsx
-  - /hooks/useFetch.js, /hooks/useAuth.js
+  - /data/products.js, /data/mockData.js (for schema tasks)
+  - /hooks/useProducts.js, /hooks/useCart.js (for backend tasks)
+  - /contexts/CartContext.jsx, /contexts/AuthContext.jsx (for backend tasks)
   - /styles/globals.css
+- ALWAYS create schema tasks that generate:
+  - /data/<entity>.js files with mock data arrays
+  - /hooks/use<Entity>.js custom hooks for CRUD operations
+- ALWAYS create backend tasks that generate:
+  - Context providers for state management (CartContext, AuthContext, etc.)
+  - API integration hooks that can switch between mock and real data
 - Mark tasks that need user input or decisions
 - Consider the existing codebase context
 - Group related tasks logically
-- ALWAYS include a "backend" category task for apps that need data persistence
-  - This task should define the collections/tables needed and how the Data API will be used
-  - Include auth setup if the app needs user accounts
 
 ## CRITICAL — NO PLACEHOLDERS
 - NEVER create tasks that produce "Coming Soon", "Under Construction", or placeholder pages
 - Every task MUST produce a FUNCTIONAL page/component — not a stub
-- If a feature is complex, the task should build an MVP version, not a placeholder
+- If a module is in the navigation, it MUST have a fully implemented page
 - Each task's buildPrompt MUST explicitly say: "Build a FULLY FUNCTIONAL page, NOT a placeholder"
-- If you can't fit all features in the task budget, prioritize and build fewer features fully rather than many placeholders
 
 ## COMPLEXITY LEVELS
 - "trivial": Single component change, CSS tweak (1 build step)
@@ -55,11 +92,10 @@ Use the create_plan tool to return a structured plan.
 
 ## TASK STRUCTURE PATTERN FOR APPS
 For a typical app, create tasks in this order:
-1. Layout + Navigation (layout/AppLayout.jsx, layout/Sidebar.jsx)
-2. Dashboard/Home page (pages/Dashboard/)
-3. Feature modules (pages/Students/, pages/Fees/, etc.) - one task per module, each FULLY FUNCTIONAL
-4. Shared UI components (components/ui/) - if not covered by above
-5. Backend integration (hooks for data fetching, auth context)
+1. **Schema tasks** (taskType: "schema"): Create /data/ files with mock data + /hooks/ for data access
+2. **Backend tasks** (taskType: "backend"): Create contexts (Cart, Auth, Toast) and API integration hooks
+3. **Layout task** (taskType: "frontend"): Layout + Navigation (layout/AppLayout.jsx, layout/Navbar.jsx or layout/Sidebar.jsx)
+4. **Page tasks** (taskType: "frontend"): Feature pages that IMPORT from hooks/data created in steps 1-2
 Each task's buildPrompt MUST instruct the agent to use the nested file structure.
 Each task's buildPrompt MUST instruct: "Build a complete, working page — NEVER output a ComingSoon or placeholder component."
 
