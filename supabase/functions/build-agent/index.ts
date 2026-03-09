@@ -187,13 +187,19 @@ Before generating code, mentally perform this analysis:
 6. **Indian/regional context**: if user mentions India, use ₹ currency, Indian phone formats, state names, CBSE/ICSE boards, etc.
 
 Example: "School ERP with student management, fees, timetable" should produce:
-- /App.jsx with router + sidebar navigation
-- /components/Sidebar.jsx with icons for each module
-- /components/Dashboard.jsx with KPI cards, charts, recent activity
-- /components/StudentManagement.jsx with full CRUD table, search, filters, add/edit modal
-- /components/FeeManagement.jsx with fee collection, receipts, pending list
-- /components/Timetable.jsx with weekly grid view, period management
-- At minimum 8-15 component files for a comprehensive app
+- /App.jsx with HashRouter + nested Route layout
+- /layout/AppLayout.jsx with sidebar + Outlet
+- /layout/Sidebar.jsx with icons for each module + NavLink active states
+- /pages/Dashboard/Dashboard.jsx with KPI cards, charts, recent activity
+- /pages/Students/StudentList.jsx with full CRUD table, search, filters, add/edit modal
+- /pages/Students/StudentDetails.jsx with detailed student profile view
+- /pages/Fees/FeeManager.jsx with fee collection, receipts, pending list
+- /pages/Fees/FeeHistory.jsx with payment history table
+- /pages/Timetable/Timetable.jsx with weekly grid view, period management
+- /components/ui/Card.jsx, Modal.jsx, DataTable.jsx, Badge.jsx — shared UI
+- /hooks/useFetch.js — reusable data fetching hook
+- /styles/globals.css — global styles with Google Fonts
+- At minimum 12-20 component files for a comprehensive app
 
 ## COMMON MISTAKES TO AVOID
 
