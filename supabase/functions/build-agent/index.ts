@@ -151,11 +151,16 @@ FORMAT RULES:
 
 CRITICAL STRUCTURE RULES:
 - Each page gets its OWN folder under /pages/ (e.g., /pages/Dashboard/, /pages/Students/)
-- Reusable UI components go in /components/ui/
-- Layout components go in /layout/
-- Custom hooks go in /hooks/
-- Styles go in /styles/
-- NEVER put all components flat in /components/ — use proper folder nesting
+- Reusable UI components go in /components/ui/ (Card, Button, Modal, DataTable, Toast, Badge, Spinner)
+- Domain-specific sub-components go in /components/ (e.g., /components/OrderStatusChart.jsx)
+- Layout components go in /layout/ ONLY (AppLayout, Sidebar, Navbar)
+- Custom hooks go in /hooks/ (useFetch, useAuth, useApi)
+- Data contexts go in /contexts/ ONLY for state management (AuthContext, DataContext) — NEVER for UI components
+- Styles go in /styles/ (globals.css)
+- NEVER put charts, widgets, or sub-components inside /pages/ folders — they go in /components/
+- NEVER create ToastContext — build a simple Toast component in /components/ui/Toast.jsx
+- NEVER put all components flat in /components/ — use /components/ui/ for generic UI
+- /pages/Module/ folders should ONLY contain page-level files (e.g., Dashboard.jsx, StudentList.jsx)
 - Minimum 10-15 files for simple apps, 15-25 for complex apps` : `## OUTPUT FORMAT
 Generate a SINGLE complete index.html inside a \`\`\`html-preview code fence.`;
 

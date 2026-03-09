@@ -476,6 +476,124 @@ function findUndefinedJSXReferences(
   return [...undefinedRefs];
 }
 
+/**
+ * Enforce mandatory folder structure by relocating misplaced files.
+ * Rules:
+ * - Non-page components inside /pages/X/ → move to /components/ or /components/ui/
+ * - Toast/context providers → /contexts/ only for data, /components/ui/ for UI
+ * - Charts, widgets inside /pages/ → move to /components/
+ * - Flat /pages/X.jsx → /pages/X/X.jsx
+ */
+function enforceFileStructure(files: Record<string, string>): Record<string, string> {
+  const result: Record<string, string> = {};
+  
+  // Known page-level suffixes (these stay in /pages/)
+  const pagePatterns = /(?:Page|List|Detail|Details|Manager|View|Form|Editor|Settings|Profile|History)\.jsx?$/;
+  
+  for (const [path, code] of Object.entries(files)) {
+    let newPath = path;
+    
+    // Rule 1: Flat /pages/X.jsx → /pages/X/X.jsx (already handled in parser, but double-check)
+    const flatPageMatch = newPath.match(/^\/pages\/([A-Z]\w+)\.(jsx?|tsx?)$/);
+    if (flatPageMatch) {
+      newPath = `/pages/${flatPageMatch[1]}/${flatPageMatch[1]}.${flatPageMatch[2]}`;
+    }
+    
+    // Rule 2: Non-page component inside /pages/Module/Component.jsx
+    // e.g., /pages/Dashboard/OrderStatusChart.jsx → /components/OrderStatusChart.jsx
+    const nestedPageFileMatch = newPath.match(/^\/pages\/([A-Z]\w+)\/([A-Z]\w+)\.(jsx?|tsx?)$/);
+    if (nestedPageFileMatch) {
+      const [, moduleName, fileName, ext] = nestedPageFileMatch;
+      const isMainPage = fileName === moduleName || pagePatterns.test(`${fileName}.${ext}`);
+      if (!isMainPage) {
+        // It's a widget/chart/sub-component — move to /components/
+        newPath = `/components/${fileName}.${ext}`;
+        // Update imports in the code that reference this file with relative path
+        // Also update other files that import from the old path
+      }
+    }
+    
+    // Rule 3: ToastContext.jsx / toast provider → /components/ui/Toast.jsx
+    if (newPath.match(/\/contexts\/Toast/i) && code.includes("toast")) {
+      newPath = `/components/ui/Toast.jsx`;
+    }
+    
+    // Rule 4: Loose components in /components/X.jsx (not in /ui/) — leave as-is for now
+    // The prompt already says /components/ui/ but we don't force-move since some 
+    // domain-specific components (e.g., OrderCard.jsx) are fine at /components/ level
+    
+    result[newPath] = code;
+  }
+  
+  // Fix cross-file imports for any relocated files
+  return fixRelocatedImports(files, result);
+}
+
+/**
+ * After relocating files, fix import paths in all files that referenced old paths.
+ */
+function fixRelocatedImports(
+  originalFiles: Record<string, string>,
+  relocatedFiles: Record<string, string>
+): Record<string, string> {
+  // Build a map of old path → new path
+  const pathMap = new Map<string, string>();
+  const origPaths = Object.keys(originalFiles);
+  const newPaths = Object.keys(relocatedFiles);
+  
+  for (let i = 0; i < origPaths.length; i++) {
+    if (origPaths[i] !== newPaths[i]) {
+      // Map old import path (without extension) to new import path
+      const oldImport = origPaths[i].replace(/\.(jsx?|tsx?)$/, "");
+      const newImport = newPaths[i].replace(/\.(jsx?|tsx?)$/, "");
+      pathMap.set(oldImport, newImport);
+    }
+  }
+  
+  if (pathMap.size === 0) return relocatedFiles;
+  
+  const result: Record<string, string> = {};
+  for (const [path, code] of Object.entries(relocatedFiles)) {
+    let fixedCode = code;
+    for (const [oldImport, newImport] of pathMap) {
+      // Replace relative imports — convert to path relative from current file
+      const oldRelative = makeRelative(path, oldImport);
+      const newRelative = makeRelative(path, newImport);
+      fixedCode = fixedCode.replace(
+        new RegExp(`(from\\s+["'])${escapeRegex(oldRelative)}(["'])`, "g"),
+        `$1${newRelative}$2`
+      );
+      // Also try the bare old path form
+      fixedCode = fixedCode.replace(
+        new RegExp(`(from\\s+["'])\\.${escapeRegex(oldImport)}(["'])`, "g"),
+        `$1.${newImport}$2`
+      );
+    }
+    result[path] = fixedCode;
+  }
+  
+  return result;
+}
+
+function makeRelative(fromPath: string, toPath: string): string {
+  const fromParts = fromPath.split("/").slice(0, -1); // directory
+  const toParts = toPath.split("/");
+  
+  // Find common prefix
+  let common = 0;
+  while (common < fromParts.length && common < toParts.length && fromParts[common] === toParts[common]) {
+    common++;
+  }
+  
+  const ups = fromParts.length - common;
+  const rel = ups > 0 ? "../".repeat(ups) + toParts.slice(common).join("/") : "./" + toParts.slice(common).join("/");
+  return rel;
+}
+
+function escapeRegex(s: string): string {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
 function makeStub(filePath: string): string {
   const componentName = filePath
     .replace(/.*\//, '')
@@ -600,9 +718,12 @@ function parseReactFilesFromOutput(text: string): {
     files["/App.jsx"] = block.trim();
   }
 
+  // Enforce mandatory folder structure (relocate misplaced files)
+  const structuredFiles = Object.keys(files).length > 0 ? enforceFileStructure(files) : files;
+
   return {
     chatText,
-    files: Object.keys(files).length > 0 ? files : null,
+    files: Object.keys(structuredFiles).length > 0 ? structuredFiles : null,
     deps,
   };
 }
