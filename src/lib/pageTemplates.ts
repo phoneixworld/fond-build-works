@@ -23,7 +23,7 @@ export const PAGE_TEMPLATES: PageTemplate[] = [
     emoji: "🚀",
     category: "landing",
     description: "Modern SaaS product landing with hero, features, pricing, testimonials, and CTA",
-    keywords: ["saas", "landing", "product", "startup", "app", "software", "platform", "tool", "service"],
+    keywords: ["saas", "landing", "product", "startup", "app", "software", "platform", "tool", "service", "website", "site", "web", "hero", "simple", "page", "homepage", "static", "build", "company", "business"],
     blueprint: `STRUCTURE: Sticky nav → Hero (badge + h1 + subtitle + 2 CTAs) → Logo bar → Features grid (3 cols, icon cards) → How it works (3 steps) → Testimonials (3 cards) → Pricing (3 tiers, middle highlighted) → FAQ accordion → CTA banner (dark bg) → Footer
 DESIGN: Gradient blob behind hero. Primary color for CTAs. Cards with hover lift. Pricing cards with ring-2 on popular tier. Stats counter in hero or after logo bar.
 SECTIONS: #hero, #features, #how-it-works, #testimonials, #pricing, #faq, #cta, #footer

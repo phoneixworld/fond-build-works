@@ -1460,12 +1460,15 @@ const CONTEXT_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
         // render it immediately, then fire an AI polish pass in the background.
         const isSimpleBuild = isFirstBuild && !!template;
         
-        if (isSimpleBuild) {
+        if (isSimpleBuild || isFirstBuild) {
           const { findInstantTemplate, hydrateTemplate } = await import("@/lib/instantTemplates");
-          const instantTemplate = findInstantTemplate(template.id);
+          // If no template matched, default to saas-landing for any first build
+          const templateId = template?.id || "saas-landing";
+          const templateName = template?.name || "Landing Page";
+          const instantTemplate = findInstantTemplate(templateId);
           
           if (instantTemplate) {
-            console.log(`[ChatPanel] ⚡ INSTANT PATH: Rendering "${template.name}" in <1s`);
+            console.log(`[ChatPanel] ⚡ INSTANT PATH: Rendering "${templateName}" in <1s`);
             setBuildStep("⚡ Instant preview loading...");
             setPipelineStep("bundling");
             
@@ -1482,7 +1485,7 @@ const CONTEXT_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
             
             // Show success message immediately
             const fileCount = Object.keys(files).length;
-            const instantMsg = `⚡ **Instant Preview** — ${fileCount} files rendered in under 1 second!\n\nYour ${template.name} is ready. I'm now polishing the content based on your prompt...`;
+            const instantMsg = `⚡ **Instant Preview** — ${fileCount} files rendered in under 1 second!\n\nYour ${templateName} is ready. I'm now polishing the content based on your prompt...`;
             setMessages((prev) => {
               const last = prev[prev.length - 1];
               if (last?.role === "assistant") {
@@ -1508,7 +1511,7 @@ const CONTEXT_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
             setPipelineStep("generating");
             
             const polishContext = `## INSTANT TEMPLATE LOADED
-The user already sees a live preview of a ${template.name} template. Your job is to CUSTOMIZE the existing template files with the user's specific content, branding, and requirements.
+The user already sees a live preview of a ${templateName} template. Your job is to CUSTOMIZE the existing template files with the user's specific content, branding, and requirements.
 
 ## USER REQUEST
 "${userText}"
@@ -1587,7 +1590,7 @@ ${Object.entries(files).map(([path, code]) => `--- ${path}\n${code}`).join("\n\n
                     )
                     .then(({ error }) => { if (error) console.warn("Polish persist error:", error); });
                   
-                  const polishedMsg = reactResult.chatText || `✅ **${template.name} customized!** Your site is ready with personalized content.`;
+                  const polishedMsg = reactResult.chatText || `✅ **${templateName} customized!** Your site is ready with personalized content.`;
                   setMessages((prev) => {
                     const last = prev[prev.length - 1];
                     if (last?.role === "assistant") {
@@ -1599,7 +1602,7 @@ ${Object.entries(files).map(([path, code]) => `--- ${path}\n${code}`).join("\n\n
                   // Polish didn't produce files — keep the instant template (it's already good)
                   setMessages((prev) => {
                     const last = prev[prev.length - 1];
-                    const msg = `✅ **${template.name} is ready!** Your site is live with all sections.`;
+                    const msg = `✅ **${templateName} is ready!** Your site is live with all sections.`;
                     if (last?.role === "assistant") {
                       return prev.map((m, i) => (i === prev.length - 1 ? { ...m, content: msg } : m));
                     }
@@ -1627,7 +1630,7 @@ ${Object.entries(files).map(([path, code]) => `--- ${path}\n${code}`).join("\n\n
                 console.warn("[ChatPanel] Polish pass failed, keeping instant template:", err);
                 setMessages((prev) => {
                   const last = prev[prev.length - 1];
-                  const msg = `✅ **${template.name} is ready!** (AI customization skipped — your template is still fully functional)`;
+                  const msg = `✅ **${templateName} is ready!** (AI customization skipped — your template is still fully functional)`;
                   if (last?.role === "assistant") {
                     return prev.map((m, i) => (i === prev.length - 1 ? { ...m, content: msg } : m));
                   }
