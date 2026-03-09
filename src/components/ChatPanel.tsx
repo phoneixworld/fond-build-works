@@ -1893,6 +1893,9 @@ ${Object.entries(files).map(([path, code]) => `--- ${path}\n${code}`).join("\n\n
           domainModel,
         };
 
+        // Save rollback snapshot before build
+        saveSnapshot(`Pre-build: ${userText.slice(0, 50)}`);
+
         await runBuildEngine(userText, engineConfig, {
           onProgress: (progress: EngineProgress) => {
             setBuildStep(progress.message);
