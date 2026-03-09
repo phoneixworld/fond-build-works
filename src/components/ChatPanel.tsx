@@ -1460,9 +1460,12 @@ const CONTEXT_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
         // render it immediately, then fire an AI polish pass in the background.
         const isSimpleBuild = isFirstBuild && !!template;
         
-        if (isSimpleBuild) {
+        if (isSimpleBuild || isFirstBuild) {
           const { findInstantTemplate, hydrateTemplate } = await import("@/lib/instantTemplates");
-          const instantTemplate = findInstantTemplate(template.id);
+          // If no template matched, default to saas-landing for any first build
+          const templateId = template?.id || "saas-landing";
+          const templateName = template?.name || "Landing Page";
+          const instantTemplate = findInstantTemplate(templateId);
           
           if (instantTemplate) {
             console.log(`[ChatPanel] ⚡ INSTANT PATH: Rendering "${template.name}" in <1s`);
