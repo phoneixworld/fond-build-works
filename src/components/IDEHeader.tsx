@@ -39,6 +39,10 @@ interface IDEHeaderProps {
   onCmdOpen: () => void;
   onTeamChatToggle: () => void;
   onSignOut: () => void;
+  onProfileClick: () => void;
+  onSettingsClick: () => void;
+  onBillingClick: () => void;
+  onHelpClick: () => void;
   publishRef: RefObject<{ openPublish: () => void; handleExport: () => void } | null>;
   primaryTabs: TabDef[];
   secondaryTabs: TabDef[];
