@@ -375,6 +375,11 @@ function parseReactFilesFromOutput(text: string): {
       if (code.length > 0) {
         let fname = currentFile.startsWith("/") ? currentFile : `/${currentFile}`;
         fname = fname.replace(/^\/src\//, "/");
+        // Enforce nested structure: /pages/Dashboard.jsx → /pages/Dashboard/Dashboard.jsx
+        const pageMatch = fname.match(/^\/pages\/([A-Z]\w+)\.(jsx?|tsx?)$/);
+        if (pageMatch) {
+          fname = `/pages/${pageMatch[1]}/${pageMatch[1]}.${pageMatch[2]}`;
+        }
         files[fname] = code;
       }
     }
