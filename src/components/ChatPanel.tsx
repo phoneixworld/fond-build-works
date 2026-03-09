@@ -617,6 +617,17 @@ const CONTEXT_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
   // Elapsed time timer during loading
   // Timer moved to BuildPipelineCard — no more per-second re-renders here
 
+  // Auto-create checkpoint when a build completes
+  const prevPipelineStep = useRef<PipelineStep | null>(null);
+  useEffect(() => {
+    if (prevPipelineStep.current !== "complete" && pipelineStep === "complete") {
+      const lastUserMsg = messagesRef.current.filter(m => m.role === "user").pop();
+      const label = lastUserMsg ? (typeof lastUserMsg.content === "string" ? lastUserMsg.content.slice(0, 40) : "Build") : "Build";
+      createCheckpoint(label, currentPreviewHtml || "", sandpackFilesRef.current);
+    }
+    prevPipelineStep.current = pipelineStep;
+  }, [pipelineStep, createCheckpoint, currentPreviewHtml]);
+
   // Scroll detection for scroll-to-bottom button
   useEffect(() => {
     const el = scrollRef.current;
