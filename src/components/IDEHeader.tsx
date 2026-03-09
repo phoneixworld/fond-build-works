@@ -110,7 +110,7 @@ const IDEHeader = ({
                 <Zap className="w-3 h-3 text-primary-foreground" />
               </div>
               <span className="text-xs font-semibold text-foreground truncate max-w-[160px]">
-                {currentProject?.name || "Phoenix World"}
+                {currentProject?.name || "Phoneix.World"}
               </span>
               <ChevronDown className="w-3 h-3 text-muted-foreground/50 group-hover:text-muted-foreground transition-colors shrink-0" />
             </button>
