@@ -1886,7 +1886,7 @@ ${Object.entries(files).map(([path, code]) => `--- ${path}\n${code}`).join("\n\n
           snippetsContext: snippetsContext || undefined,
           existingFiles: safeExistingFiles,
           templateContext: templateCtx || undefined,
-          chatHistory: currentMessages.slice(-8).map(m => ({
+          chatHistory: currentMessages.map(m => ({
             role: m.role,
             content: typeof m.content === "string" ? m.content : getTextContent(m.content),
           })),
