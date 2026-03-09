@@ -54,7 +54,8 @@ const PublishedApp = () => {
       srcDoc={html}
       className="w-full h-screen border-0"
       title="Published App"
-      sandbox="allow-scripts allow-same-origin allow-forms"
+      sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-modals"
+      style={{ background: '#fff' }}
     />
   );
 };
