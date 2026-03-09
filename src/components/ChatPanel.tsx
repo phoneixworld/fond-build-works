@@ -2474,26 +2474,29 @@ const CONTEXT_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
 
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <button className="flex items-center gap-1.5 text-[11px] text-muted-foreground hover:text-foreground transition-colors">
-                    <Palette className="w-3 h-3 text-accent" />
-                    <span>{DESIGN_THEMES.find(t => t.id === selectedTheme)?.emoji} {DESIGN_THEMES.find(t => t.id === selectedTheme)?.label}</span>
+                  <button className="flex items-center gap-1.5 px-2 py-1 rounded-md text-[11px] text-muted-foreground hover:text-foreground hover:bg-secondary/80 transition-all border border-transparent hover:border-border">
+                    <Palette className="w-3.5 h-3.5 text-accent" />
+                    <span className="font-medium">{DESIGN_THEMES.find(t => t.id === selectedTheme)?.emoji} {DESIGN_THEMES.find(t => t.id === selectedTheme)?.label}</span>
                     <ChevronDown className="w-3 h-3 opacity-50" />
                   </button>
                 </DropdownMenuTrigger>
-                <DropdownMenuContent align="start" className="min-w-[240px]">
-                  <DropdownMenuLabel className="text-[10px] uppercase tracking-wider text-muted-foreground">Design Theme</DropdownMenuLabel>
+                <DropdownMenuContent align="start" className="min-w-[280px] p-1.5">
+                  <DropdownMenuLabel className="text-[10px] uppercase tracking-wider text-muted-foreground px-2">Design Theme</DropdownMenuLabel>
                   <DropdownMenuSeparator />
                   {DESIGN_THEMES.map((theme) => (
                     <DropdownMenuItem
                       key={theme.id}
                       onClick={() => setSelectedTheme(theme.id)}
-                      className={`flex items-center gap-2 ${selectedTheme === theme.id ? "text-primary font-medium" : ""}`}
+                      className={`flex items-center gap-3 px-3 py-2.5 rounded-md cursor-pointer transition-colors ${selectedTheme === theme.id ? "bg-primary/10 text-primary font-medium" : "hover:bg-secondary"}`}
                     >
-                      <span className="text-sm">{theme.emoji}</span>
-                      <div>
-                        <span className="text-xs">{theme.label}</span>
-                        <span className="text-[10px] text-muted-foreground ml-1.5">{theme.description}</span>
+                      <span className="text-base">{theme.emoji}</span>
+                      <div className="flex flex-col">
+                        <span className="text-xs font-medium">{theme.label}</span>
+                        <span className="text-[10px] text-muted-foreground leading-tight">{theme.description}</span>
                       </div>
+                      {selectedTheme === theme.id && (
+                        <CheckCircle2 className="w-3.5 h-3.5 text-primary ml-auto" />
+                      )}
                     </DropdownMenuItem>
                   ))}
                 </DropdownMenuContent>
