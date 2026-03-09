@@ -31,6 +31,7 @@ import CommandPalette from "@/components/CommandPalette";
 import VersionHistory, { Version } from "@/components/VersionHistory";
 import TeamChat from "@/components/TeamChat";
 import IDEHeader, { PanelId } from "@/components/IDEHeader";
+import UserMenuDialogs, { DialogType } from "@/components/UserMenuDialogs";
 import RenameDialog from "@/components/RenameDialog";
 import { TechStackId } from "@/lib/techStacks";
 import { useToast } from "@/hooks/use-toast";
