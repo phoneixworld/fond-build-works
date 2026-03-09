@@ -639,6 +639,57 @@ ${buildFullCodeContext(files, 24000)}`;
   return files;
 }
 
+// ─── Backend Task Executor ────────────────────────────────────────────────
+
+async function executeBackendTask(
+  task: PlanTask,
+  config: EngineConfig,
+  onDelta: (chunk: string) => void
+): Promise<{ files: Record<string, string>; deps: Record<string, string>; chatText: string; modelMs: number }> {
+  const modelT = timer();
+  const taskType = (task as any).taskType || "backend";
+  
+  onDelta(`\n[Backend Agent] Generating ${taskType} layer...\n`);
+
+  try {
+    const BASE_URL = import.meta.env.VITE_SUPABASE_URL;
+    const AUTH_HEADER = `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`;
+
+    const resp = await fetch(`${BASE_URL}/functions/v1/backend-agent`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: AUTH_HEADER },
+      body: JSON.stringify({
+        task,
+        domainModel: config.domainModel,
+        projectId: config.projectId,
+        techStack: config.techStack,
+        existingFiles: config.existingFiles ? Object.keys(config.existingFiles) : [],
+      }),
+    });
+
+    if (resp.ok) {
+      const json = await resp.json();
+      const generatedFiles: Record<string, string> = json.files || {};
+      const chatText: string = json.chatText || `✅ ${taskType} layer generated`;
+      const modelMs = modelT.elapsed();
+      onDelta(`\n[Backend Agent] Generated ${Object.keys(generatedFiles).length} files\n`);
+      return { files: generatedFiles, deps: {}, chatText, modelMs };
+    }
+    throw new Error(`Backend agent returned ${resp.status}`);
+  } catch (err) {
+    console.warn(`[BuildEngine] Backend Agent failed, using local generator:`, err);
+    if (config.domainModel) {
+      const apiBase = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1`;
+      const anonKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+      const generatedFiles = generateMockLayer(config.domainModel, config.projectId, apiBase, anonKey);
+      const modelMs = modelT.elapsed();
+      onDelta(`\n[Local Generator] Generated ${Object.keys(generatedFiles).length} mock layer files\n`);
+      return { files: generatedFiles, deps: {}, chatText: `✅ ${taskType} layer generated locally`, modelMs };
+    }
+    throw err;
+  }
+}
+
 // ─── Main Engine ───────────────────────────────────────────────────────────
 
 export async function runBuildEngine(
