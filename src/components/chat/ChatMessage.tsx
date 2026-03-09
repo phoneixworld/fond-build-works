@@ -499,7 +499,7 @@ const ChatMessage = ({ content, role, timestamp, isLoading, onEdit, onRegenerate
                 Phoenix
               </span>
               {timestamp && (
-                <span className="text-[10px] text-white/60 font-mono opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1">
+                <span className="text-[11px] text-white font-semibold transition-opacity flex items-center gap-1">
                   <Clock className="w-2.5 h-2.5" />
                   {formatTime(timestamp)}
                 </span>
