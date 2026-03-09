@@ -472,6 +472,7 @@ const MAX_IMAGE_SIZE = 4 * 1024 * 1024;
 
 export interface ChatPanelHandle {
   clearChat: () => void;
+  sendMessage: (text: string) => void;
 }
 
 const ChatPanel = forwardRef<ChatPanelHandle, { initialPrompt?: string; onVersionCreated?: (version: Version) => void }>(({ initialPrompt, onVersionCreated }, ref) => {
