@@ -2561,15 +2561,19 @@ ${Object.entries(files).map(([path, code]) => `--- ${path}\n${code}`).join("\n\n
           )}
         </AnimatePresence>
 
-        {/* Context-aware quick suggestions — above input like Lovable */}
+        {/* Smart context-aware suggestions — above input like Lovable */}
         {!isLoading && followUpQuestions.length === 0 && !input && (
           <div className="px-3 pt-2 pb-1">
             <div className="flex flex-wrap gap-1.5">
               {(() => {
-                const hasContent = messages.length > 0;
-                const suggestions = hasContent
-                  ? [...QUICK_ACTIONS.slice(0, 2), ...CONTEXT_SUGGESTIONS.filter(s => s.condition === "has-content").slice(0, 2)]
-                  : CONTEXT_SUGGESTIONS.filter(s => s.condition === "empty");
+                // Gather code from current preview/sandpack
+                const codeForAnalysis = currentPreviewHtml || 
+                  (currentSandpackFiles ? Object.values(currentSandpackFiles).join("\n") : "");
+                const chatMsgs = messages.map(m => ({ 
+                  role: m.role, 
+                  content: typeof m.content === "string" ? m.content : "" 
+                }));
+                const suggestions = generateSmartSuggestions(codeForAnalysis, chatMsgs, 4);
                 return suggestions.map((s) => (
                   <button
                     key={s.label}
