@@ -90,6 +90,8 @@ const CloudPanel = () => {
         return <CloudSqlEditor />;
       case "export":
         return <CloudExport />;
+      case "android":
+        return <AndroidExport />;
       case "logs":
         return <CloudLogs />;
       default:
