@@ -31,6 +31,7 @@ import CommandPalette from "@/components/CommandPalette";
 import VersionHistory, { Version } from "@/components/VersionHistory";
 import TeamChat from "@/components/TeamChat";
 import IDEHeader, { PanelId } from "@/components/IDEHeader";
+import UserMenuDialogs, { DialogType } from "@/components/UserMenuDialogs";
 import RenameDialog from "@/components/RenameDialog";
 import { TechStackId } from "@/lib/techStacks";
 import { useToast } from "@/hooks/use-toast";
@@ -85,6 +86,7 @@ const IDELayout = () => {
   const [versions, setVersions] = useState<Version[]>([]);
   const [teamChatOpen, setTeamChatOpen] = useState(false);
   const [layoutSwapped, setLayoutSwapped] = useState(false);
+  const [userDialog, setUserDialog] = useState<DialogType>(null);
   const publishRef = useRef<{ openPublish: () => void; handleExport: () => void } | null>(null);
   const chatRef = useRef<{ clearChat: () => void; sendMessage: (text: string) => void } | null>(null);
   const { toast } = useToast();
@@ -212,6 +214,8 @@ const IDELayout = () => {
           validateName={validateName}
         />
 
+        <UserMenuDialogs open={userDialog} onOpenChange={setUserDialog} />
+
         <IDEHeader
           currentProject={currentProject}
           rightPanel={rightPanel}
@@ -222,6 +226,10 @@ const IDELayout = () => {
           onCmdOpen={() => setCmdOpen(true)}
           onTeamChatToggle={() => setTeamChatOpen(!teamChatOpen)}
           onSignOut={signOut}
+          onProfileClick={() => setUserDialog("profile")}
+          onSettingsClick={() => setUserDialog("settings")}
+          onBillingClick={() => setUserDialog("billing")}
+          onHelpClick={() => setUserDialog("help")}
           publishRef={publishRef}
           primaryTabs={PRIMARY_TABS}
           secondaryTabs={SECONDARY_TABS}

@@ -39,6 +39,10 @@ interface IDEHeaderProps {
   onCmdOpen: () => void;
   onTeamChatToggle: () => void;
   onSignOut: () => void;
+  onProfileClick: () => void;
+  onSettingsClick: () => void;
+  onBillingClick: () => void;
+  onHelpClick: () => void;
   publishRef: RefObject<{ openPublish: () => void; handleExport: () => void } | null>;
   primaryTabs: TabDef[];
   secondaryTabs: TabDef[];
@@ -78,6 +82,10 @@ const IDEHeader = ({
   onCmdOpen,
   onTeamChatToggle,
   onSignOut,
+  onProfileClick,
+  onSettingsClick,
+  onBillingClick,
+  onHelpClick,
   publishRef,
   primaryTabs,
   secondaryTabs,
@@ -286,19 +294,19 @@ const IDEHeader = ({
               <p className="text-[10px] text-muted-foreground/60">Personal workspace</p>
             </div>
             <DropdownMenuSeparator />
-            <DropdownMenuItem className="text-xs gap-2">
+            <DropdownMenuItem onClick={onProfileClick} className="text-xs gap-2">
               <User className="w-3.5 h-3.5" />
               Profile
             </DropdownMenuItem>
-            <DropdownMenuItem className="text-xs gap-2">
+            <DropdownMenuItem onClick={onSettingsClick} className="text-xs gap-2">
               <Settings className="w-3.5 h-3.5" />
               Settings
             </DropdownMenuItem>
-            <DropdownMenuItem className="text-xs gap-2">
+            <DropdownMenuItem onClick={onBillingClick} className="text-xs gap-2">
               <CreditCard className="w-3.5 h-3.5" />
               Billing & Usage
             </DropdownMenuItem>
-            <DropdownMenuItem className="text-xs gap-2">
+            <DropdownMenuItem onClick={onHelpClick} className="text-xs gap-2">
               <HelpCircle className="w-3.5 h-3.5" />
               Help & Support
             </DropdownMenuItem>
