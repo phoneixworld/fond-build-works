@@ -752,7 +752,8 @@ async function runPlannedBuild(
       config.existingFiles ? Object.keys(config.existingFiles) : undefined,
       config.techStack,
       config.schemas,
-      config.knowledge
+      config.knowledge,
+      config.domainModel
     );
     
     recordPlanningLatency(planTimer.elapsed());
