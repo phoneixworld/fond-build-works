@@ -1439,6 +1439,47 @@ const CONTEXT_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
         setCurrentAgent("build");
         setPipelineStep("planning");
         
+        // ─── Requirements Agent: Extract domain model ───
+        let domainModel: any = undefined;
+        const isFirstBuild = !currentSandpackFiles || Object.keys(currentSandpackFiles).length === 0;
+        if (isFirstBuild) {
+          try {
+            setBuildStep("🧠 Analyzing domain requirements...");
+            const { matchDomainTemplate, serializeDomainModel } = await import("@/lib/domainTemplates");
+            const templateMatch = matchDomainTemplate(userText);
+            
+            if (templateMatch.template) {
+              console.log(`[ChatPanel] Domain template matched: ${templateMatch.template.name} (confidence: ${templateMatch.confidence}, keywords: ${templateMatch.matchedKeywords.join(", ")})`);
+              
+              // Call requirements agent to customize the template
+              const reqResp = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/requirements-agent`, {
+                method: "POST",
+                headers: {
+                  "Content-Type": "application/json",
+                  Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+                },
+                body: JSON.stringify({
+                  prompt: userText,
+                  matchedTemplate: templateMatch.template.model,
+                  existingSchemas: schemas,
+                }),
+              });
+              
+              if (reqResp.ok) {
+                domainModel = await reqResp.json();
+                console.log(`[ChatPanel] ✅ Domain model extracted: ${domainModel.entities?.length || 0} entities, auth: ${domainModel.requiresAuth}`);
+              } else {
+                console.warn("[ChatPanel] Requirements agent failed, using template directly");
+                domainModel = templateMatch.template.model;
+              }
+            } else {
+              console.log("[ChatPanel] No domain template matched, using direct build");
+            }
+          } catch (err) {
+            console.warn("[ChatPanel] Requirements agent error, proceeding without domain model:", err);
+          }
+        }
+        
         const engineConfig: EngineConfig = {
           projectId: currentProject.id,
           techStack: currentProject.tech_stack || "react-cdn",
@@ -1447,7 +1488,7 @@ const CONTEXT_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
           designTheme: themeInfo?.prompt,
           knowledge: knowledge.length > 0 ? knowledge : undefined,
           snippetsContext: snippetsContext || undefined,
-          existingFiles: currentSandpackFiles && Object.keys(currentSandpackFiles).length > 0 
+          existingFiles: shouldIncludeCurrentCode && currentSandpackFiles && Object.keys(currentSandpackFiles).length > 0 
             ? currentSandpackFiles 
             : undefined,
           templateContext: templateCtx || undefined,
@@ -1455,6 +1496,7 @@ const CONTEXT_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
             role: m.role,
             content: typeof m.content === "string" ? m.content : getTextContent(m.content),
           })),
+          domainModel,
         };
 
         await runBuildEngine(userText, engineConfig, {
