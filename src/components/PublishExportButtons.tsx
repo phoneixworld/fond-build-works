@@ -250,6 +250,9 @@ const PublishExportButtons = forwardRef<PublishExportHandle>((_, ref) => {
   </script>
 </body>
 </html>`;
+    } else {
+      // Fallback to raw HTML
+      html = previewHtml || currentProject?.html_content || "";
     }
 
     // If deploying to production, try to use the environment snapshot
