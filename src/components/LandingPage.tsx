@@ -41,8 +41,7 @@ const LandingPage = ({ onStartProject, onOpenProject }: LandingPageProps) => {
   ];
 
   const handleUseTemplate = (template: Template) => {
-    setTechStack(template.techStack);
-    onStartProject(template.prompt, template.techStack);
+    onStartProject(template.prompt, techStack);
   };
 
   return (
