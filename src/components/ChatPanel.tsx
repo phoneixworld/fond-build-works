@@ -1088,6 +1088,7 @@ const CONTEXT_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
                 const retryResult = parseReactFiles(retryText);
                 if (retryResult.files) {
                   setSandpackFiles(retryResult.files);
+                  syncSandpackToVirtualFS(retryResult.files);
                   if (Object.keys(retryResult.deps).length > 0) setSandpackDeps(retryResult.deps);
                   setPreviewMode("sandpack");
                   
