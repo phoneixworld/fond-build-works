@@ -57,6 +57,34 @@ export const COMPONENT_SNIPPETS: ComponentSnippet[] = [
   </div>
 </section>`,
   },
+  {
+    id: "hero-dark",
+    name: "Dark Mode Hero",
+    category: "hero",
+    structure: `<section id="hero" class="py-24 bg-gray-950 text-white relative overflow-hidden">
+  <!-- Animated gradient orbs -->
+  <div style="position:absolute;top:-150px;left:-150px;width:400px;height:400px;background:radial-gradient(circle,rgba(99,102,241,0.4),transparent 70%);filter:blur(60px);animation:pulse 8s ease-in-out infinite;"></div>
+  <div style="position:absolute;bottom:-100px;right:-100px;width:350px;height:350px;background:radial-gradient(circle,rgba(236,72,153,0.3),transparent 70%);filter:blur(60px);animation:pulse 6s ease-in-out infinite 2s;"></div>
+  <!-- Grid pattern overlay -->
+  <div style="position:absolute;inset:0;background-image:linear-gradient(rgba(255,255,255,0.03) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,0.03) 1px,transparent 1px);background-size:64px 64px;"></div>
+  <div class="max-w-4xl mx-auto px-4 text-center relative z-10">
+    <span class="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-white/10 backdrop-blur-sm text-sm font-medium mb-6 border border-white/10">
+      <span style="width:6px;height:6px;border-radius:50%;background:#22c55e;animation:pulse 2s infinite;"></span>
+      Now in beta
+    </span>
+    <h1 class="text-5xl md:text-7xl font-bold tracking-tight mb-6">
+      Build <span class="bg-gradient-to-r from-indigo-400 via-purple-400 to-pink-400 bg-clip-text text-transparent">faster</span>
+    </h1>
+    <p class="text-xl text-gray-400 max-w-2xl mx-auto mb-8">Compelling description with a dark, modern aesthetic.</p>
+    <div class="flex gap-4 justify-center">
+      <a href="#cta" class="px-8 py-3 bg-white text-gray-900 rounded-xl font-medium hover:bg-gray-100 transition-all">Get Started</a>
+      <a href="#features" class="px-8 py-3 border border-white/20 text-white rounded-xl font-medium hover:bg-white/10 transition-all flex items-center gap-2">
+        <i data-lucide="play" class="w-4 h-4"></i> Watch Demo
+      </a>
+    </div>
+  </div>
+</section>`,
+  },
 
   // === FEATURES ===
   {
