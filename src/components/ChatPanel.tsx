@@ -529,6 +529,9 @@ const ChatPanel = forwardRef<ChatPanelHandle, { initialPrompt?: string; onVersio
   const sandpackFilesRef = useRef<Record<string, string> | null>(null);
   sandpackFilesRef.current = currentSandpackFiles;
 
+  // Streaming preview controller — renders partial output during builds
+  const streamingControllerRef = useRef<StreamingPreviewController | null>(null);
+
   // Undo/Redo system
   const { createCheckpoint, undo, redo, canUndo, canRedo } = useUndoRedo();
 
