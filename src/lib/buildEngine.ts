@@ -1479,8 +1479,8 @@ async function executeSingleTask(
   return new Promise((resolve, reject) => {
     let fullText = "";
     
-    // Build messages: use chat history but ensure the current prompt isn't duplicated
-    const historyMessages = (config.chatHistory || []).slice(-6).map(m => ({ role: m.role as "user" | "assistant", content: m.content }));
+    // Build messages: use compressed project memory + last 2-3 user messages
+    const historyMessages = buildSmartChatHistory(config.chatHistory || [], 3).map(m => ({ role: m.role as "user" | "assistant", content: m.content }));
     // Check if the last history message is already the same prompt to avoid duplication
     const lastHistoryMsg = historyMessages[historyMessages.length - 1];
     const promptAlreadyInHistory = lastHistoryMsg && lastHistoryMsg.role === "user" && lastHistoryMsg.content === prompt;
