@@ -637,58 +637,41 @@ const PublishExportButtons = forwardRef<PublishExportHandle>((_, ref) => {
                   />
                 </div>
 
-                {/* Favicon URL */}
-                <div className="space-y-1.5">
-                  <label className="text-[11px] font-medium text-muted-foreground flex items-center gap-1">
-                    <Globe className="w-3 h-3" /> Favicon URL
-                  </label>
-                  <div className="flex items-center gap-2">
-                    {siteInfo.faviconUrl && (
-                      <img src={siteInfo.faviconUrl} alt="Favicon" className="w-5 h-5 rounded object-cover border border-border shrink-0" />
-                    )}
-                    <input
-                      type="text"
-                      value={siteInfo.faviconUrl}
-                      onChange={e => updateSiteInfo("faviconUrl", e.target.value)}
-                      placeholder="https://example.com/favicon.ico"
-                      className="flex-1 px-3 py-2 rounded-lg border border-border bg-background text-xs text-foreground placeholder:text-muted-foreground/40 focus:outline-none focus:ring-1 focus:ring-primary transition-shadow"
-                    />
-                  </div>
-                </div>
+                {/* Favicon */}
+                <ImageUploadField
+                  label="Favicon"
+                  icon={<Globe className="w-3 h-3" />}
+                  value={siteInfo.faviconUrl}
+                  onChange={v => updateSiteInfo("faviconUrl", v)}
+                  placeholder="https://example.com/favicon.ico"
+                  previewSize="w-5 h-5"
+                  projectId={currentProject?.id}
+                  folder="favicon"
+                />
 
-                {/* Logo URL */}
-                <div className="space-y-1.5">
-                  <label className="text-[11px] font-medium text-muted-foreground flex items-center gap-1">
-                    <Image className="w-3 h-3" /> Logo URL
-                  </label>
-                  <div className="flex items-center gap-2">
-                    {siteInfo.logoUrl && (
-                      <img src={siteInfo.logoUrl} alt="Logo" className="w-6 h-6 rounded object-cover border border-border shrink-0" />
-                    )}
-                    <input
-                      type="text"
-                      value={siteInfo.logoUrl}
-                      onChange={e => updateSiteInfo("logoUrl", e.target.value)}
-                      placeholder="https://example.com/logo.png"
-                      className="flex-1 px-3 py-2 rounded-lg border border-border bg-background text-xs text-foreground placeholder:text-muted-foreground/40 focus:outline-none focus:ring-1 focus:ring-primary transition-shadow"
-                    />
-                  </div>
-                </div>
+                {/* Logo */}
+                <ImageUploadField
+                  label="Logo"
+                  icon={<Image className="w-3 h-3" />}
+                  value={siteInfo.logoUrl}
+                  onChange={v => updateSiteInfo("logoUrl", v)}
+                  placeholder="https://example.com/logo.png"
+                  previewSize="w-6 h-6"
+                  projectId={currentProject?.id}
+                  folder="logo"
+                />
 
-                {/* OG Image URL */}
-                <div className="space-y-1.5">
-                  <label className="text-[11px] font-medium text-muted-foreground flex items-center gap-1">
-                    <Image className="w-3 h-3" /> OG / Social Image
-                  </label>
-                  <input
-                    type="text"
-                    value={siteInfo.ogImageUrl}
-                    onChange={e => updateSiteInfo("ogImageUrl", e.target.value)}
-                    placeholder="https://example.com/og-image.png"
-                    className="w-full px-3 py-2 rounded-lg border border-border bg-background text-xs text-foreground placeholder:text-muted-foreground/40 focus:outline-none focus:ring-1 focus:ring-primary transition-shadow"
-                  />
-                  <p className="text-[10px] text-muted-foreground">Recommended: 1200×630px. Shown when shared on social media.</p>
-                </div>
+                {/* OG Image */}
+                <ImageUploadField
+                  label="OG / Social Image"
+                  icon={<Image className="w-3 h-3" />}
+                  value={siteInfo.ogImageUrl}
+                  onChange={v => updateSiteInfo("ogImageUrl", v)}
+                  placeholder="https://example.com/og-image.png"
+                  projectId={currentProject?.id}
+                  folder="og"
+                  hint="Recommended: 1200×630px. Shown when shared on social media."
+                />
 
                 {/* Preview card */}
                 {(siteInfo.siteTitle || siteInfo.faviconUrl || siteInfo.logoUrl) && (
