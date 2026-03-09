@@ -187,6 +187,54 @@ DESIGN: Modern education palette (indigo/violet primary). Clean, focused design.
 SECTIONS: #hero, #outcomes, #curriculum, #instructor, #testimonials, #pricing, #faq, #cta
 NAV: Curriculum, Instructor, Reviews, Pricing, FAQ | Enroll Now (primary)`,
   },
+  {
+    id: "law-firm",
+    name: "Law Firm",
+    emoji: "⚖️",
+    category: "legal",
+    description: "Law firm with practice areas, attorney profiles, case results, and consultation booking",
+    keywords: ["law", "lawyer", "attorney", "legal", "firm", "litigation", "counsel", "justice", "court", "practice"],
+    blueprint: `STRUCTURE: Nav (firm name in serif + links + Free Consultation CTA) → Hero (authoritative headline + subtitle + consultation CTA + "30+ Years Experience" badge) → Practice areas grid (6 cards: Criminal Defense, Family Law, Corporate, Immigration, etc. with icons) → Why choose us (4 pillars: Experience, Results, Dedication, Communication) → Attorneys grid (professional photo placeholders + name + title + bar admissions + bio) → Case results / Notable wins (metrics: $50M+ recovered, 500+ cases won) → Testimonials (client reviews with initials for privacy) → Awards/recognition logos bar → Contact section (consultation form: name, phone, case type dropdown, message) → Footer with disclaimer
+DESIGN: Authoritative palette (navy-900, gold accents). Serif headings (Georgia/Playfair). Professional, trustworthy aesthetic. Dark hero section. Gold borders on key elements. Formal spacing. Subtle pinstripe or texture patterns.
+SECTIONS: #hero, #practice-areas, #why-us, #attorneys, #results, #testimonials, #awards, #contact
+NAV: Practice Areas, Attorneys, Results, Testimonials, Contact | Free Consultation (gold CTA)`,
+  },
+  {
+    id: "photography",
+    name: "Photography Studio",
+    emoji: "📸",
+    category: "photography",
+    description: "Photographer portfolio with gallery, packages, booking, and about section",
+    keywords: ["photography", "photographer", "photo", "studio", "portrait", "wedding", "camera", "shoot", "session", "gallery"],
+    blueprint: `STRUCTURE: Nav (photographer name in elegant font + links + Book a Session CTA) → Hero (full-width gradient placeholder with name overlay + tagline + View Portfolio CTA) → About (photo placeholder + personal story + approach) → Portfolio gallery (masonry CSS grid with gradient placeholders, hover overlay with category tag) → Services/packages (3 cards: Portrait, Wedding, Commercial with what's included list + starting price) → Process steps (4 steps: Consultation → Planning → Shoot → Delivery) → Testimonials (couples/client reviews with event type) → Instagram feed row (6 square gradient placeholders) → Booking CTA (dark section + form: event type, date, location, message) → Footer
+DESIGN: Minimal, elegant palette (off-white bg, charcoal text, one accent). Large images dominate. Thin sans-serif or elegant serif for headings. Lots of whitespace. Gallery with subtle hover transitions. Muted tones. Film grain texture optional.
+SECTIONS: #hero, #about, #portfolio, #services, #process, #testimonials, #instagram, #booking
+NAV: Portfolio, Services, About, Contact | Book Session (accent CTA)`,
+  },
+  {
+    id: "saas-pricing",
+    name: "SaaS Pricing Page",
+    emoji: "💰",
+    category: "pricing",
+    description: "Dedicated pricing page with plan comparison, feature matrix, FAQ, and trust elements",
+    keywords: ["pricing", "plans", "subscription", "tier", "billing", "cost", "price", "saas pricing", "compare"],
+    blueprint: `STRUCTURE: Nav (product logo + Back to Home link) → Header (h1 "Simple, transparent pricing" + subtitle + monthly/annual toggle with savings badge) → Pricing cards row (3-4 tiers: Free, Starter, Pro, Enterprise — middle highlighted with "Most Popular" badge, each with price, description, feature list with check/x icons, CTA button) → Feature comparison table (full matrix: rows = features, cols = plans, checkmarks/values) → Add-ons section (optional extras with prices) → Trust bar (security badges, SOC2, GDPR, uptime guarantee) → FAQ accordion (billing questions) → Final CTA ("Start free trial, no credit card required") → Footer
+DESIGN: Clean, focused palette. Toggle switch styled with primary color. Popular plan with ring-2 border + shadow-xl + scale-105. Feature table with alternating row colors. Green checkmarks, gray x marks. Enterprise plan with "Contact us" instead of price. Annual pricing shows monthly equivalent.
+SECTIONS: #header, #pricing, #comparison, #addons, #trust, #faq, #cta
+NAV: Minimal — logo + back link`,
+  },
+  {
+    id: "nonprofit",
+    name: "Non-Profit Organization",
+    emoji: "🤝",
+    category: "nonprofit",
+    description: "Non-profit with mission, impact metrics, programs, donation, and volunteer signup",
+    keywords: ["nonprofit", "charity", "donate", "volunteer", "cause", "foundation", "ngo", "community", "impact", "mission", "give"],
+    blueprint: `STRUCTURE: Nav (org logo + links + Donate Now CTA in warm color) → Hero (emotional headline + mission statement + Donate CTA + Volunteer CTA + hero gradient with overlay) → Impact stats bar (lives touched, projects, countries, volunteers — large animated numbers) → Mission/about section (story + values) → Programs grid (3-4 cards: Education, Health, Environment, etc. with progress bars showing goals) → Stories/impact section (2-3 story cards with gradient placeholders + quote + name) → Ways to help (Donate, Volunteer, Partner — 3 columns with icons) → Donation section (preset amounts $25/$50/$100/$250 + custom + monthly/one-time toggle) → Upcoming events list (date + title + location) → Newsletter signup → Partners/sponsors logos → Footer with tax info
+DESIGN: Warm, hopeful palette (emerald/teal primary, warm amber accents). Rounded, friendly design. Progress bars for goals. Impact numbers prominently displayed. Donation buttons with warm gradients. Emotional but not overwhelming. Photos with warm overlays.
+SECTIONS: #hero, #impact, #mission, #programs, #stories, #help, #donate, #events, #newsletter
+NAV: Our Mission, Programs, Impact, Get Involved, Events | Donate Now (warm CTA)`,
+  },
 ];
 
 /**
