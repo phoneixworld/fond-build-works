@@ -1,5 +1,6 @@
 import { useState, useMemo, useCallback, useRef, useEffect } from "react";
 import { FileCode, Copy, Check, WrapText, Search, Save, Play, SplitSquareHorizontal, X, Server, Monitor } from "lucide-react";
+import RefactorMenu from "@/components/RefactorMenu";
 import { useVirtualFS } from "@/contexts/VirtualFSContext";
 import { usePreview } from "@/contexts/PreviewContext";
 import { useProjects } from "@/contexts/ProjectContext";
@@ -327,6 +328,16 @@ const CodeEditor = () => {
                     <TooltipContent side="bottom" className="text-xs">Run preview</TooltipContent>
                   </Tooltip>
                   <div className="w-px h-4 bg-border mx-0.5" />
+                  <RefactorMenu
+                    currentFile={activeFile}
+                    onRefactorAction={(action, prompt) => {
+                      // Dispatch refactor prompt to chat panel
+                      const event = new CustomEvent("refactor-action", { detail: { action, prompt } });
+                      window.dispatchEvent(event);
+                      toast({ title: "Refactor", description: `Sent "${action}" to chat editor` });
+                    }}
+                    disabled={!currentFile}
+                  />
                   <Tooltip>
                     <TooltipTrigger asChild>
                       <button

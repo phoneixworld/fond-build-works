@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useCallback, forwardRef, useImperativeHandle } from "react";
 import { Version } from "@/components/VersionHistory";
-import { Send, Bot, User, ChevronDown, Sparkles, AlertTriangle, Wand2, ImagePlus, X, Palette, ArrowDown, Clock, Zap, Trash2, ShieldCheck, MessageSquareMore, CheckCircle2, Pencil, RotateCcw, Upload, Square } from "lucide-react";
+import { Send, Bot, User, ChevronDown, Sparkles, AlertTriangle, Wand2, ImagePlus, X, Palette, ArrowDown, Clock, Zap, Trash2, ShieldCheck, MessageSquareMore, CheckCircle2, Pencil, RotateCcw, Upload, Square, Undo2, Redo2 } from "lucide-react";
 import VoiceInput from "@/components/VoiceInput";
 import { streamChat } from "@/lib/streamChat";
 import { classifyIntent, streamChatAgent, streamBuildAgent, validateReactCode, hasBuildConfirmation, stripBuildMarker, formatRetryContext, MAX_BUILD_RETRIES, type AgentIntent, type PipelineStep } from "@/lib/agentPipeline";
@@ -12,6 +12,8 @@ import { matchTemplate, PAGE_TEMPLATES, type PageTemplate } from "@/lib/pageTemp
 import { COMPONENT_SNIPPETS, getSnippetsPromptContext } from "@/lib/componentSnippets";
 import { AI_MODELS, DEFAULT_MODEL, PROMPT_SUGGESTIONS, QUICK_ACTIONS, CONTEXT_SUGGESTIONS, DESIGN_THEMES, type AIModelId } from "@/lib/aiModels";
 import { generateSmartSuggestions, type SmartSuggestion } from "@/lib/smartSuggestions";
+import { useUndoRedo } from "@/hooks/useUndoRedo";
+import DiffPreview from "@/components/DiffPreview";
 import { motion, AnimatePresence } from "framer-motion";
 import { usePreview } from "@/contexts/PreviewContext";
 import { useProjects } from "@/contexts/ProjectContext";
@@ -525,7 +527,45 @@ const ChatPanel = forwardRef<ChatPanelHandle, { initialPrompt?: string; onVersio
   const sandpackFilesRef = useRef<Record<string, string> | null>(null);
   sandpackFilesRef.current = currentSandpackFiles;
 
-  // Convert sandpack files (Record<string, string>) to VirtualFile format and sync to VirtualFS
+  // Undo/Redo system
+  const { createCheckpoint, undo, redo, canUndo, canRedo } = useUndoRedo();
+
+  // Listen for refactor actions from CodeEditor
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const detail = (e as CustomEvent).detail;
+      if (detail?.prompt) {
+        handleSmartSend(detail.prompt);
+      }
+    };
+    window.addEventListener("refactor-action", handler);
+    return () => window.removeEventListener("refactor-action", handler);
+  }, []);
+
+  const handleUndo = useCallback(() => {
+    const checkpoint = undo();
+    if (!checkpoint) return;
+    if (checkpoint.sandpackFiles) {
+      setSandpackFiles(checkpoint.sandpackFiles);
+      setPreviewMode("sandpack");
+    } else {
+      setPreviewHtml(checkpoint.html);
+      setPreviewMode("html");
+    }
+  }, [undo, setSandpackFiles, setPreviewHtml, setPreviewMode]);
+
+  const handleRedo = useCallback(() => {
+    const checkpoint = redo();
+    if (!checkpoint) return;
+    if (checkpoint.sandpackFiles) {
+      setSandpackFiles(checkpoint.sandpackFiles);
+      setPreviewMode("sandpack");
+    } else {
+      setPreviewHtml(checkpoint.html);
+      setPreviewMode("html");
+    }
+  }, [redo, setSandpackFiles, setPreviewHtml, setPreviewMode]);
+
   const syncSandpackToVirtualFS = useCallback((sandpackFiles: Record<string, string>) => {
     const virtualFiles: Record<string, { path: string; content: string; language: string }> = {};
     for (const [path, content] of Object.entries(sandpackFiles)) {
@@ -577,17 +617,66 @@ const CONTEXT_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
   // Elapsed time timer during loading
   // Timer moved to BuildPipelineCard — no more per-second re-renders here
 
+  // Auto-create checkpoint when a build completes
+  const prevPipelineStep = useRef<PipelineStep | null>(null);
+  useEffect(() => {
+    if (prevPipelineStep.current !== "complete" && pipelineStep === "complete") {
+      const lastUserMsg = messagesRef.current.filter(m => m.role === "user").pop();
+      const label = lastUserMsg ? (typeof lastUserMsg.content === "string" ? lastUserMsg.content.slice(0, 40) : "Build") : "Build";
+      createCheckpoint(label, currentPreviewHtml || "", sandpackFilesRef.current);
+    }
+    prevPipelineStep.current = pipelineStep;
+  }, [pipelineStep, createCheckpoint, currentPreviewHtml]);
+
+  // Keyboard shortcuts for undo/redo
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === "z") {
+        if (e.shiftKey) {
+          e.preventDefault();
+          handleRedo();
+        } else if (!e.target || !(e.target as HTMLElement).matches("textarea, input, [contenteditable]")) {
+          e.preventDefault();
+          handleUndo();
+        }
+      }
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [handleUndo, handleRedo]);
+
   // Scroll detection for scroll-to-bottom button
   useEffect(() => {
     const el = scrollRef.current;
     if (!el) return;
+    let ticking = false;
     const onScroll = () => {
-      const atBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 80;
-      setShowScrollBtn(!atBottom);
+      if (!ticking) {
+        requestAnimationFrame(() => {
+          if (el) {
+            const atBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 80;
+            setShowScrollBtn(!atBottom);
+          }
+          ticking = false;
+        });
+        ticking = true;
+      }
     };
-    el.addEventListener("scroll", onScroll);
+    el.addEventListener("scroll", onScroll, { passive: true });
     return () => el.removeEventListener("scroll", onScroll);
   }, []);
+
+  // Auto-scroll to bottom on new messages
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    const atBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 150;
+    if (atBottom || isLoading) {
+      requestAnimationFrame(() => {
+        el.scrollTo({ top: el.scrollHeight, behavior: "smooth" });
+      });
+    }
+  }, [messages.length, buildStreamContent, isLoading]);
 
   useEffect(() => {
     const handler = (event: MessageEvent) => {
@@ -891,9 +980,12 @@ const CONTEXT_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
     return parts;
   };
 
-  const scrollToBottom = () => {
-    scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
-  };
+  const scrollToBottom = useCallback(() => {
+    if (!scrollRef.current) return;
+    requestAnimationFrame(() => {
+      scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
+    });
+  }, []);
 
   const clearChat = useCallback(() => {
     if (!currentProject || isLoading) return;
@@ -2107,8 +2199,8 @@ ${Object.entries(files).map(([path, code]) => `--- ${path}\n${code}`).join("\n\n
 
   const handleInputChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     setInput(e.target.value);
-    e.target.style.height = "36px";
-    e.target.style.height = Math.min(e.target.scrollHeight, 120) + "px";
+    e.target.style.height = "60px";
+    e.target.style.height = Math.min(e.target.scrollHeight, 160) + "px";
   };
 
   const handleAutoFix = () => {
@@ -2155,7 +2247,7 @@ ${Object.entries(files).map(([path, code]) => `--- ${path}\n${code}`).join("\n\n
         </AnimatePresence>
 
         {/* Messages */}
-        <div ref={scrollRef} className="flex-1 overflow-y-auto px-5 py-6 space-y-8 scroll-smooth">
+        <div ref={scrollRef} className="flex-1 overflow-y-auto px-5 py-6 space-y-8 overscroll-contain" style={{ scrollBehavior: 'smooth', WebkitOverflowScrolling: 'touch' }}>
           {messages.length === 0 && !pendingPrompt && (
             <div className="flex flex-col items-center justify-center h-full gap-6">
               <motion.div
@@ -2771,6 +2863,29 @@ ${Object.entries(files).map(([path, code]) => `--- ${path}\n${code}`).join("\n\n
                   ))}
                 </DropdownMenuContent>
               </DropdownMenu>
+
+              {/* Undo/Redo */}
+              {(canUndo || canRedo) && (
+                <>
+                  <div className="w-px h-3 bg-border" />
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <button onClick={handleUndo} disabled={!canUndo || isLoading} className="text-muted-foreground/50 hover:text-foreground disabled:opacity-20 transition-colors">
+                        <Undo2 className="w-3 h-3" />
+                      </button>
+                    </TooltipTrigger>
+                    <TooltipContent side="top" className="text-xs">Undo (⌘Z)</TooltipContent>
+                  </Tooltip>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <button onClick={handleRedo} disabled={!canRedo || isLoading} className="text-muted-foreground/50 hover:text-foreground disabled:opacity-20 transition-colors">
+                        <Redo2 className="w-3 h-3" />
+                      </button>
+                    </TooltipTrigger>
+                    <TooltipContent side="top" className="text-xs">Redo (⌘⇧Z)</TooltipContent>
+                  </Tooltip>
+                </>
+              )}
 
               {messages.length > 0 && (
                 <>
