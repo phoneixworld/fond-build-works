@@ -133,13 +133,78 @@ function extractDefaultImport(imp: string): string | null {
   return null;
 }
 
+// ─── Backend-protected path patterns ──────────────────────────────────────
+
+const BACKEND_PROTECTED_PATTERNS = [
+  /^\/data\//,
+  /^\/hooks\/use\w+/,
+  /^\/contexts\/\w+Context/,
+  /^\/contexts\/DataContext/,
+  /^\/contexts\/AuthContext/,
+  /^\/api\//,
+  /^\/lib\/api/,
+];
+
+// Schema/migration paths are append-only
+const APPEND_ONLY_PATTERNS = [
+  /^\/data\/schema/,
+  /^\/migrations\//,
+  /^\/supabase\//,
+];
+
+/**
+ * Check if a path is backend-protected (frontend tasks cannot overwrite).
+ */
+export function isBackendProtected(path: string): boolean {
+  return BACKEND_PROTECTED_PATTERNS.some(p => p.test(path));
+}
+
+/**
+ * Check if a path is append-only (new content is appended, not replaced).
+ */
+function isAppendOnly(path: string): boolean {
+  return APPEND_ONLY_PATTERNS.some(p => p.test(path));
+}
+
+/**
+ * Merge two backend files (e.g., two hook files for different entities).
+ * Combines imports and exports without duplicating.
+ */
+function mergeBackendFiles(existing: string, incoming: string, path: string): string {
+  // If the files are for different entities, they shouldn't conflict
+  // If they're the same file, use the incoming version (backend task is authoritative)
+  const existingParsed = extractImports(existing);
+  const incomingParsed = extractImports(incoming);
+
+  // If the incoming file is substantially different (different entity), append exports
+  const existingExports = existing.match(/export\s+(function|const|default)\s+(\w+)/g) || [];
+  const incomingExports = incoming.match(/export\s+(function|const|default)\s+(\w+)/g) || [];
+
+  const existingNames = new Set(existingExports.map(e => e.match(/(\w+)$/)?.[1]));
+  const hasNewExports = incomingExports.some(e => {
+    const name = e.match(/(\w+)$/)?.[1];
+    return name && !existingNames.has(name);
+  });
+
+  if (hasNewExports) {
+    // Different entity hooks in the same file — merge imports + concatenate body
+    const mergedImports = deduplicateImports([...existingParsed.imports, ...incomingParsed.imports]);
+    return mergedImports.join("\n") + "\n\n" + existingParsed.body + "\n\n// ── Added by backend task ──\n\n" + incomingParsed.body;
+  }
+
+  // Same entity — incoming wins (it's a newer version)
+  return incoming;
+}
+
 /**
  * Merge two sets of React files intelligently.
  * 
  * Rules:
  * - /App.jsx: Merge routes, imports, and navigation — never overwrite
+ * - Backend files (/data/, /hooks/, /contexts/): Protected from frontend tasks
+ * - Append-only files (migrations, schemas): Content is appended, never replaced
  * - Component files: Later version wins (task output is authoritative)
- * - CSS files: Concatenate
+ * - CSS files: Smart merge with overlap detection
  * - New files: Just add
  */
 export function mergeFiles(
@@ -149,16 +214,6 @@ export function mergeFiles(
 ): MergeResult {
   const result = { ...existing };
   const conflicts: string[] = [];
-
-  // Backend-protected paths — frontend tasks cannot overwrite these
-  const BACKEND_PROTECTED_PATTERNS = [
-    /^\/data\//,
-    /^\/hooks\/use\w+Data/,
-    /^\/hooks\/use\w+Api/,
-    /^\/contexts\/\w+Context/,
-    /^\/api\//,
-    /^\/lib\/api/,
-  ];
 
   for (const [path, code] of Object.entries(incoming)) {
     if (code.trim().length === 0) continue;
