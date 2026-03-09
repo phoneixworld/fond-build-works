@@ -54,7 +54,7 @@ const LandingPage = ({ onStartProject, onOpenProject }: LandingPageProps) => {
           <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-primary to-accent flex items-center justify-center">
             <Zap className="w-4 h-4 text-primary-foreground" />
           </div>
-          <span className="text-base font-bold text-foreground">Phoenix World</span>
+          <span className="text-base font-bold text-foreground">Phoneix.World</span>
         </div>
         <div className="flex items-center gap-3">
           <span className="text-sm text-muted-foreground">{user?.email}</span>
