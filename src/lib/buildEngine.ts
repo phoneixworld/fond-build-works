@@ -39,6 +39,107 @@ import { buildIncrementalContext, contextReductionRatio } from "@/lib/incrementa
 import { applyAdaptiveSplitting } from "@/lib/adaptiveTaskSplitter";
 import { persistTaskOutput, getPersistedTaskOutput } from "@/lib/persistentCache";
 
+// ─── Base Template (mandatory scaffold for all new builds) ────────────────
+
+/**
+ * Returns the mandatory base file scaffold for new React builds.
+ * This ensures a clean, compiler-friendly, full-stack-ready starting structure.
+ * AI tasks populate these directories — they are never empty in the final output.
+ */
+function getBaseTemplate(): Record<string, string> {
+  return {
+    "/App.jsx": `import React from "react";
+import { HashRouter, Routes, Route, Navigate } from "react-router-dom";
+import AppLayout from "./layout/AppLayout";
+
+export default function App() {
+  return (
+    <HashRouter>
+      <Routes>
+        <Route path="/" element={<AppLayout />}>
+          <Route index element={<div className="p-8 text-center text-gray-400">Loading...</div>} />
+          <Route path="*" element={<Navigate to="/" />} />
+        </Route>
+      </Routes>
+    </HashRouter>
+  );
+}
+`,
+    "/layout/AppLayout.jsx": `import React from "react";
+import { Outlet } from "react-router-dom";
+import Sidebar from "./Sidebar";
+
+export default function AppLayout() {
+  return (
+    <div className="flex h-screen bg-gray-50">
+      <Sidebar />
+      <main className="flex-1 overflow-auto">
+        <Outlet />
+      </main>
+    </div>
+  );
+}
+`,
+    "/layout/Sidebar.jsx": `import React from "react";
+import { NavLink } from "react-router-dom";
+import { LayoutDashboard } from "lucide-react";
+
+const navItems = [
+  { to: "/", icon: LayoutDashboard, label: "Dashboard" },
+];
+
+export default function Sidebar() {
+  return (
+    <nav className="w-64 bg-gray-900 text-white flex flex-col">
+      <div className="p-4 border-b border-gray-800">
+        <h1 className="text-lg font-bold">App</h1>
+      </div>
+      <div className="flex-1 py-2">
+        {navItems.map(({ to, icon: Icon, label }) => (
+          <NavLink
+            key={to}
+            to={to}
+            end={to === "/"}
+            className={({ isActive }) =>
+              \`flex items-center gap-3 px-4 py-2.5 text-sm transition-colors \${
+                isActive ? "bg-gray-800 text-white" : "text-gray-400 hover:text-white hover:bg-gray-800/50"
+              }\`
+            }
+          >
+            <Icon className="w-4 h-4" />
+            {label}
+          </NavLink>
+        ))}
+      </div>
+    </nav>
+  );
+}
+`,
+    "/styles/globals.css": `@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+
+:root {
+  --color-primary: #3b82f6;
+  --color-primary-dark: #2563eb;
+  --color-success: #10b981;
+  --color-warning: #f59e0b;
+  --color-danger: #ef4444;
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: 'Inter', sans-serif; -webkit-font-smoothing: antialiased; }
+`,
+    "/components/ui/Spinner.jsx": `import React from "react";
+
+export default function Spinner({ size = "md", className = "" }) {
+  const sizes = { sm: "w-4 h-4", md: "w-6 h-6", lg: "w-8 h-8" };
+  return (
+    <div className={\`\${sizes[size] || sizes.md} border-2 border-gray-200 border-t-blue-500 rounded-full animate-spin \${className}\`} />
+  );
+}
+`,
+  };
+}
+
 // ─── Auto-Schema Detection ────────────────────────────────────────────────
 
 async function autoDetectAndCreateSchemas(files: Record<string, string>, projectId: string): Promise<void> {
@@ -818,7 +919,7 @@ async function runDirectBuild(
   
   const existingCode = config.existingFiles 
     ? buildFullCodeContext(config.existingFiles) 
-    : "";
+    : buildFullCodeContext(getBaseTemplate());
   
   const result = await executeSingleTask(prompt, config, existingCode, callbacks.onDelta);
   
@@ -830,15 +931,18 @@ async function runDirectBuild(
   }
 
   // Merge with existing if applicable
+  // Merge with existing or base template
   let finalFiles = result.files;
   let conflicts: string[] = [];
   const mergeTimer = timer();
-  if (config.existingFiles && Object.keys(config.existingFiles).length > 0) {
-    callbacks.onProgress({ phase: "merging", message: "Merging with existing code..." });
-    const merged = mergeFiles(config.existingFiles, result.files);
-    finalFiles = merged.files;
-    conflicts = merged.conflicts;
-  }
+  const baseOrExisting = config.existingFiles && Object.keys(config.existingFiles).length > 0
+    ? config.existingFiles
+    : getBaseTemplate();
+  
+  callbacks.onProgress({ phase: "merging", message: "Merging with base template..." });
+  const merged = mergeFiles(baseOrExisting, result.files);
+  finalFiles = merged.files;
+  conflicts = merged.conflicts;
   const mergeMs = mergeTimer.elapsed();
   
   // Final validation
@@ -932,8 +1036,9 @@ async function runPlannedBuild(
   
   console.log(`[BuildEngine] ${executableTasks.length} tasks in ${parallelGroups.length} parallel groups: ${parallelGroups.map(g => `[${g.map(t => t.title).join(", ")}]`).join(" → ")}`);
 
-  let accumulatedFiles: Record<string, string> = config.existingFiles ? { ...config.existingFiles } : {};
-  let previousFiles: Record<string, string> | null = config.existingFiles ? { ...config.existingFiles } : null;
+  const baseTemplate = getBaseTemplate();
+  let accumulatedFiles: Record<string, string> = config.existingFiles ? { ...config.existingFiles } : { ...baseTemplate };
+  let previousFiles: Record<string, string> | null = config.existingFiles ? { ...config.existingFiles } : { ...baseTemplate };
   let allDeps: Record<string, string> = {};
   let allConflicts: string[] = [];
   let lastChatText = "";
