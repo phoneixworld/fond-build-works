@@ -602,8 +602,6 @@ export function useApi(collection, projectId) {
 }
 
 function getGlobalStyles(): string {
-  // Import the centralized design system
-  const { DESIGN_SYSTEM_CSS } = require("@/lib/designSystem");
   return DESIGN_SYSTEM_CSS;
 }
 
