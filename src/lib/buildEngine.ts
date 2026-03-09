@@ -15,6 +15,118 @@ import { streamBuildAgent, validateReactCode, formatRetryContext, MAX_BUILD_RETR
 import { generatePlan, type BuildPlan, type PlanTask } from "@/lib/planningAgent";
 import { topologicalSort } from "@/lib/taskExecutor";
 import { mergeFiles, buildFullCodeContext, type MergeResult } from "@/lib/codeMerger";
+import { supabase } from "@/integrations/supabase/client";
+
+// ─── Auto-Schema Detection ────────────────────────────────────────────────
+
+/**
+ * Scan generated code for collection references (fetch calls to project-api)
+ * and auto-create project_schemas entries so the database reflects what the app uses.
+ */
+async function autoDetectAndCreateSchemas(files: Record<string, string>, projectId: string): Promise<void> {
+  try {
+    const allCode = Object.values(files).join("\n");
+    
+    // Pattern 1: collection: "xxx" in fetch bodies
+    const collectionMatches = allCode.matchAll(/collection:\s*["'](\w+)["']/g);
+    const collections = new Set<string>();
+    for (const match of collectionMatches) {
+      collections.add(match[1]);
+    }
+    
+    // Pattern 2: action: "create", collection: "xxx", data: { field1: ..., field2: ... }
+    // Try to infer field names from create/update calls
+    const fieldsByCollection: Record<string, Set<string>> = {};
+    
+    for (const collection of collections) {
+      fieldsByCollection[collection] = new Set<string>();
+      
+      // Find data objects associated with this collection
+      const dataPatterns = [
+        // data: { key: value, key2: value2 }
+        new RegExp(`collection:\\s*["']${collection}["'][^}]*data:\\s*\\{([^}]+)\\}`, 'g'),
+        // Reverse order: data before collection
+        new RegExp(`data:\\s*\\{([^}]+)\\}[^}]*collection:\\s*["']${collection}["']`, 'g'),
+      ];
+      
+      for (const pattern of dataPatterns) {
+        const matches = allCode.matchAll(pattern);
+        for (const m of matches) {
+          const dataBlock = m[1];
+          // Extract key names from object literal: key: value or key: "string" etc.
+          const keyMatches = dataBlock.matchAll(/(\w+)\s*:/g);
+          for (const km of keyMatches) {
+            const key = km[1];
+            // Skip common non-field keys
+            if (!['action', 'collection', 'project_id', 'id', 'filters'].includes(key)) {
+              fieldsByCollection[collection].add(key);
+            }
+          }
+        }
+      }
+    }
+    
+    if (collections.size === 0) return;
+    
+    console.log(`[AutoSchema] Detected ${collections.size} collections:`, [...collections]);
+    
+    // Fetch existing schemas for this project
+    const { data: existing } = await supabase
+      .from("project_schemas")
+      .select("collection_name")
+      .eq("project_id", projectId);
+    
+    const existingNames = new Set((existing || []).map((s: any) => s.collection_name));
+    
+    // Create schemas for new collections
+    const newSchemas = [...collections]
+      .filter(name => !existingNames.has(name))
+      .map(name => {
+        const fields = fieldsByCollection[name] || new Set();
+        const schema = {
+          fields: [...fields].map(f => ({
+            name: f,
+            type: inferFieldType(f),
+            required: false,
+          })),
+        };
+        return {
+          project_id: projectId,
+          collection_name: name,
+          schema,
+        };
+      });
+    
+    if (newSchemas.length > 0) {
+      const { error } = await supabase
+        .from("project_schemas")
+        .insert(newSchemas as any);
+      
+      if (error) {
+        console.warn("[AutoSchema] Failed to create schemas:", error);
+      } else {
+        console.log(`[AutoSchema] ✅ Created ${newSchemas.length} schemas:`, newSchemas.map(s => s.collection_name));
+      }
+    }
+  } catch (err) {
+    console.warn("[AutoSchema] Error during schema detection:", err);
+  }
+}
+
+/** Infer field type from field name patterns */
+function inferFieldType(fieldName: string): string {
+  const name = fieldName.toLowerCase();
+  if (name.includes('email')) return 'email';
+  if (name.includes('phone') || name.includes('mobile')) return 'phone';
+  if (name.includes('date') || name.includes('_at') || name.includes('time')) return 'datetime';
+  if (name.includes('price') || name.includes('amount') || name.includes('fee') || name.includes('cost') || name.includes('salary')) return 'number';
+  if (name.includes('count') || name.includes('quantity') || name.includes('age') || name.includes('total') || name.includes('number')) return 'number';
+  if (name.includes('is_') || name.includes('has_') || name.includes('active') || name.includes('done') || name.includes('completed') || name.includes('enabled')) return 'boolean';
+  if (name.includes('description') || name.includes('content') || name.includes('notes') || name.includes('body') || name.includes('bio')) return 'textarea';
+  if (name.includes('url') || name.includes('link') || name.includes('website')) return 'url';
+  if (name.includes('image') || name.includes('avatar') || name.includes('photo') || name.includes('logo')) return 'url';
+  return 'text';
+}
 
 // ─── Types ─────────────────────────────────────────────────────────────────
 
@@ -382,6 +494,10 @@ async function runDirectBuild(
   }
   
   callbacks.onFilesReady(finalFiles, result.deps);
+  
+  // Auto-detect and create database schemas from generated code
+  autoDetectAndCreateSchemas(finalFiles, config.projectId);
+  
   callbacks.onProgress({ phase: "complete", message: "Build complete" });
   callbacks.onComplete({
     files: finalFiles,
@@ -509,6 +625,9 @@ ${task.filesAffected.map(f => `- ${f}`).join("\n")}
   
   // Final preview
   callbacks.onFilesReady(accumulatedFiles, allDeps);
+  
+  // Auto-detect and create database schemas from generated code
+  autoDetectAndCreateSchemas(accumulatedFiles, config.projectId);
   
   // Build completion summary
   const taskSummary = sortedTasks.map((t, i) => `✅ ${i + 1}. ${t.title}`).join("\n");

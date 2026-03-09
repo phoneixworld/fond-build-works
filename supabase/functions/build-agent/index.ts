@@ -264,6 +264,55 @@ ${schemaSection}
 - ✅ Dashboard with KPI cards (with real icons, colored backgrounds) and at least one chart
 - ✅ Professional color palette — NOT generic gray/white. Use a strong primary + accent.
 
+## MULTI-PAGE ROUTING — MANDATORY FOR APPS WITH 2+ FEATURES
+Every app with multiple features MUST use React Router with distinct pages:
+
+\`\`\`jsx
+// App.jsx MUST look like this for multi-feature apps:
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import Sidebar from "./components/Sidebar";
+import Dashboard from "./components/Dashboard";
+import Students from "./components/Students";
+import Settings from "./components/Settings";
+
+export default function App() {
+  return (
+    <BrowserRouter>
+      <div className="flex h-screen">
+        <Sidebar />
+        <main className="flex-1 overflow-auto">
+          <Routes>
+            <Route path="/" element={<Dashboard />} />
+            <Route path="/students" element={<Students />} />
+            <Route path="/settings" element={<Settings />} />
+            <Route path="*" element={<Navigate to="/" />} />
+          </Routes>
+        </main>
+      </div>
+    </BrowserRouter>
+  );
+}
+\`\`\`
+
+RULES:
+- Each feature = separate Route with its own component file
+- Sidebar/Nav uses NavLink from react-router-dom with active state styling
+- NEVER dump all features on a single page with sections — use ROUTES
+- Each route's component has its own full CRUD operations
+- URL changes when navigating between modules
+
+## DATABASE AUTO-CREATION — CRITICAL
+When generating apps with data, you MUST use the Data API with meaningful collection names.
+Each collection in the app becomes a database table automatically. Use these patterns:
+
+- Students → collection: "students" with fields: name, email, phone, grade, section, etc.
+- Fees → collection: "fees" with fields: student_id, amount, due_date, status, payment_date
+- Attendance → collection: "attendance" with fields: student_id, date, status
+- Timetable → collection: "timetable" with fields: day, period, subject, teacher, class
+
+ALWAYS use the Data API for CRUD operations — NEVER use localStorage or in-memory arrays for persistent data.
+Generate REAL fetch calls to the API, not mock data.
+
 ## FILE STRUCTURE — PRODUCTION QUALITY
 - /App.jsx: Router setup, layout shell, sidebar/nav
 - /components/Sidebar.jsx or /components/Navigation.jsx: Main navigation
