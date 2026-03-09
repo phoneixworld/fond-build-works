@@ -4,8 +4,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useProjects, Project } from "@/contexts/ProjectContext";
 import { formatDistanceToNow } from "date-fns";
 import { motion } from "framer-motion";
-import TechStackSelector from "@/components/TechStackSelector";
-import { TechStackId, TECH_STACKS } from "@/lib/techStacks";
+import { TECH_STACKS } from "@/lib/techStacks";
 import { TEMPLATES, Template } from "@/lib/templates";
 
 interface LandingPageProps {
