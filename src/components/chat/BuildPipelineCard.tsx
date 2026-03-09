@@ -130,7 +130,8 @@ const StatusIndicator = React.forwardRef<HTMLDivElement, { status: TaskItem["sta
     default:
       return <Circle className="w-4 h-4 text-muted-foreground/25" />;
   }
-};
+});
+StatusIndicator.displayName = "StatusIndicator";
 
 const BuildPipelineCard = ({ isBuilding, streamContent, elapsed, tasks: externalTasks, pipelineStep, currentAgent }: BuildPipelineCardProps) => {
   const [collapsed, setCollapsed] = useState(false);
