@@ -27,6 +27,7 @@ import CustomDomainPanel from "@/components/CustomDomainPanel";
 import PlanningPanel from "@/components/PlanningPanel";
 import CodeQualityPanel from "@/components/CodeQualityPanel";
 import SemanticSearchPanel from "@/components/SemanticSearchPanel";
+import IREditor from "@/components/IREditor";
 import LandingPage from "@/components/LandingPage";
 import CommandPalette from "@/components/CommandPalette";
 import VersionHistory, { Version } from "@/components/VersionHistory";
