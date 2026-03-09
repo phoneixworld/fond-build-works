@@ -184,30 +184,21 @@ export interface EngineResult {
  * Auto-repair common JSX issues from AI-generated code.
  */
 function autoRepairJSX(code: string): string {
-  // ── Fix unterminated strings (truncated AI output) ──
-  // If a line has an odd number of unescaped quotes, close it
-  const lines = code.split("\n");
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i];
-    // Count unescaped single quotes and double quotes
-    const singleQuotes = (line.match(/(?<!\\)'/g) || []).length;
-    const doubleQuotes = (line.match(/(?<!\\)"/g) || []).length;
-    const backticks = (line.match(/(?<!\\)`/g) || []).length;
-    
-    if (doubleQuotes % 2 !== 0) {
-      // Unterminated double-quoted string — close it and trim the broken line
-      lines[i] = line + '"';
-      // If we're inside an array/object literal, also close the structure
-      // Look ahead for missing brackets
+  // ── Fix unterminated strings at FILE level (not per-line — multi-line templates are valid) ──
+  let inSingle = false, inDouble = false, inTemplate = false;
+  let prevCh = '';
+  for (const ch of code) {
+    if (prevCh !== '\\') {
+      if (ch === "'" && !inDouble && !inTemplate) inSingle = !inSingle;
+      if (ch === '"' && !inSingle && !inTemplate) inDouble = !inDouble;
+      if (ch === '`' && !inSingle && !inDouble) inTemplate = !inTemplate;
     }
-    if (singleQuotes % 2 !== 0) {
-      lines[i] = lines[i] + "'";
-    }
-    if (backticks % 2 !== 0) {
-      lines[i] = lines[i] + "`";
-    }
+    prevCh = ch;
   }
-  code = lines.join("\n");
+  // Close any unterminated strings at end of file
+  if (inTemplate) code = code.trimEnd() + '`';
+  if (inDouble) code = code.trimEnd() + '"';
+  if (inSingle) code = code.trimEnd() + "'";
 
   // ── Truncation recovery: if file ends mid-expression, add closing structures ──
   const trimmed = code.trimEnd();
