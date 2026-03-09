@@ -129,6 +129,49 @@ export const COMPONENT_SNIPPETS: ComponentSnippet[] = [
   </div>
 </section>`,
   },
+  {
+    id: "features-bento",
+    name: "Bento Grid Layout",
+    category: "features",
+    structure: `<section id="features" class="py-20 bg-gray-50/50">
+  <div class="max-w-7xl mx-auto px-4">
+    <div class="text-center mb-12">
+      <h2 class="text-3xl font-bold mb-4">Everything you need</h2>
+      <p class="text-gray-600">Powerful features in a beautiful package</p>
+    </div>
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <!-- Large feature (spans 2 cols) -->
+      <div class="md:col-span-2 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-3xl p-8 text-white relative overflow-hidden min-h-[280px]">
+        <div style="position:absolute;bottom:-50px;right:-50px;width:200px;height:200px;background:rgba(255,255,255,0.1);border-radius:50%;"></div>
+        <h3 class="text-2xl font-bold mb-3">Main Feature</h3>
+        <p class="text-white/80 max-w-md">Description of the primary feature with compelling copy.</p>
+      </div>
+      <!-- Small feature -->
+      <div class="bg-white rounded-3xl p-6 border border-gray-100 hover:shadow-xl transition-shadow">
+        <div class="w-12 h-12 rounded-2xl bg-amber-100 flex items-center justify-center mb-4">
+          <i data-lucide="zap" class="w-6 h-6 text-amber-600"></i>
+        </div>
+        <h3 class="font-semibold mb-2">Feature Two</h3>
+        <p class="text-sm text-gray-600">Brief description.</p>
+      </div>
+      <!-- Small feature -->
+      <div class="bg-white rounded-3xl p-6 border border-gray-100 hover:shadow-xl transition-shadow">
+        <div class="w-12 h-12 rounded-2xl bg-emerald-100 flex items-center justify-center mb-4">
+          <i data-lucide="shield" class="w-6 h-6 text-emerald-600"></i>
+        </div>
+        <h3 class="font-semibold mb-2">Feature Three</h3>
+        <p class="text-sm text-gray-600">Brief description.</p>
+      </div>
+      <!-- Medium feature (spans 2 cols) -->
+      <div class="md:col-span-2 bg-gray-900 rounded-3xl p-8 text-white relative overflow-hidden">
+        <div style="position:absolute;top:0;right:0;width:300px;height:100%;background:linear-gradient(90deg,transparent,rgba(99,102,241,0.2));"></div>
+        <h3 class="text-xl font-bold mb-3">Another Key Feature</h3>
+        <p class="text-gray-400 max-w-lg">Expanded description for this feature section.</p>
+      </div>
+    </div>
+  </div>
+</section>`,
+  },
 
   // === PRICING ===
   {
