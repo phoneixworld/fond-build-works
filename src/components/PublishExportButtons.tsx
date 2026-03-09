@@ -40,7 +40,7 @@ type DialogTab = "deploy" | "history" | "domain";
 
 const PublishExportButtons = forwardRef<PublishExportHandle>((_, ref) => {
   const { currentProject, saveProject } = useProjects();
-  const { previewHtml } = usePreview();
+  const { previewHtml, sandpackFiles } = usePreview();
   const { files } = useVirtualFS();
   const { user } = useAuth();
   const { toast } = useToast();
