@@ -2268,9 +2268,9 @@ const CONTEXT_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
                       setBuildStep("");
                       isSendingRef.current = false;
                     }}
-                    className="text-destructive hover:text-destructive/80 transition-colors pb-0.5 animate-pulse"
+                    className="flex items-center justify-center w-7 h-7 rounded-md bg-destructive/15 hover:bg-destructive/25 text-destructive transition-colors"
                   >
-                    <X className="w-4 h-4" />
+                    <Square className="w-3.5 h-3.5 fill-current" />
                   </button>
                 </TooltipTrigger>
                 <TooltipContent side="top" className="text-xs">Stop generating</TooltipContent>
