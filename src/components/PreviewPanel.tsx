@@ -407,43 +407,153 @@ const PreviewPanel = () => {
 
         {/* Preview content */}
         <div className="flex-1 relative overflow-hidden bg-background" style={{ minHeight: 0 }}>
-          {/* Building overlay — live build timeline */}
+          {/* Building overlay — live pipeline view */}
           <AnimatePresence>
             {isBuilding && !hasContent && (
               <motion.div
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                className="absolute inset-0 z-10 bg-background flex flex-col items-center justify-center p-8"
+                exit={{ opacity: 0, transition: { duration: 0.3 } }}
+                className="absolute inset-0 z-10 bg-background flex flex-col items-center justify-center p-8 overflow-hidden"
               >
-                <div className="w-full max-w-lg space-y-6">
-                  {/* Animated logo + status */}
-                  <div className="flex flex-col items-center gap-3">
+                {/* Animated background grid */}
+                <div className="absolute inset-0 opacity-[0.03]" style={{
+                  backgroundImage: `linear-gradient(hsl(var(--primary)) 1px, transparent 1px), linear-gradient(90deg, hsl(var(--primary)) 1px, transparent 1px)`,
+                  backgroundSize: '40px 40px',
+                }} />
+                <motion.div
+                  className="absolute inset-0 opacity-[0.04]"
+                  style={{
+                    background: `radial-gradient(circle at 50% 50%, hsl(var(--primary)), transparent 70%)`,
+                  }}
+                  animate={{ scale: [1, 1.2, 1], opacity: [0.04, 0.08, 0.04] }}
+                  transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
+                />
+
+                <div className="w-full max-w-md space-y-8 relative z-10">
+                  {/* Pulsing logo */}
+                  <div className="flex flex-col items-center gap-4">
                     <motion.div
-                      className="w-14 h-14 rounded-2xl bg-primary/10 flex items-center justify-center"
+                      className="relative"
                       animate={{ scale: [1, 1.05, 1] }}
                       transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
                     >
-                      <Loader2 className="w-7 h-7 text-primary animate-spin" />
+                      <div className="w-16 h-16 rounded-2xl bg-primary/10 border border-primary/20 flex items-center justify-center backdrop-blur-sm">
+                        <Loader2 className="w-7 h-7 text-primary animate-spin" />
+                      </div>
+                      <motion.div
+                        className="absolute -inset-1 rounded-2xl border border-primary/30"
+                        animate={{ opacity: [0, 0.5, 0], scale: [1, 1.15, 1.3] }}
+                        transition={{ duration: 2, repeat: Infinity, ease: "easeOut" }}
+                      />
                     </motion.div>
                     <div className="text-center">
-                      <h3 className="text-sm font-semibold text-foreground">{buildStep || "Building your app..."}</h3>
+                      <motion.h3
+                        key={buildStep}
+                        initial={{ opacity: 0, y: 4 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        className="text-sm font-semibold text-foreground"
+                      >
+                        {buildStep || "Initializing build..."}
+                      </motion.h3>
                       <p className="text-xs text-muted-foreground mt-1">Watch the pipeline in real-time</p>
                     </div>
                   </div>
 
-                  {/* Live build timeline */}
-                  <BuildTimeline metrics={buildMetrics} isBuilding={isBuilding} />
+                  {/* Pipeline stages */}
+                  <div className="flex items-center justify-center gap-1">
+                    {PIPELINE_STAGES.map((stage, i) => {
+                      const stepLower = (buildStep || "").toLowerCase();
+                      const isActive = 
+                        (i === 0 && stepLower.includes("plan")) ||
+                        (i === 1 && (stepLower.includes("generat") || stepLower.includes("task") || stepLower.includes("build"))) ||
+                        (i === 2 && stepLower.includes("validat")) ||
+                        (i === 3 && (stepLower.includes("assembl") || stepLower.includes("merg") || stepLower.includes("bundl")));
+                      const isPast = buildStepHistory.some(s => {
+                        const l = s.label.toLowerCase();
+                        if (i === 0) return l.includes("plan");
+                        if (i === 1) return l.includes("generat") || l.includes("task");
+                        if (i === 2) return l.includes("validat");
+                        if (i === 3) return l.includes("assembl") || l.includes("merg");
+                        return false;
+                      }) && !isActive;
+                      const Icon = stage.icon;
 
-                  {/* Skeleton hint of what's being built */}
-                  <div className="space-y-3 opacity-40">
-                    <div className="h-6 w-2/3 mx-auto rounded-lg bg-muted animate-pulse" />
-                    <div className="h-32 w-full rounded-xl bg-muted/60 animate-pulse" />
-                    <div className="grid grid-cols-3 gap-2">
-                      <div className="h-16 rounded-lg bg-muted animate-pulse" />
-                      <div className="h-16 rounded-lg bg-muted animate-pulse" style={{ animationDelay: "0.15s" }} />
-                      <div className="h-16 rounded-lg bg-muted animate-pulse" style={{ animationDelay: "0.3s" }} />
+                      return (
+                        <div key={stage.label} className="flex items-center gap-1">
+                          <motion.div
+                            className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px] font-medium transition-all ${
+                              isActive
+                                ? "bg-primary/15 text-primary border border-primary/30"
+                                : isPast
+                                ? "bg-muted/50 text-muted-foreground"
+                                : "text-muted-foreground/40"
+                            }`}
+                            animate={isActive ? { scale: [1, 1.02, 1] } : {}}
+                            transition={{ duration: 1.5, repeat: Infinity }}
+                          >
+                            {isPast ? (
+                              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />
+                            ) : (
+                              <Icon className={`w-3.5 h-3.5 ${isActive ? stage.color : ""}`} />
+                            )}
+                            {stage.label}
+                          </motion.div>
+                          {i < PIPELINE_STAGES.length - 1 && (
+                            <div className={`w-4 h-px ${isPast ? "bg-emerald-500/50" : "bg-border"}`} />
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  {/* Live step log */}
+                  {buildStepHistory.length > 0 && (
+                    <div className="border border-border rounded-lg bg-card/50 backdrop-blur-sm overflow-hidden">
+                      <div className="px-3 py-2 border-b border-border bg-muted/30">
+                        <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Pipeline Log</span>
+                      </div>
+                      <div className="max-h-40 overflow-y-auto">
+                        {buildStepHistory.map((step, i) => (
+                          <motion.div
+                            key={i}
+                            initial={{ opacity: 0, x: -8 }}
+                            animate={{ opacity: 1, x: 0 }}
+                            transition={{ duration: 0.2 }}
+                            className={`flex items-center gap-2 px-3 py-1.5 text-[11px] ${
+                              i === buildStepHistory.length - 1
+                                ? "text-primary font-medium bg-primary/5"
+                                : "text-muted-foreground"
+                            }`}
+                          >
+                            {i === buildStepHistory.length - 1 ? (
+                              <Loader2 className="w-3 h-3 animate-spin flex-shrink-0" />
+                            ) : (
+                              <CheckCircle2 className="w-3 h-3 text-emerald-500 flex-shrink-0" />
+                            )}
+                            <span className="truncate">{step.label}</span>
+                            <span className="ml-auto text-[9px] font-mono text-muted-foreground/60 flex-shrink-0">
+                              {(step.time / 1000).toFixed(1)}s
+                            </span>
+                          </motion.div>
+                        ))}
+                      </div>
                     </div>
+                  )}
+
+                  {/* Overall progress bar */}
+                  <div className="space-y-1.5">
+                    <div className="h-1 bg-border rounded-full overflow-hidden">
+                      <motion.div
+                        className="h-full bg-gradient-to-r from-primary to-primary/60 rounded-full"
+                        initial={{ width: "0%" }}
+                        animate={{ width: "85%" }}
+                        transition={{ duration: 15, ease: "easeOut" }}
+                      />
+                    </div>
+                    <p className="text-[10px] text-muted-foreground text-center">
+                      {buildStepHistory.length} step{buildStepHistory.length !== 1 ? "s" : ""} completed
+                    </p>
                   </div>
                 </div>
               </motion.div>
