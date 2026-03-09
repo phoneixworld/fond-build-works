@@ -1574,21 +1574,22 @@ ${Object.entries(files).map(([path, code]) => `--- ${path}\n${code}`).join("\n\n
                   if (hasErrors) {
                     // Polish produced broken code — keep the working instant template
                     console.warn("[ChatPanel] Polish pass produced broken code, keeping instant template");
+                    // Do NOT persist broken code — leave the working instant template in place
                   } else {
                     setSandpackFiles(reactResult.files);
                     syncSandpackToVirtualFS(reactResult.files);
                     if (Object.keys(reactResult.deps).length > 0) setSandpackDeps(reactResult.deps);
+                    
+                    // Only persist when code is valid
+                    const polishedPayload = { files: reactResult.files, deps: reactResult.deps || {} };
+                    supabase
+                      .from("project_data")
+                      .upsert(
+                        { project_id: buildProjectId, collection: "sandpack_state", data: polishedPayload as any },
+                        { onConflict: "project_id,collection" }
+                      )
+                      .then(({ error }) => { if (error) console.warn("Polish persist error:", error); });
                   }
-                  
-                  // Persist polished version
-                  const polishedPayload = { files: reactResult.files, deps: reactResult.deps || {} };
-                  supabase
-                    .from("project_data")
-                    .upsert(
-                      { project_id: buildProjectId, collection: "sandpack_state", data: polishedPayload as any },
-                      { onConflict: "project_id,collection" }
-                    )
-                    .then(({ error }) => { if (error) console.warn("Polish persist error:", error); });
                   
                   const polishedMsg = reactResult.chatText || `✅ **${templateName} customized!** Your site is ready with personalized content.`;
                   setMessages((prev) => {
