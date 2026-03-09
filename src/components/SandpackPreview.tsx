@@ -158,10 +158,59 @@ function attemptRepair(code: string, error: string): string | null {
   }
   return code;
 }
+/**
+ * Repair common CSS issues from AI-generated code.
+ * Fixes missing semicolons, unclosed braces, and truncated @import statements.
+ */
+function repairCSS(code: string): string {
+  const lines = code.split("\n");
+  const repaired: string[] = [];
+  let braceDepth = 0;
+
+  for (let i = 0; i < lines.length; i++) {
+    let line = lines[i];
+    const trimmed = line.trim();
+
+    // Skip empty lines and comments
+    if (!trimmed || trimmed.startsWith('/*') || trimmed.startsWith('//')) {
+      repaired.push(line);
+      continue;
+    }
+
+    // Track braces
+    for (const ch of trimmed) {
+      if (ch === '{') braceDepth++;
+      if (ch === '}') braceDepth--;
+    }
+
+    // Inside a rule block: property lines need semicolons
+    if (braceDepth > 0 && trimmed.includes(':') && !trimmed.endsWith('{') && !trimmed.endsWith('}') && !trimmed.endsWith(';') && !trimmed.startsWith('@') && !trimmed.startsWith('/*')) {
+      line = line.trimEnd() + ';';
+    }
+
+    repaired.push(line);
+  }
+
+  let result = repaired.join("\n");
+
+  // Close unclosed braces
+  if (braceDepth > 0) {
+    for (let i = 0; i < braceDepth; i++) {
+      result += '\n}';
+    }
+  }
+
+  return result;
+}
 
 function repairTruncatedCode(code: string, filePath: string): string {
   if (code.trim().length < 30) return makeStub(filePath);
   
+  // CSS files: basic repair (fix missing semicolons at end of property lines)
+  if (filePath.match(/\.css$/)) {
+    return repairCSS(code);
+  }
+
   // Skip non-JSX files
   if (!filePath.match(/\.(jsx?|tsx?)$/)) return code;
 
