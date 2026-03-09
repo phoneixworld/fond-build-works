@@ -964,6 +964,16 @@ function validateAllFiles(files: Record<string, string>): { file: string; error:
         continue;
       }
       
+      // Check for imports referencing files that don't exist in the file set
+      const missingImports = findMissingFileImports(code, filePath, files);
+      if (missingImports.length > 0) {
+        errors.push({
+          file: filePath,
+          error: `Missing local file imports: ${missingImports.join(", ")}. Either create these files or remove the imports. Only import files that exist in your output.`
+        });
+        continue;
+      }
+      
       // Check for undefined JSX components (PascalCase tags used but not imported/defined)
       const undefinedRefs = findUndefinedJSXReferences(code, filePath, files, definedComponents, availablePackages);
       if (undefinedRefs.length > 0) {
@@ -987,6 +997,53 @@ function validateAllFiles(files: Record<string, string>): { file: string; error:
   
   return errors;
 }
+
+/**
+ * Find import statements that reference local files (relative paths) not present in the file set.
+ */
+function findMissingFileImports(
+  code: string,
+  filePath: string,
+  allFiles: Record<string, string>
+): string[] {
+  const missing: string[] = [];
+  const importPathRegex = /import\s+(?:[\w{},\s*]+\s+from\s+)?["'](\.[^"']+)["']/g;
+  let m;
+  while ((m = importPathRegex.exec(code)) !== null) {
+    const importPath = m[1];
+    // Resolve the import relative to the current file's directory
+    const currentDir = filePath.substring(0, filePath.lastIndexOf("/")) || "";
+    let resolved = importPath;
+    if (importPath.startsWith("./")) {
+      resolved = currentDir + importPath.substring(1);
+    } else if (importPath.startsWith("../")) {
+      const parts = currentDir.split("/").filter(Boolean);
+      let relParts = importPath.split("/");
+      while (relParts[0] === "..") {
+        parts.pop();
+        relParts.shift();
+      }
+      resolved = "/" + parts.concat(relParts).join("/");
+    }
+    // Normalize: ensure leading slash
+    if (!resolved.startsWith("/")) resolved = "/" + resolved;
+    
+    // Check if the file exists (with or without extension)
+    const extensions = ["", ".jsx", ".js", ".tsx", ".ts"];
+    const found = extensions.some(ext => {
+      const candidate = resolved + ext;
+      return allFiles[candidate] !== undefined;
+    });
+    // Also check index files in directory
+    const indexFound = extensions.some(ext => {
+      return allFiles[resolved + "/index" + ext] !== undefined;
+    });
+    
+    if (!found && !indexFound) {
+      missing.push(importPath);
+    }
+  }
+  return missing;
 
 /**
  * Find JSX component references (PascalCase) that are neither imported nor defined in the file.

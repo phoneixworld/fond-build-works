@@ -1533,12 +1533,49 @@ ${Object.entries(files).map(([path, code]) => `--- ${path}\n${code}`).join("\n\n
               templateContext: templateCtx || undefined,
               onDelta: upsert,
               onDone: async (responseText) => {
-                // Parse and apply the polished files
+                // Parse and apply the polished files — but validate first
                 const reactResult = parseReactFiles(responseText);
                 if (reactResult.files && Object.keys(reactResult.files).length > 0) {
-                  setSandpackFiles(reactResult.files);
-                  syncSandpackToVirtualFS(reactResult.files);
-                  if (Object.keys(reactResult.deps).length > 0) setSandpackDeps(reactResult.deps);
+                  // Quick validation: check for JSX syntax errors using Sucrase
+                  let hasErrors = false;
+                  try {
+                    const { transform } = await import("sucrase");
+                    for (const [fPath, fCode] of Object.entries(reactResult.files)) {
+                      if (fPath.match(/\.(jsx?|tsx?)$/)) {
+                        try {
+                          transform(fCode, { transforms: ["jsx", "imports"], filePath: fPath });
+                        } catch {
+                          hasErrors = true;
+                          break;
+                        }
+                        // Check for missing local imports
+                        const importPathRegex = /import\s+(?:[\w{},\s*]+\s+from\s+)?["'](\.[^"']+)["']/g;
+                        let m;
+                        while ((m = importPathRegex.exec(fCode)) !== null) {
+                          const importPath = m[1];
+                          const currentDir = fPath.substring(0, fPath.lastIndexOf("/")) || "";
+                          let resolved = importPath.startsWith("./") ? currentDir + importPath.substring(1) : importPath;
+                          if (!resolved.startsWith("/")) resolved = "/" + resolved;
+                          const exts = ["", ".jsx", ".js", ".tsx", ".ts"];
+                          const found = exts.some(ext => reactResult.files![resolved + ext] !== undefined);
+                          const indexFound = exts.some(ext => reactResult.files![resolved + "/index" + ext] !== undefined);
+                          if (!found && !indexFound) { hasErrors = true; break; }
+                        }
+                        if (hasErrors) break;
+                      }
+                    }
+                  } catch {
+                    // If Sucrase import fails, skip validation
+                  }
+                  
+                  if (hasErrors) {
+                    // Polish produced broken code — keep the working instant template
+                    console.warn("[ChatPanel] Polish pass produced broken code, keeping instant template");
+                  } else {
+                    setSandpackFiles(reactResult.files);
+                    syncSandpackToVirtualFS(reactResult.files);
+                    if (Object.keys(reactResult.deps).length > 0) setSandpackDeps(reactResult.deps);
+                  }
                   
                   // Persist polished version
                   const polishedPayload = { files: reactResult.files, deps: reactResult.deps || {} };
