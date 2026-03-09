@@ -236,7 +236,7 @@ function buildSandpackFiles(files: SandpackFileSet | null): Record<string, strin
   for (const [path, code] of Object.entries(files)) {
     const normalized = path.startsWith("/") ? path : `/${path}`;
     const sandpackPath = normalized.replace(/\.tsx?$/, ".js");
-    base[sandpackPath] = sandpackPath.match(/\.(jsx?|js)$/) ? sanitizeCode(code) : code;
+    base[sandpackPath] = sandpackPath.match(/\.(jsx?|js)$/) ? sanitizeCode(code, sandpackPath) : code;
   }
 
   // Ensure entry point exists
