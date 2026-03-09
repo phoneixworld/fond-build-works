@@ -118,10 +118,28 @@ export default function App() {
 }
 `;
 
-const INDEX_JS = `import React, { StrictMode } from "react";
+const INDEX_JS = `import React, { StrictMode, useEffect } from "react";
 import { createRoot } from "react-dom/client";
 import App from "./App";
 import "./styles.css";
+
+// Report route changes to parent for URL bar sync
+const origPushState = history.pushState;
+const origReplaceState = history.replaceState;
+function reportRoute() {
+  window.parent.postMessage({ type: "route-change", path: location.pathname + location.search + location.hash }, "*");
+}
+history.pushState = function() { origPushState.apply(this, arguments); reportRoute(); };
+history.replaceState = function() { origReplaceState.apply(this, arguments); reportRoute(); };
+window.addEventListener("popstate", reportRoute);
+
+// Listen for navigation commands from parent
+window.addEventListener("message", function(e) {
+  if (e.data?.type === "navigate" && e.data.path) {
+    history.pushState(null, "", e.data.path);
+    window.dispatchEvent(new PopStateEvent("popstate"));
+  }
+});
 
 const root = createRoot(document.getElementById("root"));
 root.render(
