@@ -770,7 +770,7 @@ const ChatPanel = forwardRef<ChatPanelHandle, { initialPrompt?: string; onVersio
     saveProject({ chat_history: [], html_content: "" });
   }, [currentProject, isLoading, setPreviewHtml, saveProject]);
 
-  useImperativeHandle(ref, () => ({ clearChat }), [clearChat]);
+  useImperativeHandle(ref, () => ({ clearChat, sendMessage }), [clearChat, sendMessage]);
 
   const sendMessage = useCallback(async (text: string, images: string[] = []) => {
     if (!text || !currentProject) return;
