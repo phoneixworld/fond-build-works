@@ -1511,7 +1511,7 @@ const CONTEXT_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
             setPipelineStep("generating");
             
             const polishContext = `## INSTANT TEMPLATE LOADED
-The user already sees a live preview of a ${template.name} template. Your job is to CUSTOMIZE the existing template files with the user's specific content, branding, and requirements.
+The user already sees a live preview of a ${templateName} template. Your job is to CUSTOMIZE the existing template files with the user's specific content, branding, and requirements.
 
 ## USER REQUEST
 "${userText}"
