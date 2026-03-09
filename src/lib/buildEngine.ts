@@ -591,7 +591,7 @@ ${task.filesAffected.map(f => `- ${f}`).join("\n")}
 - NO descriptions, NO planning text — ONLY code`;
 
     try {
-      const taskResult = await executeSingleTask(taskPrompt, config, codeContext, callbacks.onDelta);
+      const taskResult = await executeSingleTask(taskPrompt, config, codeContext, callbacks.onDelta, 0, 16000);
       
       if (Object.keys(taskResult.files).length > 0) {
         // Intelligent merge
