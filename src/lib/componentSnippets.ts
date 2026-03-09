@@ -57,6 +57,34 @@ export const COMPONENT_SNIPPETS: ComponentSnippet[] = [
   </div>
 </section>`,
   },
+  {
+    id: "hero-dark",
+    name: "Dark Mode Hero",
+    category: "hero",
+    structure: `<section id="hero" class="py-24 bg-gray-950 text-white relative overflow-hidden">
+  <!-- Animated gradient orbs -->
+  <div style="position:absolute;top:-150px;left:-150px;width:400px;height:400px;background:radial-gradient(circle,rgba(99,102,241,0.4),transparent 70%);filter:blur(60px);animation:pulse 8s ease-in-out infinite;"></div>
+  <div style="position:absolute;bottom:-100px;right:-100px;width:350px;height:350px;background:radial-gradient(circle,rgba(236,72,153,0.3),transparent 70%);filter:blur(60px);animation:pulse 6s ease-in-out infinite 2s;"></div>
+  <!-- Grid pattern overlay -->
+  <div style="position:absolute;inset:0;background-image:linear-gradient(rgba(255,255,255,0.03) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,0.03) 1px,transparent 1px);background-size:64px 64px;"></div>
+  <div class="max-w-4xl mx-auto px-4 text-center relative z-10">
+    <span class="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-white/10 backdrop-blur-sm text-sm font-medium mb-6 border border-white/10">
+      <span style="width:6px;height:6px;border-radius:50%;background:#22c55e;animation:pulse 2s infinite;"></span>
+      Now in beta
+    </span>
+    <h1 class="text-5xl md:text-7xl font-bold tracking-tight mb-6">
+      Build <span class="bg-gradient-to-r from-indigo-400 via-purple-400 to-pink-400 bg-clip-text text-transparent">faster</span>
+    </h1>
+    <p class="text-xl text-gray-400 max-w-2xl mx-auto mb-8">Compelling description with a dark, modern aesthetic.</p>
+    <div class="flex gap-4 justify-center">
+      <a href="#cta" class="px-8 py-3 bg-white text-gray-900 rounded-xl font-medium hover:bg-gray-100 transition-all">Get Started</a>
+      <a href="#features" class="px-8 py-3 border border-white/20 text-white rounded-xl font-medium hover:bg-white/10 transition-all flex items-center gap-2">
+        <i data-lucide="play" class="w-4 h-4"></i> Watch Demo
+      </a>
+    </div>
+  </div>
+</section>`,
+  },
 
   // === FEATURES ===
   {
@@ -101,6 +129,49 @@ export const COMPONENT_SNIPPETS: ComponentSnippet[] = [
   </div>
 </section>`,
   },
+  {
+    id: "features-bento",
+    name: "Bento Grid Layout",
+    category: "features",
+    structure: `<section id="features" class="py-20 bg-gray-50/50">
+  <div class="max-w-7xl mx-auto px-4">
+    <div class="text-center mb-12">
+      <h2 class="text-3xl font-bold mb-4">Everything you need</h2>
+      <p class="text-gray-600">Powerful features in a beautiful package</p>
+    </div>
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <!-- Large feature (spans 2 cols) -->
+      <div class="md:col-span-2 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-3xl p-8 text-white relative overflow-hidden min-h-[280px]">
+        <div style="position:absolute;bottom:-50px;right:-50px;width:200px;height:200px;background:rgba(255,255,255,0.1);border-radius:50%;"></div>
+        <h3 class="text-2xl font-bold mb-3">Main Feature</h3>
+        <p class="text-white/80 max-w-md">Description of the primary feature with compelling copy.</p>
+      </div>
+      <!-- Small feature -->
+      <div class="bg-white rounded-3xl p-6 border border-gray-100 hover:shadow-xl transition-shadow">
+        <div class="w-12 h-12 rounded-2xl bg-amber-100 flex items-center justify-center mb-4">
+          <i data-lucide="zap" class="w-6 h-6 text-amber-600"></i>
+        </div>
+        <h3 class="font-semibold mb-2">Feature Two</h3>
+        <p class="text-sm text-gray-600">Brief description.</p>
+      </div>
+      <!-- Small feature -->
+      <div class="bg-white rounded-3xl p-6 border border-gray-100 hover:shadow-xl transition-shadow">
+        <div class="w-12 h-12 rounded-2xl bg-emerald-100 flex items-center justify-center mb-4">
+          <i data-lucide="shield" class="w-6 h-6 text-emerald-600"></i>
+        </div>
+        <h3 class="font-semibold mb-2">Feature Three</h3>
+        <p class="text-sm text-gray-600">Brief description.</p>
+      </div>
+      <!-- Medium feature (spans 2 cols) -->
+      <div class="md:col-span-2 bg-gray-900 rounded-3xl p-8 text-white relative overflow-hidden">
+        <div style="position:absolute;top:0;right:0;width:300px;height:100%;background:linear-gradient(90deg,transparent,rgba(99,102,241,0.2));"></div>
+        <h3 class="text-xl font-bold mb-3">Another Key Feature</h3>
+        <p class="text-gray-400 max-w-lg">Expanded description for this feature section.</p>
+      </div>
+    </div>
+  </div>
+</section>`,
+  },
 
   // === PRICING ===
   {
@@ -139,6 +210,42 @@ export const COMPONENT_SNIPPETS: ComponentSnippet[] = [
     </div>
   </div>
 </section>`,
+  },
+
+  // === CARDS ===
+  {
+    id: "card-glass",
+    name: "Glassmorphism Card",
+    category: "features",
+    structure: `<div class="relative group">
+  <!-- Glow effect behind card -->
+  <div style="position:absolute;inset:-1px;background:linear-gradient(135deg,rgba(99,102,241,0.5),rgba(236,72,153,0.5));border-radius:24px;filter:blur(20px);opacity:0;transition:opacity 0.3s;" class="group-hover:opacity-100"></div>
+  <!-- Glass card -->
+  <div style="background:rgba(255,255,255,0.7);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);border:1px solid rgba(255,255,255,0.5);border-radius:24px;padding:32px;position:relative;">
+    <div class="w-14 h-14 rounded-2xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center mb-5 shadow-lg">
+      <i data-lucide="sparkles" class="w-7 h-7 text-white"></i>
+    </div>
+    <h3 class="text-xl font-bold mb-3">Glassmorphism</h3>
+    <p class="text-gray-600">Modern frosted glass effect with gradient glow on hover.</p>
+  </div>
+</div>`,
+  },
+  {
+    id: "card-glass-dark",
+    name: "Glassmorphism Card (Dark)",
+    category: "features",
+    structure: `<div class="relative group">
+  <!-- Glow effect -->
+  <div style="position:absolute;inset:-2px;background:linear-gradient(135deg,#6366f1,#ec4899);border-radius:28px;opacity:0.5;filter:blur(24px);transition:opacity 0.3s;" class="group-hover:opacity-80"></div>
+  <!-- Dark glass card -->
+  <div style="background:rgba(15,23,42,0.8);backdrop-filter:blur(24px);-webkit-backdrop-filter:blur(24px);border:1px solid rgba(255,255,255,0.1);border-radius:24px;padding:32px;position:relative;">
+    <div class="w-14 h-14 rounded-2xl bg-gradient-to-br from-indigo-500 to-pink-500 flex items-center justify-center mb-5">
+      <i data-lucide="layers" class="w-7 h-7 text-white"></i>
+    </div>
+    <h3 class="text-xl font-bold text-white mb-3">Dark Glass</h3>
+    <p class="text-gray-400">Sleek dark mode glassmorphism with vibrant glow.</p>
+  </div>
+</div>`,
   },
 
   // === TESTIMONIALS ===
@@ -241,6 +348,64 @@ export const COMPONENT_SNIPPETS: ComponentSnippet[] = [
       <div><p class="text-3xl md:text-4xl font-bold text-primary mb-1">4.9/5</p><p class="text-sm text-gray-500">Rating</p></div>
     </div>
   </div>
+</section>`,
+  },
+  {
+    id: "stats-animated",
+    name: "Animated Stats Counter",
+    category: "stats",
+    structure: `<section id="stats" class="py-20 bg-gray-900 text-white relative overflow-hidden">
+  <!-- Background glow -->
+  <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:800px;height:400px;background:radial-gradient(ellipse,rgba(99,102,241,0.15),transparent 70%);"></div>
+  <div class="max-w-7xl mx-auto px-4 relative z-10">
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-8">
+      <!-- Stat card with animated counter -->
+      <div class="text-center p-6 rounded-2xl bg-white/5 backdrop-blur-sm border border-white/10">
+        <p class="text-4xl md:text-5xl font-bold bg-gradient-to-r from-indigo-400 to-purple-400 bg-clip-text text-transparent mb-2" data-counter="10000" data-suffix="+">0</p>
+        <p class="text-sm text-gray-400 uppercase tracking-wider">Active Users</p>
+      </div>
+      <div class="text-center p-6 rounded-2xl bg-white/5 backdrop-blur-sm border border-white/10">
+        <p class="text-4xl md:text-5xl font-bold bg-gradient-to-r from-emerald-400 to-cyan-400 bg-clip-text text-transparent mb-2" data-counter="99.9" data-suffix="%">0</p>
+        <p class="text-sm text-gray-400 uppercase tracking-wider">Uptime</p>
+      </div>
+      <div class="text-center p-6 rounded-2xl bg-white/5 backdrop-blur-sm border border-white/10">
+        <p class="text-4xl md:text-5xl font-bold bg-gradient-to-r from-amber-400 to-orange-400 bg-clip-text text-transparent mb-2" data-counter="150" data-suffix="M">0</p>
+        <p class="text-sm text-gray-400 uppercase tracking-wider">Requests/Day</p>
+      </div>
+      <div class="text-center p-6 rounded-2xl bg-white/5 backdrop-blur-sm border border-white/10">
+        <p class="text-4xl md:text-5xl font-bold bg-gradient-to-r from-pink-400 to-rose-400 bg-clip-text text-transparent mb-2" data-counter="4.9" data-suffix="/5">0</p>
+        <p class="text-sm text-gray-400 uppercase tracking-wider">User Rating</p>
+      </div>
+    </div>
+  </div>
+  <script>
+    // Animate counters on scroll into view
+    const counters = document.querySelectorAll('[data-counter]');
+    const observer = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          const el = entry.target;
+          const target = parseFloat(el.dataset.counter);
+          const suffix = el.dataset.suffix || '';
+          const isDecimal = target % 1 !== 0;
+          let current = 0;
+          const increment = target / 60;
+          const animate = () => {
+            current += increment;
+            if (current < target) {
+              el.textContent = (isDecimal ? current.toFixed(1) : Math.floor(current)) + suffix;
+              requestAnimationFrame(animate);
+            } else {
+              el.textContent = (isDecimal ? target.toFixed(1) : target) + suffix;
+            }
+          };
+          animate();
+          observer.unobserve(el);
+        }
+      });
+    }, { threshold: 0.5 });
+    counters.forEach(c => observer.observe(c));
+  </script>
 </section>`,
   },
 
