@@ -2155,7 +2155,7 @@ ${Object.entries(files).map(([path, code]) => `--- ${path}\n${code}`).join("\n\n
         </AnimatePresence>
 
         {/* Messages */}
-        <div ref={scrollRef} className="flex-1 overflow-y-auto px-5 py-6 space-y-8 scroll-smooth">
+        <div ref={scrollRef} className="flex-1 overflow-y-auto px-5 py-6 space-y-8 overscroll-contain" style={{ scrollBehavior: 'smooth', WebkitOverflowScrolling: 'touch' }}>
           {messages.length === 0 && !pendingPrompt && (
             <div className="flex flex-col items-center justify-center h-full gap-6">
               <motion.div
