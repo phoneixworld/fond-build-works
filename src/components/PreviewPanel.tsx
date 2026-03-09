@@ -371,7 +371,8 @@ const PreviewPanel = () => {
         </AnimatePresence>
 
         {/* Preview content */}
-        <div className="flex-1 rela" style={{ minHeight: 0 }}flow-hidtive overflow-hidden bg-background" style={{ minHeight: 0 }}overlay */}
+        <div className="flex-1 relative overflow-hidden bg-background" style={{ minHeight: 0 }}>
+          {/* Building skeleton overlay */}
           <AnimatePresence>
             {isBuilding && !hasContent && (
               <motion.div
