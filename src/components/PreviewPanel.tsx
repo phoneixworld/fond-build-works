@@ -515,8 +515,7 @@ ${DIRECT_TOUCH_SCRIPT}
               ) : (
                 <EmptyState />
               )}
-            </>
-          )}
+            </div>
         </div>
 
         {/* Viewport indicator */}
