@@ -1785,7 +1785,7 @@ const CONTEXT_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
         </AnimatePresence>
 
         {/* Messages */}
-        <div ref={scrollRef} className="flex-1 overflow-y-auto px-4 py-5 space-y-6 scroll-smooth">
+        <div ref={scrollRef} className="flex-1 overflow-y-auto px-5 py-6 space-y-8 scroll-smooth">
           {messages.length === 0 && !pendingPrompt && (
             <div className="flex flex-col items-center justify-center h-full gap-6">
               <motion.div
@@ -1965,6 +1965,11 @@ const CONTEXT_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
               streamContent={buildStreamContent}
               pipelineStep={pipelineStep}
               currentAgent={currentAgent === "clarify" ? null : currentAgent}
+              onShowPreview={() => {
+                // Switch to preview panel when Preview tab is clicked
+                const event = new CustomEvent("switch-panel", { detail: "preview" });
+                window.dispatchEvent(event);
+              }}
             />
           )}
 

@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { motion } from "framer-motion";
-import { Bot, User, ChevronDown, ChevronRight, CheckCircle2, Circle, Pencil, RotateCcw, Clock, Brain, Sparkles, Wrench, Copy, Check, Lightbulb, History, Bookmark, ArrowRight } from "lucide-react";
+import { Bot, ChevronDown, ChevronRight, CheckCircle2, Circle, Pencil, RotateCcw, Brain, Sparkles, Wrench, Copy, Check, Lightbulb, History, Bookmark, ArrowRight, ThumbsUp, ThumbsDown, MoreHorizontal } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import {
   Tooltip,
@@ -35,9 +35,10 @@ function getImageUrls(content: MsgContent): string[] {
 function formatTime(ts?: number): string {
   if (!ts) return "";
   const d = new Date(ts);
-  const date = d.toLocaleDateString([], { month: "short", day: "numeric" });
+  const day = d.getDate();
+  const month = d.toLocaleDateString([], { month: "short" });
   const time = d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
-  return `${date} at ${time}`;
+  return `${day} ${month} at ${time}`;
 }
 
 // --- Response parser ---
@@ -72,7 +73,6 @@ function parseStructuredResponse(text: string, isStreaming?: boolean): ParsedSec
     sections.push({ type: "thinking", content: thinkingText });
   }
 
-  // While streaming, skip task/summary parsing — just render as plain text to avoid premature "Changes complete"
   if (isStreaming) {
     sections.push({ type: "text", content: remaining });
     if (sections.length === 0) sections.push({ type: "text", content: text });
@@ -86,7 +86,6 @@ function parseStructuredResponse(text: string, isStreaming?: boolean): ParsedSec
 
   for (const line of lines) {
     const trimmed = line.trim();
-    // Only match EXPLICIT task markers — checkmarks and markdown checkboxes
     const checkDone = trimmed.match(/^(?:✅|☑️?|✓|[✔])\s*(.+)/);
     const checkUndone = trimmed.match(/^(?:⬜|☐|○)\s*(.+)/);
     const mdCheckDone = trimmed.match(/^-\s*\[x\]\s*(.+)/i);
@@ -128,15 +127,11 @@ const ThinkingSection = ({ content }: { content: string }) => {
   return (
     <button
       onClick={() => setExpanded(!expanded)}
-      className="flex items-center gap-2 text-[11px] text-muted-foreground/50 hover:text-muted-foreground/70 transition-colors mb-3 group"
+      className="flex items-center gap-2 text-xs text-muted-foreground/60 hover:text-muted-foreground/80 transition-colors mb-3 group"
     >
-      <div className="w-4 h-4 rounded-md bg-muted/50 flex items-center justify-center">
-        <Brain className="w-2.5 h-2.5" />
-      </div>
-      <span className="font-medium tracking-wide">Thought process</span>
-      {expanded ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
+      <span className="font-medium">Finished thinking</span>
       {expanded && (
-        <motion.span initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="ml-1 text-muted-foreground/40 font-normal italic">
+        <motion.span initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="ml-1 text-muted-foreground/40 font-normal italic text-[12px]">
           {content}
         </motion.span>
       )}
@@ -148,71 +143,52 @@ const TaskCard = ({ tasks }: { tasks: { label: string; done: boolean }[] }) => {
   const [collapsed, setCollapsed] = useState(false);
   const doneCount = tasks.filter(t => t.done).length;
   const allDone = doneCount === tasks.length;
-  const progress = tasks.length > 0 ? (doneCount / tasks.length) * 100 : 0;
 
   return (
     <motion.div
       initial={{ opacity: 0, y: 6 }}
       animate={{ opacity: 1, y: 0 }}
-      className="rounded-xl border border-border/60 bg-card/40 backdrop-blur-sm overflow-hidden mb-4"
+      className="rounded-2xl border border-border/50 bg-card/60 overflow-hidden mb-4"
     >
       <button
         onClick={() => setCollapsed(!collapsed)}
-        className="w-full flex items-center justify-between px-4 py-3 hover:bg-secondary/20 transition-colors"
+        className="w-full flex items-center justify-between px-4 py-3 hover:bg-muted/10 transition-colors"
       >
         <div className="flex items-center gap-2.5">
           {allDone ? (
-            <div className="w-5 h-5 rounded-full bg-[hsl(var(--ide-success))]/10 flex items-center justify-center">
-              <CheckCircle2 className="w-3.5 h-3.5 text-[hsl(var(--ide-success))]" />
-            </div>
+            <CheckCircle2 className="w-4 h-4 text-[hsl(var(--ide-success))]" />
           ) : (
-            <div className="w-5 h-5 rounded-full bg-primary/10 flex items-center justify-center">
-              <Wrench className="w-3 h-3 text-primary" />
-            </div>
+            <Wrench className="w-4 h-4 text-primary" />
           )}
-          <span className="text-[12px] font-semibold text-foreground tracking-tight">
+          <span className="text-sm font-medium text-foreground">
             {allDone ? "Changes complete" : "Building..."}
           </span>
-          <span className="text-[10px] text-muted-foreground/50 font-mono">
-            {doneCount}/{tasks.length}
-          </span>
         </div>
-        {collapsed ? <ChevronRight className="w-3.5 h-3.5 text-muted-foreground/30" /> : <ChevronDown className="w-3.5 h-3.5 text-muted-foreground/30" />}
+        {collapsed ? <ChevronRight className="w-4 h-4 text-muted-foreground/40" /> : <ChevronDown className="w-4 h-4 text-muted-foreground/40" />}
       </button>
-
-      {/* Progress bar */}
-      <div className="h-[2px] bg-border/30 mx-4">
-        <motion.div
-          className="h-full rounded-full"
-          style={{ backgroundColor: allDone ? "hsl(var(--ide-success))" : "hsl(var(--primary))" }}
-          initial={{ width: 0 }}
-          animate={{ width: `${progress}%` }}
-          transition={{ duration: 0.5, ease: "easeOut" }}
-        />
-      </div>
 
       {!collapsed && (
         <motion.div initial={{ height: 0 }} animate={{ height: "auto" }}>
-          <div className="px-4 py-3 space-y-1">
+          <div className="px-4 pb-3 space-y-1.5">
             {tasks.map((task, i) => (
               <motion.div
                 key={i}
                 initial={{ opacity: 0, x: -4 }}
                 animate={{ opacity: 1, x: 0 }}
                 transition={{ delay: i * 0.03 }}
-                className="flex items-start gap-2.5 py-1"
+                className="flex items-start gap-2.5 py-0.5"
               >
                 {task.done ? (
-                  <CheckCircle2 className="w-3.5 h-3.5 text-[hsl(var(--ide-success))] shrink-0 mt-[3px]" />
+                  <CheckCircle2 className="w-4 h-4 text-[hsl(var(--ide-success))] shrink-0 mt-[2px]" />
                 ) : (
-                  <Circle className="w-3.5 h-3.5 text-muted-foreground/25 shrink-0 mt-[3px]" />
+                  <Circle className="w-4 h-4 text-muted-foreground/25 shrink-0 mt-[2px]" />
                 )}
-                <span className={`text-[12px] leading-relaxed ${task.done ? "text-foreground/80" : "text-muted-foreground/60"}`}>
+                <span className={`text-sm leading-relaxed ${task.done ? "text-foreground/80" : "text-muted-foreground/50"}`}>
                   <ReactMarkdown
                     components={{
                       p: ({ children }) => <span>{children}</span>,
                       strong: ({ children }) => <strong className="font-semibold text-foreground">{children}</strong>,
-                      code: ({ children }) => <code className="text-primary bg-primary/8 px-1.5 py-0.5 rounded text-[11px] font-[JetBrains_Mono]">{children}</code>,
+                      code: ({ children }) => <code className="text-primary bg-primary/8 px-1.5 py-0.5 rounded text-xs font-[JetBrains_Mono]">{children}</code>,
                     }}
                   >
                     {task.label}
@@ -230,10 +206,10 @@ const TaskCard = ({ tasks }: { tasks: { label: string; done: boolean }[] }) => {
 const SummarySection = ({ content }: { content: string }) => (
   <div className="mt-4 pt-3 border-t border-border/30">
     <div className="flex items-center gap-1.5 mb-2">
-      <Sparkles className="w-3 h-3 text-primary/50" />
-      <span className="text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground/40">Summary</span>
+      <Sparkles className="w-3.5 h-3.5 text-primary/50" />
+      <span className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground/40">Summary</span>
     </div>
-    <div className="text-[13px] text-foreground/70 leading-[1.75] prose prose-invert prose-sm max-w-none prose-p:my-1 prose-strong:text-foreground">
+    <div className="text-sm text-foreground/70 leading-[1.8] prose prose-invert prose-sm max-w-none prose-p:my-1 prose-strong:text-foreground">
       <ReactMarkdown>{content}</ReactMarkdown>
     </div>
   </div>
@@ -249,10 +225,10 @@ const CopyButton = ({ text }: { text: string }) => {
   return (
     <button
       onClick={handleCopy}
-      className="p-1 rounded-md text-white/60 hover:text-white hover:bg-secondary/50 transition-all"
+      className="p-1.5 rounded-lg text-muted-foreground/40 hover:text-foreground hover:bg-muted/30 transition-all"
       title="Copy message"
     >
-      {copied ? <Check className="w-3 h-3 text-[hsl(var(--ide-success))]" /> : <Copy className="w-3 h-3" />}
+      {copied ? <Check className="w-4 h-4 text-[hsl(var(--ide-success))]" /> : <Copy className="w-4 h-4" />}
     </button>
   );
 };
@@ -267,8 +243,6 @@ interface ContextHint {
 
 function detectContextHints(text: string): ContextHint[] {
   const hints: ContextHint[] = [];
-  
-  // Detect [CONTEXT: ...] markers injected by the AI
   const contextPattern = /\[CONTEXT:\s*([^\]]+)\]/gi;
   let match;
   while ((match = contextPattern.exec(text)) !== null) {
@@ -281,8 +255,6 @@ function detectContextHints(text: string): ContextHint[] {
       hints.push({ icon: Lightbulb, text: hint, type: "convention" });
     }
   }
-
-  // Also detect inline memory references without markers
   if (hints.length === 0) {
     const memoryPhrases = [
       { pattern: /(?:applying|using) your (?:preferred|saved|chosen) (.+?)(?:\.|,|$)/i, type: "memory" as const },
@@ -301,7 +273,6 @@ function detectContextHints(text: string): ContextHint[] {
       }
     }
   }
-
   return hints;
 }
 
@@ -311,13 +282,11 @@ function stripContextMarkers(text: string): string {
 
 const ContextBadges = ({ hints }: { hints: ContextHint[] }) => {
   if (hints.length === 0) return null;
-  
   const colorMap = {
     memory: { bg: "bg-primary/8", text: "text-primary/70", border: "border-primary/15" },
     pattern: { bg: "bg-accent/8", text: "text-accent/70", border: "border-accent/15" },
     convention: { bg: "bg-[hsl(var(--ide-success))]/8", text: "text-[hsl(var(--ide-success))]/70", border: "border-[hsl(var(--ide-success))]/15" },
   };
-
   return (
     <div className="flex flex-wrap gap-1.5 mb-2.5">
       {hints.map((hint, i) => {
@@ -329,7 +298,7 @@ const ContextBadges = ({ hints }: { hints: ContextHint[] }) => {
             initial={{ opacity: 0, scale: 0.9, y: -4 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             transition={{ delay: i * 0.08, duration: 0.25 }}
-            className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[10px] font-medium border ${colors.bg} ${colors.text} ${colors.border}`}
+            className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-medium border ${colors.bg} ${colors.text} ${colors.border}`}
           >
             <Icon className="w-3 h-3" />
             <span className="max-w-[200px] truncate">{hint.text}</span>
@@ -356,10 +325,6 @@ function parseSuggestions(text: string): { suggestions: Suggestion[]; cleanText:
   
   for (const line of lines) {
     const trimmed = line.trim();
-    // Match formats like:
-    // 🚀 **AI Tutor** - An education platform...
-    // boardroom AI Board of Directors — A subscription...
-    // - **Smart Agent**: Does things...
     const match = trimmed.match(/^(?:-\s*)?(?:([\p{Emoji_Presentation}\p{Emoji}\uFE0F]+|[a-zA-Z0-9_]+)\s+)?(?:\*\*(.+?)\*\*|([^—–\-:*]+?))\s*[—–\-:]\s*(.+)$/u);
     
     if (match && match[0].length > 15) {
@@ -367,7 +332,6 @@ function parseSuggestions(text: string): { suggestions: Suggestion[]; cleanText:
       const title = (match[2] || match[3])?.trim();
       const description = match[4]?.trim();
       
-      // Filter out invalid matches (e.g., standard sentences that happen to have a dash)
       if (title && title.length > 2 && title.length < 60) {
         suggestions.push({
           emoji: (iconRaw.length > 2 && !iconRaw.match(/\p{Emoji}/u)) ? '💡' : iconRaw,
@@ -403,20 +367,17 @@ const SuggestionButtons = ({ suggestions, onClick }: { suggestions: Suggestion[]
             active:scale-[0.98] transition-all duration-300 group"
         >
           <div className="absolute top-0 right-0 w-32 h-32 bg-primary/5 rounded-full blur-3xl -mr-10 -mt-10 group-hover:bg-primary/10 transition-colors duration-500" />
-          
           <div className="flex items-center gap-3 z-10">
             <span className="flex items-center justify-center w-8 h-8 rounded-xl bg-gradient-to-br from-primary/10 to-primary/5 text-lg shadow-sm border border-primary/10 shrink-0 group-hover:scale-110 transition-transform duration-300">
               {s.emoji}
             </span>
-            <span className="font-semibold text-[13px] text-foreground/90 group-hover:text-primary transition-colors line-clamp-1">
+            <span className="font-semibold text-sm text-foreground/90 group-hover:text-primary transition-colors line-clamp-1">
               {s.title}
             </span>
           </div>
-          
-          <span className="text-[12px] text-muted-foreground/75 leading-relaxed z-10 line-clamp-3">
+          <span className="text-xs text-muted-foreground/75 leading-relaxed z-10 line-clamp-3">
             {s.description}
           </span>
-          
           <div className="absolute bottom-3 right-3 opacity-0 group-hover:opacity-100 transform translate-x-2 group-hover:translate-x-0 transition-all duration-300 z-10">
             <div className="w-6 h-6 rounded-full bg-primary/10 flex items-center justify-center">
               <ArrowRight className="w-3 h-3 text-primary" />
@@ -428,6 +389,47 @@ const SuggestionButtons = ({ suggestions, onClick }: { suggestions: Suggestion[]
   );
 };
 
+// --- Action bar (thumbs up/down, copy, more) ---
+
+const ActionBar = ({ text, onRegenerate }: { text: string; onRegenerate?: () => void }) => {
+  const [liked, setLiked] = useState<"up" | "down" | null>(null);
+  const [copied, setCopied] = useState(false);
+
+  const handleCopy = () => {
+    navigator.clipboard.writeText(text);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  return (
+    <div className="flex items-center gap-1 mt-3">
+      <button
+        onClick={() => setLiked(liked === "up" ? null : "up")}
+        className={`p-1.5 rounded-lg transition-all ${liked === "up" ? "text-foreground bg-muted/30" : "text-muted-foreground/40 hover:text-foreground hover:bg-muted/20"}`}
+      >
+        <ThumbsUp className="w-4 h-4" />
+      </button>
+      <button
+        onClick={() => setLiked(liked === "down" ? null : "down")}
+        className={`p-1.5 rounded-lg transition-all ${liked === "down" ? "text-foreground bg-muted/30" : "text-muted-foreground/40 hover:text-foreground hover:bg-muted/20"}`}
+      >
+        <ThumbsDown className="w-4 h-4" />
+      </button>
+      <button
+        onClick={handleCopy}
+        className="p-1.5 rounded-lg text-muted-foreground/40 hover:text-foreground hover:bg-muted/20 transition-all"
+      >
+        {copied ? <Check className="w-4 h-4 text-[hsl(var(--ide-success))]" /> : <Copy className="w-4 h-4" />}
+      </button>
+      <button
+        className="p-1.5 rounded-lg text-muted-foreground/40 hover:text-foreground hover:bg-muted/20 transition-all"
+      >
+        <MoreHorizontal className="w-4 h-4" />
+      </button>
+    </div>
+  );
+};
+
 // --- Main component ---
 
 const ChatMessage = ({ content, role, timestamp, isLoading, onEdit, onRegenerate, showActions = true, onSuggestionClick }: ChatMessageProps) => {
@@ -435,13 +437,9 @@ const ChatMessage = ({ content, role, timestamp, isLoading, onEdit, onRegenerate
   const textContent = getTextContent(content);
   const imageUrls = getImageUrls(content);
   
-  // Detect and strip context hints for assistant messages
   const contextHints = !isUser ? detectContextHints(textContent) : [];
   const cleanText = !isUser ? stripContextMarkers(textContent) : textContent;
-  
-  // Parse suggestion buttons from assistant responses
   const { suggestions, cleanText: textWithoutSuggestions } = !isUser ? parseSuggestions(cleanText) : { suggestions: [], cleanText: cleanText };
-  // Don't parse structured sections (task cards, summaries) while still loading — prevents premature "Changes complete"
   const sections = !isUser ? parseStructuredResponse(textWithoutSuggestions, isLoading) : [];
 
   return (
@@ -451,10 +449,18 @@ const ChatMessage = ({ content, role, timestamp, isLoading, onEdit, onRegenerate
       transition={{ duration: 0.25, ease: [0.25, 0.46, 0.45, 0.94] }}
       className={`group relative ${isUser ? "pl-8" : ""}`}
     >
-      {/* User messages: clean right-aligned bubble */}
+      {/* Timestamp above the message - Lovable style */}
+      {isUser && timestamp && (
+        <div className="text-center mb-3">
+          <span className="text-xs text-muted-foreground/50 font-medium">
+            {formatTime(timestamp)}
+          </span>
+        </div>
+      )}
+
+      {/* User messages: right-aligned bubble */}
       {isUser ? (
         <div className="flex flex-col items-end gap-1">
-          {/* Images */}
           {imageUrls.length > 0 && (
             <div className="flex gap-2 flex-wrap justify-end mb-1">
               {imageUrls.map((url, idx) => (
@@ -462,69 +468,30 @@ const ChatMessage = ({ content, role, timestamp, isLoading, onEdit, onRegenerate
               ))}
             </div>
           )}
-          <div className="max-w-[85%] rounded-2xl rounded-tr-md bg-primary/12 border border-primary/15 px-4 py-2.5">
-            <p className="text-[13px] text-foreground leading-[1.7] whitespace-pre-wrap">{textContent}</p>
+          <div className="max-w-[85%] rounded-2xl rounded-tr-md bg-muted/40 border border-border/30 px-4 py-3">
+            <p className="text-sm text-foreground leading-[1.7] whitespace-pre-wrap">{textContent}</p>
           </div>
-          <div className="flex items-center gap-1.5 px-1 transition-opacity">
-            {timestamp && (
-              <span className="text-[11px] text-white font-semibold flex items-center gap-1">
-                <Clock className="w-2.5 h-2.5" />
-                {formatTime(timestamp)}
-              </span>
-            )}
-            {showActions && !isLoading && onEdit && (
+          {showActions && !isLoading && onEdit && (
+            <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
               <button
                 onClick={onEdit}
-                className="p-1 rounded-md text-white/60 hover:text-white hover:bg-secondary/50 transition-all"
+                className="p-1 rounded-md text-muted-foreground/40 hover:text-foreground hover:bg-muted/20 transition-all"
                 title="Edit message"
               >
-                <Pencil className="w-3 h-3" />
+                <Pencil className="w-3.5 h-3.5" />
               </button>
-            )}
-          </div>
+            </div>
+          )}
         </div>
       ) : (
-        /* Assistant messages: clean left-aligned with icon */
-        <div className="flex gap-3">
-          {/* Avatar */}
-          <div className="w-7 h-7 rounded-xl bg-gradient-to-br from-accent/20 to-accent/5 ring-1 ring-accent/15 flex items-center justify-center shrink-0 mt-0.5">
-            <Bot className="w-3.5 h-3.5 text-accent" />
-          </div>
-
-          {/* Body */}
-          <div className="flex-1 min-w-0">
-            {/* Header */}
-            <div className="flex items-center gap-2 mb-2">
-              <span className="text-[11px] font-semibold tracking-wide text-white">
-                Phoenix
-              </span>
-              {timestamp && (
-                <span className="text-[11px] text-white font-semibold transition-opacity flex items-center gap-1">
-                  <Clock className="w-2.5 h-2.5" />
-                  {formatTime(timestamp)}
-                </span>
-              )}
-              {/* Actions */}
-              {showActions && !isLoading && (
-                <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity ml-auto">
-                  <CopyButton text={textContent} />
-                  {onRegenerate && (
-                    <button
-                      onClick={onRegenerate}
-                      className="p-1 rounded-md text-white/60 hover:text-white hover:bg-secondary/50 transition-all"
-                      title="Regenerate response"
-                    >
-                      <RotateCcw className="w-3 h-3" />
-                    </button>
-                  )}
-                </div>
-              )}
-            </div>
-
+        /* Assistant messages */
+        <div className="flex flex-col gap-0">
+          {/* Content */}
+          <div className="min-w-0">
             {/* Context awareness badges */}
             <ContextBadges hints={contextHints} />
 
-            {/* Content */}
+            {/* Sections */}
             <div className="space-y-0">
               {sections.map((section, i) => {
                 switch (section.type) {
@@ -539,12 +506,12 @@ const ChatMessage = ({ content, role, timestamp, isLoading, onEdit, onRegenerate
                     return (
                       <div
                         key={i}
-                        className="text-[13px] text-foreground/85 leading-[1.75] prose prose-invert prose-sm max-w-none
+                        className="text-sm text-foreground/90 leading-[1.8] prose prose-invert prose-sm max-w-none
                           prose-p:my-2
                           prose-headings:my-3 prose-headings:font-semibold prose-headings:tracking-tight prose-headings:text-foreground
-                          prose-ul:my-2 prose-li:my-0.5
-                          prose-code:font-[JetBrains_Mono] prose-code:text-primary prose-code:bg-primary/8 prose-code:px-1.5 prose-code:py-0.5 prose-code:rounded-md prose-code:text-[11.5px] prose-code:font-medium
-                          prose-pre:bg-[hsl(var(--ide-panel))] prose-pre:rounded-xl prose-pre:p-4 prose-pre:border prose-pre:border-border/50 prose-pre:font-[JetBrains_Mono] prose-pre:text-[12px] prose-pre:leading-relaxed
+                          prose-ul:my-2 prose-ul:space-y-1 prose-li:my-0.5
+                          prose-code:font-[JetBrains_Mono] prose-code:text-primary prose-code:bg-primary/8 prose-code:px-1.5 prose-code:py-0.5 prose-code:rounded-md prose-code:text-xs prose-code:font-medium
+                          prose-pre:bg-[hsl(var(--ide-panel))] prose-pre:rounded-xl prose-pre:p-4 prose-pre:border prose-pre:border-border/50 prose-pre:font-[JetBrains_Mono] prose-pre:text-xs prose-pre:leading-relaxed
                           prose-strong:text-foreground prose-strong:font-semibold
                           prose-a:text-primary prose-a:no-underline hover:prose-a:underline
                           prose-blockquote:border-l-2 prose-blockquote:border-primary/30 prose-blockquote:pl-4 prose-blockquote:text-muted-foreground prose-blockquote:italic"
@@ -571,6 +538,11 @@ const ChatMessage = ({ content, role, timestamp, isLoading, onEdit, onRegenerate
             
             {/* Suggestion buttons */}
             <SuggestionButtons suggestions={suggestions} onClick={onSuggestionClick} />
+
+            {/* Action bar - thumbs up/down, copy, more */}
+            {showActions && !isLoading && textContent.length > 10 && (
+              <ActionBar text={textContent} onRegenerate={onRegenerate} />
+            )}
           </div>
         </div>
       )}
