@@ -144,7 +144,7 @@ ${knowledge?.length ? `Project knowledge:\n${knowledge.join("\n")}` : ""}`;
                     items: { type: "string" },
                     description: "Potential risks or blockers",
                   },
-                  tasks: {
+                    tasks: {
                     type: "array",
                     items: {
                       type: "object",
@@ -154,6 +154,11 @@ ${knowledge?.length ? `Project knowledge:\n${knowledge.join("\n")}` : ""}`;
                         description: { type: "string", description: "What this task does" },
                         buildPrompt: { type: "string", description: "The exact prompt to send to the build agent" },
                         complexity: { type: "string", enum: ["trivial", "simple", "medium", "complex"] },
+                        taskType: { 
+                          type: "string", 
+                          enum: ["schema", "backend", "frontend"],
+                          description: "Task type: schema (data layer), backend (API/auth/contexts), frontend (UI pages/components)" 
+                        },
                         dependsOn: {
                           type: "array",
                           items: { type: "string" },
@@ -177,7 +182,7 @@ ${knowledge?.length ? `Project knowledge:\n${knowledge.join("\n")}` : ""}`;
                           enum: ["ui", "backend", "auth", "data", "styling", "testing", "config"],
                         },
                       },
-                      required: ["id", "title", "description", "buildPrompt", "complexity", "dependsOn", "filesAffected", "category"],
+                      required: ["id", "title", "description", "buildPrompt", "complexity", "taskType", "dependsOn", "filesAffected", "category"],
                     },
                   },
                 },
