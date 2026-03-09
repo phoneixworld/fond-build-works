@@ -9,6 +9,7 @@
  * 3. A final assembly step ensures all modules are connected
  * 4. Failed tasks are retried with error context before moving on
  * 5. If no code is produced, the engine forces a retry with explicit instructions
+ * 6. Validation is parse-only (Sucrase + PostCSS) — no regex repair
  */
 
 import { streamBuildAgent, validateReactCode, formatRetryContext, MAX_BUILD_RETRIES } from "@/lib/agentPipeline";
@@ -29,25 +30,19 @@ async function autoDetectAndCreateSchemas(files: Record<string, string>, project
   try {
     const allCode = Object.values(files).join("\n");
     
-    // Pattern 1: collection: "xxx" in fetch bodies
     const collectionMatches = allCode.matchAll(/collection:\s*["'](\w+)["']/g);
     const collections = new Set<string>();
     for (const match of collectionMatches) {
       collections.add(match[1]);
     }
     
-    // Pattern 2: action: "create", collection: "xxx", data: { field1: ..., field2: ... }
-    // Try to infer field names from create/update calls
     const fieldsByCollection: Record<string, Set<string>> = {};
     
     for (const collection of collections) {
       fieldsByCollection[collection] = new Set<string>();
       
-      // Find data objects associated with this collection
       const dataPatterns = [
-        // data: { key: value, key2: value2 }
         new RegExp(`collection:\\s*["']${collection}["'][^}]*data:\\s*\\{([^}]+)\\}`, 'g'),
-        // Reverse order: data before collection
         new RegExp(`data:\\s*\\{([^}]+)\\}[^}]*collection:\\s*["']${collection}["']`, 'g'),
       ];
       
@@ -55,11 +50,9 @@ async function autoDetectAndCreateSchemas(files: Record<string, string>, project
         const matches = allCode.matchAll(pattern);
         for (const m of matches) {
           const dataBlock = m[1];
-          // Extract key names from object literal: key: value or key: "string" etc.
           const keyMatches = dataBlock.matchAll(/(\w+)\s*:/g);
           for (const km of keyMatches) {
             const key = km[1];
-            // Skip common non-field keys
             if (!['action', 'collection', 'project_id', 'id', 'filters'].includes(key)) {
               fieldsByCollection[collection].add(key);
             }
@@ -72,7 +65,6 @@ async function autoDetectAndCreateSchemas(files: Record<string, string>, project
     
     console.log(`[AutoSchema] Detected ${collections.size} collections:`, [...collections]);
     
-    // Fetch existing schemas for this project
     const { data: existing } = await supabase
       .from("project_schemas")
       .select("collection_name")
@@ -80,7 +72,6 @@ async function autoDetectAndCreateSchemas(files: Record<string, string>, project
     
     const existingNames = new Set((existing || []).map((s: any) => s.collection_name));
     
-    // Create schemas for new collections
     const newSchemas = [...collections]
       .filter(name => !existingNames.has(name))
       .map(name => {
@@ -142,7 +133,6 @@ export interface EngineConfig {
   snippetsContext?: string;
   existingFiles?: Record<string, string>;
   templateContext?: string;
-  /** Previous chat messages for context (so short prompts like "same" or "build users next" make sense) */
   chatHistory?: Array<{ role: string; content: string }>;
 }
 
@@ -180,110 +170,10 @@ export interface EngineResult {
   mergeConflicts: string[];
 }
 
-// ─── JSX Auto-Repair ──────────────────────────────────────────────────────
+// ─── File Validation (real parsers — single source of truth) ──────────────
 
 /**
- * Auto-repair common JSX issues from AI-generated code.
- */
-function autoRepairJSX(code: string): string {
-  // ── Use Sucrase for real parsing — if it parses, code is valid ──
-  try {
-    transform(code, { transforms: ["jsx", "imports"], filePath: "file.jsx" });
-    return code; // Already valid
-  } catch (e: any) {
-    const error = e.message || "";
-    console.warn(`[autoRepairJSX] Parse error: ${error.slice(0, 120)}`);
-  }
-
-  // ── Fix unterminated strings at FILE level ──
-  let inSingle = false, inDouble = false, inTemplate = false;
-  let prevCh = '';
-  for (const ch of code) {
-    if (prevCh !== '\\') {
-      if (ch === "'" && !inDouble && !inTemplate) inSingle = !inSingle;
-      if (ch === '"' && !inSingle && !inTemplate) inDouble = !inDouble;
-      if (ch === '`' && !inSingle && !inDouble) inTemplate = !inTemplate;
-    }
-    prevCh = ch;
-  }
-  if (inTemplate) code = code.trimEnd() + '`';
-  if (inDouble) code = code.trimEnd() + '"';
-  if (inSingle) code = code.trimEnd() + "'";
-
-  // ── Close unclosed brackets ──
-  let braces = 0, brackets = 0, parens = 0;
-  let inStr = false, strCh = '';
-  let prev = '';
-  for (const ch of code) {
-    if (prev !== '\\') {
-      if (!inStr && (ch === '"' || ch === "'" || ch === '`')) { inStr = true; strCh = ch; }
-      else if (inStr && ch === strCh) { inStr = false; }
-    }
-    if (!inStr) {
-      if (ch === '{') braces++; else if (ch === '}') braces--;
-      if (ch === '[') brackets++; else if (ch === ']') brackets--;
-      if (ch === '(') parens++; else if (ch === ')') parens--;
-    }
-    prev = ch;
-  }
-  const closers: string[] = [];
-  for (let i = 0; i < Math.min(Math.max(0, parens), 10); i++) closers.push(')');
-  for (let i = 0; i < Math.min(Math.max(0, brackets), 10); i++) closers.push(']');
-  for (let i = 0; i < Math.min(Math.max(0, braces), 10); i++) closers.push('}');
-  if (closers.length > 0) {
-    code = code.trimEnd() + ';\n' + closers.join(';\n') + ';\n';
-    if (!code.includes('export default') && code.includes('function App')) {
-      code += '\nexport default App;\n';
-    }
-  }
-
-  // Fix unclosed <Route ... element={<Comp />}> → self-close
-  code = code.replace(
-    /(<Route\s+[^>]*element=\{<[^>]+\/>\s*\})\s*>\s*$/gm,
-    "$1 />"
-  );
-  code = code.replace(
-    /(<Route\s+[^>]*element=\{<[^>]+\/>\s*\})\s*\n/gm,
-    "$1 />\n"
-  );
-
-  // Remove duplicate Route entries
-  const routePaths = new Map<string, boolean>();
-  const routeLines = code.split("\n");
-  const cleanedLines: string[] = [];
-  for (let i = 0; i < routeLines.length; i++) {
-    const routeMatch = routeLines[i].match(/<Route\s+path=["']([^"']+)["']/);
-    if (routeMatch) {
-      const path = routeMatch[1];
-      if (routePaths.has(path)) continue;
-      routePaths.set(path, true);
-    }
-    cleanedLines.push(routeLines[i]);
-  }
-  code = cleanedLines.join("\n");
-
-  // Ensure balanced </Routes> before </HashRouter>
-  const openRoutes = (code.match(/<Routes>/g) || []).length;
-  const closeRoutes = (code.match(/<\/Routes>/g) || []).length;
-  if (openRoutes > closeRoutes) {
-    code = code.replace(/(<\/HashRouter>)/, "</Routes>\n    $1");
-  }
-
-  // Final validation pass
-  try {
-    transform(code, { transforms: ["jsx", "imports"], filePath: "file.jsx" });
-    console.info("[autoRepairJSX] Successfully repaired code");
-  } catch (e: any) {
-    console.warn(`[autoRepairJSX] Code still has errors after repair: ${(e.message || "").slice(0, 100)}`);
-  }
-
-  return code;
-}
-
-// ─── File Validation (real parsers) ───────────────────────────────────────
-
-/**
- * Validate all generated files using real parsers.
+ * Validate all generated files using real parsers. No repair, no regex.
  * JSX/TSX → Sucrase, CSS → PostCSS.
  * Returns array of { file, error } for files that failed parsing.
  */
@@ -309,11 +199,48 @@ function validateAllFiles(files: Record<string, string>): { file: string; error:
   return errors;
 }
 
+/**
+ * Generate a stub component for a fatally broken file.
+ */
+function makeStub(filePath: string): string {
+  const componentName = filePath
+    .replace(/.*\//, '')
+    .replace(/\.(jsx?|tsx?)$/, '')
+    .replace(/[^a-zA-Z0-9]/g, '');
+  const safeName = componentName.charAt(0).toUpperCase() + componentName.slice(1) || 'BrokenModule';
+  return `import React from "react";\n\nexport default function ${safeName}() {\n  return (\n    <div className="p-8 text-center space-y-3">\n      <div className="w-10 h-10 mx-auto rounded-full bg-amber-100 flex items-center justify-center"><span className="text-amber-600 text-xl">\u26A0</span></div>\n      <h2 className="text-lg font-semibold text-slate-800">${safeName}</h2>\n      <p className="text-sm text-slate-500">This module had a build error after retries. Send a follow-up message to fix it.</p>\n    </div>\n  );\n}\n`;
+}
+
+/**
+ * Stub broken CSS with safe Tailwind fallback.
+ */
+function makeCSSSub(): string {
+  return `/* CSS had parse errors after retries — using safe fallback */\n@tailwind base;\n@tailwind components;\n@tailwind utilities;\n`;
+}
+
+/**
+ * After validation retries are exhausted, stub out files that still fail.
+ * Returns a clean file map where every file is parseable.
+ */
+function stubBrokenFiles(files: Record<string, string>, errors: { file: string; error: string }[]): Record<string, string> {
+  const result = { ...files };
+  for (const { file, error } of errors) {
+    console.warn(`[BuildEngine] Stubbing broken file "${file}": ${error}`);
+    if (file.match(/\.css$/)) {
+      result[file] = makeCSSSub();
+    } else if (file.match(/\.(jsx?|tsx?)$/)) {
+      result[file] = makeStub(file);
+    }
+  }
+  return result;
+}
+
 // ─── File Parser ───────────────────────────────────────────────────────────
 
 /**
  * Parse react files from build-agent output.
  * Handles multiple fence formats and file separator styles.
+ * NO repair — files are stored as-is from the AI output.
  */
 function parseReactFilesFromOutput(text: string): { 
   chatText: string; 
@@ -330,7 +257,6 @@ function parseReactFilesFromOutput(text: string): {
     if (fenceStart !== -1) break;
   }
   
-  // Fallback: generic fence with --- /App.jsx
   if (fenceStart === -1) {
     const genericFence = text.match(/```\w*\n[\s\S]*?---\s+\/?(src\/)?App\.jsx?\s*-{0,3}/);
     if (genericFence) fenceStart = text.indexOf(genericFence[0]);
@@ -359,7 +285,6 @@ function parseReactFilesFromOutput(text: string): {
   const block = fenceEnd === -1 ? text.slice(codeStart) : text.slice(codeStart, fenceEnd);
   if (block.trim().length === 0) return { chatText: text, files: null, deps };
 
-  // Parse file sections
   const separatorRegex = /^-{3}\s+(\/?\w[\w/.-]*\.(?:jsx?|tsx?|css))\s*-{0,3}\s*$/;
   const depsRegex = /^-{3}\s+dependencies\s*-{0,3}\s*$/;
   const lines = block.split("\n");
@@ -374,10 +299,7 @@ function parseReactFilesFromOutput(text: string): {
       if (code.length > 0) {
         let fname = currentFile.startsWith("/") ? currentFile : `/${currentFile}`;
         fname = fname.replace(/^\/src\//, "/");
-        // Auto-repair JSX issues in App files and component files
-        if (fname.match(/\.(jsx?|tsx?)$/)) {
-          code = autoRepairJSX(code);
-        }
+        // Store as-is — no repair. Validation happens downstream.
         files[fname] = code;
       }
     }
@@ -408,7 +330,6 @@ function parseReactFilesFromOutput(text: string): {
   }
   flush();
 
-  // If no separators found, treat as single App.jsx
   if (Object.keys(files).length === 0 && block.trim().length > 20) {
     files["/App.jsx"] = block.trim();
   }
@@ -423,8 +344,10 @@ function parseReactFilesFromOutput(text: string): {
 // ─── Single Task Executor ──────────────────────────────────────────────────
 
 /**
- * Execute a single build task with retry logic.
- * Returns the generated files or empty object on failure.
+ * Execute a single build task with validation-driven retry logic.
+ * 
+ * Flow: Generate → Validate (Sucrase + PostCSS) → if errors, retry with error context
+ * After max retries, stub broken files so the pipeline never emits invalid code.
  */
 async function executeSingleTask(
   prompt: string,
@@ -439,7 +362,6 @@ async function executeSingleTask(
     
     streamBuildAgent({
       messages: [
-        // Include chat history for context (so "same", "build users next" etc. work)
         ...(config.chatHistory || []).slice(-6).map(m => ({ role: m.role as "user" | "assistant", content: m.content })),
         { role: "user", content: prompt },
       ],
@@ -461,12 +383,13 @@ async function executeSingleTask(
         const parsed = parseReactFilesFromOutput(responseText);
         
         if (parsed.files && Object.keys(parsed.files).length > 0) {
-          // ── Validate all files with real parsers ──
+          // ── Validate all files with real parsers (single source of truth) ──
           const validationErrors = validateAllFiles(parsed.files);
           
           if (validationErrors.length > 0 && retryCount < 2) {
+            // Retry with exact parser errors — no repair attempt
             const errorSummary = validationErrors.map(e => `${e.file}: ${e.error}`).join('\n');
-            console.warn(`[BuildEngine] Parse errors found, retrying (attempt ${retryCount + 1}):\n${errorSummary}`);
+            console.warn(`[BuildEngine] Validation errors, retrying (attempt ${retryCount + 1}):\n${errorSummary}`);
             executeSingleTask(
               prompt + `\n\n⚠️ SYNTAX ERRORS IN YOUR OUTPUT — FIX THESE:\n${errorSummary}\n\nRegenerate ONLY the broken files with correct syntax.`,
               config,
@@ -476,10 +399,15 @@ async function executeSingleTask(
               maxTokens
             ).then(resolve).catch(reject);
           } else {
-            resolve({ files: parsed.files, deps: parsed.deps, chatText: parsed.chatText });
+            // Either valid, or max retries reached — stub any remaining broken files
+            let finalFiles = parsed.files;
+            if (validationErrors.length > 0) {
+              console.warn(`[BuildEngine] Max retries reached, stubbing ${validationErrors.length} broken file(s)`);
+              finalFiles = stubBrokenFiles(parsed.files, validationErrors);
+            }
+            resolve({ files: finalFiles, deps: parsed.deps, chatText: parsed.chatText });
           }
         } else if (retryCount < 2) {
-          // No code produced — force retry
           console.warn(`[BuildEngine] No code in response, retrying (attempt ${retryCount + 1})`);
           executeSingleTask(
             prompt + "\n\nCRITICAL: Your previous response did not contain code. You MUST output React code inside ```react-preview fences with --- /App.jsx markers. Output the code NOW.",
@@ -490,7 +418,6 @@ async function executeSingleTask(
             maxTokens
           ).then(resolve).catch(reject);
         } else {
-          // Give up — return empty
           console.error("[BuildEngine] No code after retries");
           resolve({ files: {}, deps: {}, chatText: responseText });
         }
@@ -512,10 +439,6 @@ async function executeSingleTask(
 
 // ─── Assembly Step ─────────────────────────────────────────────────────────
 
-/**
- * Final assembly: verify all components are imported and routes are connected.
- * If the App.jsx is missing imports or routes, trigger a targeted fix.
- */
 async function assembleApp(
   files: Record<string, string>,
   config: EngineConfig,
@@ -524,7 +447,6 @@ async function assembleApp(
   const appFile = files["/App.jsx"] || files["/App.tsx"];
   if (!appFile) return files;
   
-  // Check: are all component files imported and routed?
   const componentFiles = Object.keys(files).filter(p => 
     p.startsWith("/components/") && p.match(/\.(jsx?|tsx?)$/)
   );
@@ -540,7 +462,6 @@ async function assembleApp(
   
   if (missingImports.length === 0) return files;
   
-  // Trigger an assembly fix
   console.log(`[BuildEngine:assemble] ${missingImports.length} components not connected, running assembly fix`);
   
   const assemblyPrompt = `## ASSEMBLY FIX — Connect missing modules
@@ -561,7 +482,6 @@ ${buildFullCodeContext(files, 24000)}`;
   try {
     const result = await executeSingleTask(assemblyPrompt, config, buildFullCodeContext(files), onDelta, 0, 12000);
     if (result.files["/App.jsx"] || result.files["/App.tsx"]) {
-      // Only take the App file from assembly — don't overwrite components
       const appKey = result.files["/App.jsx"] ? "/App.jsx" : "/App.tsx";
       return { ...files, [appKey]: result.files[appKey] };
     }
@@ -574,12 +494,6 @@ ${buildFullCodeContext(files, 24000)}`;
 
 // ─── Main Engine ───────────────────────────────────────────────────────────
 
-/**
- * Run the full build engine pipeline.
- * 
- * For simple prompts: Direct build → validate → done
- * For complex prompts: Plan → execute tasks → merge → validate → assemble → done
- */
 export async function runBuildEngine(
   userPrompt: string,
   config: EngineConfig,
@@ -592,10 +506,8 @@ export async function runBuildEngine(
   
   try {
     if (isComplex && !hasExistingCode) {
-      // ─── COMPLEX: Plan → Execute → Merge → Assemble ─────────────────
       await runPlannedBuild(userPrompt, config, callbacks);
     } else {
-      // ─── SIMPLE: Direct build ─────────────────────────────────────────
       await runDirectBuild(userPrompt, config, callbacks);
     }
   } catch (err) {
@@ -604,9 +516,6 @@ export async function runBuildEngine(
   }
 }
 
-/**
- * Direct build — single prompt, single response
- */
 async function runDirectBuild(
   prompt: string,
   config: EngineConfig,
@@ -635,27 +544,16 @@ async function runDirectBuild(
     conflicts = merged.conflicts;
   }
   
-  // Validate
+  // Final validation pass (should pass since executeSingleTask already validates)
   callbacks.onProgress({ phase: "validating", message: "Validating code..." });
-  const validation = validateReactCode(finalFiles);
-  
-  if (!validation.valid) {
-    console.warn("[BuildEngine:direct] Validation issues:", validation.errors);
-    // Try auto-fix
-    const retryContext = formatRetryContext(validation.errors, 1, finalFiles);
-    const fixPrompt = `${prompt}\n\n${retryContext}`;
-    
-    const fixResult = await executeSingleTask(fixPrompt, config, existingCode, callbacks.onDelta);
-    if (Object.keys(fixResult.files).length > 0) {
-      finalFiles = config.existingFiles 
-        ? mergeFiles(config.existingFiles, fixResult.files).files 
-        : fixResult.files;
-    }
+  const postMergeErrors = validateAllFiles(finalFiles);
+  if (postMergeErrors.length > 0) {
+    console.warn("[BuildEngine:direct] Post-merge validation issues — stubbing:", postMergeErrors);
+    finalFiles = stubBrokenFiles(finalFiles, postMergeErrors);
   }
   
   callbacks.onFilesReady(finalFiles, result.deps);
   
-  // Auto-detect and create database schemas from generated code
   autoDetectAndCreateSchemas(finalFiles, config.projectId);
   
   callbacks.onProgress({ phase: "complete", message: "Build complete" });
@@ -667,15 +565,11 @@ async function runDirectBuild(
   });
 }
 
-/**
- * Planned build — decompose into tasks, execute sequentially, merge, assemble
- */
 async function runPlannedBuild(
   prompt: string,
   config: EngineConfig,
   callbacks: EngineCallbacks
 ): Promise<void> {
-  // Phase 1: Plan
   callbacks.onProgress({ phase: "planning", message: "Analyzing requirements and creating build plan..." });
   
   let plan: BuildPlan;
@@ -700,7 +594,6 @@ async function runPlannedBuild(
     return;
   }
 
-  // Phase 2: Execute tasks sequentially
   const sortedTasks = topologicalSort(plan.tasks);
   let accumulatedFiles: Record<string, string> = config.existingFiles ? { ...config.existingFiles } : {};
   let allDeps: Record<string, string> = {};
@@ -724,7 +617,6 @@ async function runPlannedBuild(
       plan,
     });
 
-    // Build a focused prompt with FULL accumulated context
     const codeContext = buildFullCodeContext(accumulatedFiles);
     
     const taskPrompt = `## TASK ${i + 1}/${sortedTasks.length}: ${task.title}
@@ -745,15 +637,12 @@ ${task.filesAffected.map(f => `- ${f}`).join("\n")}
       const taskResult = await executeSingleTask(taskPrompt, config, codeContext, callbacks.onDelta, 0, 16000);
       
       if (Object.keys(taskResult.files).length > 0) {
-        // Intelligent merge
         const merged = mergeFiles(accumulatedFiles, taskResult.files);
         accumulatedFiles = merged.files;
         allConflicts.push(...merged.conflicts);
         
-        // Accumulate deps
         Object.assign(allDeps, taskResult.deps);
         
-        // Push intermediate preview
         callbacks.onFilesReady(accumulatedFiles, allDeps);
         
         if (taskResult.chatText) lastChatText = taskResult.chatText;
@@ -763,7 +652,6 @@ ${task.filesAffected.map(f => `- ${f}`).join("\n")}
       }
     } catch (err) {
       console.error(`[BuildEngine] Task "${task.title}" failed:`, err);
-      // Continue with remaining tasks
     }
   }
 
@@ -772,24 +660,21 @@ ${task.filesAffected.map(f => `- ${f}`).join("\n")}
     return;
   }
 
-  // Phase 3: Validate
+  // Final validation after all tasks merged
   callbacks.onProgress({ phase: "validating", message: "Validating assembled app..." });
-  const validation = validateReactCode(accumulatedFiles);
-  if (!validation.valid) {
-    console.warn("[BuildEngine:planned] Validation issues:", validation.errors);
+  const finalErrors = validateAllFiles(accumulatedFiles);
+  if (finalErrors.length > 0) {
+    console.warn("[BuildEngine:planned] Stubbing broken files post-assembly:", finalErrors);
+    accumulatedFiles = stubBrokenFiles(accumulatedFiles, finalErrors);
   }
 
-  // Phase 4: Assembly — ensure all modules are connected
   callbacks.onProgress({ phase: "assembling", message: "Connecting all modules..." });
   accumulatedFiles = await assembleApp(accumulatedFiles, config, callbacks.onDelta);
   
-  // Final preview
   callbacks.onFilesReady(accumulatedFiles, allDeps);
   
-  // Auto-detect and create database schemas from generated code
   autoDetectAndCreateSchemas(accumulatedFiles, config.projectId);
   
-  // Build completion summary
   const taskSummary = sortedTasks.map((t, i) => `✅ ${i + 1}. ${t.title}`).join("\n");
   const chatText = `✅ **Build Complete** — ${sortedTasks.length} tasks\n\n${plan.summary}\n\n${taskSummary}`;
 
