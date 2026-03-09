@@ -925,22 +925,16 @@ const CONTEXT_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
 
     try {
       // ─── Context: served from in-memory cache (populated at project load) ───────
-      // fetchProjectContext uses Promise.allSettled internally so 4 queries run
-      // in parallel. On repeated messages the cache is hit and no DB query fires.
       const { schemas, knowledge } = await fetchProjectContext(currentProject.id);
 
       // ─── Current code context: smart file prioritization ─────────────────────
-      // The build agent receives the FULL current project so it never regresses or
-      // overwrites features the user already has.
       let currentCodeSummary = "";
       if (currentSandpackFiles && Object.keys(currentSandpackFiles).length > 0) {
         const fileEntries = Object.entries(currentSandpackFiles);
         const totalChars = fileEntries.reduce((sum, [, code]) => sum + code.length, 0);
         if (totalChars <= 16000) {
-          // Small project — send everything in full
           currentCodeSummary = fileEntries.map(([path, code]) => `--- ${path}\n${code}`).join("\n\n");
         } else {
-          // Large project — always include App entry point fully, then fill remaining budget
           const ENTRY_PATTERNS = ["/App.jsx", "/App.tsx", "/App.js"];
           const keyFiles = fileEntries.filter(([p]) => ENTRY_PATTERNS.some(k => p.endsWith(k)));
           const otherFiles = fileEntries.filter(([p]) => !ENTRY_PATTERNS.some(k => p.endsWith(k)));
@@ -984,272 +978,258 @@ const CONTEXT_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
         console.log(`[Template Matched] ${template.emoji} ${template.name}`);
         setSelectedTemplate(null);
       }
-      
-      await streamChat({
-        messages: apiMessages,
-        projectId: currentProject.id,
-        techStack: currentProject.tech_stack || "html-tailwind",
-        schemas,
-        model: selectedModel,
-        designTheme: themeInfo?.prompt,
-        knowledge,
-        templateContext: templateCtx || undefined,
-        currentCode: currentCodeSummary || undefined,
-        snippetsContext: snippetsContext || undefined,
-        onDelta: upsert,
-        onDone: async () => {
-          if (abortController.signal.aborted) return;
-          
-          // Debug: log response details
-          console.log(`[ChatPanel:onDone] Response length: ${fullResponse.length}`);
-          console.log(`[ChatPanel:onDone] Has react-preview fence:`, fullResponse.includes('```react-preview'));
-          console.log(`[ChatPanel:onDone] Has react fence:`, fullResponse.includes('```react'));
-          console.log(`[ChatPanel:onDone] First 200 chars of code area:`, fullResponse.slice(fullResponse.indexOf('```'), fullResponse.indexOf('```') + 200));
-          
-          // Check for React file output first
-          const reactResult = parseReactFiles(fullResponse);
-          let finalHtml: string | null = null;
-          
-          if (reactResult.files) {
-            // Validation step
-            setPipelineStep("validating");
-            setBuildStep("✅ Validating code...");
-            const validation = validateReactCode(reactResult.files);
-            
-            if (!validation.valid && buildRetryCount < MAX_BUILD_RETRIES) {
-              // AUTO-RETRY: Re-invoke build agent with error context
-              console.warn(`[ChatPanel:onDone] Validation failed (attempt ${buildRetryCount + 1}/${MAX_BUILD_RETRIES + 1}):`, validation.errors);
-              setPipelineStep("retrying");
-              setBuildStep(`🔄 Auto-fixing ${validation.errors.length} issue(s)... (attempt ${buildRetryCount + 2})`);
-              setBuildRetryCount(prev => prev + 1);
-              
-              setMessages((prev) => {
-                const retryMsg = `⚠️ Found ${validation.errors.length} issue(s), auto-fixing...`;
-                const last = prev[prev.length - 1];
-                if (last?.role === "assistant") {
-                  return prev.map((m, i) => (i === prev.length - 1 ? { ...m, content: retryMsg } : m));
-                }
-                return [...prev, { role: "assistant", content: retryMsg, timestamp: Date.now() }];
-              });
-              
-              const retryContext = formatRetryContext(validation.errors, buildRetryCount + 1);
-              let retryFullResponse = "";
-              
-              await streamBuildAgent({
-                messages: apiMessages,
-                projectId: currentProject.id,
-                techStack: currentProject.tech_stack || "react-cdn",
-                schemas,
-                model: selectedModel,
-                designTheme: themeInfo?.prompt,
-                knowledge,
-                currentCode: currentCodeSummary || undefined,
-                snippetsContext: snippetsContext || undefined,
-                retryContext,
-                onDelta: (chunk) => {
-                  retryFullResponse += chunk;
-                  setBuildStreamContent(retryFullResponse);
-                },
-                onDone: (retryText) => {
-                  const retryResult = parseReactFiles(retryText);
-                  if (retryResult.files) {
-                    const retryValidation = validateReactCode(retryResult.files);
-                    if (!retryValidation.valid) {
-                      console.warn("[ChatPanel:retry] Still has errors:", retryValidation.errors);
-                    }
-                    setSandpackFiles(retryResult.files);
-                    if (Object.keys(retryResult.deps).length > 0) setSandpackDeps(retryResult.deps);
-                    setPreviewMode("sandpack");
-                    
-                    const retryChatText = retryResult.chatText || "✅ Fixed and rebuilt successfully";
-                    setMessages((prev) => {
-                      const last = prev[prev.length - 1];
-                      if (last?.role === "assistant") {
-                        return prev.map((m, i) => (i === prev.length - 1 ? { ...m, content: retryChatText } : m));
-                      }
-                      return prev;
-                    });
-                  }
-                  
-                  // Finalize
-                  setIsLoading(false);
-                  setIsBuilding(false);
-                  setBuildStep("");
-                  setPipelineStep("complete");
-                  setCurrentAgent(null);
-                  setBuildRetryCount(0);
-                  isSendingRef.current = false;
-                  setTimeout(() => setBuildStreamContent(""), 3000);
-                  
-                  const persistMessages = messagesRef.current.map(m => ({
-                    role: m.role,
-                    content: typeof m.content === "string" ? m.content : getTextContent(m.content),
-                  }));
-                  saveProject({ chat_history: persistMessages });
-                },
-                onError: (err) => {
-                  console.error("[ChatPanel:retry] Retry failed:", err);
-                  // Fall through with original flawed output
-                  setSandpackFiles(reactResult.files!);
-                  if (Object.keys(reactResult.deps).length > 0) setSandpackDeps(reactResult.deps);
-                  setPreviewMode("sandpack");
-                  setIsLoading(false);
-                  setIsBuilding(false);
-                  setBuildStep("");
-                  setPipelineStep("complete");
-                  setCurrentAgent(null);
-                  setBuildRetryCount(0);
-                  isSendingRef.current = false;
-                },
-              });
-              return; // Retry handler will finalize
-            }
-            
-            if (!validation.valid) {
-              console.warn("[ChatPanel:onDone] Validation warnings (max retries reached):", validation.errors);
-            }
-            
-            // React/Sandpack mode — push to preview
-            const fileNames = Object.keys(reactResult.files);
-            console.log(`[ChatPanel:onDone] ✅ React files found:`, fileNames, `Total code: ${Object.values(reactResult.files).join('').length} chars`);
-            setSandpackFiles(reactResult.files);
-            if (Object.keys(reactResult.deps).length > 0) setSandpackDeps(reactResult.deps);
-            setPreviewMode("sandpack");
-            setBuildRetryCount(0);
-          } else {
-            console.log("[ChatPanel:onDone] ❌ No React files parsed — falling back to HTML mode");
-            const { files: parsedFiles, html: htmlCode, chatText } = parseMultiFileOutput(fullResponse);
-            
-            if (Object.keys(parsedFiles).length > 0) {
-              setVirtualFiles(parsedFiles);
-            }
-            
-            if (htmlCode) setPreviewHtml(postProcessHtml(htmlCode));
 
-            finalHtml = htmlCode;
-            if (htmlCode && htmlCode.length > 200 && currentMessages.length === 0) {
-              setBuildStep("Reviewing & polishing...");
-              try {
-                const reviewResp = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/review-code`, {
-                  method: "POST",
-                  headers: {
-                    "Content-Type": "application/json",
-                    Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
-                  },
-                  body: JSON.stringify({ html: htmlCode }),
-                });
-                if (reviewResp.ok) {
-                  const reviewData = await reviewResp.json();
-                  if (reviewData.reviewed && reviewData.html && reviewData.html.length > 200) {
-                    finalHtml = reviewData.html;
-                    setPreviewHtml(postProcessHtml(finalHtml));
-                  }
-                }
-              } catch (e) {
-                console.warn("[Phase 3] Review pass skipped:", e);
+      // ─── Shared onDone handler for both build-agent and chat paths ───
+      const handleOnDone = async (responseText: string) => {
+        if (abortController.signal.aborted) return;
+        fullResponse = responseText;
+        
+        console.log(`[ChatPanel:onDone] Response length: ${fullResponse.length}`);
+        
+        const reactResult = parseReactFiles(fullResponse);
+        let finalHtml: string | null = null;
+        
+        if (reactResult.files) {
+          setPipelineStep("validating");
+          setBuildStep("✅ Validating code...");
+          const validation = validateReactCode(reactResult.files);
+          
+          if (!validation.valid && buildRetryCount < MAX_BUILD_RETRIES) {
+            console.warn(`[ChatPanel:onDone] Validation failed (attempt ${buildRetryCount + 1}):`, validation.errors);
+            setPipelineStep("retrying");
+            setBuildStep(`🔄 Auto-fixing ${validation.errors.length} issue(s)...`);
+            setBuildRetryCount(prev => prev + 1);
+            
+            setMessages((prev) => {
+              const retryMsg = `⚠️ Found ${validation.errors.length} issue(s), auto-fixing...`;
+              const last = prev[prev.length - 1];
+              if (last?.role === "assistant") {
+                return prev.map((m, i) => (i === prev.length - 1 ? { ...m, content: retryMsg } : m));
               }
-            }
-          }
-
-          console.log(`[ChatPanel:onDone] Stream parse count: ${streamParseCount}, hasSetBuilding: ${hasSetBuilding}`);
-          
-          setIsLoading(false);
-          setIsBuilding(false);
-          setBuildStep("");
-          setPipelineStep("complete");
-          setCurrentAgent(null);
-          isSendingRef.current = false;
-          setTimeout(() => setBuildStreamContent(""), 3000);
-
-          const processedHtml = finalHtml ? postProcessHtml(finalHtml) : null;
-
-          // Auto-sync to Dev environment
-          if (processedHtml && currentProject?.id) {
-            supabase
-              .from("project_environments" as any)
-              .update({
-                html_snapshot: processedHtml,
-                status: "active",
-                updated_at: new Date().toISOString(),
-              } as any)
-              .eq("project_id", currentProject.id)
-              .eq("name", "development")
-              .then(() => {});
-          }
-
-          // Create version snapshot
-          if (processedHtml && onVersionCreated) {
-            const userPrompt = getTextContent(userMsg.content);
-            onVersionCreated({
-              id: crypto.randomUUID(),
-              timestamp: Date.now(),
-              label: userPrompt.slice(0, 60) || "Build update",
-              html: processedHtml,
-              messageIndex: currentMessages.length,
+              return [...prev, { role: "assistant", content: retryMsg, timestamp: Date.now() }];
             });
-          }
-
-          // Extract final chat text for persistence
-          const finalChatText = reactResult.files ? reactResult.chatText : (() => {
-            const { chatText: ct } = parseMultiFileOutput(fullResponse);
-            return ct;
-          })();
-
-          setMessages((prev) => {
-            const final = finalChatText
-              ? prev.map((m, i) => (i === prev.length - 1 && m.role === "assistant" ? { ...m, content: finalChatText } : m))
-              : prev;
-
-            const persistMessages = final.map(m => ({
-              role: m.role,
-              content: typeof m.content === "string" ? m.content : getTextContent(m.content),
-            }));
-
-            const isFirstMessage = persistMessages.filter(m => m.role === "user").length === 1;
             
-            if (isFirstMessage && currentProject.name === "Untitled Project") {
-              const userPromptText = persistMessages[0]?.content || "";
-              fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/project-name`, {
+            const retryContext = formatRetryContext(validation.errors, buildRetryCount + 1);
+            let retryFullResponse = "";
+            
+            await streamBuildAgent({
+              messages: apiMessages,
+              projectId: currentProject.id,
+              techStack: currentProject.tech_stack || "react-cdn",
+              schemas,
+              model: selectedModel,
+              designTheme: themeInfo?.prompt,
+              knowledge,
+              currentCode: currentCodeSummary || undefined,
+              snippetsContext: snippetsContext || undefined,
+              retryContext,
+              onDelta: (chunk) => {
+                retryFullResponse += chunk;
+                setBuildStreamContent(retryFullResponse);
+              },
+              onDone: (retryText) => {
+                const retryResult = parseReactFiles(retryText);
+                if (retryResult.files) {
+                  setSandpackFiles(retryResult.files);
+                  if (Object.keys(retryResult.deps).length > 0) setSandpackDeps(retryResult.deps);
+                  setPreviewMode("sandpack");
+                  
+                  const retryChatText = retryResult.chatText || "✅ Fixed and rebuilt successfully";
+                  setMessages((prev) => {
+                    const last = prev[prev.length - 1];
+                    if (last?.role === "assistant") {
+                      return prev.map((m, i) => (i === prev.length - 1 ? { ...m, content: retryChatText } : m));
+                    }
+                    return prev;
+                  });
+                }
+                
+                setIsLoading(false);
+                setIsBuilding(false);
+                setBuildStep("");
+                setPipelineStep("complete");
+                setCurrentAgent(null);
+                setBuildRetryCount(0);
+                isSendingRef.current = false;
+                setTimeout(() => setBuildStreamContent(""), 3000);
+                
+                const persistMessages = messagesRef.current.map(m => ({
+                  role: m.role,
+                  content: typeof m.content === "string" ? m.content : getTextContent(m.content),
+                }));
+                saveProject({ chat_history: persistMessages });
+              },
+              onError: (err) => {
+                console.error("[ChatPanel:retry] Retry failed:", err);
+                setSandpackFiles(reactResult.files!);
+                if (Object.keys(reactResult.deps).length > 0) setSandpackDeps(reactResult.deps);
+                setPreviewMode("sandpack");
+                setIsLoading(false);
+                setIsBuilding(false);
+                setBuildStep("");
+                setPipelineStep("complete");
+                setCurrentAgent(null);
+                setBuildRetryCount(0);
+                isSendingRef.current = false;
+              },
+            });
+            return;
+          }
+          
+          if (!validation.valid) {
+            console.warn("[ChatPanel:onDone] Validation warnings (max retries reached):", validation.errors);
+          }
+          
+          const fileNames = Object.keys(reactResult.files);
+          console.log(`[ChatPanel:onDone] ✅ React files:`, fileNames);
+          setSandpackFiles(reactResult.files);
+          if (Object.keys(reactResult.deps).length > 0) setSandpackDeps(reactResult.deps);
+          setPreviewMode("sandpack");
+          setBuildRetryCount(0);
+        } else {
+          console.log("[ChatPanel:onDone] No React files — falling back to HTML");
+          const { files: parsedFiles, html: htmlCode, chatText } = parseMultiFileOutput(fullResponse);
+          
+          if (Object.keys(parsedFiles).length > 0) setVirtualFiles(parsedFiles);
+          if (htmlCode) setPreviewHtml(postProcessHtml(htmlCode));
+
+          finalHtml = htmlCode;
+          if (htmlCode && htmlCode.length > 200 && currentMessages.length === 0) {
+            setBuildStep("Reviewing & polishing...");
+            try {
+              const reviewResp = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/review-code`, {
                 method: "POST",
                 headers: {
                   "Content-Type": "application/json",
                   Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
                 },
-                body: JSON.stringify({ prompt: userPromptText }),
-              })
-                .then(r => r.json())
-                .then(({ name, emoji }) => {
-                  const fullName = emoji ? `${emoji} ${name}` : name;
-                  supabase
-                    .from("projects")
-                    .update({ name: fullName, updated_at: new Date().toISOString() } as any)
-                    .eq("id", currentProject.id)
-                    .then(() => {
-                      saveProject({ name: fullName } as any);
-                    });
-                })
-                .catch(() => {});
+                body: JSON.stringify({ html: htmlCode }),
+              });
+              if (reviewResp.ok) {
+                const reviewData = await reviewResp.json();
+                if (reviewData.reviewed && reviewData.html && reviewData.html.length > 200) {
+                  finalHtml = reviewData.html;
+                  setPreviewHtml(postProcessHtml(finalHtml));
+                }
+              }
+            } catch (e) {
+              console.warn("[Phase 3] Review pass skipped:", e);
             }
+          }
+        }
 
-            saveProject({
-              chat_history: persistMessages,
-              html_content: finalHtml || currentProject.html_content || "",
-            });
+        setIsLoading(false);
+        setIsBuilding(false);
+        setBuildStep("");
+        setPipelineStep("complete");
+        setCurrentAgent(null);
+        isSendingRef.current = false;
+        setTimeout(() => setBuildStreamContent(""), 3000);
 
-            return final;
+        const processedHtml = finalHtml ? postProcessHtml(finalHtml) : null;
+
+        if (processedHtml && currentProject?.id) {
+          supabase
+            .from("project_environments" as any)
+            .update({ html_snapshot: processedHtml, status: "active", updated_at: new Date().toISOString() } as any)
+            .eq("project_id", currentProject.id)
+            .eq("name", "development")
+            .then(() => {});
+        }
+
+        if (processedHtml && onVersionCreated) {
+          onVersionCreated({
+            id: crypto.randomUUID(),
+            timestamp: Date.now(),
+            label: getTextContent(userMsg.content).slice(0, 60) || "Build update",
+            html: processedHtml,
+            messageIndex: currentMessages.length,
           });
-        },
-        onError: (err) => {
-          if (abortController.signal.aborted) return;
-          setMessages((prev) => [...prev, { role: "assistant", content: `⚠️ ${err}`, timestamp: Date.now() }]);
-          setIsLoading(false);
-          setIsBuilding(false);
-          setBuildStep("");
-          setPipelineStep("error");
-          setCurrentAgent(null);
-          isSendingRef.current = false;
-        },
-      });
+        }
+
+        const finalChatText = reactResult.files ? reactResult.chatText : (() => {
+          const { chatText: ct } = parseMultiFileOutput(fullResponse);
+          return ct;
+        })();
+
+        setMessages((prev) => {
+          const final = finalChatText
+            ? prev.map((m, i) => (i === prev.length - 1 && m.role === "assistant" ? { ...m, content: finalChatText } : m))
+            : prev;
+
+          const persistMessages = final.map(m => ({
+            role: m.role,
+            content: typeof m.content === "string" ? m.content : getTextContent(m.content),
+          }));
+
+          const isFirstMessage = persistMessages.filter(m => m.role === "user").length === 1;
+          if (isFirstMessage && currentProject.name === "Untitled Project") {
+            const userPromptText = persistMessages[0]?.content || "";
+            fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/project-name`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json", Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}` },
+              body: JSON.stringify({ prompt: userPromptText }),
+            })
+              .then(r => r.json())
+              .then(({ name, emoji }) => {
+                const fullName = emoji ? `${emoji} ${name}` : name;
+                supabase.from("projects").update({ name: fullName, updated_at: new Date().toISOString() } as any).eq("id", currentProject.id).then(() => saveProject({ name: fullName } as any));
+              })
+              .catch(() => {});
+          }
+
+          saveProject({ chat_history: persistMessages, html_content: finalHtml || currentProject.html_content || "" });
+          return final;
+        });
+      };
+
+      const handleOnError = (err: string) => {
+        if (abortController.signal.aborted) return;
+        setMessages((prev) => [...prev, { role: "assistant", content: `⚠️ ${err}`, timestamp: Date.now() }]);
+        setIsLoading(false);
+        setIsBuilding(false);
+        setBuildStep("");
+        setPipelineStep("error");
+        setCurrentAgent(null);
+        isSendingRef.current = false;
+      };
+
+      // ─── CORE FIX: Use build-agent for React stacks (lower temperature, focused prompts) ───
+      const isReactStack = ["react-cdn", "react-node", "react-python", "react-go", "nextjs"].includes(currentProject.tech_stack || "react-cdn");
+      
+      if (isReactStack) {
+        await streamBuildAgent({
+          messages: apiMessages,
+          projectId: currentProject.id,
+          techStack: currentProject.tech_stack || "react-cdn",
+          schemas,
+          model: selectedModel,
+          designTheme: themeInfo?.prompt,
+          knowledge,
+          templateContext: templateCtx || undefined,
+          currentCode: currentCodeSummary || undefined,
+          snippetsContext: snippetsContext || undefined,
+          onDelta: upsert,
+          onDone: handleOnDone,
+          onError: handleOnError,
+        });
+      } else {
+        await streamChat({
+          messages: apiMessages,
+          projectId: currentProject.id,
+          techStack: currentProject.tech_stack || "html-tailwind",
+          schemas,
+          model: selectedModel,
+          designTheme: themeInfo?.prompt,
+          knowledge,
+          templateContext: templateCtx || undefined,
+          currentCode: currentCodeSummary || undefined,
+          snippetsContext: snippetsContext || undefined,
+          onDelta: upsert,
+          onDone: () => handleOnDone(fullResponse),
+          onError: handleOnError,
+        });
+      }
     } catch (e) {
       console.error("[ChatPanel] sendMessage error:", e);
       setIsLoading(false);

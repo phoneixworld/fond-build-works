@@ -94,7 +94,25 @@ Generate a SINGLE complete index.html inside a \`\`\`html-preview code fence.`;
 - NEVER use \`require()\` — use ES6 imports only
 - NEVER import from packages not in the allowed list above
 
-## COMMON MISTAKES TO AVOID — CORRECTION EXAMPLES
+## REQUIREMENTS TRANSLATION — CRITICAL
+Before generating code, mentally perform this analysis:
+1. **Extract every feature** from the user's request — if they say "with all features", expand to at least 8-12 concrete features
+2. **Map each feature to components**: each feature = at least 1 dedicated component file
+3. **Define routes**: multi-module apps need React Router with sidebar/tab navigation
+4. **Data model**: infer collections needed and create full CRUD for each
+5. **UI completeness**: every screen needs header, content area, actions, empty states, loading states
+6. **Indian/regional context**: if user mentions India, use ₹ currency, Indian phone formats, state names, CBSE/ICSE boards, etc.
+
+Example: "School ERP with student management, fees, timetable" should produce:
+- /App.jsx with router + sidebar navigation
+- /components/Sidebar.jsx with icons for each module
+- /components/Dashboard.jsx with KPI cards, charts, recent activity
+- /components/StudentManagement.jsx with full CRUD table, search, filters, add/edit modal
+- /components/FeeManagement.jsx with fee collection, receipts, pending list
+- /components/Timetable.jsx with weekly grid view, period management
+- At minimum 8-15 component files for a comprehensive app
+
+## COMMON MISTAKES TO AVOID
 
 ❌ WRONG - Bracket notation in JSX:
 {items.map((item, i) => <arr[i].icon className="w-6 h-6" />)}
@@ -127,16 +145,20 @@ export default function App() { return <div>Hello</div>; }
 
 ✅ CORRECT - Use gradients or icons:
 <div className="w-64 h-64 rounded-lg bg-gradient-to-br from-blue-400 to-purple-600" />
-{/* OR */}
-<Image className="w-64 h-64" />
 
 ❌ WRONG - Importing unavailable packages:
 import axios from "axios";
-import _ from "lodash";
 
-✅ CORRECT - Use native fetch and built-in methods:
+✅ CORRECT - Use native fetch:
 const response = await fetch(url);
-const data = await response.json();
+
+❌ WRONG - Primitive/placeholder content:
+<p>Lorem ipsum dolor sit amet</p>
+<div>Feature 1 description goes here</div>
+
+✅ CORRECT - Real, contextual content:
+<p>Track student attendance in real-time with automated SMS notifications to parents</p>
+<div>Manage fee collections with ₹ receipts, pending reminders, and installment plans</div>
 
 ## ERROR HANDLING — MANDATORY
 - ALL fetch calls wrapped in try/catch with user-visible error states
@@ -144,36 +166,25 @@ const data = await response.json();
 - Empty states with helpful CTAs for all data lists
 - Form validation with inline error messages (not just alerts)
 - Graceful degradation — app must never show a blank screen on error
-- Use React error boundaries at the App level:
-  class ErrorBoundary extends React.Component {
-    state = { hasError: false };
-    static getDerivedStateFromError() { return { hasError: true }; }
-    render() { return this.state.hasError ? <FallbackUI /> : this.props.children; }
-  }
 
 ## ACCESSIBILITY — MANDATORY
-- All interactive elements must have accessible names (aria-label or visible text)
-- All images/icons must have alt text or aria-hidden="true" for decorative ones
-- Color contrast ratio: minimum 4.5:1 for normal text, 3:1 for large text
-- Focus indicators on all interactive elements (focus-visible:ring-2)
+- All interactive elements must have accessible names
+- Color contrast ratio: minimum 4.5:1 for normal text
+- Focus indicators on all interactive elements
 - Keyboard navigation: all actions reachable via Tab + Enter/Space
-- Skip navigation link for complex layouts
-- Use semantic HTML: <nav>, <main>, <article>, <section>, <header>, <footer>
+- Semantic HTML: <nav>, <main>, <article>, <section>, <header>, <footer>
 - Form inputs must have associated <label> elements
-- ARIA landmarks for major page sections
 
 ## PERFORMANCE
 - Use React.memo() for expensive list items
 - Use useCallback for event handlers passed to children
-- Lazy load below-fold content with Intersection Observer
 - Debounce search/filter inputs (300ms)
-- Virtualize lists over 50 items
 - Minimize re-renders: avoid creating objects/arrays in JSX props
 
 ## STATE MANAGEMENT
 - useState for component-local state
 - useReducer for complex state with multiple sub-values
-- Lift state to lowest common ancestor — avoid prop drilling more than 2 levels
+- Lift state to lowest common ancestor
 - Use React context for truly global state (theme, auth, etc.)
 - NEVER store derived state — compute it in render or useMemo`;
 
@@ -232,23 +243,36 @@ ${schemaSection}
 - Pure visual (landing pages) → no backend needed
 - Dashboard → fetch real data shape, show skeleton loading
 
-## APP COMPLETENESS CHECKLIST
-- ✅ Multiple views with React Router (BrowserRouter, Routes, Route)
-- ✅ Full CRUD with forms, validation, loading states, success feedback
-- ✅ Search, filter, sort for data lists
-- ✅ Empty states with illustrations and CTAs
+## APP COMPLETENESS CHECKLIST — EVERY app must have ALL of these
+- ✅ Multiple views with React Router (BrowserRouter, Routes, Route) — NOT single-page dumps
+- ✅ Sidebar or tab navigation connecting ALL modules/views
+- ✅ Full CRUD with forms, validation, loading states, success feedback (toast notifications)
+- ✅ Search, filter, sort for ALL data lists
+- ✅ Empty states with illustrations and CTAs for EVERY list view
 - ✅ Error handling on ALL API calls with user-visible feedback
-- ✅ Responsive: mobile-first, sm:, md:, lg: breakpoints tested
-- ✅ Real content — no "Lorem ipsum" or placeholder text
+- ✅ Responsive: mobile-first, sm:, md:, lg: breakpoints
+- ✅ Real, contextual content — NO "Lorem ipsum", NO generic placeholders like "Feature 1"
 - ✅ Consistent hover/focus states on all interactive elements
 - ✅ Page transitions with AnimatePresence
-- ✅ Toast notifications for user actions (use a simple toast component)
-- ✅ 404 page with navigation back to home
+- ✅ Toast notifications for user actions
+- ✅ Data tables with proper columns, pagination indicators, action buttons
+- ✅ Modal forms for add/edit operations with proper validation
+- ✅ Dashboard with KPI cards (with real icons, colored backgrounds) and at least one chart
+- ✅ Professional color palette — NOT generic gray/white. Use a strong primary + accent.
+
+## FILE STRUCTURE — PRODUCTION QUALITY
+- /App.jsx: Router setup, layout shell, sidebar/nav
+- /components/Sidebar.jsx or /components/Navigation.jsx: Main navigation
+- /components/Dashboard.jsx: Overview with KPI cards and charts
+- /components/[Feature].jsx: One file per major feature/module
+- /components/ui/[Widget].jsx: Reusable UI components (Modal, Table, Card, Toast)
+- Minimum 8 files for simple apps, 12-20 for complex/ERP apps
+- NEVER put everything in App.jsx — split into focused components
 
 ${designTheme ? `## DESIGN THEME\n${designTheme}` : ''}
 ${knowledgeSection}
 
-CRITICAL: Generate the FULL, COMPLETE code. Not snippets. Not partial. The entire working application. Every file must be importable and functional.`;
+CRITICAL: Generate the FULL, COMPLETE code. Not snippets. Not partial. The entire working application with EVERY feature the user requested. Every file must be importable and functional. If the user asks for 10 modules, build ALL 10 — don't skip any.`;
 }
 
 serve(async (req) => {
@@ -314,7 +338,7 @@ Review the error details above carefully and fix ALL issues. Do not repeat the s
         ],
         stream: true,
         temperature,
-        max_tokens: 32000,
+        max_tokens: 64000,
       }),
     });
 
