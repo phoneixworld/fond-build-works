@@ -64,10 +64,7 @@ const PublishExportButtons = forwardRef<PublishExportHandle>((_, ref) => {
   useEffect(() => {
     if (showPublish && currentProject?.is_published && currentProject?.published_slug) {
       const slug = currentProject.published_slug;
-      const { data: urlData } = supabase.storage
-        .from("app-assets")
-        .getPublicUrl(`published/${slug}/index.html`);
-      setPublishedUrl(urlData?.publicUrl || `${window.location.origin}/app/${slug}`);
+      setPublishedUrl(`${window.location.origin}/app/${slug}`);
     }
   }, [showPublish, currentProject]);
 
