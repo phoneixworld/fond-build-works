@@ -1816,6 +1816,13 @@ async function runDirectBuild(
     status: postMergeErrors.length > 0 ? "stubbed" : "success",
   });
   
+  // Design system lint pass — replace raw colors with semantic tokens
+  const linted = lintDesignTokens(finalFiles);
+  finalFiles = linted.files;
+  if (linted.replacements > 0) {
+    console.log(`[BuildEngine:direct] Design lint: ${linted.replacements} raw color(s) → semantic tokens`);
+  }
+
   callbacks.onFilesReady(finalFiles, result.deps);
   autoDetectAndCreateSchemas(finalFiles, config.projectId);
   
