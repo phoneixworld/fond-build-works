@@ -236,8 +236,10 @@ const IDELayout = () => {
               <ChatPanel ref={chatRef} initialPrompt={initialPrompt} onVersionCreated={handleVersionCreated} />
             </ResizablePanel>
             <ResizableHandle className="w-px bg-border hover:bg-primary transition-colors" />
-            <ResizablePanel defaultSize={65}>
-              {renderPanel()}
+            <ResizablePanel defaultSize={65} className="!overflow-hidden">
+              <div className="h-full w-full overflow-hidden">
+                {renderPanel()}
+              </div>
             </ResizablePanel>
           </ResizablePanelGroup>
 

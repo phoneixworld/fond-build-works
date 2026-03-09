@@ -398,7 +398,7 @@ const PreviewPanel = () => {
           </AnimatePresence>
 
           {previewMode === "sandpack" ? (
-            <div className="absolute inset-0" key="sandpack-container">
+            <div className="absolute inset-0" key="sandpack-container" style={{ display: 'flex', flexDirection: 'column' }}>
               {isBuilding && (!sandpackFiles || Object.keys(sandpackFiles).length === 0) ? (
                 <EmptyState />
               ) : (
