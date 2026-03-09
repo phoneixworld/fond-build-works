@@ -363,7 +363,7 @@ const EnvironmentManager = () => {
                         </div>
                       </div>
                     ) : (
-                      {(() => {
+                      (() => {
                         const nextEnvData = environments.find(e => e.name === nextEnv.name);
                         const hasChanges = hasSnapshot && envData.html_snapshot !== (nextEnvData?.html_snapshot || "");
                         return (
@@ -381,7 +381,7 @@ const EnvironmentManager = () => {
                             {!hasChanges && <span className="text-[9px] opacity-60 ml-1">• No changes</span>}
                           </button>
                         );
-                      })()}
+                      })()
                     )}
                   </div>
                 )}
