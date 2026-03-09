@@ -2043,6 +2043,13 @@ ${task.filesAffected.map(f => `- ${f}`).join("\n")}
     accumulatedFiles = stubBrokenFiles(accumulatedFiles, finalErrors);
   }
 
+  // Design system lint pass — replace raw colors with semantic tokens
+  const lintResult = lintDesignTokens(accumulatedFiles);
+  accumulatedFiles = lintResult.files;
+  if (lintResult.replacements > 0) {
+    console.log(`[BuildEngine:planned] Design lint: ${lintResult.replacements} raw color(s) → semantic tokens`);
+  }
+
   // ── Assembly ──
   callbacks.onProgress({ phase: "assembling", message: "Connecting all modules..." });
   const asmTimer = timer();
