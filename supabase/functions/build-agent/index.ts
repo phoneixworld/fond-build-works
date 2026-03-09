@@ -313,6 +313,119 @@ Each collection in the app becomes a database table automatically. Use these pat
 ALWAYS use the Data API for CRUD operations — NEVER use localStorage or in-memory arrays for persistent data.
 Generate REAL fetch calls to the API, not mock data.
 
+## AUTHENTICATION — MANDATORY IMPLEMENTATION PATTERN
+When the app needs login/signup/user management, you MUST implement this exact pattern:
+
+### 1. Create /components/AuthContext.jsx — Global auth state
+\`\`\`jsx
+import React, { createContext, useContext, useState, useEffect } from "react";
+const API = "${SUPABASE_URL}/functions/v1/project-auth";
+const HEADERS = { "Content-Type": "application/json", "Authorization": "Bearer ${ANON_KEY}" };
+const PROJECT_ID = "${projectId}";
+
+const AuthContext = createContext(null);
+
+export function AuthProvider({ children }) {
+  const [user, setUser] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const token = localStorage.getItem("auth_token");
+    if (token) {
+      fetch(API, {
+        method: "POST", headers: HEADERS,
+        body: JSON.stringify({ project_id: PROJECT_ID, action: "me", token })
+      }).then(r => r.json()).then(res => {
+        if (res.data?.user) setUser(res.data.user);
+        else localStorage.removeItem("auth_token");
+      }).catch(() => localStorage.removeItem("auth_token"))
+      .finally(() => setLoading(false));
+    } else setLoading(false);
+  }, []);
+
+  const login = async (email, password) => {
+    const res = await fetch(API, {
+      method: "POST", headers: HEADERS,
+      body: JSON.stringify({ project_id: PROJECT_ID, action: "login", email, password })
+    }).then(r => r.json());
+    if (res.error) throw new Error(res.error);
+    localStorage.setItem("auth_token", res.data.token);
+    setUser(res.data.user);
+    return res.data.user;
+  };
+
+  const signup = async (email, password, display_name) => {
+    const res = await fetch(API, {
+      method: "POST", headers: HEADERS,
+      body: JSON.stringify({ project_id: PROJECT_ID, action: "signup", email, password, display_name })
+    }).then(r => r.json());
+    if (res.error) throw new Error(res.error);
+    localStorage.setItem("auth_token", res.data.token);
+    setUser(res.data.user);
+    return res.data.user;
+  };
+
+  const logout = () => { localStorage.removeItem("auth_token"); setUser(null); };
+
+  return <AuthContext.Provider value={{ user, loading, login, signup, logout }}>{children}</AuthContext.Provider>;
+}
+
+export const useAuth = () => useContext(AuthContext);
+\`\`\`
+
+### 2. Create /components/LoginPage.jsx — Login/Signup form
+- Form with email + password fields, toggle between Login/Signup
+- On submit: call login() or signup() from AuthContext
+- On success: navigate to "/" (dashboard) using useNavigate()
+- On error: show error message below the form
+- NEVER navigate away without actually calling the auth API
+
+### 3. In App.jsx — Protected routing
+\`\`\`jsx
+import { AuthProvider, useAuth } from "./components/AuthContext";
+import LoginPage from "./components/LoginPage";
+
+function ProtectedRoute({ children }) {
+  const { user, loading } = useAuth();
+  if (loading) return <div className="flex items-center justify-center h-screen"><Loader className="animate-spin" /></div>;
+  if (!user) return <Navigate to="/login" replace />;
+  return children;
+}
+
+export default function App() {
+  return (
+    <AuthProvider>
+      <BrowserRouter>
+        <Routes>
+          <Route path="/login" element={<LoginPage />} />
+          <Route path="/*" element={
+            <ProtectedRoute>
+              <div className="flex h-screen">
+                <Sidebar />
+                <main className="flex-1 overflow-auto">
+                  <Routes>
+                    <Route path="/" element={<Dashboard />} />
+                    {/* other routes */}
+                  </Routes>
+                </main>
+              </div>
+            </ProtectedRoute>
+          } />
+        </Routes>
+      </BrowserRouter>
+    </AuthProvider>
+  );
+}
+\`\`\`
+
+### CRITICAL AUTH RULES:
+- Login button MUST call the auth API — NEVER just navigate() to another page
+- After successful login, navigate to dashboard — NEVER to landing page
+- Wrap all app routes in ProtectedRoute — unauthenticated users see LoginPage
+- Show the logged-in user's name/email in the sidebar header
+- Add a Logout button in the sidebar that calls logout() and redirects to /login
+- If the app has a public landing page, it goes on "/" and dashboard on "/app" or "/dashboard"
+
 ## FILE STRUCTURE — PRODUCTION QUALITY
 - /App.jsx: Router setup, layout shell, sidebar/nav
 - /components/Sidebar.jsx or /components/Navigation.jsx: Main navigation
