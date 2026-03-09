@@ -1348,7 +1348,8 @@ async function executeSingleTask(
   accumulatedCode: string,
   onDelta: (chunk: string) => void,
   retryCount = 0,
-  maxTokens?: number
+  maxTokens?: number,
+  taskType?: string
 ): Promise<{ files: Record<string, string>; deps: Record<string, string>; chatText: string; modelMs: number; cached: boolean }> {
   // ── Check in-memory cache first, then persistent cache ──
   const cacheKey = getTaskCacheKey(prompt, accumulatedCode);
@@ -1392,6 +1393,7 @@ async function executeSingleTask(
       templateContext: config.templateContext,
       currentCode: accumulatedCode || undefined,
       maxTokens,
+      taskType,
       onDelta: (chunk) => {
         fullText += chunk;
         onDelta(chunk);
@@ -1414,7 +1416,8 @@ async function executeSingleTask(
               accumulatedCode,
               onDelta,
               retryCount + 1,
-              maxTokens
+              maxTokens,
+              taskType
             ).then(resolve).catch(reject);
           } else {
             let finalFiles = parsed.files;
@@ -1436,7 +1439,8 @@ async function executeSingleTask(
             accumulatedCode,
             onDelta,
             retryCount + 1,
-            maxTokens
+            maxTokens,
+            taskType
           ).then(resolve).catch(reject);
         } else {
           console.error("[BuildEngine] No code after retries");
@@ -1453,7 +1457,7 @@ async function executeSingleTask(
         if (retryCount < 1) {
           console.warn(`[BuildEngine] Task error, retrying: ${err}`);
           setTimeout(() => {
-            executeSingleTask(prompt, config, accumulatedCode, onDelta, retryCount + 1, maxTokens)
+            executeSingleTask(prompt, config, accumulatedCode, onDelta, retryCount + 1, maxTokens, taskType)
               .then(resolve).catch(reject);
           }, 1000);
         } else {
@@ -1856,7 +1860,7 @@ ${task.filesAffected.map(f => `- ${f}`).join("\n")}
         const codeContext = buildIncrementalContext(task, accumulatedFiles);
         const { reductionPercent } = contextReductionRatio(task, accumulatedFiles);
         if (reductionPercent > 0) console.log(`[BuildEngine] Task "${task.title}" context reduced by ${reductionPercent}%`);
-        const taskResult = await executeSingleTask(taskPrompt, config, codeContext, callbacks.onDelta, 0, 16000);
+        const taskResult = await executeSingleTask(taskPrompt, config, codeContext, callbacks.onDelta, 0, 16000, taskType);
         
         const totalSize = Object.values(taskResult.files).reduce((s, c) => s + c.length, 0);
         completeTask(taskMet, {

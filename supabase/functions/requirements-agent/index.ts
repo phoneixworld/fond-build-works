@@ -59,7 +59,7 @@ ${existingSchemas?.length ? `\n## EXISTING SCHEMAS (don't duplicate):\n${JSON.st
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "google/gemini-3-flash-preview",
+        model: "google/gemini-2.5-pro",
         temperature: 0.2,
         messages: [
           { role: "system", content: systemPrompt },
