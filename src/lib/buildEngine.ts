@@ -415,9 +415,10 @@ async function executeSingleTask(
               console.warn(`[BuildEngine] Max retries reached, stubbing ${validationErrors.length} broken file(s)`);
               finalFiles = stubBrokenFiles(parsed.files, validationErrors);
             }
-            // Cache successful output
+            // Cache successful output (memory + persistent)
             const output = { files: finalFiles, deps: parsed.deps, chatText: parsed.chatText };
             setCachedTaskOutput(cacheKey, { ...output, timestamp: Date.now() });
+            persistTaskOutput(cacheKey, output).catch(() => {});
             resolve({ ...output, modelMs, cached: false });
           }
         } else if (retryCount < 2) {
