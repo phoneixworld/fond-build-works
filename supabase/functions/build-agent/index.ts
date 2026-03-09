@@ -269,7 +269,7 @@ Every app with multiple features MUST use React Router with distinct pages:
 
 \`\`\`jsx
 // App.jsx MUST look like this for multi-feature apps:
-import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { HashRouter, Routes, Route, Navigate } from "react-router-dom";
 import Sidebar from "./components/Sidebar";
 import Dashboard from "./components/Dashboard";
 import Students from "./components/Students";
@@ -277,7 +277,7 @@ import Settings from "./components/Settings";
 
 export default function App() {
   return (
-    <BrowserRouter>
+    <HashRouter>
       <div className="flex h-screen">
         <Sidebar />
         <main className="flex-1 overflow-auto">
@@ -289,7 +289,7 @@ export default function App() {
           </Routes>
         </main>
       </div>
-    </BrowserRouter>
+    </HashRouter>
   );
 }
 \`\`\`
