@@ -40,6 +40,8 @@ import { applyAdaptiveSplitting } from "@/lib/adaptiveTaskSplitter";
 import { persistTaskOutput, getPersistedTaskOutput } from "@/lib/persistentCache";
 import { DESIGN_SYSTEM_CSS, lintDesignTokens } from "@/lib/designSystem";
 import { buildSmartChatHistory } from "@/lib/contextManager";
+import { parseStructuredOutput } from "@/lib/structuredParser";
+import { getPromptConfigKey, getCachedSystemPrompt, setCachedSystemPrompt } from "@/lib/promptCache";
 
 // ─── Base Template (mandatory scaffold for all new builds) ────────────────
 //
