@@ -75,17 +75,18 @@ function isAllowedPkg(pkg: string): boolean {
 }
 
 /** Second-pass sanitizer applied right before Sandpack receives code */
-function repairTruncatedCode(code: string): string {
+function repairTruncatedCode(code: string, filePath: string): string {
   // Fix unterminated strings line-by-line
   const lines = code.split("\n");
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
+    // Count quotes not inside template literals or escaped
     const dq = (line.match(/(?<!\\)"/g) || []).length;
     const sq = (line.match(/(?<!\\)'/g) || []).length;
     const bt = (line.match(/(?<!\\)`/g) || []).length;
-    if (dq % 2 !== 0) lines[i] = line + '" },';
-    else if (sq % 2 !== 0) lines[i] = line + "' },";
-    else if (bt % 2 !== 0) lines[i] = line + '`';
+    if (dq % 2 !== 0) lines[i] = line + '"';
+    if (sq % 2 !== 0) lines[i] = lines[i] + "'";
+    if (bt % 2 !== 0) lines[i] = lines[i] + '`';
   }
   code = lines.join("\n");
 
@@ -96,6 +97,20 @@ function repairTruncatedCode(code: string): string {
     if (ch === '[') brackets++; else if (ch === ']') brackets--;
     if (ch === '(') parens++; else if (ch === ')') parens--;
   }
+
+  // If severely unbalanced (>5 unclosed), the file is fatally truncated
+  // Replace with a stub component
+  const totalUnclosed = Math.max(0, braces) + Math.max(0, brackets) + Math.max(0, parens);
+  if (totalUnclosed > 8) {
+    const componentName = filePath
+      .replace(/.*\//, '')
+      .replace(/\.(jsx?|tsx?)$/, '')
+      .replace(/[^a-zA-Z0-9]/g, '');
+    const safeName = componentName.charAt(0).toUpperCase() + componentName.slice(1);
+    console.warn(`[SandpackRepair] File "${filePath}" is fatally truncated (${totalUnclosed} unclosed). Replacing with stub.`);
+    return `import React from "react";\n\nexport default function ${safeName || 'TruncatedPage'}() {\n  return (\n    <div className="p-8 text-center">\n      <h2 className="text-lg font-semibold text-slate-800">Loading ${safeName}...</h2>\n      <p className="text-sm text-slate-500 mt-2">This page is being generated. Please rebuild.</p>\n    </div>\n  );\n}\n`;
+  }
+
   const closers: string[] = [];
   for (let i = 0; i < Math.min(parens, 15); i++) closers.push(')');
   for (let i = 0; i < Math.min(brackets, 15); i++) closers.push(']');
@@ -103,7 +118,6 @@ function repairTruncatedCode(code: string): string {
   if (closers.length > 0) {
     code = code.trimEnd() + ';\n' + closers.join(';\n') + ';\n';
     if (!code.includes('export default')) {
-      // Try to find the main component name
       const compMatch = code.match(/function\s+(\w+)\s*\(/);
       if (compMatch) code += `\nexport default ${compMatch[1]};\n`;
     }
