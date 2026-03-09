@@ -465,7 +465,7 @@ const LandingPage = ({ onStartProject, onOpenProject }: LandingPageProps) => {
             </motion.div>
           </section>
 
-          {/* ─── WHY PHOENIX IS DIFFERENT ─── */}
+          {/* ─── WHY PHONEIX IS DIFFERENT ─── */}
           <section className="px-6 py-20 bg-card/30 relative overflow-hidden">
             <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[400px] pointer-events-none">
               <div className="absolute inset-0 bg-[hsl(210,100%,56%/0.06)] rounded-full blur-[150px]" />
