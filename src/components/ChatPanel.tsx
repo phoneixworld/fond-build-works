@@ -1220,7 +1220,10 @@ const ChatPanel = forwardRef<ChatPanelHandle, { initialPrompt?: string; onVersio
     }
   }, [currentProject, saveProject, setPreviewHtml, setIsBuilding, setBuildStep, selectedModel, selectedTheme, onVersionCreated, setVirtualFiles]);
 
-  // Edit a previous user message and regenerate from that point
+  // Keep ref in sync so useImperativeHandle can call the latest version
+  sendMessageRef.current = sendMessage;
+
+
   const handleEditMessage = useCallback((index: number) => {
     const msg = messagesRef.current[index];
     if (msg?.role !== "user") return;
