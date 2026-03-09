@@ -26,8 +26,6 @@ export interface PublishExportHandle {
   handleExport: () => void;
 }
 
-type DeployTarget = "staging" | "production";
-
 interface DeployRecord {
   id: string;
   to_env: string;
@@ -36,6 +34,11 @@ interface DeployRecord {
   notes: string;
   deployed_by_email: string;
   created_at: string;
+}
+
+interface EnvStatus {
+  staging: { deployed: boolean; deployedAt: string | null; snapshotSize: number };
+  production: { deployed: boolean; deployedAt: string | null; snapshotSize: number };
 }
 
 type DialogTab = "deploy" | "history" | "domain" | "siteinfo";
