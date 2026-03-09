@@ -1416,7 +1416,8 @@ async function executeSingleTask(
               accumulatedCode,
               onDelta,
               retryCount + 1,
-              maxTokens
+              maxTokens,
+              taskType
             ).then(resolve).catch(reject);
           } else {
             let finalFiles = parsed.files;
