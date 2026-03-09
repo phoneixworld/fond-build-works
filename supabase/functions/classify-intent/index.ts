@@ -9,9 +9,14 @@ serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
-    const { prompt, hasHistory, hasExistingCode } = await req.json();
+    const { prompt, hasHistory, hasExistingCode, existingFileNames } = await req.json();
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY not configured");
+
+    // Build file context for smarter questions
+    const fileContext = existingFileNames?.length
+      ? `\n\nEXISTING PROJECT FILES:\n${existingFileNames.slice(0, 40).join("\n")}\n\nUse these file names to generate CONTEXTUAL questions. For example, if you see "/pages/Dashboard/Dashboard.jsx" and "/pages/Students/StudentManagement.jsx", ask which specific pages to improve.`
+      : "";
 
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
@@ -20,8 +25,8 @@ serve(async (req) => {
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "google/gemini-2.5-flash", // Upgraded for better classification
-        temperature: 0.1, // Low temperature for deterministic classification
+        model: "google/gemini-2.5-flash",
+        temperature: 0.1,
         messages: [
           {
             role: "system",
@@ -45,19 +50,17 @@ CLASSIFICATION RULES:
 - Direct imperative command: "Build a...", "Create a...", "Add a...", "Make the...", "Change the...", "Fix the...", "Update the..."
 - Describes an app, system, or feature: "ERP", "dashboard", "landing page", "e-commerce", "management system", "student portal"
 - Affirmative response to a previous suggestion: "Yes", "Go ahead", "Do it", "Yes, build it", "Sounds good, go ahead"
-- Short modification request: "Make it darker", "Add animations", "Improve the design"
-- Describes what they want built without asking if it's possible
+- Short modification request with SPECIFIC scope: "Make the header blue", "Add a search bar", "Fix the login button"
 - ANY prompt that mentions specific features, modules, pages, or UI elements
-${hasHistory ? '- Follow-up modifications: "change colors", "add a section", "make it responsive"' : ''}
+${hasHistory ? '- Follow-up modifications with clear scope: "change the sidebar color", "add pagination to the table"' : ''}
 
 **CLARIFY** — Return this when the prompt is genuinely vague:
 ${hasHistory
-  ? `- Use clarify for broad/vague enhancement requests that could go many directions: "improve the design", "enhance the ERP", "make it better", "redesign", "optimize"
+  ? `- Use clarify for broad/vague enhancement requests that could go many directions: "improve the design", "enhance the ERP", "make it better", "redesign", "optimize", "polish it", "refine"
 - These requests NEED clarification: what specifically to improve? colors? layout? typography? which pages?
 - Direct specific requests should be BUILD: "change the header color to blue", "add a search bar"
 - When in doubt between clarify and build for vague prompts, choose CLARIFY
-- When in doubt for specific prompts, choose BUILD
-- Generate 2-4 clarifying questions as tabs (e.g. "Focus Area", "Style Direction", "Priority Pages")`
+- When in doubt for specific prompts, choose BUILD`
   : `- When the message is vague with no clear direction
 - "Build me a website" → clarify (too vague)
 - "Build me a school ERP with student management" → BUILD (has enough direction)
@@ -65,32 +68,49 @@ ${hasHistory
 - When in doubt between clarify and build for vague prompts, CHOOSE CLARIFY
 - If the user describes features, modules, or gives any detail → BUILD, never clarify`}
 
+QUESTION GENERATION RULES (for "clarify" intent):
+- Generate 2-4 questions as separate tabs
+- Each question should have a short "header" (1-3 words) used as tab label
+- Questions MUST be contextual — reference actual pages/modules from the existing file list
+- Use multiSelect: true when multiple options make sense (e.g., "Which pages to improve?")
+- Each option needs: value (slug), label (display text), description (brief explanation)
+- Generate 3-4 options per question
+- ALWAYS include diverse, actionable options — never generic filler
+
+DYNAMIC QUESTION EXAMPLES:
+- If files include Dashboard, Students, Fees pages → ask "Which pages?" with those as options
+- If request is about "design" → ask about Focus Area (Colors, Typography, Layout, Animations)
+- If request is about "enhance/improve" → ask about Priority (Performance, UX, Visual Polish, Features)
+- If request is about "redesign" → ask about Style Direction (Minimal, Bold, Corporate, Playful)
+${fileContext}
+
 FEW-SHOT EXAMPLES:
 
 Example 1 - CHAT:
 User: "Can we add user authentication to this app?"
 Intent: "chat" (asking if it's possible, not commanding to build)
-Confidence: 0.95
 
 Example 2 - BUILD:
 User: "Add user authentication with login and signup"
 Intent: "build" (direct imperative command)
-Confidence: 0.98
 
-Example 3 - BUILD (follow-up):
-User: "Make the buttons bigger"
-Intent: "build" (clear modification request)
-Confidence: 0.97
-
-Example 4 - CHAT:
-User: "What kind of animations can we add?"
-Intent: "chat" (exploring options, not ready to build)
-Confidence: 0.93
-
-Example 5 - BUILD:
-User: "Yes, go ahead"
-Intent: "build" (affirmative response to previous suggestion)
-Confidence: 0.99
+Example 3 - CLARIFY (with existing code):
+User: "Improve the overall design"
+Intent: "clarify"
+Questions: [
+  { id: "focus", header: "Focus Area", text: "What aspects of the design should I focus on?", multiSelect: true, options: [
+    { value: "colors", label: "Colors & Theme", description: "Update color palette, gradients, and visual tone" },
+    { value: "typography", label: "Typography", description: "Font sizes, weights, line heights, and hierarchy" },
+    { value: "spacing", label: "Spacing & Layout", description: "Padding, margins, alignment, and grid structure" },
+    { value: "animations", label: "Animations & Micro-interactions", description: "Hover effects, transitions, loading states" }
+  ]},
+  { id: "pages", header: "Pages", text: "Which pages should I improve first?", multiSelect: true, options: [dynamically from file list] },
+  { id: "style", header: "Style", text: "What visual direction do you prefer?", multiSelect: false, options: [
+    { value: "minimal", label: "Clean & Minimal", description: "Lots of whitespace, subtle colors" },
+    { value: "bold", label: "Bold & Vibrant", description: "Strong colors, dramatic contrasts" },
+    { value: "corporate", label: "Professional", description: "Polished, enterprise-grade look" }
+  ]}
+]
 
 Use the classify_intent tool to return your classification.`
           },
@@ -141,14 +161,14 @@ Use the classify_intent tool to return your classification.`
                   },
                   questions: {
                     type: "array",
-                    description: "Clarifying questions (only for clarify intent)",
+                    description: "Clarifying questions (only for clarify intent). Generate 2-4 contextual questions.",
                     items: {
                       type: "object",
                       properties: {
-                        id: { type: "string" },
-                        header: { type: "string" },
-                        text: { type: "string" },
-                        multiSelect: { type: "boolean" },
+                        id: { type: "string", description: "Unique slug like 'focus', 'pages', 'style'" },
+                        header: { type: "string", description: "Short tab label: 1-3 words like 'Focus Area', 'Pages', 'Style'" },
+                        text: { type: "string", description: "The full question text" },
+                        multiSelect: { type: "boolean", description: "true if user can pick multiple options" },
                         options: {
                           type: "array",
                           items: {
@@ -193,11 +213,9 @@ Use the classify_intent tool to return your classification.`
     if (toolCall?.function?.arguments) {
       try {
         const parsed = JSON.parse(toolCall.function.arguments);
-        // Ensure valid intent
         if (!["chat", "build", "clarify"].includes(parsed.intent)) {
           parsed.intent = "build";
         }
-        // Ensure questions array exists
         if (!parsed.questions) {
           parsed.questions = [];
         }
@@ -209,7 +227,6 @@ Use the classify_intent tool to return your classification.`
       }
     }
 
-    // Fallback to build
     return new Response(JSON.stringify({ 
       intent: "build", 
       confidence: 0.5, 
