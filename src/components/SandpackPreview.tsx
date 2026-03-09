@@ -6,8 +6,6 @@ import {
 } from "@codesandbox/sandpack-react";
 import { usePreview, SandpackFileSet } from "@/contexts/PreviewContext";
 import { AlertTriangle, RefreshCw } from "lucide-react";
-import { transform } from "sucrase";
-import postcss from "postcss";
 
 // ─── Error Boundary ───────────────────────────────────────────────────────────
 interface ErrorBoundaryState {
@@ -61,7 +59,7 @@ class SandpackErrorBoundary extends Component<
   }
 }
 
-// ─── Allowlist ────────────────────────────────────────────────────────────────
+// ─── Allowlist (for import stripping only) ────────────────────────────────
 const ALLOWED_PACKAGES = new Set([
   "react", "react-dom", "react/jsx-runtime",
   "lucide-react", "framer-motion", "date-fns", "recharts",
@@ -76,168 +74,29 @@ function isAllowedPkg(pkg: string): boolean {
   return ALLOWED_PACKAGES.has(base);
 }
 
-/** Second-pass sanitizer applied right before Sandpack receives code */
-function makeStub(filePath: string): string {
-  const componentName = filePath
-    .replace(/.*\//, '')
-    .replace(/\.(jsx?|tsx?)$/, '')
-    .replace(/[^a-zA-Z0-9]/g, '');
-  const safeName = componentName.charAt(0).toUpperCase() + componentName.slice(1) || 'TruncatedPage';
-  console.warn(`[SandpackRepair] File "${filePath}" could not be repaired. Using stub.`);
-  return `import React from "react";\n\nexport default function ${safeName}() {\n  return (\n    <div className="p-8 text-center space-y-3">\n      <div className="w-10 h-10 mx-auto rounded-full bg-amber-100 flex items-center justify-center"><span className="text-amber-600 text-xl">\u26A0</span></div>\n      <h2 className="text-lg font-semibold text-slate-800">${safeName}</h2>\n      <p className="text-sm text-slate-500">This module had a build error. Send a follow-up message to fix it.</p>\n    </div>\n  );\n}\n`;
-}
-
 /**
- * Try to parse JSX with Sucrase. Returns null if valid, or error message if invalid.
+ * Minimal sanitization — strip blocked imports only. No repair, no mutation.
+ * Files reaching this point have already been validated upstream by the build engine.
  */
-function tryParse(code: string): string | null {
-  try {
-    transform(code, { transforms: ["jsx", "imports"], filePath: "file.jsx" });
-    return null;
-  } catch (e: any) {
-    return e.message || "Unknown parse error";
-  }
-}
-
-/**
- * Attempt targeted repairs based on Sucrase parse error messages.
- * Returns repaired code or null if unrepairable.
- */
-function attemptRepair(code: string, error: string): string | null {
-  // Unterminated template literal
-  if (/unterminated template/i.test(error)) {
-    code = code.trimEnd() + '`';
-  }
-  // Unterminated string literal  
-  else if (/unterminated string/i.test(error)) {
-    // Detect which quote type
-    let inSingle = false, inDouble = false, prevCh = '';
-    for (const ch of code) {
-      if (prevCh !== '\\') {
-        if (ch === "'" && !inDouble) inSingle = !inSingle;
-        if (ch === '"' && !inSingle) inDouble = !inDouble;
-      }
-      prevCh = ch;
-    }
-    if (inDouble) code = code.trimEnd() + '"';
-    else if (inSingle) code = code.trimEnd() + "'";
-    else code = code.trimEnd() + '"';
-  }
-  // Unterminated regular expression
-  else if (/unterminated regular expression/i.test(error)) {
-    // Usually means a template literal or string was misinterpreted
-    // Try closing with backtick first
-    code = code.trimEnd() + '`';
-  }
-  // Unexpected token / unexpected EOF — likely unclosed brackets
-  else if (/unexpected (token|eof)/i.test(error) || /expected/i.test(error)) {
-    // Count bracket imbalances
-    let braces = 0, brackets = 0, parens = 0;
-    let inStr = false, strCh = '';
-    let prev = '';
-    for (const ch of code) {
-      if (prev !== '\\') {
-        if (!inStr && (ch === '"' || ch === "'" || ch === '`')) { inStr = true; strCh = ch; }
-        else if (inStr && ch === strCh) { inStr = false; }
-      }
-      if (!inStr) {
-        if (ch === '{') braces++; else if (ch === '}') braces--;
-        if (ch === '[') brackets++; else if (ch === ']') brackets--;
-        if (ch === '(') parens++; else if (ch === ')') parens--;
-      }
-      prev = ch;
-    }
-    const closers: string[] = [];
-    for (let i = 0; i < Math.max(0, parens); i++) closers.push(')');
-    for (let i = 0; i < Math.max(0, brackets); i++) closers.push(']');
-    for (let i = 0; i < Math.max(0, braces); i++) closers.push('}');
-    if (closers.length > 0) {
-      code = code.trimEnd() + ';\n' + closers.join(';\n') + ';\n';
-    }
-  } else {
-    return null; // Unknown error type
-  }
-  return code;
-}
-/**
- * Validate CSS with PostCSS. Returns null if valid, or error string if invalid.
- */
-function tryParseCSS(code: string): string | null {
-  try {
-    postcss.parse(code);
-    return null;
-  } catch (e: any) {
-    return e.message || "Unknown CSS parse error";
-  }
-}
-
-function repairTruncatedCode(code: string, filePath: string): string {
-  if (code.trim().length < 30 && filePath.match(/\.(jsx?|tsx?)$/)) return makeStub(filePath);
-  
-  // CSS files: validate with PostCSS — don't repair, return safe fallback if broken
-  if (filePath.match(/\.css$/)) {
-    const cssError = tryParseCSS(code);
-    if (cssError) {
-      console.warn(`[SandpackRepair] CSS error in "${filePath}": ${cssError}`);
-      return `/* CSS parse error in ${filePath}: ${cssError.replace(/\*\//g, '')} */\n@tailwind base;\n@tailwind components;\n@tailwind utilities;\n`;
-    }
-    return code;
-  }
-
-  // Skip non-JSX files
+function sanitizeImports(code: string, filePath: string): string {
   if (!filePath.match(/\.(jsx?|tsx?)$/)) return code;
 
-  // ── Step 1: Try parsing as-is ──
-  let parseError = tryParse(code);
-  if (!parseError) return code; // Valid! No repair needed.
-
-  // ── Step 2: Try up to 3 rounds of targeted repair ──
-  let repaired = code;
-  for (let attempt = 0; attempt < 3; attempt++) {
-    const fixed = attemptRepair(repaired, parseError!);
-    if (!fixed) break;
-    repaired = fixed;
-    parseError = tryParse(repaired);
-    if (!parseError) {
-      console.info(`[SandpackRepair] Fixed "${filePath}" after ${attempt + 1} repair(s)`);
-      // Ensure export exists
-      const hasExport = /export\s+(default|const|function|class|let|var|\{)/.test(repaired) || repaired.includes('module.exports');
-      if (!hasExport) {
-        const fnMatch = repaired.match(/(?:function|const|class)\s+([A-Z]\w+)/);
-        if (fnMatch) repaired += `\nexport default ${fnMatch[1]};\n`;
-      }
-      return repaired;
-    }
-  }
-
-  // ── Step 3: All repairs failed — stub it ──
-  console.warn(`[SandpackRepair] Could not fix "${filePath}": ${parseError}`);
-  return makeStub(filePath);
-}
-
-/** Second-pass sanitizer applied right before Sandpack receives code */
-function sanitizeCode(code: string, filePath: string = ""): string {
-  // First repair any truncated code
-  code = repairTruncatedCode(code, filePath);
-  
-  // Strip file separator lines
+  // Strip file separator lines (leftover from AI output formatting)
   code = code.split("\n").filter(line => {
     const t = line.trim();
     if (/^-{3}\s+\/?\w[\w/.-]*\.\w+\s*-{0,3}\s*$/.test(t)) return false;
     return true;
   }).join("\n");
-  
-  // Strip import/export ... from 'unknown-pkg'
+
+  // Strip import/export from blocked packages
   code = code.replace(
     /^\s*(?:import|export)\s+[\s\S]*?\s+from\s+['"]([^'"]+)['"]\s*;?\s*$/gm,
     (match, pkg) => isAllowedPkg(pkg) ? match : `// [BLOCKED] ${pkg}`
   );
-  // Strip side-effect imports
   code = code.replace(
     /^\s*import\s+['"]([^'"]+)['"]\s*;?\s*$/gm,
     (match, pkg) => isAllowedPkg(pkg) ? match : `// [BLOCKED] ${pkg}`
   );
-  // Strip require()
   code = code.replace(
     /\brequire\s*\(\s*['"]([^'"]+)['"]\s*\)/g,
     (match, pkg) => isAllowedPkg(pkg) ? match : `undefined /* BLOCKED: ${pkg} */`
@@ -322,19 +181,17 @@ function buildSandpackFiles(files: SandpackFileSet | null): Record<string, strin
     return base;
   }
 
-  // Map user files into sandpack paths
+  // Map user files into sandpack paths — sanitize imports only, no repair
   for (const [path, code] of Object.entries(files)) {
     const normalized = path.startsWith("/") ? path : `/${path}`;
     const sandpackPath = normalized.replace(/\.tsx?$/, ".js");
-    base[sandpackPath] = sandpackPath.match(/\.(jsx?|js)$/) ? sanitizeCode(code, sandpackPath) : code;
+    base[sandpackPath] = sandpackPath.match(/\.(jsx?|js)$/) ? sanitizeImports(code, sandpackPath) : code;
   }
 
-  // Ensure entry point exists
   if (!base["/App.js"] && !base["/App.jsx"]) {
     base["/App.js"] = DEFAULT_APP;
   }
 
-  // If we have /App.jsx but not /App.js, update index.js import
   if (base["/App.jsx"] && !base["/App.js"]) {
     base["/index.js"] = INDEX_JS.replace('./App', './App.jsx');
   }
@@ -342,13 +199,20 @@ function buildSandpackFiles(files: SandpackFileSet | null): Record<string, strin
   return base;
 }
 
-// ─── Stable hash for files to avoid unnecessary Sandpack remounts ─────────
-function filesHash(files: SandpackFileSet | null): string {
+// ─── Content hash for stable Sandpack remounting ─────────────────────────
+function contentHash(files: SandpackFileSet | null): string {
   if (!files) return "empty";
   const keys = Object.keys(files).sort();
-  // Use file count + total length as a fast fingerprint
-  const totalLen = keys.reduce((sum, k) => sum + files[k].length, 0);
-  return `${keys.length}-${totalLen}`;
+  // FNV-1a-inspired fast hash of all paths + contents
+  let hash = 2166136261;
+  for (const key of keys) {
+    const str = key + files[key];
+    for (let i = 0; i < str.length; i++) {
+      hash ^= str.charCodeAt(i);
+      hash = (hash * 16777619) >>> 0;
+    }
+  }
+  return hash.toString(36);
 }
 
 interface SandpackPreviewProps {
@@ -362,8 +226,8 @@ const SandpackPreview = ({ viewport, showConsole = false, initialPath }: Sandpac
 
   const files = useMemo(() => buildSandpackFiles(sandpackFiles), [sandpackFiles]);
 
-  // Stable key: only remount Sandpack when file structure actually changes
-  const stableKey = useMemo(() => filesHash(sandpackFiles), [sandpackFiles]);
+  // Content-based key: remount only when file contents actually change
+  const stableKey = useMemo(() => contentHash(sandpackFiles), [sandpackFiles]);
 
   const dependencies = useMemo(() => ({
     "react": "^18.2.0",
