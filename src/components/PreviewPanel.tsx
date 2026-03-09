@@ -411,7 +411,7 @@ const PreviewPanel = () => {
             </div>
           ) : (
             // Legacy HTML iframe
-            <>
+            <div className="flex-1 w-full min-h-0 flex items-center justify-center">
               {previewHtml ? (
                 <div
                   className="h-full transition-all duration-300 ease-in-out"
