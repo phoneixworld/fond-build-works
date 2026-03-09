@@ -944,7 +944,7 @@ const CONTEXT_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
     setInput("");
     setAttachedImages([]);
     setPreviewErrors([]);
-    if (inputRef.current) inputRef.current.style.height = "36px";
+    if (inputRef.current) inputRef.current.style.height = "60px";
     setMessages((prev) => [...prev, userMsg]);
     setIsLoading(true);
     setBuildStreamContent("");
