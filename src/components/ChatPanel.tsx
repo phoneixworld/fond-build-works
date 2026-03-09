@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useCallback, forwardRef, useImperativeHandle } from "react";
 import { Version } from "@/components/VersionHistory";
-import { Send, Bot, User, ChevronDown, Sparkles, AlertTriangle, Wand2, ImagePlus, X, Palette, ArrowDown, Clock, Zap, Trash2, ShieldCheck, MessageSquareMore, CheckCircle2, Pencil, RotateCcw, Upload, Square } from "lucide-react";
+import { Send, Bot, User, ChevronDown, Sparkles, AlertTriangle, Wand2, ImagePlus, X, Palette, ArrowDown, Clock, Zap, Trash2, ShieldCheck, MessageSquareMore, CheckCircle2, Pencil, RotateCcw, Upload, Square, Undo2, Redo2 } from "lucide-react";
 import VoiceInput from "@/components/VoiceInput";
 import { streamChat } from "@/lib/streamChat";
 import { classifyIntent, streamChatAgent, streamBuildAgent, validateReactCode, hasBuildConfirmation, stripBuildMarker, formatRetryContext, MAX_BUILD_RETRIES, type AgentIntent, type PipelineStep } from "@/lib/agentPipeline";
