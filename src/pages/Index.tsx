@@ -76,6 +76,7 @@ const SECONDARY_TABS = [
 const PANEL_COMPONENTS: Record<string, React.FC<any>> = {
   code: CodeEditor,
   cloud: CloudPanel,
+  ir: IREditor,
   quality: CodeQualityPanel,
   search: SemanticSearchPanel,
   brain: ProjectBrain,
