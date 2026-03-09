@@ -221,6 +221,7 @@ export interface EngineConfig {
   existingFiles?: Record<string, string>;
   templateContext?: string;
   chatHistory?: Array<{ role: string; content: string }>;
+  domainModel?: any; // Domain model from Requirements Agent
 }
 
 export type EnginePhase = 
