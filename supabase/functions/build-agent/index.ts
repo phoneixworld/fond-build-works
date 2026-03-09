@@ -10,8 +10,40 @@ const ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY")!;
 
 /**
  * Build Agent — enterprise-grade code generation agent.
- * Prompt v3: tighter structure, stronger anti-patterns, improved iteration support.
+ * Prompt v3.1: tighter structure, prompt caching, improved iteration.
  */
+
+// ─── Prompt Cache (in-memory, per-isolate) ────────────────────────────────
+
+const promptCache = new Map<string, { prompt: string; timestamp: number }>();
+const PROMPT_CACHE_TTL = 30 * 60 * 1000; // 30 min
+
+function hashConfig(projectId: string, techStack: string, schemas?: any[], designTheme?: string, knowledge?: string[]): string {
+  const parts = [projectId, techStack, designTheme || "", JSON.stringify(schemas || []), (knowledge || []).join("|")];
+  let hash = 2166136261;
+  const str = parts.join("||");
+  for (let i = 0; i < str.length; i++) {
+    hash ^= str.charCodeAt(i);
+    hash = (hash * 16777619) >>> 0;
+  }
+  return hash.toString(36);
+}
+
+function getOrBuildSystemPrompt(projectId: string, techStack: string, schemas?: any[], designTheme?: string, knowledge?: string[]): string {
+  const key = hashConfig(projectId, techStack, schemas, designTheme, knowledge);
+  const cached = promptCache.get(key);
+  if (cached && Date.now() - cached.timestamp < PROMPT_CACHE_TTL) {
+    return cached.prompt;
+  }
+  const prompt = buildSystemPrompt(projectId, techStack, schemas, designTheme, knowledge);
+  promptCache.set(key, { prompt, timestamp: Date.now() });
+  // Evict old entries
+  if (promptCache.size > 20) {
+    const oldest = [...promptCache.entries()].sort((a, b) => a[1].timestamp - b[1].timestamp)[0];
+    if (oldest) promptCache.delete(oldest[0]);
+  }
+  return prompt;
+}
 
 function buildSystemPrompt(projectId: string, techStack: string, schemas?: any[], designTheme?: string, knowledge?: string[]): string {
   const apiBase = `${SUPABASE_URL}/functions/v1`;
