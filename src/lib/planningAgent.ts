@@ -8,6 +8,7 @@ const AUTH_HEADER = `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`;
 export type TaskComplexity = "trivial" | "simple" | "medium" | "complex";
 export type TaskCategory = "ui" | "backend" | "auth" | "data" | "styling" | "testing" | "config";
 export type TaskStatus = "pending" | "in_progress" | "done" | "skipped" | "failed";
+export type TaskType = "schema" | "backend" | "frontend";
 
 export interface PlanTask {
   id: string;
@@ -15,6 +16,7 @@ export interface PlanTask {
   description: string;
   buildPrompt: string;
   complexity: TaskComplexity;
+  taskType: TaskType;
   dependsOn: string[];
   filesAffected: string[];
   needsUserInput?: boolean;
