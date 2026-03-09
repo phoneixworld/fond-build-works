@@ -178,6 +178,47 @@ export interface EngineResult {
   mergeConflicts: string[];
 }
 
+// ─── JSX Auto-Repair ──────────────────────────────────────────────────────
+
+/**
+ * Auto-repair common JSX issues from AI-generated code.
+ */
+function autoRepairJSX(code: string): string {
+  // Fix unclosed <Route ... element={<Comp />}> → self-close
+  code = code.replace(
+    /(<Route\s+[^>]*element=\{<[^>]+\/>\s*\})\s*>\s*$/gm,
+    "$1 />"
+  );
+  code = code.replace(
+    /(<Route\s+[^>]*element=\{<[^>]+\/>\s*\})\s*\n/gm,
+    "$1 />\n"
+  );
+
+  // Remove duplicate Route entries (same path appearing twice)
+  const routePaths = new Map<string, boolean>();
+  const lines = code.split("\n");
+  const cleanedLines: string[] = [];
+  for (let i = 0; i < lines.length; i++) {
+    const routeMatch = lines[i].match(/<Route\s+path=["']([^"']+)["']/);
+    if (routeMatch) {
+      const path = routeMatch[1];
+      if (routePaths.has(path)) continue;
+      routePaths.set(path, true);
+    }
+    cleanedLines.push(lines[i]);
+  }
+  code = cleanedLines.join("\n");
+
+  // Ensure balanced </Routes> before </HashRouter>
+  const openRoutes = (code.match(/<Routes>/g) || []).length;
+  const closeRoutes = (code.match(/<\/Routes>/g) || []).length;
+  if (openRoutes > closeRoutes) {
+    code = code.replace(/(<\/HashRouter>)/, "</Routes>\n    $1");
+  }
+
+  return code;
+}
+
 // ─── File Parser ───────────────────────────────────────────────────────────
 
 /**
@@ -239,10 +280,14 @@ function parseReactFilesFromOutput(text: string): {
 
   function flush() {
     if (currentFile) {
-      const code = currentLines.join("\n").trim();
+      let code = currentLines.join("\n").trim();
       if (code.length > 0) {
         let fname = currentFile.startsWith("/") ? currentFile : `/${currentFile}`;
         fname = fname.replace(/^\/src\//, "/");
+        // Auto-repair JSX issues in App files and component files
+        if (fname.match(/\.(jsx?|tsx?)$/)) {
+          code = autoRepairJSX(code);
+        }
         files[fname] = code;
       }
     }

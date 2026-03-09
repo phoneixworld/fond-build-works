@@ -94,6 +94,13 @@ Generate a SINGLE complete index.html inside a \`\`\`html-preview code fence.`;
 - NEVER use \`require()\` — use ES6 imports only
 - NEVER import from packages not in the allowed list above
 
+## JSX SYNTAX — CRITICAL (violations cause build failures)
+- Every <Route> with an element prop MUST self-close: <Route path="/" element={<Home />} />
+- NEVER leave <Route> unclosed or use </Route> unless nesting child routes
+- Adjacent JSX elements MUST be wrapped in <></> or a parent element
+- Every opening <tag> needs a matching </tag> or self-close />
+- Double-check <Routes>...</Routes> has matching open/close
+
 ## REQUIREMENTS TRANSLATION — CRITICAL
 Before generating code, mentally perform this analysis:
 1. **Extract every feature** from the user's request — if they say "with all features", expand to at least 8-12 concrete features
