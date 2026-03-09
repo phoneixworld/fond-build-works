@@ -98,10 +98,14 @@ function repairTruncatedCode(code: string, filePath: string): string {
     if (ch === '(') parens++; else if (ch === ')') parens--;
   }
 
-  // If severely unbalanced (>5 unclosed), the file is fatally truncated
-  // Replace with a stub component
+  // Detect if file ends mid-data (e.g. truncated inside an array/object literal)
+  const lastLines = code.split("\n").slice(-5).join("\n");
+  const endsAbruptly = /['"][,\s]*$/.test(lastLines.trim()) === false && 
+    (lastLines.includes("{ id:") || lastLines.includes("code:") || lastLines.includes("text:"));
+
+  // If severely unbalanced (>3 unclosed) or ends mid-data, the file is fatally truncated
   const totalUnclosed = Math.max(0, braces) + Math.max(0, brackets) + Math.max(0, parens);
-  if (totalUnclosed > 8) {
+  if (totalUnclosed > 3 || (totalUnclosed > 1 && endsAbruptly)) {
     const componentName = filePath
       .replace(/.*\//, '')
       .replace(/\.(jsx?|tsx?)$/, '')
@@ -305,8 +309,8 @@ const SandpackPreview = ({ viewport, showConsole = false, initialPath }: Sandpac
               "https://cdn.tailwindcss.com",
             ],
             recompileMode: "delayed",
-            recompileDelay: 600,
-            bundlerTimeOut: 60000,
+            recompileDelay: 800,
+            bundlerTimeOut: 120000,
           }}
         >
           <div className="h-full flex flex-col" style={viewport ? { width: viewport.width, maxWidth: viewport.maxWidth, height: '100%' } : { height: '100%' }}>
