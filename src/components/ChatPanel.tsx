@@ -628,6 +628,23 @@ const CONTEXT_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
     prevPipelineStep.current = pipelineStep;
   }, [pipelineStep, createCheckpoint, currentPreviewHtml]);
 
+  // Keyboard shortcuts for undo/redo
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === "z") {
+        if (e.shiftKey) {
+          e.preventDefault();
+          handleRedo();
+        } else if (!e.target || !(e.target as HTMLElement).matches("textarea, input, [contenteditable]")) {
+          e.preventDefault();
+          handleUndo();
+        }
+      }
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [handleUndo, handleRedo]);
+
   // Scroll detection for scroll-to-bottom button
   useEffect(() => {
     const el = scrollRef.current;
