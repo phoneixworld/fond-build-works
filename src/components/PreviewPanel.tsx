@@ -1,4 +1,4 @@
-import { Globe, RefreshCw, ExternalLink, Loader2, Monitor, Tablet, Smartphone, Code2, FileText, ChevronLeft, ChevronRight, ChevronDown, MapPin } from "lucide-react";
+import { Globe, RefreshCw, ExternalLink, Loader2, Monitor, Tablet, Smartphone, Code2, FileText, ChevronLeft, ChevronRight, ChevronDown, MapPin, CheckCircle2, Sparkles, Cpu, FileCode, Boxes } from "lucide-react";
 import { useState, useCallback, useRef, useMemo, useEffect } from "react";
 import { usePreview } from "@/contexts/PreviewContext";
 import { motion, AnimatePresence } from "framer-motion";
@@ -14,6 +14,39 @@ import {
 import DirectTouch, { DIRECT_TOUCH_SCRIPT } from "@/components/DirectTouch";
 import SandpackPreview from "@/components/SandpackPreview";
 import BuildTimeline from "@/components/BuildTimeline";
+
+/** Track build steps as they happen for a live timeline */
+function useBuildStepHistory(buildStep: string, isBuilding: boolean) {
+  const [steps, setSteps] = useState<{ label: string; time: number }[]>([]);
+  const startTime = useRef(Date.now());
+
+  useEffect(() => {
+    if (isBuilding && steps.length === 0) {
+      startTime.current = Date.now();
+    }
+    if (!isBuilding) {
+      setSteps([]);
+    }
+  }, [isBuilding]);
+
+  useEffect(() => {
+    if (buildStep && isBuilding) {
+      setSteps(prev => {
+        if (prev.length > 0 && prev[prev.length - 1].label === buildStep) return prev;
+        return [...prev, { label: buildStep, time: Date.now() - startTime.current }];
+      });
+    }
+  }, [buildStep, isBuilding]);
+
+  return steps;
+}
+
+const PIPELINE_STAGES = [
+  { icon: Sparkles, label: "Planning", color: "text-purple-400" },
+  { icon: Cpu, label: "Generating", color: "text-blue-400" },
+  { icon: FileCode, label: "Validating", color: "text-emerald-400" },
+  { icon: Boxes, label: "Assembling", color: "text-amber-400" },
+];
 
 const VIEWPORTS = [
   { id: "desktop", label: "Desktop", icon: Monitor, width: "100%", maxWidth: "none" },
