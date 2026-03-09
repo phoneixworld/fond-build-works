@@ -41,6 +41,18 @@ function useBuildStepHistory(buildStep: string, isBuilding: boolean) {
   return steps;
 }
 
+/** Simple elapsed timer component */
+function ElapsedTimer() {
+  const [elapsed, setElapsed] = useState(0);
+  useEffect(() => {
+    const interval = setInterval(() => setElapsed(e => e + 1), 1000);
+    return () => clearInterval(interval);
+  }, []);
+  const mins = Math.floor(elapsed / 60);
+  const secs = elapsed % 60;
+  return <span className="font-mono">{mins}:{secs.toString().padStart(2, '0')}</span>;
+}
+
 const PIPELINE_STAGES = [
   { icon: Sparkles, label: "Planning", color: "text-purple-400" },
   { icon: Cpu, label: "Generating", color: "text-blue-400" },
