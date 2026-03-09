@@ -744,6 +744,9 @@ ${task.filesAffected.map(f => `- ${f}`).join("\n")}
 - NO descriptions, NO planning text — ONLY code`;
 
       try {
+        const codeContext = buildIncrementalContext(task, accumulatedFiles);
+        const { reductionPercent } = contextReductionRatio(task, accumulatedFiles);
+        if (reductionPercent > 0) console.log(`[BuildEngine] Task "${task.title}" context reduced by ${reductionPercent}%`);
         const taskResult = await executeSingleTask(taskPrompt, config, codeContext, callbacks.onDelta, 0, 16000);
         
         const totalSize = Object.values(taskResult.files).reduce((s, c) => s + c.length, 0);
