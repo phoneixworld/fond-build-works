@@ -837,6 +837,9 @@ const CONTEXT_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
     setCurrentAgent(null);
     setPipelineStep(null);
     setPendingBuildPrompt(null);
+    setCurrentPlan(null);
+    setCurrentTaskIndex(0);
+    setTotalPlanTasks(0);
     isSendingRef.current = false;
     saveProject({ chat_history: [], html_content: "" });
   }, [currentProject, isLoading, setPreviewHtml, saveProject]);
