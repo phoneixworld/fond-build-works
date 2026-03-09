@@ -823,6 +823,11 @@ async function runPlannedBuild(
       plan,
     });
   } catch (err) {
+    const errMsg = err instanceof Error ? err.message : String(err);
+    // Don't fallback on quota errors — surface them directly
+    if (errMsg.includes("Usage limit") || errMsg.includes("Rate limited")) {
+      throw new Error("⚠️ AI usage limit reached. Please add credits in Settings → Workspace → Usage, then try again.");
+    }
     console.warn("[BuildEngine] Planning failed, falling back to direct build:", err);
     await runDirectBuild(prompt, config, callbacks);
     return;
