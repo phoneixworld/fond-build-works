@@ -1444,7 +1444,11 @@ const CONTEXT_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
         
         // ─── Requirements Agent: Extract domain model ───
         let domainModel: any = undefined;
-        const isFirstBuild = !currentSandpackFiles || Object.keys(currentSandpackFiles).length === 0;
+        // FIX: Read sandpack files from ref to get the latest value (not stale closure)
+        // Also verify the project ID hasn't changed since we started
+        const buildProjectId = currentProject.id;
+        const liveSandpackFiles = sandpackFilesRef.current;
+        const isFirstBuild = !liveSandpackFiles || Object.keys(liveSandpackFiles).length === 0;
         if (isFirstBuild) {
           try {
             setBuildStep("🧠 Analyzing domain requirements...");
@@ -1483,17 +1487,28 @@ const CONTEXT_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
           }
         }
         
+        // FIX: Guard against project switch — if project changed during async ops, abort
+        if (lastProjectIdRef.current !== buildProjectId) {
+          console.warn("[ChatPanel] Project switched during build setup, aborting");
+          setIsLoading(false);
+          setIsBuilding(false);
+          return;
+        }
+        
+        // FIX: Use ref-based files to prevent stale data from previous project
+        const safeExistingFiles = shouldIncludeCurrentCode && liveSandpackFiles && Object.keys(liveSandpackFiles).length > 0
+          ? liveSandpackFiles
+          : undefined;
+        
         const engineConfig: EngineConfig = {
-          projectId: currentProject.id,
+          projectId: buildProjectId,
           techStack: currentProject.tech_stack || "react-cdn",
           schemas: schemas.length > 0 ? schemas : undefined,
           model: selectedModel,
           designTheme: themeInfo?.prompt,
           knowledge: knowledge.length > 0 ? knowledge : undefined,
           snippetsContext: snippetsContext || undefined,
-          existingFiles: shouldIncludeCurrentCode && currentSandpackFiles && Object.keys(currentSandpackFiles).length > 0 
-            ? currentSandpackFiles 
-            : undefined,
+          existingFiles: safeExistingFiles,
           templateContext: templateCtx || undefined,
           chatHistory: currentMessages.slice(-8).map(m => ({
             role: m.role,
