@@ -510,14 +510,18 @@ export default function App() {
 - Add a Logout button in the sidebar that calls logout() and redirects to /login
 - If the app has a public landing page, it goes on "/" and dashboard on "/app" or "/dashboard"
 
-## FILE STRUCTURE — PRODUCTION QUALITY
-- /App.jsx: Router setup, layout shell, sidebar/nav
-- /components/Sidebar.jsx or /components/Navigation.jsx: Main navigation
-- /components/Dashboard.jsx: Overview with KPI cards and charts
-- /components/[Feature].jsx: One file per major feature/module
-- /components/ui/[Widget].jsx: Reusable UI components (Modal, Table, Card, Toast)
-- Minimum 8 files for simple apps, 12-20 for complex/ERP apps
-- NEVER put everything in App.jsx — split into focused components
+## FILE STRUCTURE — PRODUCTION QUALITY (NESTED FOLDERS)
+- /App.jsx: Router setup with HashRouter — imports from /layout/ and /pages/
+- /layout/AppLayout.jsx: Main layout shell with Sidebar + Outlet
+- /layout/Sidebar.jsx: Navigation sidebar with NavLink active states
+- /layout/Navbar.jsx: Top navigation bar (if applicable)
+- /pages/[Module]/[Module].jsx: One folder per page/module (e.g., /pages/Dashboard/Dashboard.jsx)
+- /pages/[Module]/[SubPage].jsx: Sub-pages within module folder (e.g., /pages/Students/StudentDetails.jsx)
+- /components/ui/[Widget].jsx: Reusable UI components (Modal, DataTable, Card, Toast, Badge)
+- /hooks/use[Name].js: Custom hooks (useFetch, useAuth, useDebounce)
+- /styles/globals.css: Global CSS with Google Fonts import
+- Minimum 12 files for simple apps, 18-25 for complex/ERP apps
+- EVERY page module gets its OWN folder — NEVER flat /components/Dashboard.jsx
 
 ${designTheme ? `## DESIGN THEME\n${designTheme}` : ''}
 ${knowledgeSection}
