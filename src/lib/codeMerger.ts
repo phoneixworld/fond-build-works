@@ -144,13 +144,33 @@ function extractDefaultImport(imp: string): string | null {
  */
 export function mergeFiles(
   existing: Record<string, string>,
-  incoming: Record<string, string>
+  incoming: Record<string, string>,
+  protectBackend = false
 ): MergeResult {
   const result = { ...existing };
   const conflicts: string[] = [];
 
+  // Backend-protected paths — frontend tasks cannot overwrite these
+  const BACKEND_PROTECTED_PATTERNS = [
+    /^\/data\//,
+    /^\/hooks\/use\w+Data/,
+    /^\/hooks\/use\w+Api/,
+    /^\/contexts\/\w+Context/,
+    /^\/api\//,
+    /^\/lib\/api/,
+  ];
+
   for (const [path, code] of Object.entries(incoming)) {
     if (code.trim().length === 0) continue;
+
+    // If protectBackend is on, skip overwriting backend files
+    if (protectBackend && result[path]) {
+      const isProtected = BACKEND_PROTECTED_PATTERNS.some(p => p.test(path));
+      if (isProtected) {
+        conflicts.push(`${path}: protected backend file — skipped overwrite`);
+        continue;
+      }
+    }
 
     // App.jsx — smart merge
     if ((path === "/App.jsx" || path === "/App.tsx") && result[path]) {
@@ -161,20 +181,15 @@ export function mergeFiles(
     }
 
     // CSS files — smart merge: use incoming as authoritative, don't concatenate
-    // This prevents the endlessly growing CSS duplication bug
     if (path.endsWith(".css") && result[path]) {
-      // If the incoming CSS is substantially different, replace entirely
-      // If it's similar (>50% overlap), just use the newer version
       const existingLines = new Set(result[path].split("\n").map(l => l.trim()).filter(Boolean));
       const incomingLines = code.split("\n").map(l => l.trim()).filter(Boolean);
       const overlapCount = incomingLines.filter(l => existingLines.has(l)).length;
       const overlapRatio = incomingLines.length > 0 ? overlapCount / incomingLines.length : 0;
       
       if (overlapRatio > 0.3) {
-        // Mostly the same CSS — just use the newer version
         result[path] = code;
       } else {
-        // Genuinely different CSS — merge but deduplicate @import lines
         const existingImports = new Set(
           result[path].split("\n").filter(l => l.trim().startsWith("@import")).map(l => l.trim())
         );

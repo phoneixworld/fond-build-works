@@ -221,6 +221,7 @@ export interface EngineConfig {
   existingFiles?: Record<string, string>;
   templateContext?: string;
   chatHistory?: Array<{ role: string; content: string }>;
+  domainModel?: any; // Domain model from Requirements Agent
 }
 
 export type EnginePhase = 
@@ -751,7 +752,8 @@ async function runPlannedBuild(
       config.existingFiles ? Object.keys(config.existingFiles) : undefined,
       config.techStack,
       config.schemas,
-      config.knowledge
+      config.knowledge,
+      config.domainModel
     );
     
     recordPlanningLatency(planTimer.elapsed());
@@ -811,9 +813,15 @@ async function runPlannedBuild(
         plan,
       });
       
+      const domainContext = config.domainModel 
+        ? `\n\n## DOMAIN MODEL\n${JSON.stringify(config.domainModel, null, 2).slice(0, 4000)}` 
+        : "";
+      
       const taskPrompt = `## TASK: ${task.title}
+## TASK TYPE: ${(task as any).taskType || "frontend"}
 
 ${task.buildPrompt}
+${domainContext}
 
 ## FILES TO CREATE/MODIFY:
 ${task.filesAffected.map(f => `- ${f}`).join("\n")}
@@ -823,7 +831,10 @@ ${task.filesAffected.map(f => `- ${f}`).join("\n")}
 - Make sure imports reference existing component files correctly
 - If updating /App.jsx, KEEP ALL existing routes and imports — only ADD new ones
 - Output complete, working code in \`\`\`react-preview fences
-- NO descriptions, NO planning text — ONLY code`;
+- NO descriptions, NO planning text — ONLY code
+- For schema/data tasks: Generate realistic mock data arrays and CRUD hooks
+- For backend tasks: Generate context providers and API integration hooks
+- For frontend tasks: Import data from /data/ and hooks from /hooks/ — do NOT hardcode mock data in pages`;
 
       try {
         const codeContext = buildIncrementalContext(task, accumulatedFiles);
@@ -866,7 +877,9 @@ ${task.filesAffected.map(f => `- ${f}`).join("\n")}
         continue;
       }
 
-      const merged = mergeFiles(accumulatedFiles, result.files);
+      // Protect backend files from being overwritten by frontend tasks
+      const isFrontendTask = (task as any).taskType === "frontend";
+      const merged = mergeFiles(accumulatedFiles, result.files, isFrontendTask);
       accumulatedFiles = merged.files;
       allConflicts.push(...merged.conflicts);
       Object.assign(allDeps, result.deps);

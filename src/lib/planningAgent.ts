@@ -8,6 +8,7 @@ const AUTH_HEADER = `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`;
 export type TaskComplexity = "trivial" | "simple" | "medium" | "complex";
 export type TaskCategory = "ui" | "backend" | "auth" | "data" | "styling" | "testing" | "config";
 export type TaskStatus = "pending" | "in_progress" | "done" | "skipped" | "failed";
+export type TaskType = "schema" | "backend" | "frontend";
 
 export interface PlanTask {
   id: string;
@@ -15,6 +16,7 @@ export interface PlanTask {
   description: string;
   buildPrompt: string;
   complexity: TaskComplexity;
+  taskType: TaskType;
   dependsOn: string[];
   filesAffected: string[];
   needsUserInput?: boolean;
@@ -36,7 +38,8 @@ export async function generatePlan(
   existingFiles?: string[],
   techStack?: string,
   schemas?: any[],
-  knowledge?: string[]
+  knowledge?: string[],
+  domainModel?: any
 ): Promise<BuildPlan> {
   const resp = await fetch(`${BASE_URL}/functions/v1/plan-agent`, {
     method: "POST",
@@ -44,7 +47,7 @@ export async function generatePlan(
       "Content-Type": "application/json",
       Authorization: AUTH_HEADER,
     },
-    body: JSON.stringify({ prompt, existingFiles, techStack, schemas, knowledge }),
+    body: JSON.stringify({ prompt, existingFiles, techStack, schemas, knowledge, domainModel }),
   });
 
   if (!resp.ok) {
@@ -54,8 +57,12 @@ export async function generatePlan(
   }
 
   const plan = await resp.json();
-  // Add status to each task
-  plan.tasks = (plan.tasks || []).map((t: any) => ({ ...t, status: "pending" as TaskStatus }));
+  // Add status and default taskType to each task
+  plan.tasks = (plan.tasks || []).map((t: any) => ({
+    ...t,
+    status: "pending" as TaskStatus,
+    taskType: t.taskType || "frontend" as TaskType,
+  }));
   return plan;
 }
 
