@@ -1,8 +1,16 @@
-import { Globe, RefreshCw, ExternalLink, Loader2, Monitor, Tablet, Smartphone, Code2, FileText } from "lucide-react";
-import { useState, useCallback, useRef } from "react";
+import { Globe, RefreshCw, ExternalLink, Loader2, Monitor, Tablet, Smartphone, Code2, FileText, ChevronLeft, ChevronRight, ChevronDown, MapPin } from "lucide-react";
+import { useState, useCallback, useRef, useMemo, useEffect } from "react";
 import { usePreview } from "@/contexts/PreviewContext";
 import { motion, AnimatePresence } from "framer-motion";
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from "@/components/ui/tooltip";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+  DropdownMenuSeparator,
+  DropdownMenuLabel,
+} from "@/components/ui/dropdown-menu";
 import DirectTouch, { DIRECT_TOUCH_SCRIPT } from "@/components/DirectTouch";
 import SandpackPreview from "@/components/SandpackPreview";
 
@@ -14,11 +22,70 @@ const VIEWPORTS = [
 
 type ViewportId = typeof VIEWPORTS[number]["id"];
 
+/** Extract routes from generated React code by scanning for <Route path="..."> patterns */
+function detectRoutes(files: Record<string, string> | null): { path: string; label: string }[] {
+  if (!files) return [];
+  
+  const routes: { path: string; label: string }[] = [];
+  const seen = new Set<string>();
+  
+  for (const [, code] of Object.entries(files)) {
+    // Match <Route path="/about" ...> or path: "/about"
+    const routeMatches = code.matchAll(/<Route\s+[^>]*path\s*=\s*["']([^"']+)["']/g);
+    for (const match of routeMatches) {
+      const path = match[1];
+      if (!seen.has(path)) {
+        seen.add(path);
+        // Generate readable label from path
+        const label = path === "/" || path === "/*" 
+          ? "Home" 
+          : path.replace(/^\//, "").replace(/[/-]/g, " ").replace(/^\w/, c => c.toUpperCase()).replace(/:\w+/g, "⟨param⟩");
+        routes.push({ path, label });
+      }
+    }
+    
+    // Also detect navigate("/path") calls
+    const navMatches = code.matchAll(/navigate\s*\(\s*["']([^"']+)["']/g);
+    for (const match of navMatches) {
+      const path = match[1];
+      if (!seen.has(path) && path.startsWith("/")) {
+        seen.add(path);
+        const label = path === "/" ? "Home" : path.replace(/^\//, "").replace(/[/-]/g, " ").replace(/^\w/, c => c.toUpperCase());
+        routes.push({ path, label });
+      }
+    }
+
+    // Detect <Link to="/path"> patterns
+    const linkMatches = code.matchAll(/<Link\s+[^>]*to\s*=\s*["']([^"']+)["']/g);
+    for (const match of linkMatches) {
+      const path = match[1];
+      if (!seen.has(path) && path.startsWith("/")) {
+        seen.add(path);
+        const label = path === "/" ? "Home" : path.replace(/^\//, "").replace(/[/-]/g, " ").replace(/^\w/, c => c.toUpperCase());
+        routes.push({ path, label });
+      }
+    }
+  }
+  
+  // Sort: Home first, then alphabetical
+  routes.sort((a, b) => {
+    if (a.path === "/" || a.path === "/*") return -1;
+    if (b.path === "/" || b.path === "/*") return 1;
+    return a.path.localeCompare(b.path);
+  });
+  
+  return routes;
+}
+
 const PreviewPanel = () => {
   const [refreshKey, setRefreshKey] = useState(0);
   const [viewport, setViewport] = useState<ViewportId>("desktop");
   const [directTouchActive, setDirectTouchActive] = useState(false);
+  const [currentPath, setCurrentPath] = useState("/");
+  const [urlInput, setUrlInput] = useState("/");
+  const [isEditingUrl, setIsEditingUrl] = useState(false);
   const iframeRef = useRef<HTMLIFrameElement>(null);
+  const urlInputRef = useRef<HTMLInputElement>(null);
   const { previewHtml, isBuilding, buildStep, previewMode, setPreviewMode, sandpackFiles } = usePreview();
 
   const toggleDirectTouch = useCallback(() => {
@@ -30,29 +97,151 @@ const PreviewPanel = () => {
   }, [directTouchActive]);
 
   const currentViewport = VIEWPORTS.find(v => v.id === viewport)!;
-
   const hasContent = previewMode === "sandpack" ? !!sandpackFiles : !!previewHtml;
+
+  // Detect routes from generated code
+  const detectedRoutes = useMemo(() => detectRoutes(sandpackFiles), [sandpackFiles]);
+  const hasRoutes = detectedRoutes.length > 1; // More than just home
+
+  // Navigate to a specific route via postMessage to Sandpack iframe
+  const navigateToRoute = useCallback((path: string) => {
+    setCurrentPath(path);
+    setUrlInput(path);
+    // Sandpack uses an iframe — we post a message to trigger navigation
+    // The generated apps use react-router, so we inject a navigation script
+    const sandpackIframe = document.querySelector('.sp-preview-iframe') as HTMLIFrameElement;
+    if (sandpackIframe?.contentWindow) {
+      sandpackIframe.contentWindow.postMessage(
+        { type: "navigate", path },
+        "*"
+      );
+    }
+  }, []);
+
+  const handleUrlSubmit = useCallback(() => {
+    setIsEditingUrl(false);
+    if (urlInput.startsWith("/")) {
+      navigateToRoute(urlInput);
+    }
+  }, [urlInput, navigateToRoute]);
+
+  // Listen for route changes from inside the Sandpack iframe
+  useEffect(() => {
+    const handler = (e: MessageEvent) => {
+      if (e.data?.type === "route-change" && typeof e.data.path === "string") {
+        setCurrentPath(e.data.path);
+        setUrlInput(e.data.path);
+      }
+    };
+    window.addEventListener("message", handler);
+    return () => window.removeEventListener("message", handler);
+  }, []);
 
   return (
     <TooltipProvider delayDuration={300}>
       <div className="flex flex-col h-full bg-[hsl(var(--ide-panel))]">
         {/* URL bar */}
-        <div className="flex items-center gap-2 px-3 py-2 border-b border-border bg-[hsl(var(--ide-panel-header))]">
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <button
-                onClick={() => setRefreshKey((k) => k + 1)}
-                className="text-muted-foreground hover:text-foreground transition-colors"
-              >
-                <RefreshCw className={`w-3.5 h-3.5 ${isBuilding ? "animate-spin" : ""}`} />
-              </button>
-            </TooltipTrigger>
-            <TooltipContent side="bottom" className="text-xs">Refresh preview</TooltipContent>
-          </Tooltip>
+        <div className="flex items-center gap-1.5 px-3 py-2 border-b border-border bg-[hsl(var(--ide-panel-header))]">
+          {/* Navigation buttons */}
+          <div className="flex items-center gap-0.5">
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  onClick={() => {
+                    const sandpackIframe = document.querySelector('.sp-preview-iframe') as HTMLIFrameElement;
+                    sandpackIframe?.contentWindow?.history.back();
+                  }}
+                  className="p-1 text-muted-foreground hover:text-foreground transition-colors rounded-md hover:bg-muted/50"
+                >
+                  <ChevronLeft className="w-3.5 h-3.5" />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent side="bottom" className="text-xs">Back</TooltipContent>
+            </Tooltip>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  onClick={() => {
+                    const sandpackIframe = document.querySelector('.sp-preview-iframe') as HTMLIFrameElement;
+                    sandpackIframe?.contentWindow?.history.forward();
+                  }}
+                  className="p-1 text-muted-foreground hover:text-foreground transition-colors rounded-md hover:bg-muted/50"
+                >
+                  <ChevronRight className="w-3.5 h-3.5" />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent side="bottom" className="text-xs">Forward</TooltipContent>
+            </Tooltip>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  onClick={() => setRefreshKey((k) => k + 1)}
+                  className="p-1 text-muted-foreground hover:text-foreground transition-colors rounded-md hover:bg-muted/50"
+                >
+                  <RefreshCw className={`w-3.5 h-3.5 ${isBuilding ? "animate-spin" : ""}`} />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent side="bottom" className="text-xs">Refresh preview</TooltipContent>
+            </Tooltip>
+          </div>
 
-          <div className="flex items-center gap-2 flex-1 bg-secondary rounded-md px-3 py-1">
-            <Globe className="w-3 h-3 text-muted-foreground" />
-            <span className="text-xs text-muted-foreground">phoneix.world</span>
+          {/* URL bar with route input */}
+          <div className="flex items-center gap-1.5 flex-1 bg-secondary rounded-lg px-2.5 py-1 min-w-0">
+            <Globe className="w-3 h-3 text-muted-foreground flex-shrink-0" />
+            {isEditingUrl ? (
+              <input
+                ref={urlInputRef}
+                value={urlInput}
+                onChange={(e) => setUrlInput(e.target.value)}
+                onBlur={handleUrlSubmit}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") handleUrlSubmit();
+                  if (e.key === "Escape") { setIsEditingUrl(false); setUrlInput(currentPath); }
+                }}
+                className="flex-1 bg-transparent text-xs text-foreground outline-none min-w-0"
+                autoFocus
+                spellCheck={false}
+              />
+            ) : (
+              <button
+                onClick={() => {
+                  setIsEditingUrl(true);
+                  setTimeout(() => urlInputRef.current?.select(), 0);
+                }}
+                className="flex-1 text-left text-xs text-muted-foreground hover:text-foreground transition-colors truncate min-w-0"
+              >
+                <span className="text-muted-foreground/60">phoneix.world</span>
+                <span className="text-foreground font-medium">{currentPath}</span>
+              </button>
+            )}
+
+            {/* Route picker dropdown */}
+            {previewMode === "sandpack" && hasRoutes && (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <button className="flex items-center gap-0.5 px-1.5 py-0.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors flex-shrink-0">
+                    <MapPin className="w-3 h-3" />
+                    <ChevronDown className="w-2.5 h-2.5" />
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="min-w-[180px]">
+                  <DropdownMenuLabel className="text-[10px] text-muted-foreground uppercase tracking-wider">
+                    Pages ({detectedRoutes.length})
+                  </DropdownMenuLabel>
+                  <DropdownMenuSeparator />
+                  {detectedRoutes.map((route) => (
+                    <DropdownMenuItem
+                      key={route.path}
+                      onClick={() => navigateToRoute(route.path)}
+                      className={`text-xs gap-2 ${currentPath === route.path ? "bg-primary/10 text-primary font-medium" : ""}`}
+                    >
+                      <span className="font-mono text-muted-foreground text-[10px] min-w-[60px]">{route.path}</span>
+                      <span>{route.label}</span>
+                    </DropdownMenuItem>
+                  ))}
+                </DropdownMenuContent>
+              </DropdownMenu>
+            )}
           </div>
 
           {/* Preview mode toggle */}
@@ -128,6 +317,34 @@ const PreviewPanel = () => {
           </Tooltip>
         </div>
 
+        {/* Route tabs — show when multiple pages detected */}
+        <AnimatePresence>
+          {previewMode === "sandpack" && hasRoutes && (
+            <motion.div
+              initial={{ height: 0, opacity: 0 }}
+              animate={{ height: "auto", opacity: 1 }}
+              exit={{ height: 0, opacity: 0 }}
+              className="border-b border-border bg-[hsl(var(--ide-panel-header))] overflow-hidden"
+            >
+              <div className="flex items-center gap-0.5 px-2 py-1 overflow-x-auto scrollbar-none">
+                {detectedRoutes.map((route) => (
+                  <button
+                    key={route.path}
+                    onClick={() => navigateToRoute(route.path)}
+                    className={`px-2.5 py-1 rounded-md text-[11px] font-medium whitespace-nowrap transition-all ${
+                      currentPath === route.path
+                        ? "bg-primary/10 text-primary border border-primary/20"
+                        : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
+                    }`}
+                  >
+                    {route.label}
+                  </button>
+                ))}
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
         {/* Build progress overlay */}
         <AnimatePresence>
           {isBuilding && (
@@ -186,9 +403,9 @@ const PreviewPanel = () => {
                 <SandpackPreview
                   key={refreshKey}
                   viewport={{ width: currentViewport.width, maxWidth: currentViewport.maxWidth }}
+                  initialPath={currentPath}
                 />
               ) : isBuilding ? (
-                /* Show skeleton while building — don't show empty state prematurely */
                 null
               ) : (
                 <EmptyState />
