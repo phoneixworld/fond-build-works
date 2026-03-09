@@ -268,6 +268,27 @@ export interface EngineResult {
 function validateAllFiles(files: Record<string, string>): { file: string; error: string }[] {
   const errors: { file: string; error: string }[] = [];
   
+  // Available packages that provide named/default exports usable as JSX components
+  const availablePackages = new Set([
+    "react", "react-dom", "lucide-react", "framer-motion", "date-fns",
+    "recharts", "react-router-dom", "clsx", "tailwind-merge",
+  ]);
+  
+  // Collect all exported component names across generated files
+  const definedComponents = new Set<string>(["React", "Fragment"]);
+  for (const [, code] of Object.entries(files)) {
+    // Match: export default function Foo / export function Foo / function Foo (top-level)
+    const exportDefaultMatch = code.matchAll(/export\s+default\s+function\s+(\w+)/g);
+    for (const m of exportDefaultMatch) definedComponents.add(m[1]);
+    const exportNamedMatch = code.matchAll(/export\s+(?:const|function|class)\s+(\w+)/g);
+    for (const m of exportNamedMatch) definedComponents.add(m[1]);
+    // Match top-level function declarations (may be exported elsewhere)
+    const fnMatch = code.matchAll(/^function\s+([A-Z]\w+)/gm);
+    for (const m of fnMatch) definedComponents.add(m[1]);
+    const constMatch = code.matchAll(/^(?:export\s+)?const\s+([A-Z]\w+)\s*=/gm);
+    for (const m of constMatch) definedComponents.add(m[1]);
+  }
+  
   for (const [filePath, code] of Object.entries(files)) {
     // Skip if this exact content was already validated
     if (isFileValidated(filePath, code)) continue;
@@ -275,10 +296,22 @@ function validateAllFiles(files: Record<string, string>): { file: string; error:
     if (filePath.match(/\.(jsx?|tsx?)$/)) {
       try {
         transform(code, { transforms: ["jsx", "imports"], filePath });
-        markFileValidated(filePath, code);
       } catch (e: any) {
         errors.push({ file: filePath, error: (e.message || "JSX parse error").slice(0, 200) });
+        continue;
       }
+      
+      // Check for undefined JSX components (PascalCase tags used but not imported/defined)
+      const undefinedRefs = findUndefinedJSXReferences(code, filePath, files, definedComponents, availablePackages);
+      if (undefinedRefs.length > 0) {
+        errors.push({ 
+          file: filePath, 
+          error: `${undefinedRefs.join(", ")} ${undefinedRefs.length === 1 ? "is" : "are"} not defined. Either import ${undefinedRefs.length === 1 ? "it" : "them"} or remove ${undefinedRefs.length === 1 ? "it" : "them"}. Available packages: ${[...availablePackages].join(", ")}. Do NOT use react-hot-toast, sonner, or any toast library — implement a simple inline toast component instead.`
+        });
+        continue;
+      }
+      
+      markFileValidated(filePath, code);
     } else if (filePath.match(/\.css$/)) {
       try {
         postcss.parse(code);
@@ -290,6 +323,56 @@ function validateAllFiles(files: Record<string, string>): { file: string; error:
   }
   
   return errors;
+}
+
+/**
+ * Find JSX component references (PascalCase) that are neither imported nor defined in the file.
+ */
+function findUndefinedJSXReferences(
+  code: string,
+  filePath: string,
+  allFiles: Record<string, string>,
+  definedComponents: Set<string>,
+  availablePackages: Set<string>
+): string[] {
+  // Collect locally defined/imported names
+  const localNames = new Set<string>();
+  
+  // Imports: import Foo from "..."; import { Foo, Bar } from "...";
+  const importRegex = /import\s+(?:(\w+)(?:\s*,\s*)?)?(?:\{([^}]+)\})?\s+from\s+["'][^"']+["']/g;
+  let m;
+  while ((m = importRegex.exec(code)) !== null) {
+    if (m[1]) localNames.add(m[1]);
+    if (m[2]) {
+      m[2].split(",").forEach(n => {
+        const name = n.trim().split(/\s+as\s+/).pop()?.trim();
+        if (name) localNames.add(name);
+      });
+    }
+  }
+  
+  // Local function/const declarations
+  const localDeclRegex = /(?:function|const|let|var|class)\s+([A-Z]\w+)/g;
+  while ((m = localDeclRegex.exec(code)) !== null) {
+    localNames.add(m[1]);
+  }
+  
+  // Built-in HTML-like React components to skip
+  const builtins = new Set(["React", "Fragment", "Suspense", "StrictMode"]);
+  
+  // Find all PascalCase JSX tags: <ComponentName or <ComponentName>
+  const jsxTagRegex = /<([A-Z]\w+)[\s/>]/g;
+  const undefinedRefs = new Set<string>();
+  while ((m = jsxTagRegex.exec(code)) !== null) {
+    const name = m[1];
+    if (builtins.has(name)) continue;
+    if (localNames.has(name)) continue;
+    if (definedComponents.has(name)) continue;
+    // Check if it could be from a dotted import (e.g., motion.div) — skip
+    undefinedRefs.add(name);
+  }
+  
+  return [...undefinedRefs];
 }
 
 function makeStub(filePath: string): string {
