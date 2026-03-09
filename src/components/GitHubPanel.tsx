@@ -4,6 +4,7 @@ import { useProjects } from "@/contexts/ProjectContext";
 import { useVirtualFS } from "@/contexts/VirtualFSContext";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { toExportPath, toSandpackPath } from "@/lib/pathNormalizer";
 
 type Step = "connect" | "select-account" | "select-repo" | "connected";
 
@@ -206,7 +207,7 @@ const GitHubPanel = () => {
         owner,
         repo,
         branch: connectedRepo.default_branch,
-        files: fileEntries.map(([path, file]) => ({ path, content: file.content })),
+        files: fileEntries.map(([path, file]) => ({ path: toExportPath(path), content: file.content })),
         message: `Update from IDE – ${currentProject?.name || "project"}`,
       });
       const commitsData = await callGitHub({ action: "commits", owner, repo, branch: connectedRepo.default_branch });
@@ -227,10 +228,12 @@ const GitHubPanel = () => {
       const data = await callGitHub({ action: "pull", owner, repo, branch: connectedRepo.default_branch });
       if (data.files) {
         for (const file of data.files) {
-          if (files[file.path]) {
-            updateFile(file.path, file.content);
+          const normalizedPath = file.path.startsWith("src/") ? file.path : file.path;
+          // Use the path as-is for VirtualFS storage
+          if (files[normalizedPath]) {
+            updateFile(normalizedPath, file.content);
           } else {
-            addFile(file.path, file.content);
+            addFile(normalizedPath, file.content);
           }
         }
       }

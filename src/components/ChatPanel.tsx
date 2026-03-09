@@ -19,6 +19,7 @@ import { usePreview } from "@/contexts/PreviewContext";
 import { useProjects } from "@/contexts/ProjectContext";
 import { useVirtualFS, parseMultiFileOutput } from "@/contexts/VirtualFSContext";
 import { supabase } from "@/integrations/supabase/client";
+import { toExportPath } from "@/lib/pathNormalizer";
 import ChatMessage from "@/components/chat/ChatMessage";
 import BuildPipelineCard from "@/components/chat/BuildPipelineCard";
 import ClarifyingQuestions from "@/components/chat/ClarifyingQuestions";
@@ -570,12 +571,14 @@ const ChatPanel = forwardRef<ChatPanelHandle, { initialPrompt?: string; onVersio
     const virtualFiles: Record<string, { path: string; content: string; language: string }> = {};
     for (const [path, content] of Object.entries(sandpackFiles)) {
       const cleanPath = path.startsWith("/") ? path.slice(1) : path;
-      const ext = cleanPath.split(".").pop()?.toLowerCase() || "";
+      // Map sandpack paths to src/ structure for display
+      const displayPath = toExportPath(cleanPath);
+      const ext = displayPath.split(".").pop()?.toLowerCase() || "";
       const langMap: Record<string, string> = {
         tsx: "typescript", ts: "typescript", jsx: "javascript", js: "javascript",
         css: "css", html: "html", json: "json",
       };
-      virtualFiles[cleanPath] = { path: cleanPath, content, language: langMap[ext] || "text" };
+      virtualFiles[displayPath] = { path: displayPath, content, language: langMap[ext] || "text" };
     }
     setVirtualFiles(virtualFiles);
   }, [setVirtualFiles]);
