@@ -4,12 +4,11 @@ import { useAuth } from "@/hooks/useAuth";
 import { useProjects, Project } from "@/contexts/ProjectContext";
 import { formatDistanceToNow } from "date-fns";
 import { motion } from "framer-motion";
-import TechStackSelector from "@/components/TechStackSelector";
-import { TechStackId, TECH_STACKS } from "@/lib/techStacks";
+import { TECH_STACKS } from "@/lib/techStacks";
 import { TEMPLATES, Template } from "@/lib/templates";
 
 interface LandingPageProps {
-  onStartProject: (prompt: string, techStack: TechStackId) => void;
+  onStartProject: (prompt: string, techStack: string) => void;
   onOpenProject: (id: string) => void;
 }
 
@@ -17,7 +16,7 @@ const LandingPage = ({ onStartProject, onOpenProject }: LandingPageProps) => {
   const { user, signOut } = useAuth();
   const { projects, loading, deleteProject, cloneProject } = useProjects();
   const [input, setInput] = useState("");
-  const [techStack, setTechStack] = useState<TechStackId>("html-tailwind");
+  const techStack = "html-tailwind";
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
   const handleSubmit = () => {
@@ -42,8 +41,7 @@ const LandingPage = ({ onStartProject, onOpenProject }: LandingPageProps) => {
   ];
 
   const handleUseTemplate = (template: Template) => {
-    setTechStack(template.techStack);
-    onStartProject(template.prompt, template.techStack);
+    onStartProject(template.prompt, techStack);
   };
 
   return (
@@ -84,10 +82,6 @@ const LandingPage = ({ onStartProject, onOpenProject }: LandingPageProps) => {
             </p>
           </div>
 
-          {/* Tech stack selector */}
-          <div className="flex justify-center">
-            <TechStackSelector value={techStack} onChange={setTechStack} />
-          </div>
 
           {/* Prompt input */}
           <div className="relative bg-secondary border border-border rounded-xl p-1 focus-within:border-primary/50 focus-within:ring-2 focus-within:ring-primary/20 transition-all">
@@ -102,7 +96,7 @@ const LandingPage = ({ onStartProject, onOpenProject }: LandingPageProps) => {
             />
             <div className="absolute bottom-3 left-3 right-3 flex items-center justify-between">
               <span className="text-xs text-muted-foreground">
-                {TECH_STACKS.find(s => s.id === techStack)?.label} • Full-stack enabled
+                React + Lovable Cloud
               </span>
               <button
                 onClick={handleSubmit}
