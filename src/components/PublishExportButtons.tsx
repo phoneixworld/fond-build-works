@@ -40,7 +40,7 @@ type DialogTab = "deploy" | "history" | "domain";
 
 const PublishExportButtons = forwardRef<PublishExportHandle>((_, ref) => {
   const { currentProject, saveProject } = useProjects();
-  const { previewHtml, sandpackFiles } = usePreview();
+  const { previewHtml, sandpackFiles, isBuilding } = usePreview();
   const { files } = useVirtualFS();
   const { user } = useAuth();
   const { toast } = useToast();
@@ -403,7 +403,7 @@ const PublishExportButtons = forwardRef<PublishExportHandle>((_, ref) => {
                     <div className="flex gap-2 pt-1">
                       <button
                         onClick={handlePublish}
-                        disabled={publishing}
+                        disabled={publishing || isBuilding}
                         className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-xs font-semibold bg-primary text-primary-foreground hover:bg-primary/90 transition-colors disabled:opacity-50"
                       >
                         {publishing ? (
@@ -414,7 +414,7 @@ const PublishExportButtons = forwardRef<PublishExportHandle>((_, ref) => {
                       </button>
                       <button
                         onClick={handleUnpublish}
-                        disabled={publishing}
+                        disabled={publishing || isBuilding}
                         className="px-3 py-2.5 rounded-lg text-xs font-medium text-muted-foreground hover:text-destructive hover:bg-destructive/10 border border-transparent hover:border-destructive/20 transition-all"
                       >
                         Unpublish
@@ -467,7 +467,7 @@ const PublishExportButtons = forwardRef<PublishExportHandle>((_, ref) => {
 
                     <button
                       onClick={handlePublish}
-                      disabled={publishing}
+                      disabled={publishing || isBuilding}
                       className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-sm font-semibold bg-primary text-primary-foreground hover:bg-primary/90 transition-colors disabled:opacity-50"
                     >
                       {publishing ? (
