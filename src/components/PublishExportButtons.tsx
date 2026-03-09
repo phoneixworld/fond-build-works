@@ -308,7 +308,7 @@ const PublishExportButtons = forwardRef<PublishExportHandle>((_, ref) => {
         notes: deployNotes || "Deployed to staging",
       } as any);
 
-      setStagingUrl(`${window.location.origin}/app/staging-${slug}`);
+      setStagingUrl(`${getPublishedOrigin()}/app/staging-${slug}`);
       setDeployNotes("");
       toast({ title: "Deployed to Staging! 🎯", description: "Preview and test before promoting to production." });
       fetchEnvStatus();
