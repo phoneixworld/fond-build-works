@@ -82,10 +82,6 @@ const LandingPage = ({ onStartProject, onOpenProject }: LandingPageProps) => {
             </p>
           </div>
 
-          {/* Tech stack selector */}
-          <div className="flex justify-center">
-            <TechStackSelector value={techStack} onChange={setTechStack} />
-          </div>
 
           {/* Prompt input */}
           <div className="relative bg-secondary border border-border rounded-xl p-1 focus-within:border-primary/50 focus-within:ring-2 focus-within:ring-primary/20 transition-all">
