@@ -1590,7 +1590,7 @@ ${Object.entries(files).map(([path, code]) => `--- ${path}\n${code}`).join("\n\n
                     )
                     .then(({ error }) => { if (error) console.warn("Polish persist error:", error); });
                   
-                  const polishedMsg = reactResult.chatText || `✅ **${template.name} customized!** Your site is ready with personalized content.`;
+                  const polishedMsg = reactResult.chatText || `✅ **${templateName} customized!** Your site is ready with personalized content.`;
                   setMessages((prev) => {
                     const last = prev[prev.length - 1];
                     if (last?.role === "assistant") {
