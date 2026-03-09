@@ -686,6 +686,13 @@ async function runPlannedBuild(
     return;
   }
 
+  // ── Adaptive task splitting ──
+  const splitResult = applyAdaptiveSplitting(plan.tasks);
+  if (splitResult.splitCount > 0) {
+    console.log(`[BuildEngine] Split ${splitResult.splitCount} oversized tasks: ${splitResult.originalCount} → ${splitResult.totalAfterSplit}`);
+    plan = { ...plan, tasks: splitResult.tasks };
+  }
+
   const sortedTasks = topologicalSort(plan.tasks);
   const executableTasks = sortedTasks.filter(t => !t.needsUserInput);
   const parallelGroups = buildParallelGroups(executableTasks);
