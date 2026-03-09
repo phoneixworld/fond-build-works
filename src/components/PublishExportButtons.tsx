@@ -279,74 +279,78 @@ const PublishExportButtons = forwardRef<PublishExportHandle>((_, ref) => {
       </button>
 
       <Dialog open={showPublish} onOpenChange={setShowPublish}>
-        <DialogContent className="sm:max-w-lg">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <Globe className="w-5 h-5 text-primary" />
-              Publish Your App
-            </DialogTitle>
-            <DialogDescription>
-              Deploy, manage domains, and view deploy history.
-            </DialogDescription>
-          </DialogHeader>
-
-          {/* Tabs */}
-          <div className="flex gap-1 bg-secondary/50 rounded-lg p-0.5">
-            {tabs.map(tab => {
-              const Icon = tab.icon;
-              return (
-                <button
-                  key={tab.id}
-                  onClick={() => setActiveTab(tab.id)}
-                  className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-all ${
-                    activeTab === tab.id
-                      ? "bg-background text-foreground shadow-sm"
-                      : "text-muted-foreground hover:text-foreground"
-                  }`}
-                >
-                  <Icon className="w-3 h-3" /> {tab.label}
-                </button>
-              );
-            })}
+        <DialogContent className="sm:max-w-md p-0 gap-0 overflow-hidden border-border/50 bg-card">
+          {/* Header */}
+          <div className="px-5 pt-5 pb-4">
+            <DialogHeader className="space-y-1">
+              <DialogTitle className="text-base font-semibold text-foreground">
+                Publish
+              </DialogTitle>
+              <DialogDescription className="text-xs text-muted-foreground">
+                Deploy your app and share it with the world.
+              </DialogDescription>
+            </DialogHeader>
           </div>
 
-          <div className="space-y-4 pt-1">
+          {/* Tab bar */}
+          <div className="px-5">
+            <div className="flex border-b border-border">
+              {tabs.map(tab => {
+                const Icon = tab.icon;
+                return (
+                  <button
+                    key={tab.id}
+                    onClick={() => setActiveTab(tab.id)}
+                    className={`flex items-center gap-1.5 px-3 py-2 text-xs font-medium border-b-2 -mb-px transition-colors ${
+                      activeTab === tab.id
+                        ? "border-primary text-foreground"
+                        : "border-transparent text-muted-foreground hover:text-foreground"
+                    }`}
+                  >
+                    <Icon className="w-3.5 h-3.5" />
+                    {tab.label}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Content */}
+          <div className="px-5 py-4">
             {/* ========= DEPLOY TAB ========= */}
             {activeTab === "deploy" && (
               <>
                 {publishedUrl ? (
                   <div className="space-y-4">
-                    {/* Live status */}
-                    <div className="flex items-center gap-2 p-3 rounded-xl bg-[hsl(var(--ide-success))]/10 border border-[hsl(var(--ide-success))]/20">
-                      <Check className="w-5 h-5 text-[hsl(var(--ide-success))]" />
-                      <div>
-                        <span className="text-sm font-semibold text-foreground">Your app is live! 🚀</span>
-                        <p className="text-[11px] text-muted-foreground">Deployed and accessible to anyone</p>
-                      </div>
+                    {/* Live badge */}
+                    <div className="flex items-center gap-2.5 p-3 rounded-lg bg-ide-success/10 border border-ide-success/20">
+                      <div className="w-2 h-2 rounded-full bg-ide-success animate-pulse-dot" />
+                      <span className="text-xs font-medium text-foreground">Live</span>
                     </div>
 
-                    {/* URL */}
-                    <div className="flex items-center gap-2 bg-secondary rounded-xl px-3 py-2.5">
-                      <Link2 className="w-4 h-4 text-primary shrink-0" />
-                      <span className="text-xs text-foreground truncate flex-1 font-mono">{publishedUrl}</span>
-                      <button onClick={handleCopy} className="text-muted-foreground hover:text-foreground shrink-0 transition-colors">
-                        {copied ? <Check className="w-4 h-4 text-[hsl(var(--ide-success))]" /> : <Copy className="w-4 h-4" />}
+                    {/* URL row */}
+                    <div className="flex items-center gap-2 rounded-lg border border-border bg-background px-3 py-2">
+                      <Link2 className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
+                      <span className="text-xs text-foreground truncate flex-1 font-mono select-all">{publishedUrl}</span>
+                      <button onClick={handleCopy} className="text-muted-foreground hover:text-foreground shrink-0 transition-colors p-1 rounded hover:bg-secondary">
+                        {copied ? <Check className="w-3.5 h-3.5 text-ide-success" /> : <Copy className="w-3.5 h-3.5" />}
                       </button>
+                      <a href={publishedUrl} target="_blank" rel="noopener noreferrer" className="text-muted-foreground hover:text-foreground shrink-0 transition-colors p-1 rounded hover:bg-secondary">
+                        <ExternalLink className="w-3.5 h-3.5" />
+                      </a>
                     </div>
 
-                    {/* Environment selector */}
-                    <div>
-                      <label className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground mb-1.5 block">Deploy Target</label>
-                      <div className="flex gap-2">
+                    {/* Deploy target */}
+                    <div className="space-y-1.5">
+                      <label className="text-[11px] font-medium text-muted-foreground">Environment</label>
+                      <div className="grid grid-cols-2 gap-2">
                         {(["staging", "production"] as const).map(env => (
                           <button
                             key={env}
                             onClick={() => setDeployTarget(env)}
-                            className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium border transition-all ${
+                            className={`flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium border transition-all ${
                               deployTarget === env
-                                ? env === "production"
-                                  ? "border-[hsl(var(--ide-success))] bg-[hsl(var(--ide-success))]/5 text-foreground"
-                                  : "border-primary bg-primary/5 text-foreground"
+                                ? "border-primary bg-primary/5 text-foreground"
                                 : "border-border text-muted-foreground hover:border-primary/30"
                             }`}
                           >
@@ -357,87 +361,74 @@ const PublishExportButtons = forwardRef<PublishExportHandle>((_, ref) => {
                       </div>
                     </div>
 
-                    {/* Deploy notes */}
-                    <div>
-                      <label className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground mb-1.5 block">Deploy Notes (optional)</label>
+                    {/* Notes */}
+                    <div className="space-y-1.5">
+                      <label className="text-[11px] font-medium text-muted-foreground">Notes <span className="text-muted-foreground/50">(optional)</span></label>
                       <input
                         type="text"
                         value={deployNotes}
                         onChange={e => setDeployNotes(e.target.value)}
-                        placeholder="e.g. Fixed hero section layout"
-                        className="w-full px-3 py-2 rounded-lg border border-border bg-secondary/50 text-xs text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:ring-1 focus:ring-primary"
+                        placeholder="What changed in this deploy?"
+                        className="w-full px-3 py-2 rounded-lg border border-border bg-background text-xs text-foreground placeholder:text-muted-foreground/40 focus:outline-none focus:ring-1 focus:ring-primary transition-shadow"
                       />
                     </div>
 
-                    {/* Action buttons */}
-                    <div className="flex gap-2">
-                      <a
-                        href={publishedUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-xl text-xs font-medium text-primary hover:bg-primary/10 transition-colors"
-                      >
-                        <ExternalLink className="w-3.5 h-3.5" />
-                        Open
-                      </a>
+                    {/* Actions */}
+                    <div className="flex gap-2 pt-1">
                       <button
                         onClick={handlePublish}
                         disabled={publishing}
-                        className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-xs font-semibold bg-primary text-primary-foreground hover:bg-primary/90 transition-colors disabled:opacity-50"
+                        className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-xs font-semibold bg-primary text-primary-foreground hover:bg-primary/90 transition-colors disabled:opacity-50"
                       >
                         {publishing ? (
-                          <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Deploying to {deployTarget}...</>
+                          <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Deploying...</>
                         ) : (
-                          <><Rocket className="w-3.5 h-3.5" /> Update {deployTarget}</>
+                          <><ArrowRight className="w-3.5 h-3.5" /> Update</>
                         )}
                       </button>
                       <button
                         onClick={handleUnpublish}
                         disabled={publishing}
-                        className="px-3 py-2.5 rounded-xl text-xs font-medium text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
+                        className="px-3 py-2.5 rounded-lg text-xs font-medium text-muted-foreground hover:text-destructive hover:bg-destructive/10 border border-transparent hover:border-destructive/20 transition-all"
                       >
                         Unpublish
                       </button>
                     </div>
                   </div>
                 ) : (
-                  /* Pre-publish state */
+                  /* Pre-publish */
                   <div className="space-y-4">
-                    <div className="space-y-3">
+                    <div className="grid grid-cols-2 gap-2">
                       {[
-                        { icon: Globe, color: "text-primary", bgColor: "bg-primary/10", title: "Real deployment", desc: "Your app gets a public URL hosted on our CDN" },
-                        { icon: Link2, color: "text-accent", bgColor: "bg-accent/10", title: "Shareable link", desc: "Anyone with the link can view your app" },
-                        { icon: Shield, color: "text-primary", bgColor: "bg-primary/10", title: "Custom domain", desc: "Connect your own domain like myapp.com" },
-                        { icon: History, color: "text-muted-foreground", bgColor: "bg-secondary", title: "Deploy history", desc: "Track every deployment with rollback support" },
+                        { icon: Globe, title: "Public URL", desc: "Hosted on our CDN" },
+                        { icon: Link2, title: "Share anywhere", desc: "Instant access link" },
+                        { icon: Shield, title: "Custom domain", desc: "Use your own .com" },
+                        { icon: History, title: "Version history", desc: "Rollback anytime" },
                       ].map((item, i) => {
                         const Icon = item.icon;
                         return (
-                          <div key={i} className="flex items-center gap-3 p-3 rounded-xl bg-secondary">
-                            <div className={`w-8 h-8 rounded-lg ${item.bgColor} flex items-center justify-center`}>
-                              <Icon className={`w-4 h-4 ${item.color}`} />
-                            </div>
+                          <div key={i} className="flex items-start gap-2.5 p-3 rounded-lg border border-border bg-background">
+                            <Icon className="w-4 h-4 text-primary shrink-0 mt-0.5" />
                             <div>
-                              <p className="text-xs font-medium text-foreground">{item.title}</p>
-                              <p className="text-[10px] text-muted-foreground">{item.desc}</p>
+                              <p className="text-xs font-medium text-foreground leading-tight">{item.title}</p>
+                              <p className="text-[10px] text-muted-foreground mt-0.5">{item.desc}</p>
                             </div>
                           </div>
                         );
                       })}
                     </div>
 
-                    {/* Environment selector */}
-                    <div>
-                      <label className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground mb-1.5 block">Deploy Target</label>
-                      <div className="flex gap-2">
+                    {/* Environment */}
+                    <div className="space-y-1.5">
+                      <label className="text-[11px] font-medium text-muted-foreground">Environment</label>
+                      <div className="grid grid-cols-2 gap-2">
                         {(["staging", "production"] as const).map(env => (
                           <button
                             key={env}
                             onClick={() => setDeployTarget(env)}
-                            className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium border transition-all ${
+                            className={`flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium border transition-all ${
                               deployTarget === env
-                                ? env === "production"
-                                  ? "border-[hsl(var(--ide-success))] bg-[hsl(var(--ide-success))]/5 text-foreground"
-                                  : "border-primary bg-primary/5 text-foreground"
+                                ? "border-primary bg-primary/5 text-foreground"
                                 : "border-border text-muted-foreground hover:border-primary/30"
                             }`}
                           >
@@ -448,25 +439,13 @@ const PublishExportButtons = forwardRef<PublishExportHandle>((_, ref) => {
                       </div>
                     </div>
 
-                    {/* Deploy notes */}
-                    <div>
-                      <label className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground mb-1.5 block">Deploy Notes (optional)</label>
-                      <input
-                        type="text"
-                        value={deployNotes}
-                        onChange={e => setDeployNotes(e.target.value)}
-                        placeholder="e.g. Initial launch"
-                        className="w-full px-3 py-2 rounded-lg border border-border bg-secondary/50 text-xs text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:ring-1 focus:ring-primary"
-                      />
-                    </div>
-
                     <button
                       onClick={handlePublish}
                       disabled={publishing}
-                      className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl text-sm font-semibold bg-primary text-primary-foreground hover:bg-primary/90 transition-colors disabled:opacity-50 shadow-lg shadow-primary/20"
+                      className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-sm font-semibold bg-primary text-primary-foreground hover:bg-primary/90 transition-colors disabled:opacity-50"
                     >
                       {publishing ? (
-                        <><Loader2 className="w-4 h-4 animate-spin" /> Deploying to {deployTarget}...</>
+                        <><Loader2 className="w-4 h-4 animate-spin" /> Deploying...</>
                       ) : (
                         <><Rocket className="w-4 h-4" /> Deploy to {deployTarget}</>
                       )}
@@ -480,58 +459,44 @@ const PublishExportButtons = forwardRef<PublishExportHandle>((_, ref) => {
             {activeTab === "history" && (
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
-                  <span className="text-xs font-medium text-foreground">Deploy History</span>
-                  <button onClick={fetchHistory} className="text-[10px] text-muted-foreground hover:text-foreground flex items-center gap-1">
+                  <span className="text-xs font-medium text-foreground">Recent Deployments</span>
+                  <button onClick={fetchHistory} className="text-[11px] text-muted-foreground hover:text-foreground flex items-center gap-1 transition-colors">
                     <RotateCcw className="w-3 h-3" /> Refresh
                   </button>
                 </div>
 
                 {loadingHistory ? (
-                  <div className="flex items-center justify-center py-8">
+                  <div className="flex items-center justify-center py-10">
                     <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
                   </div>
                 ) : deployHistory.length === 0 ? (
-                  <div className="text-center py-8">
-                    <History className="w-8 h-8 text-muted-foreground/30 mx-auto mb-2" />
+                  <div className="text-center py-10">
+                    <History className="w-6 h-6 text-muted-foreground/20 mx-auto mb-2" />
                     <p className="text-xs text-muted-foreground">No deployments yet</p>
-                    <p className="text-[10px] text-muted-foreground/60 mt-1">Deploy your app to see history here</p>
                   </div>
                 ) : (
-                  <div className="space-y-2 max-h-[350px] overflow-y-auto">
+                  <div className="space-y-1.5 max-h-[320px] overflow-y-auto">
                     {deployHistory.map(record => (
-                      <div key={record.id} className="flex items-start gap-3 p-3 rounded-lg border border-border bg-background">
-                        <div className={`w-2 h-2 rounded-full mt-1.5 shrink-0 ${
-                          record.status === "success" ? "bg-[hsl(var(--ide-success))]" : "bg-destructive"
+                      <div key={record.id} className="flex items-center gap-3 px-3 py-2.5 rounded-lg border border-border bg-background hover:bg-secondary/30 transition-colors">
+                        <div className={`w-1.5 h-1.5 rounded-full shrink-0 ${
+                          record.status === "success" ? "bg-ide-success" : "bg-destructive"
                         }`} />
                         <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2">
-                            <span className="text-[10px] font-semibold uppercase text-muted-foreground">
-                              {record.from_env} → {record.to_env}
-                            </span>
-                            <span className={`text-[9px] px-1.5 py-0.5 rounded-full font-medium ${
-                              record.status === "success"
-                                ? "bg-[hsl(var(--ide-success))]/10 text-[hsl(var(--ide-success))]"
-                                : "bg-destructive/10 text-destructive"
-                            }`}>
-                              {record.status}
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-[11px] font-medium text-foreground truncate">
+                              {record.notes || `${record.from_env} → ${record.to_env}`}
                             </span>
                           </div>
-                          {record.notes && (
-                            <p className="text-[11px] text-foreground mt-0.5 truncate">{record.notes}</p>
-                          )}
-                          <div className="flex items-center gap-2 mt-1">
-                            <span className="text-[10px] text-muted-foreground">
-                              {new Date(record.created_at).toLocaleDateString()} {new Date(record.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
-                            </span>
-                            <span className="text-[10px] text-muted-foreground">by {record.deployed_by_email || "unknown"}</span>
-                          </div>
+                          <span className="text-[10px] text-muted-foreground">
+                            {new Date(record.created_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })} · {record.deployed_by_email?.split('@')[0] || "unknown"}
+                          </span>
                         </div>
                         {record.status === "success" && (
                           <button
                             onClick={() => handleRollback(record)}
                             disabled={!!rollingBack}
-                            className="shrink-0 p-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors disabled:opacity-40"
-                            title="Rollback to this deploy"
+                            className="shrink-0 p-1 rounded text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors disabled:opacity-40"
+                            title="Rollback"
                           >
                             {rollingBack === record.id ? (
                               <Loader2 className="w-3.5 h-3.5 animate-spin" />
@@ -552,89 +517,71 @@ const PublishExportButtons = forwardRef<PublishExportHandle>((_, ref) => {
               <div className="space-y-4">
                 {domainStatus === "none" ? (
                   <>
-                    <div className="text-center py-3">
-                      <div className="w-12 h-12 rounded-2xl bg-primary/10 flex items-center justify-center mx-auto mb-3">
-                        <Shield className="w-6 h-6 text-primary" />
-                      </div>
-                      <h3 className="text-sm font-semibold text-foreground">Connect Your Domain</h3>
-                      <p className="text-[11px] text-muted-foreground mt-1">Use your own domain instead of the default URL</p>
+                    <div className="text-center py-2">
+                      <Globe className="w-8 h-8 text-muted-foreground/30 mx-auto mb-2" />
+                      <h3 className="text-sm font-semibold text-foreground">Custom Domain</h3>
+                      <p className="text-xs text-muted-foreground mt-1">Point your own domain to this app</p>
                     </div>
 
-                    <div>
-                      <label className="text-[10px] font-medium text-muted-foreground mb-1 block">Your Domain</label>
+                    <div className="space-y-1.5">
+                      <label className="text-[11px] font-medium text-muted-foreground">Domain</label>
                       <input
                         type="text"
                         value={domainInput}
                         onChange={e => setDomainInput(e.target.value)}
                         placeholder="myapp.com"
-                        className="w-full px-3 py-2 rounded-lg border border-border bg-secondary/50 text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary"
+                        className="w-full px-3 py-2 rounded-lg border border-border bg-background text-xs text-foreground placeholder:text-muted-foreground/40 focus:outline-none focus:ring-1 focus:ring-primary transition-shadow"
                         onKeyDown={e => e.key === "Enter" && handleConnectDomain()}
                       />
                     </div>
 
-                    <div className="p-3 rounded-lg bg-primary/5 border border-primary/10">
-                      <div className="flex items-start gap-2">
-                        <AlertCircle className="w-3.5 h-3.5 text-primary shrink-0 mt-0.5" />
-                        <div className="text-[10px] text-muted-foreground space-y-1">
-                          <p className="font-medium text-foreground">DNS Records Required:</p>
-                          <div className="font-mono bg-secondary/50 rounded p-2 space-y-1">
-                            <p><span className="text-primary font-semibold">A</span> @ → <span className="text-foreground">185.158.133.1</span></p>
-                            <p><span className="text-primary font-semibold">A</span> www → <span className="text-foreground">185.158.133.1</span></p>
-                            <p><span className="text-primary font-semibold">TXT</span> _lovable → <span className="text-foreground">lovable_verify={currentProject?.id?.slice(0, 12)}</span></p>
-                          </div>
-                          <p className="mt-1">Add these at your domain registrar (GoDaddy, Namecheap, Cloudflare, etc.)</p>
-                        </div>
+                    <div className="rounded-lg border border-border bg-background p-3">
+                      <p className="text-[11px] font-medium text-foreground mb-2">Required DNS Records</p>
+                      <div className="font-mono text-[10px] text-muted-foreground space-y-1 bg-secondary/50 rounded p-2">
+                        <p><span className="text-primary font-semibold">A</span> {"   "}@ → 185.158.133.1</p>
+                        <p><span className="text-primary font-semibold">A</span> {"   "}www → 185.158.133.1</p>
+                        <p><span className="text-primary font-semibold">TXT</span> _lovable → lovable_verify={currentProject?.id?.slice(0, 12)}</p>
                       </div>
                     </div>
 
                     <button
                       onClick={handleConnectDomain}
                       disabled={!domainInput.trim()}
-                      className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl text-sm font-semibold bg-primary text-primary-foreground hover:bg-primary/90 transition-colors disabled:opacity-40"
+                      className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-xs font-semibold bg-primary text-primary-foreground hover:bg-primary/90 transition-colors disabled:opacity-40"
                     >
-                      <Globe className="w-4 h-4" /> Connect Domain
+                      <Globe className="w-3.5 h-3.5" /> Connect Domain
                     </button>
                   </>
                 ) : (
                   <div className="space-y-4">
-                    {/* Domain status card */}
-                    <div className={`flex items-center gap-3 p-4 rounded-xl border ${
+                    <div className={`flex items-center gap-3 p-3 rounded-lg border ${
                       domainStatus === "active"
-                        ? "border-[hsl(var(--ide-success))]/30 bg-[hsl(var(--ide-success))]/5"
-                        : "border-yellow-500/30 bg-yellow-500/5"
+                        ? "border-ide-success/30 bg-ide-success/5"
+                        : "border-ide-warning/30 bg-ide-warning/5"
                     }`}>
-                      <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${
-                        domainStatus === "active" ? "bg-[hsl(var(--ide-success))]/10" : "bg-yellow-500/10"
-                      }`}>
-                        {domainStatus === "active" ? (
-                          <Check className="w-5 h-5 text-[hsl(var(--ide-success))]" />
-                        ) : domainStatus === "verifying" ? (
-                          <Loader2 className="w-5 h-5 text-yellow-500 animate-spin" />
-                        ) : (
-                          <AlertCircle className="w-5 h-5 text-yellow-500" />
-                        )}
-                      </div>
+                      {domainStatus === "active" ? (
+                        <Check className="w-4 h-4 text-ide-success shrink-0" />
+                      ) : domainStatus === "verifying" ? (
+                        <Loader2 className="w-4 h-4 text-ide-warning animate-spin shrink-0" />
+                      ) : (
+                        <AlertCircle className="w-4 h-4 text-ide-warning shrink-0" />
+                      )}
                       <div>
-                        <p className="text-sm font-semibold text-foreground">{domainInput}</p>
-                        <p className="text-[11px] text-muted-foreground">
-                          {domainStatus === "active" && "Domain is live and serving your app! ✓"}
-                          {domainStatus === "verifying" && "Verifying DNS records... (can take up to 72h)"}
-                          {domainStatus === "pending" && "Waiting for DNS records to be added"}
+                        <p className="text-xs font-semibold text-foreground">{domainInput}</p>
+                        <p className="text-[10px] text-muted-foreground">
+                          {domainStatus === "active" && "Connected and serving traffic"}
+                          {domainStatus === "verifying" && "Verifying DNS records…"}
+                          {domainStatus === "pending" && "Waiting for DNS configuration"}
                         </p>
                       </div>
                     </div>
 
                     {domainStatus !== "active" && (
-                      <div className="p-3 rounded-lg bg-secondary">
-                        <p className="text-[11px] font-medium text-foreground mb-2">Next Steps:</p>
-                        <ol className="text-[10px] text-muted-foreground space-y-1.5 list-decimal list-inside">
-                          <li>Go to your domain registrar's DNS settings</li>
-                          <li>Add the A records pointing to <code className="text-foreground">185.158.133.1</code></li>
-                          <li>Add the TXT record for verification</li>
-                          <li>Wait for DNS propagation (usually 15min - 72h)</li>
-                          <li>SSL will be auto-provisioned once verified</li>
-                        </ol>
-                      </div>
+                      <ol className="text-[11px] text-muted-foreground space-y-1 list-decimal list-inside p-3 rounded-lg bg-secondary/50">
+                        <li>Add DNS records at your registrar</li>
+                        <li>Wait for propagation (15 min – 72 h)</li>
+                        <li>SSL auto-provisions on verification</li>
+                      </ol>
                     )}
 
                     {domainStatus === "active" && (
@@ -642,16 +589,16 @@ const PublishExportButtons = forwardRef<PublishExportHandle>((_, ref) => {
                         href={`https://${domainInput}`}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl text-xs font-semibold bg-primary text-primary-foreground hover:bg-primary/90 transition-colors"
+                        className="w-full flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-lg text-xs font-semibold bg-primary text-primary-foreground hover:bg-primary/90 transition-colors"
                       >
                         <ExternalLink className="w-3.5 h-3.5" />
-                        Visit https://{domainInput}
+                        Visit {domainInput}
                       </a>
                     )}
 
                     <button
                       onClick={() => { setDomainStatus("none"); setDomainInput(""); }}
-                      className="w-full flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl text-xs text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
+                      className="w-full text-center text-[11px] text-muted-foreground hover:text-destructive transition-colors py-1"
                     >
                       Remove Domain
                     </button>
