@@ -10,7 +10,7 @@ import { runBuildEngine, type EngineConfig, type EngineProgress } from "@/lib/bu
 import { validateAndFixHtml } from "@/lib/htmlValidator";
 import { matchTemplate, PAGE_TEMPLATES, type PageTemplate } from "@/lib/pageTemplates";
 import { COMPONENT_SNIPPETS, getSnippetsPromptContext } from "@/lib/componentSnippets";
-import { AI_MODELS, DEFAULT_MODEL, PROMPT_SUGGESTIONS, QUICK_ACTIONS, DESIGN_THEMES, type AIModelId } from "@/lib/aiModels";
+import { AI_MODELS, DEFAULT_MODEL, PROMPT_SUGGESTIONS, QUICK_ACTIONS, CONTEXT_SUGGESTIONS, DESIGN_THEMES, type AIModelId } from "@/lib/aiModels";
 import { motion, AnimatePresence } from "framer-motion";
 import { usePreview } from "@/contexts/PreviewContext";
 import { useProjects } from "@/contexts/ProjectContext";
