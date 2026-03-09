@@ -371,7 +371,7 @@ const PreviewPanel = () => {
         </AnimatePresence>
 
         {/* Preview content */}
-        <div className="flex-1 relative flex flex-col overflow-hidden bg-background min-h-0">
+        <div className="flex-1 relative overflow-hidden bg-background min-h-0">
           {/* Building skeleton overlay */}
           <AnimatePresence>
             {isBuilding && !hasContent && (
@@ -398,9 +398,9 @@ const PreviewPanel = () => {
           </AnimatePresence>
 
           {previewMode === "sandpack" ? (
-            <div className="flex-1 w-full min-h-0" key="sandpack-container">
+            <div className="absolute inset-0" key="sandpack-container">
               {isBuilding && (!sandpackFiles || Object.keys(sandpackFiles).length === 0) ? (
-                null
+                <EmptyState />
               ) : (
                 <SandpackPreview
                   key={refreshKey}
@@ -411,7 +411,7 @@ const PreviewPanel = () => {
             </div>
           ) : (
             // Legacy HTML iframe
-            <div className="flex-1 w-full min-h-0 flex items-center justify-center">
+            <div className="absolute inset-0">
               {previewHtml ? (
                 <div
                   className="h-full transition-all duration-300 ease-in-out"
