@@ -225,8 +225,8 @@ const WhiteLabelPanel = () => {
             {/* Hide Attribution */}
             <label className="flex items-center justify-between p-3 bg-secondary/50 rounded-xl border border-border cursor-pointer">
               <div>
-                <span className="text-xs font-medium">Hide "Built with Lovable" badge</span>
-                <p className="text-[10px] text-muted-foreground mt-0.5">Remove all Lovable branding from your app</p>
+                <span className="text-xs font-medium">Hide "Built with Phoenix World" badge</span>
+                <p className="text-[10px] text-muted-foreground mt-0.5">Remove all Phoenix World branding from your app</p>
               </div>
               <div className={`w-10 h-5 rounded-full p-0.5 transition-colors ${config.hideAttribution ? "bg-primary" : "bg-muted"}`} onClick={() => update("hideAttribution", !config.hideAttribution)}>
                 <div className={`w-4 h-4 rounded-full bg-white transition-transform ${config.hideAttribution ? "translate-x-5" : ""}`} />
