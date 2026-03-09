@@ -229,6 +229,8 @@ const IDELayout = () => {
           onlineUsers={onlineUsers}
           userEmail={user?.email || ""}
           myColor={myColor}
+          layoutSwapped={layoutSwapped}
+          onSwapLayout={() => setLayoutSwapped(prev => !prev)}
         />
 
         <div className="flex-1 overflow-hidden">
