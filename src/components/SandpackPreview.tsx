@@ -81,17 +81,29 @@ function makeStub(filePath: string): string {
     .replace(/\.(jsx?|tsx?)$/, '')
     .replace(/[^a-zA-Z0-9]/g, '');
   const safeName = componentName.charAt(0).toUpperCase() + componentName.slice(1) || 'TruncatedPage';
-  console.warn(`[SandpackRepair] File "${filePath}" is truncated. Replacing with stub.`);
-  return `import React from "react";\n\nexport default function ${safeName}() {\n  return (\n    <div className="p-8 text-center">\n      <h2 className="text-lg font-semibold text-slate-800">${safeName}</h2>\n      <p className="text-sm text-slate-500 mt-2">This page is being generated. Please rebuild.</p>\n    </div>\n  );\n}\n`;
+  console.warn(`[SandpackRepair] File "${filePath}" could not be repaired. Using stub.`);
+  return `import React from "react";\n\nexport default function ${safeName}() {\n  return (\n    <div className="p-8 text-center space-y-3">\n      <div className="w-10 h-10 mx-auto rounded-full bg-amber-100 flex items-center justify-center"><span className="text-amber-600 text-xl">\u26A0</span></div>\n      <h2 className="text-lg font-semibold text-slate-800">${safeName}</h2>\n      <p className="text-sm text-slate-500">This module had a build error. Send a follow-up message to fix it.</p>\n    </div>\n  );\n}\n`;
 }
 
 function repairTruncatedCode(code: string, filePath: string): string {
   // Quick check: if file is very short or empty, stub it
   if (code.trim().length < 30) return makeStub(filePath);
 
-  // Count unmatched brackets BEFORE any repair
+  // ── Step 1: Fix unterminated strings per-line (same as autoRepairJSX) ──
+  const lines = code.split("\n");
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    const dq = (line.match(/(?<!\\)"/g) || []).length;
+    const sq = (line.match(/(?<!\\)'/g) || []).length;
+    const bt = (line.match(/(?<!\\)`/g) || []).length;
+    if (dq % 2 !== 0) lines[i] = line + '"';
+    if (sq % 2 !== 0) lines[i] = lines[i] + "'";
+    if (bt % 2 !== 0) lines[i] = lines[i] + "`";
+  }
+  code = lines.join("\n");
+
+  // ── Step 2: Count unmatched brackets AFTER string repair ──
   let braces = 0, brackets = 0, parens = 0;
-  // Also check for unterminated strings (odd quotes across entire file)
   let inSingleStr = false, inDoubleStr = false, inTemplate = false;
   let prevCh = '';
   for (const ch of code) {
@@ -108,25 +120,20 @@ function repairTruncatedCode(code: string, filePath: string): string {
     prevCh = ch;
   }
 
-  const totalUnclosed = Math.max(0, braces) + Math.max(0, brackets) + Math.max(0, parens);
-  const hasUnterminatedString = inSingleStr || inDoubleStr || inTemplate;
+  // Close any remaining unterminated strings at file level
+  if (inTemplate) code = code.trimEnd() + '`';
+  if (inDoubleStr) code = code.trimEnd() + '"';
+  if (inSingleStr) code = code.trimEnd() + "'";
 
-  // If ANY unterminated string or >2 unclosed brackets, the file is fatally truncated
-  // Trying to "repair" it produces broken code that crashes Sandpack's Babel
-  if (hasUnterminatedString || totalUnclosed > 2) {
+  const totalUnclosed = Math.max(0, braces) + Math.max(0, brackets) + Math.max(0, parens);
+
+  // Only stub if SEVERELY broken (>8 unclosed) — otherwise try to repair
+  if (totalUnclosed > 8) {
+    console.warn(`[SandpackRepair] File "${filePath}" has ${totalUnclosed} unclosed brackets — stubbing.`);
     return makeStub(filePath);
   }
 
-  // Also stub if no export statement exists (component file without export = truncated)
-  const hasExport = /export\s+(default|const|function|class|let|var|\{)/.test(code) || code.includes('module.exports');
-  if (!hasExport) {
-    // Only for component-like files (not utility/css/data files)
-    if (filePath.match(/\.(jsx?|tsx?)$/) && !filePath.includes('styles') && !filePath.includes('utils') && !filePath.includes('data') && !filePath.includes('config') && !filePath.includes('constants')) {
-      return makeStub(filePath);
-    }
-  }
-
-  // Light repair: close minor imbalances (1-2 brackets)
+  // Close unclosed brackets (up to 8)
   const closers: string[] = [];
   for (let i = 0; i < Math.max(0, parens); i++) closers.push(')');
   for (let i = 0; i < Math.max(0, brackets); i++) closers.push(']');
@@ -134,6 +141,22 @@ function repairTruncatedCode(code: string, filePath: string): string {
   if (closers.length > 0) {
     code = code.trimEnd() + ';\n' + closers.join(';\n') + ';\n';
   }
+
+  // If no export, add a default export wrapper instead of stubbing
+  const hasExport = /export\s+(default|const|function|class|let|var|\{)/.test(code) || code.includes('module.exports');
+  if (!hasExport) {
+    if (filePath.match(/\.(jsx?|tsx?)$/) && !filePath.includes('styles') && !filePath.includes('utils') && !filePath.includes('data') && !filePath.includes('config') && !filePath.includes('constants')) {
+      // Try to find a function/const component name
+      const fnMatch = code.match(/(?:function|const|class)\s+([A-Z]\w+)/);
+      if (fnMatch) {
+        code += `\nexport default ${fnMatch[1]};\n`;
+      } else {
+        // No recoverable component — stub it
+        return makeStub(filePath);
+      }
+    }
+  }
+
   return code;
 }
 
