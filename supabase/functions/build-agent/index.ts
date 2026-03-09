@@ -589,7 +589,7 @@ serve(async (req) => {
     const projectId = project_id || "default";
     const techStack = tech_stack || "react-cdn";
 
-    const systemPrompt = buildSystemPrompt(projectId, techStack, schemas, design_theme, knowledge);
+    let systemPrompt = buildSystemPrompt(projectId, techStack, schemas, design_theme, knowledge);
 
     if (template_context) {
       systemPrompt += `\n\n## TEMPLATE CONTEXT\n${template_context}`;
