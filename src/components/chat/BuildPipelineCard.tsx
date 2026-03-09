@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { CheckCircle2, Circle, Loader2, ChevronRight, FileCode2, Bot, Cpu, Shield, RotateCcw } from "lucide-react";
+import { CheckCircle2, Circle, Loader2, ChevronRight, ChevronDown, FileCode2, Bookmark, Eye } from "lucide-react";
 import type { PipelineStep } from "@/lib/agentPipeline";
 
 export interface TaskItem {
@@ -12,15 +12,13 @@ export interface TaskItem {
 interface BuildPipelineCardProps {
   isBuilding: boolean;
   streamContent: string;
-  /** Optional explicit tasks from outside */
   tasks?: TaskItem[];
-  /** Current agent pipeline step */
   pipelineStep?: PipelineStep | null;
-  /** Which agent is active */
   currentAgent?: "chat" | "build" | null;
+  buildTitle?: string;
+  onShowPreview?: () => void;
 }
 
-/** Detect which files are being edited from stream content */
 function detectEditingFiles(content: string): string[] {
   const files: string[] = [];
   const reactMatches = content.matchAll(/---\s+\/?([^\s]+\.(?:jsx?|tsx?|css))/g);
@@ -34,7 +32,6 @@ function detectEditingFiles(content: string): string[] {
   return files.slice(0, 3);
 }
 
-/** Agent-aware task detection */
 function detectTasks(content: string, isBuilding: boolean, pipelineStep?: PipelineStep | null, currentAgent?: "chat" | "build" | null): TaskItem[] {
   const len = content.length;
   const hasCode = content.includes("```react-preview") || content.includes("```jsx") || content.includes("```html") || content.includes("```react");
@@ -46,73 +43,36 @@ function detectTasks(content: string, isBuilding: boolean, pipelineStep?: Pipeli
 
   const tasks: TaskItem[] = [];
 
-  // Step 1: Intent Classification (hidden from UI — internal detail)
-
-  // For chat agent, just show "Responding..."
   if (currentAgent === "chat") {
-    tasks.push({
-      id: "chat",
-      label: "Chat agent responding",
-      status: isBuilding ? "in_progress" : "done",
-    });
-    if (!isBuilding && len > 0) {
-      return tasks.map(t => ({ ...t, status: "done" as const }));
-    }
+    tasks.push({ id: "chat", label: "Chat agent responding", status: isBuilding ? "in_progress" : "done" });
+    if (!isBuilding && len > 0) return tasks.map(t => ({ ...t, status: "done" as const }));
     return tasks;
   }
 
-  // Build agent pipeline
   if (isBuilding && len > 0) {
-    tasks.push({
-      id: "analyze",
-      label: "Analyzing request",
-      status: hasCode ? "done" : (len > 80 ? "done" : "in_progress"),
-    });
+    tasks.push({ id: "analyze", label: "Analyzing request", status: hasCode ? "done" : (len > 80 ? "done" : "in_progress") });
   }
 
   if (isBuilding && len > 80) {
-    tasks.push({
-      id: "generate",
-      label: "Build agent generating code",
-      status: hasCode ? "done" : "in_progress",
-    });
+    tasks.push({ id: "generate", label: "Build agent generating code", status: hasCode ? "done" : "in_progress" });
   }
 
   if (hasCode) {
     const codeStart = content.indexOf("```");
     const codeContent = content.slice(codeStart);
-    tasks.push({
-      id: "build",
-      label: "Assembling UI & components",
-      status: codeContent.length > 3000 ? "done" : "in_progress",
-    });
+    tasks.push({ id: "build", label: "Assembling UI & components", status: codeContent.length > 3000 ? "done" : "in_progress" });
 
     if (codeContent.length > 2000) {
-      tasks.push({
-        id: "validate",
-        label: "Validating in Sandpack",
-        status: hasClosingFence && !isBuilding ? "done" : "in_progress",
-      });
+      tasks.push({ id: "validate", label: "Validating in Sandpack", status: hasClosingFence && !isBuilding ? "done" : "in_progress" });
     }
 
-    // Show retry step if pipeline is in retry mode
     if (pipelineStep === "retrying") {
-      tasks.push({
-        id: "retry",
-        label: "Auto-fixing validation errors",
-        status: "in_progress",
-      });
+      tasks.push({ id: "retry", label: "Auto-fixing validation errors", status: "in_progress" });
     }
   }
 
-  if (!isBuilding && hasCode && len > 100) {
-    return tasks.map(t => ({ ...t, status: "done" as const }));
-  }
-
-  if (!isBuilding && !hasCode) {
-    return [];
-  }
-
+  if (!isBuilding && hasCode && len > 100) return tasks.map(t => ({ ...t, status: "done" as const }));
+  if (!isBuilding && !hasCode) return [];
   return tasks;
 }
 
@@ -132,10 +92,10 @@ const StatusIndicator = React.forwardRef<HTMLDivElement, { status: TaskItem["sta
 });
 StatusIndicator.displayName = "StatusIndicator";
 
-const BuildPipelineCard = ({ isBuilding, streamContent, tasks: externalTasks, pipelineStep, currentAgent }: BuildPipelineCardProps) => {
+const BuildPipelineCard = ({ isBuilding, streamContent, tasks: externalTasks, pipelineStep, currentAgent, buildTitle, onShowPreview }: BuildPipelineCardProps) => {
   const [collapsed, setCollapsed] = useState(false);
+  const [activeTab, setActiveTab] = useState<"details" | "preview">("details");
 
-  // Self-contained elapsed timer — no parent re-renders
   const [elapsed, setElapsed] = useState(0);
   useEffect(() => {
     if (isBuilding) {
@@ -152,7 +112,14 @@ const BuildPipelineCard = ({ isBuilding, streamContent, tasks: externalTasks, pi
   const allDone = doneCount === tasks.length && !isBuilding && tasks.length > 0;
   const activeTask = tasks.find(t => t.status === "in_progress");
 
-  const agentLabel = currentAgent === "chat" ? "💬 Chat Agent" : currentAgent === "build" ? "🏗️ Build Agent" : "";
+  // Infer build title from stream content
+  const inferredTitle = useMemo(() => {
+    if (buildTitle) return buildTitle;
+    // Try to extract a meaningful title from the plan
+    const titleMatch = streamContent.match(/##\s*TASK:\s*(.+?)(?:\n|$)/);
+    if (titleMatch) return titleMatch[1].trim();
+    return allDone ? "Build complete" : "Building...";
+  }, [buildTitle, streamContent, allDone]);
 
   const description = useMemo(() => {
     if (allDone) return `Completed in ${elapsed}s`;
@@ -166,10 +133,12 @@ const BuildPipelineCard = ({ isBuilding, streamContent, tasks: externalTasks, pi
         validate: "Validating in Sandpack environment",
         retry: "Auto-fixing validation errors...",
       };
-      return descs[activeTask.id] || "Processing...";
+      // Add file context
+      const fileStr = editingFiles.length > 0 ? ` · ${editingFiles.join(", ")}` : "";
+      return (descs[activeTask.id] || "Processing...") + fileStr;
     }
     return "Starting...";
-  }, [allDone, activeTask, elapsed]);
+  }, [allDone, activeTask, elapsed, editingFiles]);
 
   if (tasks.length === 0 && !isBuilding) return null;
 
@@ -178,38 +147,35 @@ const BuildPipelineCard = ({ isBuilding, streamContent, tasks: externalTasks, pi
       initial={{ opacity: 0, y: 8 }}
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, y: -8 }}
-      className="rounded-xl border border-border/60 bg-card/50 overflow-hidden"
+      className="rounded-2xl border border-border/50 bg-card/60 overflow-hidden"
     >
-      {/* Header row */}
-      <button
-        onClick={() => setCollapsed(!collapsed)}
-        className="w-full flex items-center justify-between px-4 py-3 hover:bg-muted/20 transition-colors"
-      >
-        <div className="flex flex-col items-start gap-1 min-w-0">
-          <div className="flex items-center gap-2 flex-wrap">
-            <span className="text-[13px] font-semibold text-foreground">
-              {allDone ? "Completed" : agentLabel || "Processing"}
-            </span>
-            {currentAgent === "build" && editingFiles.map((file) => (
-              <span
-                key={file}
-                className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-mono font-medium bg-muted/80 text-muted-foreground border border-border/50"
-              >
-                <FileCode2 className="w-3 h-3" />
-                {file}
-              </span>
-            ))}
+      {/* Header */}
+      <div className="px-4 py-3">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2.5 min-w-0">
+            {isBuilding ? (
+              <div className="flex flex-col gap-1">
+                <span className="text-xs text-muted-foreground/60">Editing</span>
+                <span className="text-sm text-muted-foreground/80">{description}</span>
+              </div>
+            ) : (
+              <span className="text-sm font-medium text-foreground">{inferredTitle}</span>
+            )}
           </div>
-          <span className="text-[11px] text-muted-foreground/60 leading-tight">
-            {description}
-          </span>
+          <div className="flex items-center gap-2">
+            {!isBuilding && (
+              <Bookmark className="w-4 h-4 text-muted-foreground/30 hover:text-foreground cursor-pointer transition-colors" />
+            )}
+            <button onClick={() => setCollapsed(!collapsed)}>
+              {collapsed ? (
+                <ChevronRight className="w-4 h-4 text-muted-foreground/40" />
+              ) : (
+                <ChevronDown className="w-4 h-4 text-muted-foreground/40" />
+              )}
+            </button>
+          </div>
         </div>
-        <ChevronRight
-          className={`w-4 h-4 text-muted-foreground/30 shrink-0 transition-transform duration-200 ${
-            !collapsed ? "rotate-90" : ""
-          }`}
-        />
-      </button>
+      </div>
 
       {/* Task list */}
       <AnimatePresence>
@@ -220,22 +186,22 @@ const BuildPipelineCard = ({ isBuilding, streamContent, tasks: externalTasks, pi
             exit={{ height: 0, opacity: 0 }}
             transition={{ duration: 0.2 }}
           >
-            <div className="border-t border-border/40 px-4 py-2.5 space-y-0.5">
+            <div className="px-4 pb-3 space-y-1">
               {tasks.map((task, i) => (
                 <motion.div
                   key={task.id}
                   initial={{ opacity: 0, x: -4 }}
                   animate={{ opacity: 1, x: 0 }}
                   transition={{ delay: i * 0.04 }}
-                  className="flex items-center gap-3 py-1.5"
+                  className="flex items-center gap-3 py-1"
                 >
                   <StatusIndicator status={task.status} />
                   <span
-                    className={`text-[13px] font-medium ${
+                    className={`text-sm ${
                       task.status === "done"
-                        ? "text-foreground/60"
+                        ? "text-foreground/70"
                         : task.status === "in_progress"
-                        ? "text-foreground"
+                        ? "text-foreground font-medium"
                         : "text-muted-foreground/30"
                     }`}
                   >
@@ -244,6 +210,35 @@ const BuildPipelineCard = ({ isBuilding, streamContent, tasks: externalTasks, pi
                 </motion.div>
               ))}
             </div>
+
+            {/* Details / Preview tabs — shown when build is done */}
+            {allDone && onShowPreview && (
+              <div className="flex border-t border-border/40">
+                <button
+                  onClick={() => setActiveTab("details")}
+                  className={`flex-1 py-2.5 text-sm font-medium text-center transition-colors ${
+                    activeTab === "details"
+                      ? "text-foreground"
+                      : "text-muted-foreground/50 hover:text-foreground"
+                  }`}
+                >
+                  Details
+                </button>
+                <button
+                  onClick={() => {
+                    setActiveTab("preview");
+                    onShowPreview?.();
+                  }}
+                  className={`flex-1 py-2.5 text-sm font-medium text-center transition-colors rounded-lg mx-2 my-1 ${
+                    activeTab === "preview"
+                      ? "bg-primary/80 text-primary-foreground"
+                      : "bg-primary/20 text-primary hover:bg-primary/30"
+                  }`}
+                >
+                  Preview
+                </button>
+              </div>
+            )}
           </motion.div>
         )}
       </AnimatePresence>
