@@ -446,7 +446,7 @@ serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
-    const { messages, project_id, tech_stack, schemas, model, design_theme, knowledge, template_context, current_code, snippets_context, retry_context } = await req.json();
+    const { messages, project_id, tech_stack, schemas, model, design_theme, knowledge, template_context, current_code, snippets_context, retry_context, max_tokens: requestedMaxTokens } = await req.json();
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY is not configured");
 
@@ -481,15 +481,18 @@ CRITICAL FIXES REQUIRED:
 Review the error details above carefully and fix ALL issues. Do not repeat the same mistakes.`;
     }
 
-    const selectedModel = model || "google/gemini-2.5-pro";
+    const selectedModel = model || "google/gemini-2.5-flash";
     
     // Smart temperature based on context
-    let temperature = 0.3; // Default for code generation (consistent, focused)
+    let temperature = 0.3;
     if (retry_context) {
-      temperature = 0.2; // Even lower on retry for maximum determinism
+      temperature = 0.2;
     } else if (current_code) {
-      temperature = 0.25; // Slightly lower when modifying existing code
+      temperature = 0.25;
     }
+
+    // Use requested max_tokens or default — smaller for task-level builds
+    const maxTokens = requestedMaxTokens || 64000;
 
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
@@ -505,7 +508,7 @@ Review the error details above carefully and fix ALL issues. Do not repeat the s
         ],
         stream: true,
         temperature,
-        max_tokens: 64000,
+        max_tokens: maxTokens,
       }),
     });
 
