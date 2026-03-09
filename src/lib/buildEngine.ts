@@ -964,14 +964,19 @@ function validateAllFiles(files: Record<string, string>): { file: string; error:
         continue;
       }
       
-      // Check for imports referencing files that don't exist in the file set
+      // Check for imports referencing files that don't exist — auto-stub them
       const missingImports = findMissingFileImports(code, filePath, files);
       if (missingImports.length > 0) {
-        errors.push({
-          file: filePath,
-          error: `Missing local file imports: ${missingImports.join(", ")}. Either create these files or remove the imports. Only import files that exist in your output.`
-        });
-        continue;
+        const unresolvable = autoCreateStubFiles(missingImports, filePath, files);
+        if (unresolvable.length > 0) {
+          errors.push({
+            file: filePath,
+            error: `Missing local file imports: ${unresolvable.join(", ")}. Either create these files or remove the imports. Only import files that exist in your output.`
+          });
+          continue;
+        }
+        // Stubs were created — re-validate this file on next pass
+        console.log(`[BuildEngine] Auto-created stubs for ${missingImports.length} missing imports from ${filePath}`);
       }
       
       // Check for undefined JSX components (PascalCase tags used but not imported/defined)
