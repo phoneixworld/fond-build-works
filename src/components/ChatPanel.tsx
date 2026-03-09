@@ -6,6 +6,7 @@ import { streamChat } from "@/lib/streamChat";
 import { classifyIntent, streamChatAgent, streamBuildAgent, validateReactCode, hasBuildConfirmation, stripBuildMarker, formatRetryContext, MAX_BUILD_RETRIES, type AgentIntent, type PipelineStep } from "@/lib/agentPipeline";
 import { generatePlan, type BuildPlan, type PlanTask } from "@/lib/planningAgent";
 import { executePlan } from "@/lib/taskExecutor";
+import { runBuildEngine, type EngineConfig, type EngineProgress } from "@/lib/buildEngine";
 import { validateAndFixHtml } from "@/lib/htmlValidator";
 import { matchTemplate, PAGE_TEMPLATES, type PageTemplate } from "@/lib/pageTemplates";
 import { COMPONENT_SNIPPETS, getSnippetsPromptContext } from "@/lib/componentSnippets";
