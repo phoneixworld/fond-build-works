@@ -139,7 +139,9 @@ const PreviewPanel = () => {
 
   return (
     <TooltipProvider delayDuration={300}>
-      <div className="flex flex-col bg-[hsl(var(--ide-panel))]" style={{ height: '100%', minHeight: 0 }}<div className="flex items-center gap-1.5 px-3 py-2 border-b border-border bg-[hsl(var(--ide-panel-header))]">
+      <div className="flex flex-col bg-[hsl(var(--ide-panel))]" style={{ height: '100%', minHeight: 0 }}>
+        {/* URL bar */}
+        <div className="flex items-center gap-1.5 px-3 py-2 border-b border-border bg-[hsl(var(--ide-panel-header))]">
           {/* Navigation buttons */}
           <div className="flex items-center gap-0.5">
             <Tooltip>
