@@ -48,14 +48,16 @@ CLASSIFICATION RULES:
 - Describes what they want built without asking if it's possible
 ${hasHistory ? '- Follow-up modifications: "change colors", "add a section", "make it responsive"' : ''}
 
-**CLARIFY** — Return this when:
+**CLARIFY** — Return this VERY RARELY:
 ${hasHistory
-  ? `- ONLY for major new features: "add e-commerce", "rebuild the site", "add a blog system"
-- NEVER for: tweaks, fixes, minor additions, style changes
-- When in doubt between clarify and build, choose BUILD`
-  : `- First message that is vague about style, scope, or features
-- "Build me a website" (what kind? what style?)
-- "Create a dashboard" (what data? what layout?)`}
+  ? `- NEVER use clarify when there's existing code — always build
+- When in doubt, choose BUILD`
+  : `- ONLY when the message is extremely vague (under 10 words) with no clear direction
+- "Build me a website" → clarify (too vague)
+- BUT "Build me a school ERP with student management" → BUILD (has enough direction)
+- "Create a dashboard" with specifics → BUILD
+- When in doubt between clarify and build, ALWAYS choose BUILD
+- If the user describes features, modules, or gives any detail → BUILD, never clarify`}
 
 FEW-SHOT EXAMPLES:
 

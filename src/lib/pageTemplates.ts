@@ -235,6 +235,66 @@ DESIGN: Warm, hopeful palette (emerald/teal primary, warm amber accents). Rounde
 SECTIONS: #hero, #impact, #mission, #programs, #stories, #help, #donate, #events, #newsletter
 NAV: Our Mission, Programs, Impact, Get Involved, Events | Donate Now (warm CTA)`,
   },
+  {
+    id: "school-erp",
+    name: "School ERP",
+    emoji: "🏫",
+    category: "erp",
+    description: "Comprehensive school management ERP with multi-module sidebar navigation, role-based access, and Indian education context",
+    keywords: ["school", "erp", "education", "student", "teacher", "admission", "timetable", "examination", "library", "management", "edusphere", "lms", "sis", "academic", "college", "university", "institute"],
+    blueprint: `STRUCTURE: Login screen (role selector: Admin/Teacher/Student/Parent) → Sidebar layout (collapsible sidebar + top header with user avatar + notifications) → Dashboard (role-based KPIs) → Module pages
+
+SIDEBAR MODULES (icon + label, collapsible groups):
+- 📊 Dashboard (default)
+- 👥 Students (List, Add Student, Profiles, Attendance, Bulk Import)
+- 👨‍🏫 Staff (Faculty List, Add Staff, Departments, Leave Management)
+- 📚 Academics (Classes, Sections, Subjects, Syllabus, Lesson Plans)
+- 📅 Timetable (Weekly View, Period Management, Substitutions)
+- 📝 Examinations (Exam Schedule, Marks Entry, Report Cards, Grade System)
+- 💰 Finance (Fee Collection, Fee Structure, Pending Dues, Expense Tracker, ₹ currency)
+- 📖 Library (Book Catalog, Issue/Return, Fine Management)
+- 🚌 Transport (Routes, Vehicles, Assignments, GPS Tracking placeholder)
+- 📢 Communication (Notices, Circular, SMS/Email, Parent Portal)
+- ⚙️ Settings (School Profile, Academic Year, Roles, Backup)
+
+DASHBOARD (Admin view):
+- Stats row: Total Students, Total Staff, Today's Attendance %, Fee Collection (₹)
+- Charts: Enrollment trends (bar), Attendance this week (line), Fee collection by month (bar)
+- Quick Actions: Add Student, Record Attendance, Create Circular, Generate Report Card
+- Recent Activity feed + Upcoming Events calendar widget
+
+KEY PAGES TO BUILD:
+1. Student List — searchable table with filters (class, section, status), bulk actions, export
+2. Student Profile — photo, personal info, academic history, attendance %, fee status, parent details
+3. Attendance — class/section selector → student grid with Present/Absent/Late toggle → save
+4. Fee Collection — student search → fee breakdown → payment modal (cash/online) → receipt
+5. Exam Marks Entry — exam/class/subject selector → marks grid → auto-calculate grades
+6. Timetable View — weekly grid (Mon-Sat, 8 periods) → drag-to-assign or modal
+
+DESIGN: Clean professional design. Indian context (₹ currency, CBSE/ICSE board references, Indian academic calendar Apr-Mar). Sidebar dark (slate-800), content area light. Cards with subtle shadows. Data tables with zebra striping. Status badges (Active/Inactive/Alumni). Responsive — sidebar collapses on mobile.
+
+ROUTES: /, /students, /students/:id, /staff, /academics, /timetable, /exams, /finance, /library, /transport, /communication, /settings
+NAV: All via sidebar, NOT top nav`,
+  },
+  {
+    id: "dashboard-app",
+    name: "Admin Dashboard",
+    emoji: "📊",
+    category: "dashboard",
+    description: "Data-rich admin dashboard with charts, tables, KPI cards, and sidebar navigation",
+    keywords: ["dashboard", "admin", "panel", "analytics", "metrics", "kpi", "management", "crm", "erp", "backend", "control"],
+    blueprint: `STRUCTURE: Sidebar (dark, collapsible, icon+label nav) → Header (search + notifications + user avatar) → Dashboard grid
+
+SIDEBAR: Dashboard, Users, Analytics, Content, Orders, Reports, Settings
+DASHBOARD LAYOUT:
+- KPI row (4 cards: users, revenue, orders, conversion — with sparkline trends)
+- Charts row (line chart: revenue 7d + bar chart: top categories)
+- Recent activity table (sortable, paginated, status badges)
+- Quick actions panel
+
+DESIGN: Professional dark sidebar (gray-900), white content area. Cards with hover shadow. Charts using Recharts. Tables with zebra striping + row hover. Status badges (green/yellow/red). Responsive grid.
+ROUTES: /, /users, /analytics, /content, /orders, /reports, /settings`,
+  },
 ];
 
 /**
