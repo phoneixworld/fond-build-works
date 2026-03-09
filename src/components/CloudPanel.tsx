@@ -32,6 +32,7 @@ import GovernanceEngine from "./cloud/GovernanceEngine";
 import EnvironmentManager from "./cloud/EnvironmentManager";
 import SecurityDashboard from "./cloud/SecurityDashboard";
 import CloudEmail from "./cloud/CloudEmail";
+import AndroidExport from "./cloud/AndroidExport";
 
 const PREMIUM_SECTIONS = new Set(["environments"]);
 
