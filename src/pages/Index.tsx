@@ -4,7 +4,7 @@ import {
   ResizablePanel,
   ResizablePanelGroup,
 } from "@/components/ui/resizable";
-import { Code, Eye, Cloud } from "lucide-react";
+import { Code, Eye, Cloud, Palette } from "lucide-react";
 import { forwardRef } from "react";
 import { usePanelLocking } from "@/hooks/usePanelLocking";
 import PanelLockOverlay from "@/components/PanelLockOverlay";
