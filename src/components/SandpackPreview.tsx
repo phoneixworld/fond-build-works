@@ -20,11 +20,25 @@ class SandpackErrorBoundary extends Component<
   state: ErrorBoundaryState = { hasError: false, error: null };
 
   static getDerivedStateFromError(error: Error) {
-    return { hasError: true, error };
+    // Some Sandpack errors have read-only properties; safely extract message
+    let safeError = error;
+    try {
+      // If the error's message is read-only, wrap it in a new Error
+      const msg = error?.message || String(error) || "Preview error";
+      safeError = new Error(msg);
+    } catch {
+      safeError = new Error("Preview encountered an error");
+    }
+    return { hasError: true, error: safeError };
   }
 
   componentDidCatch(error: Error) {
-    console.error("[SandpackErrorBoundary]", error);
+    // Safely log — don't try to modify the error
+    try {
+      console.error("[SandpackErrorBoundary]", error?.message || String(error));
+    } catch {
+      console.error("[SandpackErrorBoundary] Error caught");
+    }
   }
 
   render() {
@@ -75,8 +89,60 @@ function isAllowedPkg(pkg: string): boolean {
 }
 
 /**
+ * Quick syntax check using Function constructor heuristic.
+ * Returns true if code is likely parseable, false if obviously broken.
+ */
+function quickSyntaxCheck(code: string): boolean {
+  // Check for obvious truncation: unclosed braces/brackets
+  let braces = 0, brackets = 0, parens = 0;
+  let inString = false;
+  let stringChar = '';
+  for (let i = 0; i < code.length; i++) {
+    const c = code[i];
+    if (inString) {
+      if (c === stringChar && code[i - 1] !== '\\') inString = false;
+      continue;
+    }
+    if (c === '"' || c === "'" || c === '`') { inString = true; stringChar = c; continue; }
+    if (c === '{') braces++;
+    else if (c === '}') braces--;
+    else if (c === '[') brackets++;
+    else if (c === ']') brackets--;
+    else if (c === '(') parens++;
+    else if (c === ')') parens--;
+  }
+  // If significantly unbalanced, it's broken
+  if (braces > 2 || braces < -2 || brackets > 2 || brackets < -2 || parens > 2 || parens < -2) {
+    return false;
+  }
+  // Check for unterminated strings (still inString at end)
+  if (inString) return false;
+  return true;
+}
+
+/**
+ * Generate a safe stub component when code is broken.
+ */
+function makeSafeStub(filePath: string): string {
+  const name = filePath.replace(/.*\//, '').replace(/\.\w+$/, '').replace(/[^a-zA-Z0-9]/g, '') || 'BrokenModule';
+  const safeName = name.charAt(0).toUpperCase() + name.slice(1);
+  return `import React from "react";
+
+export default function ${safeName}() {
+  return (
+    <div style={{padding: "2rem", textAlign: "center"}}>
+      <p style={{color: "#f59e0b", fontSize: "1.5rem"}}>⚠</p>
+      <p style={{color: "#64748b", fontSize: "0.875rem"}}>${safeName} had a build error. Send a follow-up to fix it.</p>
+    </div>
+  );
+}
+`;
+}
+
+/**
  * Minimal sanitization — strip blocked imports only. No repair, no mutation.
  * Files reaching this point have already been validated upstream by the build engine.
+ * Also performs a final syntax safety check to prevent Sandpack crashes.
  */
 function sanitizeImports(code: string, filePath: string): string {
   if (!filePath.match(/\.(jsx?|tsx?)$/)) return code;
@@ -101,6 +167,13 @@ function sanitizeImports(code: string, filePath: string): string {
     /\brequire\s*\(\s*['"]([^'"]+)['"]\s*\)/g,
     (match, pkg) => isAllowedPkg(pkg) ? match : `undefined /* BLOCKED: ${pkg} */`
   );
+
+  // Final safety: if code is obviously broken (truncated/malformed), replace with stub
+  if (!quickSyntaxCheck(code)) {
+    console.warn(`[SandpackPreview] Broken syntax detected in ${filePath}, using safe stub`);
+    return makeSafeStub(filePath);
+  }
+
   return code;
 }
 
