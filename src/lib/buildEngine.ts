@@ -414,7 +414,8 @@ async function executeSingleTask(
           }
 
           // Prompt echo detection — reject code that just renders the requirements as content
-          if (detectPromptEcho(parsed.files, prompt) && retryCount < 2) {
+          const echoCheckText = originalUserPrompt || prompt;
+          if (detectPromptEcho(parsed.files, echoCheckText) && retryCount < 2) {
             console.warn(`[BuildEngine] Prompt echo detected — AI rendered requirements as content. Retrying...`);
             onDelta(`\n[Detected prompt echo — regenerating actual functional UI...]\n`);
             executeSingleTask(
@@ -424,7 +425,8 @@ async function executeSingleTask(
               onDelta,
               retryCount + 1,
               maxTokens,
-              taskType
+              taskType,
+              originalUserPrompt
             ).then(resolve).catch(reject);
             return;
           }
