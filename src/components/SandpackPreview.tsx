@@ -183,10 +183,16 @@ export default function App() {
 }
 `;
 
-const INDEX_JS = `import React, { StrictMode } from "react";
+function buildIndexJs(projectId: string, supabaseUrl: string, supabaseKey: string): string {
+  return `import React, { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import App from "./App";
 import "./styles.css";
+
+// Inject project globals for generated auth/data hooks
+window.__PROJECT_ID__ = "${projectId}";
+window.__SUPABASE_URL__ = "${supabaseUrl}";
+window.__SUPABASE_KEY__ = "${supabaseKey}";
 
 // Report route changes to parent for URL bar sync
 function reportRoute() {
@@ -233,6 +239,7 @@ root.render(
   React.createElement(StrictMode, null, React.createElement(App))
 );
 `;
+}
 
 const DEFAULT_STYLES = `@tailwind base;
 @tailwind components;
