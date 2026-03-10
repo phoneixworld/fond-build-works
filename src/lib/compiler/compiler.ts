@@ -245,6 +245,7 @@ export async function compile(
 
   // ── Phase 6: Completion ────────────────────────────────────────────
 
+  cloudLog.info(`Build complete: ${status} — ${workspace.fileCount()} files`, "compiler");
   callbacks.onPhase("complete", "Build complete.");
   finalizeTrace(trace, workspace.fileCount());
   printTrace(trace);
