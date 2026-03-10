@@ -117,7 +117,13 @@ const ChatInput = ({
           style={{ minHeight: "60px", maxHeight: "160px" }}
           disabled={isLoading}
           rows={3}
+          maxLength={MAX_CHARS}
         />
+        {showCharWarning && (
+          <span className={`text-[10px] font-mono whitespace-nowrap pb-0.5 ${isOverLimit ? 'text-destructive font-semibold' : 'text-muted-foreground'}`}>
+            {charCount.toLocaleString()}/{MAX_CHARS.toLocaleString()}
+          </span>
+        )}
         {isLoading ? (
           <Tooltip>
             <TooltipTrigger asChild>
