@@ -79,17 +79,22 @@ export const PreviewProvider = ({ children }: { children: ReactNode }) => {
     });
   }, []);
 
+  const contextValue = useMemo(() => ({
+    previewHtml, setPreviewHtml,
+    sandpackFiles, setSandpackFiles,
+    sandpackDeps, setSandpackDeps,
+    isBuilding, setIsBuilding,
+    buildStep, setBuildStep,
+    previewMode, setPreviewMode,
+    buildMetrics, setBuildMetrics,
+    snapshots, saveSnapshot, restoreSnapshot,
+  }), [
+    previewHtml, sandpackFiles, sandpackDeps, isBuilding, buildStep,
+    previewMode, buildMetrics, snapshots, saveSnapshot, restoreSnapshot,
+  ]);
+
   return (
-    <PreviewContext.Provider value={{
-      previewHtml, setPreviewHtml,
-      sandpackFiles, setSandpackFiles,
-      sandpackDeps, setSandpackDeps,
-      isBuilding, setIsBuilding,
-      buildStep, setBuildStep,
-      previewMode, setPreviewMode,
-      buildMetrics, setBuildMetrics,
-      snapshots, saveSnapshot, restoreSnapshot,
-    }}>
+    <PreviewContext.Provider value={contextValue}>
       {children}
     </PreviewContext.Provider>
   );

@@ -116,7 +116,7 @@ export const VirtualFSProvider = ({ children }: { children: ReactNode }) => {
     });
   }, []);
 
-  const fileTree = buildTree(files);
+  const fileTree = useMemo(() => buildTree(files), [files]);
 
   return (
     <VirtualFSContext.Provider value={{ files, fileTree, setFiles, updateFile, addFile, removeFile, getFile, activeFile, setActiveFile }}>
