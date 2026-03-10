@@ -192,7 +192,7 @@ export function useConversationState() {
   }, [mode]);
 
   // ─── ADD PHASE: Server-persisted with optimistic UI ───────────────
-  const addPhase = useCallback(async (text: string, hasImages: boolean, irState?: any): Promise<RequirementPhase> => {
+  const addPhase = useCallback(async (text: string, hasImages: boolean, irState?: any, imageUrls?: string[]): Promise<RequirementPhase> => {
     const localPhase: RequirementPhase = {
       id: phases.length + 1,
       summary: text.slice(0, 200).replace(/\n/g, " "),
@@ -208,7 +208,14 @@ export function useConversationState() {
     const projectId = currentProjectId.current;
     if (projectId) {
       try {
-        const result = await callEngine({ action: "add_requirement", projectId, message: text, hasImages, irState });
+        const result = await callEngine({
+          action: "add_requirement",
+          projectId,
+          message: text,
+          hasImages,
+          irState,
+          imageUrls: imageUrls || [], // Pass image data URLs for server-side vision extraction
+        });
 
         // Sync with server response (server is authoritative)
         const enriched: RequirementPhase = {
@@ -216,6 +223,8 @@ export function useConversationState() {
           parsed: result.parsed,
           normalized: result.normalized,
           irMappings: result.irMappings,
+          // Server may have extracted text from images — update rawText
+          rawText: result.requirement?.raw_text || text,
         };
         setPhases(prev => prev.map(p => p.id === localPhase.id ? enriched : p));
         if (result.buildReadiness) syncReadiness(result.buildReadiness);
