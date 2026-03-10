@@ -32,7 +32,6 @@ const LandingPage = ({ onStartProject, onOpenProject }: LandingPageProps) => {
   const [input, setInput] = useState("");
   const techStack = "react-cdn";
   const inputRef = useRef<HTMLTextAreaElement>(null);
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
   const handleSubmit = () => {
     if (!input.trim()) return;
