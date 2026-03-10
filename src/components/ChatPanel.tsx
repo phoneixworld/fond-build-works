@@ -500,7 +500,7 @@ const CONTEXT_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
     setPreviewMode("html");
     setPreviewErrors([]);
     setHealAttempts(0);
-    setIsHealing(false);
+    resetHealing();
     setCurrentAgent(null);
     setPipelineStep(null);
     setPendingBuildPrompt(null);
