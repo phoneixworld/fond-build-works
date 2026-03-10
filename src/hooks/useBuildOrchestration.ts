@@ -83,7 +83,7 @@ export interface BuildOrchestrationConfig {
   // Conversation state machine
   conversationAnalyze?: (text: string, hasImages: boolean) => { action: "gather" | "build" | "chat" | "continue"; reason: string };
   conversationAddPhase?: (text: string, hasImages: boolean, imageUrls?: string[]) => any;
-  conversationGetRequirements?: () => string;
+  conversationGetRequirements?: () => Promise<string> | string;
   conversationStartBuilding?: () => void;
   conversationCompleteBuild?: (result: any) => void;
   conversationGenerateAck?: (phase: any) => string;
