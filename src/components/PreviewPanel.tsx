@@ -4,6 +4,7 @@ import { usePreview } from "@/contexts/PreviewContext";
 import { motion, AnimatePresence } from "framer-motion";
 import { DIRECT_TOUCH_SCRIPT } from "@/components/DirectTouch";
 import SandpackPreview from "@/components/SandpackPreview";
+import ESMPreview from "@/components/ESMPreview";
 
 const VIEWPORTS_MAP = {
   desktop: { width: "100%", maxWidth: "none" },
@@ -62,7 +63,7 @@ const PreviewPanel = () => {
   const buildStepHistory = useBuildStepHistory(buildStep, isBuilding);
 
   const currentViewport = VIEWPORTS_MAP[viewport];
-  const hasContent = previewMode === "sandpack" ? !!sandpackFiles : !!previewHtml;
+  const hasContent = previewMode === "sandpack" || previewMode === "esm" ? !!sandpackFiles : !!previewHtml;
 
   // Listen for route changes from inside the Sandpack iframe
   useEffect(() => {
@@ -197,7 +198,19 @@ const PreviewPanel = () => {
           )}
         </AnimatePresence>
 
-        {previewMode === "sandpack" ? (
+        {previewMode === "esm" ? (
+          <div className="absolute inset-0" key="esm-container" style={{ display: 'flex', flexDirection: 'column' }}>
+            {isBuilding && (!sandpackFiles || Object.keys(sandpackFiles).length === 0) ? (
+              <EmptyState />
+            ) : (
+              <ESMPreview
+                key={refreshKey}
+                viewport={{ width: currentViewport.width, maxWidth: currentViewport.maxWidth }}
+                initialPath={currentPath}
+              />
+            )}
+          </div>
+        ) : previewMode === "sandpack" ? (
           <div className="absolute inset-0" key="sandpack-container" style={{ display: 'flex', flexDirection: 'column' }}>
             {isBuilding && (!sandpackFiles || Object.keys(sandpackFiles).length === 0) ? (
               <EmptyState />

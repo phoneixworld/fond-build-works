@@ -33,8 +33,8 @@ interface PreviewContextType {
   buildStep: string;
   setBuildStep: (step: string) => void;
   // Mode
-  previewMode: "html" | "sandpack";
-  setPreviewMode: (mode: "html" | "sandpack") => void;
+  previewMode: "html" | "sandpack" | "esm";
+  setPreviewMode: (mode: "html" | "sandpack" | "esm") => void;
   // Build metrics for timeline
   buildMetrics: BuildMetrics | null;
   setBuildMetrics: (metrics: BuildMetrics | null) => void;
@@ -59,7 +59,7 @@ export const PreviewProvider = ({ children }: { children: ReactNode }) => {
   const [sandpackDeps, setSandpackDeps] = useState<Record<string, string>>({});
   const [isBuilding, setIsBuilding] = useState(false);
   const [buildStep, setBuildStep] = useState("");
-  const [previewMode, setPreviewMode] = useState<"html" | "sandpack">("html");
+  const [previewMode, setPreviewMode] = useState<"html" | "sandpack" | "esm">("html");
   const [buildMetrics, setBuildMetrics] = useState<BuildMetrics | null>(null);
   const [snapshots, setSnapshots] = useState<BuildSnapshot[]>([]);
   const [viewport, setViewport] = useState<ViewportId>("desktop");

@@ -281,7 +281,7 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
           hasSetBuilding = true;
         }
         streamParseCount++;
-        setPreviewMode("sandpack");
+        setPreviewMode("esm");
       } else if (htmlCode) {
         if (!hasSetBuilding) {
           setBuildStep("Building your app...");
@@ -409,7 +409,7 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
                   setSandpackFiles(retryResult.files);
                   syncSandpackToVirtualFS(retryResult.files);
                   if (Object.keys(retryResult.deps).length > 0) setSandpackDeps(retryResult.deps);
-                  setPreviewMode("sandpack");
+                  setPreviewMode("esm");
 
                   const retryChatText = retryResult.chatText || "✅ Fixed and rebuilt successfully";
                   setMessages((prev) => {
@@ -441,7 +441,7 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
                 setSandpackFiles(reactResult.files!);
                 syncSandpackToVirtualFS(reactResult.files!);
                 if (Object.keys(reactResult.deps).length > 0) setSandpackDeps(reactResult.deps);
-                setPreviewMode("sandpack");
+                setPreviewMode("esm");
                 setIsLoading(false);
                 setIsBuilding(false);
                 setBuildStep("");
@@ -463,7 +463,7 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
           setSandpackFiles(reactResult.files);
           syncSandpackToVirtualFS(reactResult.files);
           if (Object.keys(reactResult.deps).length > 0) setSandpackDeps(reactResult.deps);
-          setPreviewMode("sandpack");
+          setPreviewMode("esm");
           setBuildRetryCount(0);
         } else {
           console.log("[BuildOrch:onDone] No React files — falling back to HTML");
@@ -514,7 +514,7 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
                   setSandpackFiles(retryResult.files);
                   syncSandpackToVirtualFS(retryResult.files);
                   if (Object.keys(retryResult.deps).length > 0) setSandpackDeps(retryResult.deps);
-                  setPreviewMode("sandpack");
+                  setPreviewMode("esm");
 
                   const retryChatText = retryResult.chatText || "✅ Code generated successfully";
                   setMessages((prev) => {
@@ -836,7 +836,7 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
             const mergedFiles = { ...currentFiles, ...files };
             setSandpackFiles(mergedFiles);
             syncSandpackToVirtualFS(mergedFiles);
-            setPreviewMode("sandpack");
+            setPreviewMode("esm");
           }
         },
         onTaskError: (task, error) => {
@@ -857,7 +857,7 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
           // Set final files
           setSandpackFiles(result.workspace);
           syncSandpackToVirtualFS(result.workspace);
-          setPreviewMode("sandpack");
+          setPreviewMode("esm");
 
           // Build completion message
           const statusEmoji = result.status === "success" ? "✅" : result.status === "partial" ? "⚠️" : "❌";
