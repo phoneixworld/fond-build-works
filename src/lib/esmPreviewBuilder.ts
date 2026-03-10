@@ -231,14 +231,25 @@ export function buildESMPreview(
     }
   }
 
-  // Find entry point
-  const entryPath = ["/App.tsx", "/App.jsx", "/App.js", "/App.ts"]
-    .find(p => blobUrls.has(p));
+  // Find entry point — check multiple possible locations
+  const allBlobPaths = Array.from(blobUrls.keys());
+  console.log("[ESM] Compiled files:", allBlobPaths);
+  
+  const entryPath = [
+    "/App.tsx", "/App.jsx", "/App.js", "/App.ts",
+    "/src/App.tsx", "/src/App.jsx", "/src/App.js", "/src/App.ts",
+  ].find(p => blobUrls.has(p))
+    // Fallback: find any file named App in any directory
+    || allBlobPaths.find(p => /\/App\.(tsx?|jsx?)$/.test(p));
   
   if (!entryPath) {
+    const fileList = allBlobPaths.join(", ") || "(none)";
     errors.push("No App entry point found");
-    return { html: buildErrorPage("No App.tsx/jsx found in workspace"), fileCount: 0, errors };
+    console.error("[ESM] No App entry point. Available files:", fileList);
+    return { html: buildErrorPage(`No App found. Files: ${fileList}`), fileCount: compiled.size, errors };
   }
+  
+  console.log("[ESM] Entry point:", entryPath);
 
   const appBlobUrl = blobUrls.get(entryPath)!;
 
