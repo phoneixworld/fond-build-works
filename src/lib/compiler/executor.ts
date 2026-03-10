@@ -61,7 +61,9 @@ ${workspaceContext ? `### Current code:\n${workspaceContext}` : ""}
 6. Every component must have a default export
 7. Use Tailwind CSS with design tokens (var(--color-*)) for all styling
 8. App.jsx MUST wrap all routes in AuthContext provider. AuthProvider MUST be placed OUTSIDE HashRouter/BrowserRouter since it must not use useNavigate.
-9. Protected pages must check useAuth().user and redirect to /login if null`;
+9. Protected pages must check useAuth().user and redirect to /login if null
+10. **CRITICAL**: Every function called in a component MUST be defined in that component, imported, or destructured from a hook/context. Never reference undefined functions like fetchBoards() without defining them first. If you need data-fetching functions, define them inside the component or a custom hook using the Data API pattern.
+11. When using useEffect, ensure ALL dependencies (functions, variables) referenced inside the effect are either defined above or listed in the dependency array. Define fetch functions with useCallback or inside the effect itself.`;
 }
 
 // ─── Workspace Context Builder ────────────────────────────────────────────

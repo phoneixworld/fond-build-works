@@ -41,6 +41,10 @@ export function verifyWorkspace(
   const routeResults = checkRoutes(workspace);
   issues.push(...routeResults.issues);
 
+  // 7. Structural checks: undefined function calls in useEffect
+  const undefResults = checkUndefinedCalls(workspace);
+  issues.push(...undefResults.issues);
+
   // Stats
   const files = workspace.listFiles();
   const jsFiles = files.filter(f => /\.(jsx?|tsx?)$/.test(f));
@@ -348,4 +352,63 @@ function checkRoutes(workspace: Workspace): {
   }
 
   return { issues, found, missing };
+}
+
+// ─── Undefined Function Calls in useEffect ────────────────────────────────
+
+function checkUndefinedCalls(workspace: Workspace): { issues: VerificationIssue[] } {
+  const issues: VerificationIssue[] = [];
+
+  for (const path of workspace.listFiles()) {
+    if (!/\.(jsx?|tsx?)$/.test(path)) continue;
+    const content = workspace.getFile(path)!;
+
+    // Find useEffect calls and check that functions referenced inside are defined
+    const effectRegex = /useEffect\(\s*\(\)\s*=>\s*\{([^}]*(?:\{[^}]*\}[^}]*)*)\}/g;
+    let match;
+    while ((match = effectRegex.exec(content)) !== null) {
+      const effectBody = match[1];
+      // Find function calls like fetchBoards(), loadData(), etc.
+      const callRegex = /\b([a-zA-Z_]\w*)\s*\(/g;
+      let callMatch;
+      while ((callMatch = callRegex.exec(effectBody)) !== null) {
+        const fnName = callMatch[1];
+        // Skip common built-ins and React functions
+        const builtins = new Set([
+          "console", "setTimeout", "setInterval", "clearTimeout", "clearInterval",
+          "fetch", "JSON", "Array", "Object", "Promise", "parseInt", "parseFloat",
+          "String", "Number", "Boolean", "Date", "Math", "Error", "RegExp",
+          "alert", "confirm", "encodeURIComponent", "decodeURIComponent",
+        ]);
+        if (builtins.has(fnName)) continue;
+        // Skip setState-like calls (setX pattern)
+        if (/^set[A-Z]/.test(fnName)) continue;
+
+        // Check if the function is defined/imported anywhere in the file
+        const defPatterns = [
+          new RegExp(`function\\s+${fnName}\\s*\\(`),
+          new RegExp(`const\\s+${fnName}\\s*=`),
+          new RegExp(`let\\s+${fnName}\\s*=`),
+          new RegExp(`var\\s+${fnName}\\s*=`),
+          new RegExp(`\\{[^}]*\\b${fnName}\\b[^}]*\\}\\s*=`), // destructuring
+          new RegExp(`import\\b[^;]*\\b${fnName}\\b`),
+        ];
+
+        const isDefined = defPatterns.some(p => p.test(content));
+        if (!isDefined) {
+          const lineNum = content.substring(0, match.index).split("\n").length;
+          issues.push({
+            category: "missing_component",
+            severity: "error",
+            file: path,
+            line: lineNum,
+            message: `Function '${fnName}()' called in useEffect but never defined or imported`,
+            suggestedFix: `Define '${fnName}' as a function or destructure it from a context/hook before calling it`,
+          });
+        }
+      }
+    }
+  }
+
+  return { issues };
 }
