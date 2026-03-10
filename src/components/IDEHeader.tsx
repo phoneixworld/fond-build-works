@@ -1,4 +1,11 @@
-import { Zap, LogOut, ArrowLeft, ChevronDown, Settings, Pencil, ArrowLeftRight, Lock, User, CreditCard, HelpCircle, Monitor, Tablet, Smartphone, Globe, ChevronLeft, ChevronRight, ExternalLink, RefreshCw } from "lucide-react";
+import { Zap, LogOut, ArrowLeft, ChevronDown, Settings, Pencil, ArrowLeftRight, Lock, User, CreditCard, HelpCircle, Monitor, Tablet, Smartphone, Globe, ChevronLeft, ChevronRight, ExternalLink, RefreshCw, Clock, RotateCcw } from "lucide-react";
+import { Version } from "@/components/VersionHistory";
+import { formatDistanceToNow } from "date-fns";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import { useState, useCallback, useRef, useEffect } from "react";
 import { TechStackId } from "@/lib/techStacks";
 import PublishExportButtons from "@/components/PublishExportButtons";
