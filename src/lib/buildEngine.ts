@@ -691,23 +691,31 @@ export async function runBuildEngine(
   const promptLength = userPrompt.length;
   const hasMultiplePhases = /Phase \d+/gi.test(userPrompt) && (userPrompt.match(/Phase \d+/gi) || []).length >= 2;
   const hasModulePlan = /MODULE PLAN|BUILD CHECKLIST|BUILD ORDER|AI-EXTRACTED/i.test(userPrompt);
-  const hasStructuralComplexity = /\b(with|and|include|featuring|modules?|sections?)\b.*\b(with|and|include|featuring|modules?|sections?)\b/gi.test(userPrompt);
   const hasChatContext = /APPLICATION REQUIREMENTS.*from conversation/i.test(userPrompt);
-  
-  // A build is complex if it has substantial requirements context (not just "add a button")
-  const isComplex = promptLength > 5000 || hasMultiplePhases || hasModulePlan || (hasChatContext && promptLength > 2000);
   const hasExistingCode = config.existingFiles && Object.keys(config.existingFiles).length > 0;
   
+  // FIX: If there's existing code AND the prompt is a fix/iteration (error reports, 
+  // "fix this", "update that"), use direct build — planned builds are overkill for fixes.
+  const isFixIteration = hasExistingCode && (
+    /\b(fix|error|bug|broken|crash|blank|not working|doesn't work|issue|problem)\b/i.test(userPrompt) ||
+    /Something went wrong|SyntaxError|TypeError|ReferenceError|is not a function|has already been declared/i.test(userPrompt)
+  );
+  
+  // A build is complex if it has substantial NEW requirements (not fix iterations)
+  const isComplex = !isFixIteration && (
+    promptLength > 5000 || hasMultiplePhases || hasModulePlan || (hasChatContext && promptLength > 2000)
+  );
+  
   if (isComplex) {
-    console.log(`[BuildEngine] Complex build detected: length=${promptLength}, phases=${hasMultiplePhases}, modulePlan=${hasModulePlan}, chatContext=${hasChatContext}, structural=${hasStructuralComplexity}, existingFiles=${hasExistingCode}`);
+    console.log(`[BuildEngine] Complex build detected: length=${promptLength}, phases=${hasMultiplePhases}, modulePlan=${hasModulePlan}, chatContext=${hasChatContext}, existingFiles=${hasExistingCode}`);
+  }
+  if (isFixIteration) {
+    console.log(`[BuildEngine] Fix/iteration detected with existing code — using direct build for speed`);
   }
   
   clearValidationCache();
   
   try {
-    // FIXED: Complex builds use planned pipeline REGARDLESS of existing files.
-    // The planned build already handles existing files via accumulatedFiles workspace.
-    // Only skip planned builds for short/simple prompts (e.g., "change button color").
     if (isComplex) {
       await runPlannedBuild(userPrompt, config, callbacks);
     } else {
