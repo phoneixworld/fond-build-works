@@ -78,6 +78,11 @@ export function useIntentClassification(
   // Client-side fast classification — obvious intents skip the 1-2s server round-trip
   const fastClassifyLocal = useCallback((text: string): AgentIntent | null => {
     const t = text.trim().toLowerCase();
+
+    // Long requirement documents (>3000 chars) are always "build" — skip keyword matching
+    // which can falsely match chat patterns in spec documents
+    if (text.length > 3000) return "build";
+
     // Clear build commands
     if (/^(build|create|make|add|generate|design|implement|develop|set up|scaffold|wire up)\b/i.test(t)) return "build";
     // Descriptive app prompts

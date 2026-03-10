@@ -61,6 +61,13 @@ export function useInstantBuild(config: InstantBuildConfig) {
     buildProjectId: string,
     upsert: (chunk: string) => void,
   ): Promise<boolean> => {
+    // Guard: Don't use instant templates for long requirement documents
+    // They contain keywords that falsely match templates (e.g. "platform", "system")
+    if (userText.length > 3000) {
+      console.log("[InstantBuild] Skipping instant path — input too long for template customization");
+      return false;
+    }
+
     const { findInstantTemplate, hydrateTemplate } = await import("@/lib/instantTemplates");
     const templateId = template?.id || "saas-landing";
     const templateName = template?.name || "Landing Page";
