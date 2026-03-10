@@ -1,5 +1,5 @@
 import { useState, useRef } from "react";
-import { Zap, Send, FolderOpen, Trash2, Loader2, ArrowRight, Copy, Rocket, Database, Shield, Cloud, BarChart3, Globe, Lock, Users, Cpu, Eye, Wand2, MessageSquare, Layers, RefreshCw, Lightbulb, CheckCircle2, Sparkles, Server, FileCode, ShoppingCart, LayoutDashboard, PenTool, Briefcase, ChevronRight, Smartphone, Palette, MessagesSquare, GitBranch, ImageIcon, Puzzle, Brain, Plus } from "lucide-react";
+import { ArrowRight, Rocket, Database, Shield, Cloud, BarChart3, Globe, Lock, Users, Cpu, Eye, Wand2, MessageSquare, Layers, RefreshCw, Lightbulb, Sparkles, Server, FileCode, ShoppingCart, LayoutDashboard, PenTool, Briefcase, ChevronRight, Smartphone, Palette, MessagesSquare, GitBranch, ImageIcon, Puzzle, Brain } from "lucide-react";
 import ProjectGallery from "./ProjectGallery";
 import { useAuth } from "@/hooks/useAuth";
 import { useProjects, Project } from "@/contexts/ProjectContext";
