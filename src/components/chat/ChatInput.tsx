@@ -135,7 +135,7 @@ const ChatInput = ({
             <TooltipTrigger asChild>
               <button
                 onClick={onSend}
-                disabled={!input.trim() && attachedImages.length === 0}
+                disabled={(!input.trim() && attachedImages.length === 0) || isOverLimit}
                 className="text-primary hover:text-primary/80 disabled:text-muted-foreground/30 transition-colors pb-0.5"
               >
                 <Send className="w-4 h-4" />
