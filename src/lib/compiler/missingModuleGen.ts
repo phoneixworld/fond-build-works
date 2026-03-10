@@ -141,10 +141,10 @@ function generateComponentStub(name: string, issue: MissingModuleIssue): string 
   // Named exports (e.g. useToast from Toast component)
   for (const sym of namedExports) {
     if (sym.startsWith("use")) {
-      // Hook-like named export
-      code += `export function ${sym}() {\n  return { show: () => {}, hide: () => {} };\n}\n\n`;
+      // Hook-like named export — NEVER throw, return safe no-op
+      code += `export function ${sym}() {\n  return { show: () => {}, hide: () => {}, toast: () => {}, dismiss: () => {} };\n}\n\n`;
     } else {
-      code += `export const ${sym} = (props) => {\n  return <div {...props}>{props.children || '${sym}'}</div>;\n};\n\n`;
+      code += `export const ${sym} = ({ children, className, ...props }) => {\n  return <div className={className} {...props}>{children || '${sym}'}</div>;\n};\n\n`;
     }
   }
 
@@ -161,28 +161,31 @@ function generateComponentStub(name: string, issue: MissingModuleIssue): string 
 }
 
 function generateContextStub(name: string, issue: MissingModuleIssue): string {
-  // Derive provider name and hook name
   const baseName = name.replace(/Context$/, "").replace(/Provider$/, "");
   const contextName = `${baseName}Context`;
   const providerName = `${baseName}Provider`;
   const hookName = `use${baseName}`;
 
+  // Default value so useContext never returns null — stubs should NEVER throw
+  const defaultValue = `{
+  user: null,
+  token: null,
+  loading: false,
+  login: async () => {},
+  signup: async () => {},
+  logout: () => {},
+}`;
+
   return `import React, { createContext, useContext, useState } from 'react';
 
-const ${contextName} = createContext(null);
+const defaultCtx = ${defaultValue};
+
+const ${contextName} = createContext(defaultCtx);
 
 export function ${providerName}({ children }) {
   const [state, setState] = useState({});
   
-  const value = {
-    ...state,
-    user: null,
-    token: null,
-    loading: false,
-    login: async () => {},
-    signup: async () => {},
-    logout: () => {},
-  };
+  const value = { ...defaultCtx, ...state };
 
   return (
     <${contextName}.Provider value={value}>
@@ -192,11 +195,7 @@ export function ${providerName}({ children }) {
 }
 
 export function ${hookName}() {
-  const context = useContext(${contextName});
-  if (!context) {
-    throw new Error('${hookName} must be used within a ${providerName}');
-  }
-  return context;
+  return useContext(${contextName});
 }
 
 export { ${contextName} };
