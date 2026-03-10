@@ -1832,6 +1832,7 @@ ${Object.entries(files).map(([path, code]) => `--- ${path}\n${code}`).join("\n\n
             knowledge,
             templateContext: templateCtx || undefined,
             snippetsContext: snippetsContext || undefined,
+            irContext: irContext || undefined,
             onDelta: upsert,
             onDone: handleOnDone,
             onError: handleOnError,
