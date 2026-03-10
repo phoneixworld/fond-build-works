@@ -68,9 +68,16 @@ export function useInstantBuild(config: InstantBuildConfig) {
       return false;
     }
 
+    // Only use instant templates when a specific template was explicitly matched
+    // Never default to "saas-landing" — this causes prompt text to render as content
+    if (!template) {
+      console.log("[InstantBuild] No template matched — skipping instant path, using full AI build");
+      return false;
+    }
+
     const { findInstantTemplate, hydrateTemplate } = await import("@/lib/instantTemplates");
-    const templateId = template?.id || "saas-landing";
-    const templateName = template?.name || "Landing Page";
+    const templateId = template.id;
+    const templateName = template.name;
     const instantTemplate = findInstantTemplate(templateId);
 
     if (!instantTemplate) return false;
