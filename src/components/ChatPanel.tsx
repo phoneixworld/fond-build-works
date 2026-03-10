@@ -142,6 +142,14 @@ const ChatPanel = forwardRef<ChatPanelHandle, { initialPrompt?: string; onVersio
     fetchProjectContext,
     classifyUserIntent,
     fastClassifyLocal,
+    // Conversation state machine
+    conversationAnalyze: conversationState.analyzeMessage,
+    conversationAddPhase: conversationState.addPhase,
+    conversationGetRequirements: conversationState.getRequirementsContext,
+    conversationStartBuilding: conversationState.startBuilding,
+    conversationCompleteBuild: conversationState.completeBuild,
+    conversationGenerateAck: conversationState.generateAcknowledgment,
+    conversationMode: conversationState.mode,
   });
 
   const {
