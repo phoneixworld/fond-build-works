@@ -41,7 +41,7 @@ const TABS: { id: SettingsTab; label: string; icon: React.ElementType }[] = [
   { id: "tools", label: "Tools", icon: Wrench },
 ];
 
-const ProjectSettingsPage = ({ onBack, onRenameClick, versions, onRevert, onSendMessage }: ProjectSettingsPageProps) => {
+const ProjectSettingsPage = ({ onBack, onRenameClick, onExport, versions, onRevert, onSendMessage }: ProjectSettingsPageProps) => {
   const { currentProject } = useProjects();
   const [activeTab, setActiveTab] = useState<SettingsTab>("general");
   const [toolsSubTab, setToolsSubTab] = useState<string>("brain");
