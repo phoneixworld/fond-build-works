@@ -206,13 +206,24 @@ const ChatPanel = forwardRef<ChatPanelHandle, { initialPrompt?: string; onVersio
     }
   }, [redo, setSandpackFiles, setPreviewHtml, setPreviewMode]);
 
-  // Auto-create checkpoint when build completes
+  // Auto-create checkpoint and record build completion when build completes
   const prevPipelineStep = useRef<any>(null);
   useEffect(() => {
     if (prevPipelineStep.current !== "complete" && pipelineStep === "complete") {
       const lastUserMsg = messagesRef.current.filter(m => m.role === "user").pop();
       const label = lastUserMsg ? (typeof lastUserMsg.content === "string" ? lastUserMsg.content.slice(0, 40) : "Build") : "Build";
       createCheckpoint(label, currentPreviewHtml || "", sandpackFilesRef.current);
+
+      // Record build completion in conversation state
+      const filesChanged = sandpackFilesRef.current ? Object.keys(sandpackFilesRef.current) : [];
+      const lastAssistant = messagesRef.current.filter(m => m.role === "assistant").pop();
+      const chatSummary = lastAssistant ? (typeof lastAssistant.content === "string" ? lastAssistant.content.slice(0, 200) : "Build completed") : "Build completed";
+      conversationState.completeBuild({
+        filesChanged,
+        totalFiles: filesChanged.length,
+        chatSummary: chatSummary.replace(/```[\s\S]*?```/g, "").trim().slice(0, 150),
+        timestamp: Date.now(),
+      });
     }
     prevPipelineStep.current = pipelineStep;
   }, [pipelineStep, createCheckpoint, currentPreviewHtml]);
