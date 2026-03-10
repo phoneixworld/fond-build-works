@@ -921,7 +921,7 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
     }
   }, [currentProject, saveProject, setPreviewHtml, setIsBuilding, setBuildStep, selectedModel, selectedTheme, onVersionCreated, setVirtualFiles, fetchProjectContext, syncSandpackToVirtualFS, buildMessageContent, currentPreviewHtml, setMessages, setInput, setAttachedImages, setPreviewErrors, setHealAttempts, setSandpackFiles, setSandpackDeps, setPreviewMode, setBuildMetrics, saveSnapshot, selectedTemplate, tryInstantBuild, handleOnError]);
 
-  // Smart routing
+  // Smart routing with conversation state machine
   const handleSmartSend = useCallback(async (text: string, images: string[] = []) => {
     if (!text && images.length === 0) return;
     if (isSendingRef.current || isLoadingRef.current) return;
@@ -932,6 +932,46 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
     const hasImages = images.length > 0;
     const isConfirmation = /^(yes|go ahead|do it|build it|sounds good|ok|sure)/i.test(finalText.trim());
     const hasAnswers = finalText.includes("--- Additional Requirements ---");
+
+    // ── Step 0: Conversation State Machine (runs FIRST) ──
+    if (!isAutoFix && conversationAnalyze) {
+      const convResult = conversationAnalyze(finalText, hasImages);
+      console.log(`[ConvState] mode=${conversationMode}, action=${convResult.action}, reason=${convResult.reason}`);
+
+      if (convResult.action === "gather") {
+        // User is providing requirements — store them, acknowledge, don't build
+        const phase = conversationAddPhase?.(finalText, hasImages);
+        const ackText = conversationGenerateAck?.(phase) || "✅ Got it! Send the next phase when ready, or say **\"build it\"** to start.";
+
+        // Add user message
+        const content = buildMessageContent(finalText, images);
+        const userMsg: Msg = { role: "user", content, timestamp: Date.now() };
+        setInput("");
+        setAttachedImages([]);
+        setMessages((prev) => [...prev, userMsg]);
+
+        // Add acknowledgment as assistant message
+        const assistantMsg: Msg = { role: "assistant", content: ackText, timestamp: Date.now() };
+        setMessages((prev) => [...prev, assistantMsg]);
+
+        // Save to project
+        const updatedMessages = [...messagesRef.current, userMsg, assistantMsg];
+        saveProject({ chat_history: updatedMessages.map(m => ({ role: m.role, content: m.content })) });
+        return;
+      }
+
+      if (convResult.action === "build" && conversationMode === "gathering") {
+        // User said "build it" after gathering phases — compile all requirements and build
+        console.log("[ConvState] Building with accumulated requirements");
+        conversationStartBuilding?.();
+        const requirements = conversationGetRequirements?.() || "";
+        const buildPrompt = requirements + "\n\n" + finalText;
+        setCurrentAgent("build");
+        setPipelineStep("planning");
+        sendMessage(buildPrompt, images);
+        return;
+      }
+    }
 
     if (!isAutoFix && !isShort && !hasImages && !isConfirmation && !hasAnswers) {
       const localIntent = fastClassifyLocal(finalText);
@@ -966,7 +1006,7 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
     setCurrentAgent("build");
     setPipelineStep("planning");
     sendMessage(finalText, images);
-  }, [classifyUserIntent, fastClassifyLocal, sendChatMessage, sendMessage]);
+  }, [classifyUserIntent, fastClassifyLocal, sendChatMessage, sendMessage, conversationAnalyze, conversationAddPhase, conversationGetRequirements, conversationStartBuilding, conversationGenerateAck, conversationMode, buildMessageContent, setInput, setAttachedImages, setMessages, saveProject]);
 
   const clearChat = useCallback(() => {
     if (!currentProject || isLoading) return;
