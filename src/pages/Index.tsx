@@ -93,6 +93,7 @@ const PANEL_COMPONENTS: Record<string, React.FC<any>> = {
   whitelabel: WhiteLabelPanel,
   github: GitHubPanel,
   domains: CustomDomainPanel,
+  settings: ProjectSettings,
 };
 
 const IDELayout = () => {
