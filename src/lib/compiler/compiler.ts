@@ -22,6 +22,7 @@ import {
   createTrace, startPass, endPass,
   traceTaskStart, traceTaskEnd, finalizeTrace, printTrace,
 } from "./observability";
+import { cloudLog } from "@/lib/cloudLogBus";
 
 // ─── Public API ───────────────────────────────────────────────────────────
 
