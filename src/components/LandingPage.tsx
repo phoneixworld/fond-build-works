@@ -444,7 +444,6 @@ const LandingPage = ({ onStartProject, onOpenProject }: LandingPageProps) => {
             <p className="text-xs text-muted-foreground">Built with Phoneix World • © {new Date().getFullYear()} All rights reserved.</p>
           </footer>
         </main>
-      </div>
     </div>
   );
 };
