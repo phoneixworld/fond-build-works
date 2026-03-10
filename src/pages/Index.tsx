@@ -4,7 +4,7 @@ import {
   ResizablePanel,
   ResizablePanelGroup,
 } from "@/components/ui/resizable";
-import { Code, Eye, Cloud, Clock, Brain, Activity, Users, Palette, FlaskConical, Puzzle, Tag, GitBranch, Globe, ListChecks, Shield, Search, Layers } from "lucide-react";
+import { Code, Eye, Cloud, Clock, Brain, Activity, Users, Palette, FlaskConical, Puzzle, Tag, GitBranch, Globe, ListChecks, Shield, Search, Layers, Settings } from "lucide-react";
 import { forwardRef, lazy, Suspense } from "react";
 import { usePanelLocking } from "@/hooks/usePanelLocking";
 import PanelLockOverlay from "@/components/PanelLockOverlay";
@@ -31,6 +31,7 @@ import PlanningPanel from "@/components/PlanningPanel";
 import CodeQualityPanel from "@/components/CodeQualityPanel";
 import SemanticSearchPanel from "@/components/SemanticSearchPanel";
 import IREditor from "@/components/IREditor";
+import ProjectSettings from "@/components/ProjectSettings";
 import LandingPage from "@/components/LandingPage";
 import CommandPalette from "@/components/CommandPalette";
 import VersionHistory, { Version } from "@/components/VersionHistory";
@@ -73,6 +74,7 @@ const SECONDARY_TABS = [
   { id: "plugins" as PanelId, label: "Plugins", icon: Puzzle },
   { id: "whitelabel" as PanelId, label: "White-label", icon: Tag },
   { id: "domains" as PanelId, label: "Domains", icon: Globe },
+  { id: "settings" as PanelId, label: "Settings", icon: Settings },
   { id: "history" as PanelId, label: "History", icon: Clock },
 ];
 
@@ -91,6 +93,7 @@ const PANEL_COMPONENTS: Record<string, React.FC<any>> = {
   whitelabel: WhiteLabelPanel,
   github: GitHubPanel,
   domains: CustomDomainPanel,
+  settings: ProjectSettings,
 };
 
 const IDELayout = () => {
@@ -201,6 +204,9 @@ const IDELayout = () => {
             }}
           />
         );
+      }
+      if (rightPanel === "settings") {
+        return <ProjectSettings onRenameClick={() => setRenameOpen(true)} />;
       }
       const Component = PANEL_COMPONENTS[rightPanel];
       return Component ? <Component /> : <PreviewPanel />;
