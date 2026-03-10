@@ -1,7 +1,6 @@
 import { useState } from "react";
-import { Settings, Copy, Check, Trash2, GitFork, Eye, EyeOff, Calendar, User, Hash, Globe, MessageCircle, Code2 } from "lucide-react";
+import { Settings, Copy, Check, Trash2, GitFork, Eye, EyeOff, Calendar, User, Hash, Globe, MessageCircle } from "lucide-react";
 import { useProjects } from "@/contexts/ProjectContext";
-import { TECH_STACKS, TechStackId } from "@/lib/techStacks";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import { Switch } from "@/components/ui/switch";
@@ -123,19 +122,6 @@ const ProjectSettings = ({ onRenameClick, onClone }: ProjectSettingsProps) => {
               </div>
             </div>
 
-            {/* Tech Stack */}
-            <div>
-              <p className="text-[11px] text-muted-foreground uppercase tracking-wider mb-1">Tech Stack</p>
-              <select
-                value={currentProject.tech_stack || "html-tailwind"}
-                onChange={(e) => saveProject({ tech_stack: e.target.value as TechStackId })}
-                className="text-sm bg-secondary text-foreground rounded-md px-2 py-1 border border-border focus:border-primary outline-none cursor-pointer"
-              >
-                {TECH_STACKS.map((stack) => (
-                  <option key={stack.id} value={stack.id}>{stack.label}</option>
-                ))}
-              </select>
-            </div>
 
             {/* Messages Count */}
             <div>
