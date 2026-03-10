@@ -206,9 +206,14 @@ const IDELayout = () => {
       return Component ? <Component /> : <PreviewPanel />;
     })();
 
+    const lockOwner = getLockOwner(rightPanel);
+
     return (
       <ErrorBoundary fallbackTitle={rightPanel.charAt(0).toUpperCase() + rightPanel.slice(1)}>
-        {panel}
+        <div className="relative h-full w-full">
+          {panel}
+          {lockOwner && <PanelLockOverlay lock={lockOwner} />}
+        </div>
       </ErrorBoundary>
     );
   };
