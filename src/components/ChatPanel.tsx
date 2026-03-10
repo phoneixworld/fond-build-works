@@ -603,6 +603,7 @@ const projectContextCacheRef = useRef<{
   projectId: string;
   schemas: any[];
   knowledge: string[];
+  irContext: string;
   fetchedAt: number;
 } | null>(null);
 const CONTEXT_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
