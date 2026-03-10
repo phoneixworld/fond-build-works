@@ -249,37 +249,95 @@ FIX CHECKLIST:
 6. Output the COMPLETE fixed file — no partial snippets`;
     }
 
-    // Model routing — cost-optimized selection
-    // Priority: use cheapest model that can handle the task
+    // ─── Dynamic Cost Router ───────────────────────────────────────────
+    // Scores prompt complexity (0-100) and picks cheapest capable model
     const totalInputChars = JSON.stringify(messages).length + systemPrompt.length;
     const estimatedInputTokens = Math.ceil(totalInputChars / 4);
+    const userPromptText = messages.filter((m: any) => m.role === "user").map((m: any) => typeof m.content === "string" ? m.content : "").join(" ");
     
+    // Count structural indicators for complexity scoring
+    const moduleKeywords = userPromptText.toLowerCase().match(/\b(module|page|section|tab|panel|screen|view|dashboard|form|table|chart)\b/gi);
+    const complexFeatures = [
+      /\b(authentication|auth|login.*signup)\b/i,
+      /\b(real-?time|websocket|live)\b/i,
+      /\b(chart|graph|visualization|analytics)\b/i,
+      /\b(drag.?and.?drop|sortable|reorder)\b/i,
+      /\b(file.?upload|image.?upload)\b/i,
+      /\b(multi.?step|wizard|workflow)\b/i,
+      /\b(role|permission|rbac|access.?control)\b/i,
+      /\b(search|filter|pagination)\b/i,
+    ];
+    const featureCount = complexFeatures.filter(r => r.test(userPromptText)).length;
+    
+    // Complexity score: 0-100
+    let complexity = 0;
+    // Size scoring (0-30)
+    if (estimatedInputTokens > 20000) complexity += 30;
+    else if (estimatedInputTokens > 10000) complexity += 20;
+    else if (estimatedInputTokens > 5000) complexity += 10;
+    else if (estimatedInputTokens > 2000) complexity += 5;
+    // Structural complexity (0-30)
+    const modCount = moduleKeywords?.length || 0;
+    if (modCount > 8) complexity += 20;
+    else if (modCount > 4) complexity += 12;
+    else if (modCount > 2) complexity += 6;
+    if (/\b(crud|create.*read.*update|list.*add.*edit.*delete)\b/i.test(userPromptText)) complexity += 10;
+    // Feature complexity (0-20)
+    complexity += Math.min(featureCount * 4, 20);
+    // Iteration bonus
+    if (current_code) complexity += 5;
+    complexity = Math.min(complexity, 100);
+
+    // Route model dynamically
     let selectedModel: string;
+    let routeReason: string;
+    
     if (model) {
       selectedModel = model;
+      routeReason = `User override: ${model}`;
+    } else if (retry_context) {
+      selectedModel = "google/gemini-2.5-flash";
+      routeReason = `Retry → Flash 2.5 (focused fix)`;
     } else if (task_type === "schema" || task_type === "backend") {
-      // Schema/backend tasks need precision → use flash (not gpt-5 which is 5-10x more expensive)
       selectedModel = "google/gemini-2.5-flash";
-    } else if (estimatedInputTokens > 25000) {
-      // Only use pro for truly massive inputs (raised threshold from 15k to 25k)
-      selectedModel = "google/gemini-2.5-flash";
-      console.log(`[build-agent] Large input (${estimatedInputTokens} est. tokens) → using gemini-2.5-flash (cost-optimized)`);
-    } else {
+      routeReason = `${task_type} task → Flash 2.5`;
+    } else if (complexity >= 70) {
+      selectedModel = "google/gemini-2.5-pro";
+      routeReason = `High complexity (${complexity}/100) → Pro`;
+    } else if (complexity >= 40) {
       selectedModel = "google/gemini-3-flash-preview";
+      routeReason = `Medium complexity (${complexity}/100) → Flash 3`;
+    } else if (complexity >= 20) {
+      selectedModel = "google/gemini-2.5-flash";
+      routeReason = `Low complexity (${complexity}/100) → Flash 2.5`;
+    } else {
+      selectedModel = "google/gemini-2.5-flash-lite";
+      routeReason = `Trivial (${complexity}/100) → Flash Lite`;
     }
     
-    // Temperature: lower for retries/iterations, slightly higher for fresh builds
+    console.log(`[build-agent] 🎯 CostRouter: ${routeReason} | tokens≈${estimatedInputTokens} | features=${featureCount} | modules=${modCount}`);
+
+    // Dynamic temperature
     let temperature = 0.3;
     if (retry_context) temperature = 0.15;
     else if (current_code) temperature = 0.2;
 
-    // Cap max_tokens to control costs — 64k is sufficient for most apps
-    // Previously auto-scaled to 100k which significantly increases cost
-    let maxTokens = requestedMaxTokens || 64000;
-    if (estimatedInputTokens > 20000 && !requestedMaxTokens) {
-      maxTokens = 80000; // Moderate increase, not 100k
-      console.log(`[build-agent] Scaled max_tokens to ${maxTokens} for large input`);
+    // Dynamic max_tokens — scale with actual need, not fixed caps
+    let maxTokens: number;
+    if (requestedMaxTokens) {
+      maxTokens = requestedMaxTokens;
+    } else if (retry_context) {
+      maxTokens = 32000; // Retries are focused
+    } else if (complexity >= 70) {
+      maxTokens = 80000;
+    } else if (complexity >= 40) {
+      maxTokens = 64000;
+    } else if (complexity >= 20) {
+      maxTokens = 48000;
+    } else {
+      maxTokens = 32000;
     }
+    console.log(`[build-agent] 💰 maxTokens=${maxTokens} | temp=${temperature}`);
 
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
