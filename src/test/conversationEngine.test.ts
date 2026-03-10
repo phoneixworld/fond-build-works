@@ -101,12 +101,12 @@ describe("Build Readiness Engine", () => {
     expect(result.unresolvedRoles).toContain("moderator");
   });
 
-  it("should detect auth inconsistency", () => {
+  it("should detect auth without protected routes", () => {
     const irState: IRState = {
       ...DEFAULT_IR_STATE,
       routes: [
         { id: "r1", path: "/", label: "Home", isProtected: false },
-        { id: "r2", path: "/admin", label: "Admin", isProtected: false }, // should be protected
+        { id: "r2", path: "/admin", label: "Admin", isProtected: false },
       ],
       auth: {
         enabled: true,
@@ -119,8 +119,9 @@ describe("Build Readiness Engine", () => {
     };
 
     const result = compileBuildReadiness(irState, [{ rawText: "Admin panel" }], undefined);
-    const authCheck = result.checks.find(c => c.name === "auth_consistency");
-    expect(authCheck?.passed).toBe(false);
+    // Auth enabled + no protected routes = warning
+    const authRouteCheck = result.checks.find(c => c.name === "auth_route_consistency");
+    expect(authRouteCheck?.passed).toBe(false);
   });
 });
 
