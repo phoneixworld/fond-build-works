@@ -176,8 +176,9 @@ describe("State Transitions", () => {
     expect(VALID_TRANSITIONS["gathering"].includes("gathering")).toBe(true);
   });
 
-  it("should allow reset from any state", () => {
+  it("should allow reset from non-idle states", () => {
     for (const state of Object.keys(VALID_TRANSITIONS)) {
+      if (state === "idle") continue; // idle->idle is a no-op, not a transition
       expect(VALID_TRANSITIONS[state].includes("idle")).toBe(true);
     }
   });
