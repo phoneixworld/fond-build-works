@@ -205,23 +205,7 @@ function rewriteToRegistry(
     }
   );
 
-  // 5) export default function Name(...)
-  code = code.replace(
-    /export\s+default\s+function\s+(\w+)/g,
-    (_match, name: string) => `function ${name}/* __export_default__${name}__ */`
-  );
-  // capture the name and assign after
-  code = code.replace(
-    /function\s+(\w+)\/\*\s*__export_default__(\w+)__\s*\*\//g,
-    (_match, name: string) => {
-      return `function ${name}`;
-    }
-  );
-  // Simpler approach: just do it inline
-  // Let's redo export default handling more cleanly
-  // Reset - do a single pass
-  
-  // Actually let me do export rewrites line-by-line since they're simpler
+  // Export rewrites — done line-by-line since they're declaration-level
   const lines = code.split("\n");
   const result: string[] = [];
   const defaultExportNames: string[] = [];
