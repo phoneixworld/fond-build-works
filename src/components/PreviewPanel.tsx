@@ -111,33 +111,8 @@ const PreviewPanel = () => {
 
   return (
     <div className="flex flex-col bg-[hsl(var(--ide-panel))]" style={{ height: '100%', minHeight: 0 }}>
-      {/* Route tabs — show when multiple pages detected */}
-      <AnimatePresence>
-        {previewMode === "sandpack" && hasRoutes && (
-          <motion.div
-            initial={{ height: 0, opacity: 0 }}
-            animate={{ height: "auto", opacity: 1 }}
-            exit={{ height: 0, opacity: 0 }}
-            className="border-b border-border bg-[hsl(var(--ide-panel-header))] overflow-hidden"
-          >
-            <div className="flex items-center gap-0.5 px-2 py-1 overflow-x-auto scrollbar-none">
-              {detectedRoutes.map((route) => (
-                <button
-                  key={route.path}
-                  onClick={() => navigateToRoute(route.path)}
-                  className={`px-2.5 py-1 rounded-md text-[11px] font-medium whitespace-nowrap transition-all ${
-                    currentPath === route.path
-                      ? "bg-primary/10 text-primary border border-primary/20"
-                      : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
-                  }`}
-                >
-                  {route.label}
-                </button>
-              ))}
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+
+
 
       {/* Build progress overlay */}
       <AnimatePresence>
