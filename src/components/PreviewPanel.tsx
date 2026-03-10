@@ -77,31 +77,6 @@ const PreviewPanel = () => {
 
   return (
     <div className="flex flex-col bg-[hsl(var(--ide-panel))]" style={{ height: '100%', minHeight: 0 }}>
-      {/* Build progress overlay */}
-      <AnimatePresence>
-        {isBuilding && (
-          <motion.div
-            initial={{ height: 0, opacity: 0 }}
-            animate={{ height: "auto", opacity: 1 }}
-            exit={{ height: 0, opacity: 0 }}
-            className="bg-[hsl(var(--ide-panel-header))] border-b border-border overflow-hidden"
-          >
-            <div className="flex items-center gap-2 px-3 py-2">
-              <Loader2 className="w-3.5 h-3.5 text-primary animate-spin" />
-              <span className="text-xs text-primary font-medium">{buildStep || "Building..."}</span>
-            </div>
-            <div className="h-0.5 bg-border">
-              <motion.div
-                className="h-full bg-primary"
-                initial={{ width: "0%" }}
-                animate={{ width: "100%" }}
-                transition={{ duration: 8, ease: "easeInOut" }}
-              />
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
       {/* Preview content */}
       <div className="flex-1 relative overflow-hidden bg-background" style={{ minHeight: 0 }}>
         {/* Building overlay — live pipeline view */}
