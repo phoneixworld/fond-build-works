@@ -18,6 +18,7 @@ import { Workspace } from "./workspace";
 import { executeTask, type ExecutionCallbacks } from "./executor";
 import { verifyWorkspace } from "./verifier";
 import { classifyRepairActions, buildRepairSummary, MAX_REPAIR_ROUNDS } from "./repair";
+import { fixBrokenImports } from "./importFixer";
 import {
   createTrace, startPass, endPass,
   traceTaskStart, traceTaskEnd, finalizeTrace, printTrace,
@@ -172,6 +173,16 @@ export async function compile(
     }
 
     endPass(passTiming);
+  }
+
+  // ── Phase 3.5: Deterministic Import Fix ─────────────────────────────
+
+  callbacks.onPhase("fixing-imports", "Fixing broken import paths...");
+
+  const importsFixed = fixBrokenImports(workspace);
+  if (importsFixed > 0) {
+    cloudLog.info(`Import fixer: corrected ${importsFixed} broken import path(s)`, "compiler");
+    console.log(`[Compiler] 🔗 Import fixer: corrected ${importsFixed} broken import path(s)`);
   }
 
   // ── Phase 4: Verification ──────────────────────────────────────────
