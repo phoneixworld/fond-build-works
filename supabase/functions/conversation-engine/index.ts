@@ -588,22 +588,24 @@ Deno.serve(async (req) => {
 
       // Compile build readiness
       const readiness = compileBuildReadiness(irState || {}, allReqs || [], mergedNormalized);
-      await supabase
+      const { error: readinessError } = await supabase
         .from("project_build_readiness")
         .upsert({
           project_id: projectId,
-          ...readiness,
+          is_ready: readiness.isReady,
+          score: readiness.score,
           checks: readiness.checks,
           missing_fields: readiness.missingFields,
           incomplete_workflows: readiness.incompleteWorkflows,
           unresolved_roles: readiness.unresolvedRoles,
           underspecified_components: readiness.underspecifiedComponents,
           missing_constraints: readiness.missingConstraints,
-          is_ready: readiness.isReady,
-          score: readiness.score,
           recommendation: readiness.recommendation,
           updated_at: new Date().toISOString(),
         }, { onConflict: "project_id" });
+      if (readinessError) {
+        console.error("[conversation-engine] Build readiness upsert error:", JSON.stringify(readinessError));
+      }
 
       // Audit log
       await supabase
