@@ -108,6 +108,7 @@ const IDELayout = () => {
   const chatRef = useRef<{ clearChat: () => void; sendMessage: (text: string) => void } | null>(null);
   const { toast } = useToast();
   const { onlineUsers, setTyping, myColor } = useRealtimePresence(rightPanel);
+  const { isLocked, getLockOwner } = usePanelLocking(onlineUsers);
 
   // Derive IDE mode from whether a project is selected
   const inIDE = !!currentProject;
