@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Settings, Copy, Check, Trash2, GitFork, Eye, EyeOff, Calendar, User, Hash, Globe, MessageCircle } from "lucide-react";
+import { Settings, Copy, Check, Trash2, GitFork, Eye, EyeOff, Calendar, User, Hash, Globe, MessageCircle, Download } from "lucide-react";
 import { useProjects } from "@/contexts/ProjectContext";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
