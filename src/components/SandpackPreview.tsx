@@ -19,17 +19,15 @@ class SandpackErrorBoundary extends Component<
 > {
   state: ErrorBoundaryState = { hasError: false, error: null };
 
-  static getDerivedStateFromError(error: Error) {
-    // Some Sandpack errors have read-only properties; safely extract message
-    let safeError = error;
+  static getDerivedStateFromError(error: unknown) {
+    // Sandpack throws SyntaxErrors with read-only properties.
+    // Always create a fresh Error to avoid "Cannot assign to read only property 'message'"
+    let msg = "Preview encountered an error";
     try {
-      // If the error's message is read-only, wrap it in a new Error
-      const msg = error?.message || String(error) || "Preview error";
-      safeError = new Error(msg);
-    } catch {
-      safeError = new Error("Preview encountered an error");
-    }
-    return { hasError: true, error: safeError };
+      if (error instanceof Error) msg = error.message;
+      else msg = String(error);
+    } catch { /* swallow */ }
+    return { hasError: true, error: new Error(msg) };
   }
 
   componentDidCatch(error: Error) {
