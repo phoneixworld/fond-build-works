@@ -592,15 +592,14 @@ Deno.serve(async (req) => {
         .from("project_build_readiness")
         .upsert({
           project_id: projectId,
-          ...readiness,
+          is_ready: readiness.isReady,
+          score: readiness.score,
           checks: readiness.checks,
           missing_fields: readiness.missingFields,
           incomplete_workflows: readiness.incompleteWorkflows,
           unresolved_roles: readiness.unresolvedRoles,
           underspecified_components: readiness.underspecifiedComponents,
           missing_constraints: readiness.missingConstraints,
-          is_ready: readiness.isReady,
-          score: readiness.score,
           recommendation: readiness.recommendation,
           updated_at: new Date().toISOString(),
         }, { onConflict: "project_id" });
