@@ -982,27 +982,40 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
         // Always try to include accumulated requirements when phases exist
         const hasAccumulatedPhases = conversationMode === "gathering" || conversationMode === "ready" || conversationMode === "complete";
         
-        if (hasAccumulatedPhases) {
-          console.log(`[SmartSend] Building with accumulated requirements (mode=${conversationMode})`);
-          conversationStartBuilding?.();
+        // Try server-compiled requirements first
+        console.log(`[SmartSend] Build requested, mode=${conversationMode}`);
+        conversationStartBuilding?.();
+        
+        // Get server-compiled requirements (includes chat history fallback now)
+        const requirements = await Promise.resolve(conversationGetRequirements?.() || "");
+        
+        if (requirements && requirements.length > 50) {
+          const buildPrompt = requirements + "\n\n" + finalText;
+          console.log(`[SmartSend] Build prompt length: ${buildPrompt.length} chars (requirements: ${requirements.length})`);
           
-          // Get server-compiled requirements (includes extracted image text)
-          const requirements = await Promise.resolve(conversationGetRequirements?.() || "");
-          
-          if (requirements && requirements.length > 50) {
-            const buildPrompt = requirements + "\n\n" + finalText;
-            console.log(`[SmartSend] Build prompt length: ${buildPrompt.length} chars (requirements: ${requirements.length})`);
-            
-            setCurrentAgent("build");
-            setPipelineStep("planning");
-            sendMessage(buildPrompt, images);
-            return;
-          } else {
-            console.log(`[SmartSend] No substantial requirements found (${requirements.length} chars), proceeding as direct build`);
-          }
-        } else {
-          console.log(`[SmartSend] Build requested, mode=${conversationMode}, proceeding as direct build`);
+          setCurrentAgent("build");
+          setPipelineStep("planning");
+          sendMessage(buildPrompt, images);
+          return;
         }
+        
+        // Fallback: extract from local chat history
+        const chatContext = messages
+          .filter(m => typeof m.content === "string" && m.content.length > 30)
+          .map(m => `**${m.role === "user" ? "User" : "Assistant"}:**\n${m.content}`)
+          .join("\n\n");
+        
+        if (chatContext.length > 100) {
+          const buildPrompt = `# APPLICATION REQUIREMENTS (from conversation)\n\n${chatContext}\n\n## BUILD INSTRUCTION\nBuild the COMPLETE application based on the conversation above.\n\n${finalText}`;
+          console.log(`[SmartSend] Build from chat history fallback: ${buildPrompt.length} chars`);
+          
+          setCurrentAgent("build");
+          setPipelineStep("planning");
+          sendMessage(buildPrompt, images);
+          return;
+        }
+        
+        console.log(`[SmartSend] No context found, proceeding as direct build`);
       }
 
       // ── CHAT: Route to chat agent ──
