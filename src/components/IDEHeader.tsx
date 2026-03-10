@@ -1,6 +1,8 @@
-import { Zap, LogOut, ArrowLeft, ChevronDown, Settings, Pencil, ArrowLeftRight, Lock, User, CreditCard, HelpCircle } from "lucide-react";
+import { Zap, LogOut, ArrowLeft, ChevronDown, Settings, Pencil, ArrowLeftRight, Lock, User, CreditCard, HelpCircle, Monitor, Tablet, Smartphone, Globe, ChevronLeft, ChevronRight, ExternalLink, RefreshCw } from "lucide-react";
+import { useState, useCallback, useRef, useEffect } from "react";
 import { TechStackId } from "@/lib/techStacks";
 import PublishExportButtons from "@/components/PublishExportButtons";
+import { usePreview } from "@/contexts/PreviewContext";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -17,6 +19,12 @@ import { LucideIcon } from "lucide-react";
 import { RefObject } from "react";
 
 export type PanelId = "code" | "preview" | "cloud" | "marketing";
+
+const VIEWPORTS = [
+  { id: "desktop" as const, label: "Desktop", icon: Monitor },
+  { id: "tablet" as const, label: "Tablet", icon: Tablet },
+  { id: "mobile" as const, label: "Mobile", icon: Smartphone },
+];
 
 interface TabDef {
   id: PanelId;
@@ -51,7 +59,6 @@ interface IDEHeaderProps {
   getLockOwner?: (panelId: PanelId) => { email: string; color: string } | null;
 }
 
-
 const IDEHeader = ({
   currentProject,
   rightPanel,
@@ -77,13 +84,45 @@ const IDEHeader = ({
   isLocked,
   getLockOwner,
 }: IDEHeaderProps) => {
+  const { viewport, setViewport, triggerRefresh, isBuilding, currentPath, setCurrentPath } = usePreview();
+
+  const [urlInput, setUrlInput] = useState("/");
+  const [isEditingUrl, setIsEditingUrl] = useState(false);
+  const urlInputRef = useRef<HTMLInputElement>(null);
+
+  const handleUrlSubmit = useCallback(() => {
+    setIsEditingUrl(false);
+    if (urlInput.startsWith("/")) {
+      setCurrentPath(urlInput);
+      const sandpackIframe = document.querySelector('.sp-preview-iframe') as HTMLIFrameElement;
+      if (sandpackIframe?.contentWindow) {
+        sandpackIframe.contentWindow.postMessage({ type: "navigate", path: urlInput }, "*");
+      }
+    }
+  }, [urlInput, setCurrentPath]);
+
+  useEffect(() => {
+    if (!isEditingUrl) setUrlInput(currentPath);
+  }, [currentPath, isEditingUrl]);
+
+  useEffect(() => {
+    const handler = (e: MessageEvent) => {
+      if (e.data?.type === "route-change" && typeof e.data.path === "string") {
+        setCurrentPath(e.data.path);
+      }
+    };
+    window.addEventListener("message", handler);
+    return () => window.removeEventListener("message", handler);
+  }, [setCurrentPath]);
 
   const getInitials = (email: string) => email.slice(0, 2).toUpperCase();
+  const isPreview = rightPanel === "preview";
+  const ViewportIcon = VIEWPORTS.find(v => v.id === viewport)!.icon;
 
   return (
     <header className="h-11 flex items-center px-3 border-b border-border shrink-0 z-10 relative bg-ide-panel-header">
-      {/* Left: Back + Project dropdown */}
-      <div className="flex items-center gap-1.5 min-w-0 shrink-0">
+      {/* Left: Back + Project name + Tabs */}
+      <div className="flex items-center gap-2 min-w-0 shrink-0">
         <Tooltip>
           <TooltipTrigger asChild>
             <button onClick={onBack} className="text-muted-foreground hover:text-foreground transition-colors p-1 rounded-md hover:bg-secondary shrink-0">
@@ -107,11 +146,10 @@ const IDEHeader = ({
           </TooltipTrigger>
           <TooltipContent side="bottom" className="text-xs">Click to rename</TooltipContent>
         </Tooltip>
-      </div>
 
-      {/* Center: Tabs */}
-      <div className="flex items-center gap-2 mx-auto min-w-0">
-        {/* Primary tabs */}
+        <div className="w-px h-4 bg-border mx-0.5" />
+
+        {/* Tabs */}
         <div className="flex items-center gap-0.5 bg-secondary/40 rounded-lg p-0.5 shrink-0">
           {primaryTabs.map((tab) => {
             const Icon = tab.icon;
@@ -152,8 +190,97 @@ const IDEHeader = ({
         </div>
       </div>
 
-      {/* Right: Actions + User menu */}
-      <div className="flex items-center gap-1 shrink-0">
+      {/* Right: Preview controls (when preview active) + Actions + User menu */}
+      <div className="flex items-center gap-1 ml-auto shrink-0">
+        {/* Preview controls — right side, only when preview tab active */}
+        {isPreview && (
+          <>
+            {/* Viewport cycle */}
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  onClick={() => {
+                    const order = VIEWPORTS.map(v => v.id);
+                    const idx = order.indexOf(viewport);
+                    setViewport(order[(idx + 1) % order.length]);
+                  }}
+                  className="p-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-all"
+                >
+                  <ViewportIcon className="w-3.5 h-3.5" />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent side="bottom" className="text-xs">{VIEWPORTS.find(v => v.id === viewport)!.label} — click to switch</TooltipContent>
+            </Tooltip>
+
+            {/* Nav arrows */}
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button onClick={() => { const iframe = document.querySelector('.sp-preview-iframe') as HTMLIFrameElement; iframe?.contentWindow?.history.back(); }} className="p-1 text-muted-foreground hover:text-foreground transition-colors rounded-md hover:bg-muted/50">
+                  <ChevronLeft className="w-3.5 h-3.5" />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent side="bottom" className="text-xs">Back</TooltipContent>
+            </Tooltip>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button onClick={() => { const iframe = document.querySelector('.sp-preview-iframe') as HTMLIFrameElement; iframe?.contentWindow?.history.forward(); }} className="p-1 text-muted-foreground hover:text-foreground transition-colors rounded-md hover:bg-muted/50">
+                  <ChevronRight className="w-3.5 h-3.5" />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent side="bottom" className="text-xs">Forward</TooltipContent>
+            </Tooltip>
+
+            {/* URL bar */}
+            <div className="flex items-center gap-1.5 bg-secondary rounded-lg px-2 py-1 min-w-0 w-[180px]">
+              <Globe className="w-3 h-3 text-muted-foreground flex-shrink-0" />
+              {isEditingUrl ? (
+                <input
+                  ref={urlInputRef}
+                  value={urlInput}
+                  onChange={(e) => setUrlInput(e.target.value)}
+                  onBlur={handleUrlSubmit}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") handleUrlSubmit();
+                    if (e.key === "Escape") { setIsEditingUrl(false); setUrlInput(currentPath); }
+                  }}
+                  className="flex-1 bg-transparent text-xs text-foreground outline-none min-w-0"
+                  autoFocus
+                  spellCheck={false}
+                />
+              ) : (
+                <button
+                  onClick={() => { setIsEditingUrl(true); setTimeout(() => urlInputRef.current?.select(), 0); }}
+                  className="flex-1 text-left text-xs text-muted-foreground hover:text-foreground transition-colors truncate min-w-0"
+                >
+                  <span className="text-foreground font-medium">{currentPath}</span>
+                </button>
+              )}
+            </div>
+
+            {/* Open in new tab */}
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button className="p-1.5 text-muted-foreground hover:text-foreground transition-colors rounded-md hover:bg-muted/50">
+                  <ExternalLink className="w-3.5 h-3.5" />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent side="bottom" className="text-xs">Open in new tab</TooltipContent>
+            </Tooltip>
+
+            {/* Refresh */}
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button onClick={triggerRefresh} className="p-1.5 text-muted-foreground hover:text-foreground transition-colors rounded-md hover:bg-muted/50">
+                  <RefreshCw className={`w-3.5 h-3.5 ${isBuilding ? "animate-spin" : ""}`} />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent side="bottom" className="text-xs">Refresh</TooltipContent>
+            </Tooltip>
+
+            <div className="w-px h-4 bg-border mx-0.5" />
+          </>
+        )}
+
         {onSwapLayout && (
           <Tooltip>
             <TooltipTrigger asChild>
