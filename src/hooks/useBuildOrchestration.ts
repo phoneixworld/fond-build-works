@@ -819,7 +819,6 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
         },
         onDelta: (chunk) => {
           setBuildStreamContent(prev => prev + chunk);
-          streamingControllerRef.current?.addChunk(chunk);
         },
         onFilesReady: (files, deps) => {
           if (lastProjectIdRef.current !== buildProjectId) {
