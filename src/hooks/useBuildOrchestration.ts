@@ -79,7 +79,17 @@ export interface BuildOrchestrationConfig {
   fetchProjectContext: (pid: string) => Promise<{ schemas: any[]; knowledge: string[]; irContext: string }>;
   classifyUserIntent: (prompt: string) => Promise<{ intent: AgentIntent; questions?: any[] } | null>;
   fastClassifyLocal: (text: string) => AgentIntent | null;
+
+  // Conversation state machine
+  conversationAnalyze?: (text: string, hasImages: boolean) => { action: "gather" | "build" | "chat" | "continue"; reason: string };
+  conversationAddPhase?: (text: string, hasImages: boolean) => any;
+  conversationGetRequirements?: () => string;
+  conversationStartBuilding?: () => void;
+  conversationCompleteBuild?: (result: any) => void;
+  conversationGenerateAck?: (phase: any) => string;
+  conversationMode?: string;
 }
+
 
 export function useBuildOrchestration(config: BuildOrchestrationConfig) {
   const {
