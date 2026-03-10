@@ -211,7 +211,7 @@ const IDEHeader = ({
                 <TooltipTrigger asChild>
                   <button
                     onClick={() => setRightPanel(tab.id)}
-                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-[11px] font-medium transition-all relative ${
+                    className={`flex items-center gap-1.5 ${tab.iconOnly ? 'px-2' : 'px-3'} py-1.5 rounded-md text-[11px] font-medium transition-all relative ${
                       isActive
                         ? "bg-background text-foreground shadow-sm ring-1 ring-border/50"
                         : locked
@@ -220,7 +220,7 @@ const IDEHeader = ({
                     }`}
                   >
                     <Icon className="w-3.5 h-3.5" />
-                    {tab.label}
+                    {!tab.iconOnly && tab.label}
                     {locked && lockOwner && (
                       <span className="w-2 h-2 rounded-full ring-1 ring-background absolute -top-0.5 -right-0.5" style={{ backgroundColor: lockOwner.color }} />
                     )}
