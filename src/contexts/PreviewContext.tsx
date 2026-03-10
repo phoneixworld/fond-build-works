@@ -16,6 +16,8 @@ export interface BuildSnapshot {
 
 const MAX_SNAPSHOTS = 10;
 
+export type ViewportId = "desktop" | "tablet" | "mobile";
+
 interface PreviewContextType {
   // Legacy HTML preview
   previewHtml: string;
@@ -40,6 +42,13 @@ interface PreviewContextType {
   snapshots: BuildSnapshot[];
   saveSnapshot: (label: string) => void;
   restoreSnapshot: (index: number) => void;
+  // Viewport & refresh (shared with header)
+  viewport: ViewportId;
+  setViewport: (vp: ViewportId) => void;
+  refreshKey: number;
+  triggerRefresh: () => void;
+  currentPath: string;
+  setCurrentPath: (path: string) => void;
 }
 
 const PreviewContext = createContext<PreviewContextType | null>(null);
