@@ -784,68 +784,87 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
       // to rebundle every 500ms, which causes severe flickering and crashes.
       // Files are now only sent to Sandpack on task completion (onFilesReady).
 
-      await runBuildEngine(userText, engineConfig, {
-        onProgress: (progress: EngineProgress) => {
-          setBuildStep(progress.message);
+      // ─── COMPILER V1.0 PATH ───────────────────────────────────────
+      const compileOptions: CompileOptions = {
+        rawRequirements: userText,
+        existingWorkspace: safeExistingFiles || {},
+        projectId: buildProjectId,
+        techStack: currentProject.tech_stack || "react-cdn",
+        schemas: schemas.length > 0 ? schemas : undefined,
+        knowledge: knowledge.length > 0 ? knowledge : undefined,
+        designTheme: themeInfo?.prompt,
+        model: routedModel,
+      };
 
-          if (progress.plan) setCurrentPlan(progress.plan);
-          if (progress.totalTasks !== undefined) setTotalPlanTasks(progress.totalTasks);
-          if (progress.taskIndex !== undefined) setCurrentTaskIndex(progress.taskIndex);
+      const compileCallbacks: CompileCallbacks = {
+        onPhase: (phase, detail) => {
+          setBuildStep(detail);
+          if (phase === "planning") setPipelineStep("planning");
+          else if (phase === "executing") setPipelineStep("generating");
+          else if (phase === "verifying") setPipelineStep("validating");
+          else if (phase === "repairing") setPipelineStep("retrying");
+          else if (phase === "complete") setPipelineStep("complete");
+        },
+        onTaskStart: (task, index, total) => {
+          setCurrentTaskIndex(index);
+          setTotalPlanTasks(total);
+          setBuildStep(`🔨 Task ${index + 1}/${total}: ${task.label}`);
 
-          if (progress.phase === "planning" && progress.plan) {
-            const planSummary = `📋 **Build Plan** (${progress.plan.overallComplexity})\n${progress.plan.summary}\n\n${progress.plan.tasks.map((t: any, i: number) => `⏳ ${i + 1}. ${t.title}`).join("\n")}`;
-            setMessages((prev) => {
-              const last = prev[prev.length - 1];
-              if (last?.role === "assistant") {
-                return prev.map((m, i) => (i === prev.length - 1 ? { ...m, content: planSummary } : m));
-              }
-              return [...prev, { role: "assistant", content: planSummary, timestamp: Date.now() }];
-            });
-          } else if (progress.phase === "executing" && progress.plan) {
-            const progressMsg = `📋 **Building** (${progress.plan.overallComplexity})\n${progress.plan.summary}\n\n${progress.plan.tasks.map((t: any, i: number) => {
-              const idx = progress.taskIndex ?? 0;
-              const status = i < idx ? "✅" : i === idx ? "🔨" : "⏳";
-              return `${status} ${i + 1}. ${t.title}`;
-            }).join("\n")}`;
-            setMessages((prev) => {
-              const last = prev[prev.length - 1];
-              if (last?.role === "assistant") {
-                return prev.map((m, i) => (i === prev.length - 1 ? { ...m, content: progressMsg } : m));
-              }
-              return prev;
-            });
-          }
-        },
-        onDelta: (chunk) => {
-          setBuildStreamContent(prev => prev + chunk);
-        },
-        onFilesReady: (files, deps) => {
-          if (lastProjectIdRef.current !== buildProjectId) {
-            console.warn(`[BuildOrch] ⛔ Blocked cross-project file injection: build=${buildProjectId}, current=${lastProjectIdRef.current}`);
-            return;
-          }
-          setSandpackFiles(files);
-          syncSandpackToVirtualFS(files);
-          if (Object.keys(deps).length > 0) setSandpackDeps(deps);
-          setPreviewMode("sandpack");
-
-          if (Object.keys(files).length > 0) {
-            const payload = { files, deps: deps || {} };
-            supabase
-              .from("project_data")
-              .upsert(
-                { project_id: buildProjectId, collection: "sandpack_state", data: payload as any },
-                { onConflict: "project_id,collection" }
-              )
-              .then(({ error }) => {
-                if (error) console.warn("[BuildOrch] Incremental persist failed:", error);
-              });
-          }
-        },
-        onComplete: (result) => {
+          const progressMsg = `📋 **Building** (${total} tasks)\n\n${Array.from({ length: total }, (_, i) => {
+            const status = i < index ? "✅" : i === index ? "🔨" : "⏳";
+            return `${status} ${i + 1}. Task ${i + 1}`;
+          }).join("\n")}`;
           setMessages((prev) => {
             const last = prev[prev.length - 1];
-            const msg = result.chatText;
+            if (last?.role === "assistant") {
+              return prev.map((m, i) => (i === prev.length - 1 ? { ...m, content: progressMsg } : m));
+            }
+            return [...prev, { role: "assistant", content: progressMsg, timestamp: Date.now() }];
+          });
+        },
+        onTaskDelta: (task, chunk) => {
+          setBuildStreamContent(prev => prev + chunk);
+        },
+        onTaskDone: (task, files) => {
+          if (lastProjectIdRef.current !== buildProjectId) {
+            console.warn(`[Compiler] ⛔ Blocked cross-project file injection`);
+            return;
+          }
+          // Update preview with accumulated files on each task completion
+          if (Object.keys(files).length > 0) {
+            const currentFiles = sandpackFilesRef.current || {};
+            const mergedFiles = { ...currentFiles, ...files };
+            setSandpackFiles(mergedFiles);
+            syncSandpackToVirtualFS(mergedFiles);
+            setPreviewMode("sandpack");
+          }
+        },
+        onTaskError: (task, error) => {
+          console.error(`[Compiler] Task '${task.label}' failed:`, error);
+        },
+        onVerification: (result) => {
+          if (result.ok) {
+            setBuildStep("✅ All checks passed");
+          } else {
+            const errorCount = result.issues.filter(i => i.severity === "error").length;
+            setBuildStep(`⚠️ ${errorCount} issues found, repairing...`);
+          }
+        },
+        onRepairStart: (round, actionCount) => {
+          setBuildStep(`🔧 Auto-repair round ${round}: fixing ${actionCount} issues...`);
+        },
+        onComplete: (result: BuildResult) => {
+          // Set final files
+          setSandpackFiles(result.workspace);
+          syncSandpackToVirtualFS(result.workspace);
+          setPreviewMode("sandpack");
+
+          // Build completion message
+          const statusEmoji = result.status === "success" ? "✅" : result.status === "partial" ? "⚠️" : "❌";
+          const msg = `${statusEmoji} ${result.summary}${result.knownIssues.length > 0 ? `\n\n**Known issues:**\n${result.knownIssues.map(i => `- ${i}`).join("\n")}` : ""}${result.nextActions.length > 0 ? `\n\n**Next steps:**\n${result.nextActions.map(a => `- ${a}`).join("\n")}` : ""}`;
+
+          setMessages((prev) => {
+            const last = prev[prev.length - 1];
             if (last?.role === "assistant") {
               return prev.map((m, i) => (i === prev.length - 1 ? { ...m, content: msg } : m));
             }
@@ -857,20 +876,20 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
           setBuildStep("");
           setPipelineStep("complete");
           setCurrentAgent(null);
-          setCurrentPlan(result.plan || null);
           isSendingRef.current = false;
           setBuildRetryCount(0);
-          if (result.metrics) setBuildMetrics(result.metrics);
+          if (result.trace) setBuildMetrics(result.trace);
           setTimeout(() => setBuildStreamContent(""), 3000);
 
+          // Persist
           const persistMessages = messagesRef.current.map(m => ({
             role: m.role,
             content: typeof m.content === "string" ? m.content : getTextContent(m.content),
           }));
           saveProject({ chat_history: persistMessages, html_content: currentProject.html_content || "" });
 
-          if (result.files && Object.keys(result.files).length > 0) {
-            const payload = { files: result.files, deps: result.deps || {} };
+          if (Object.keys(result.workspace).length > 0) {
+            const payload = { files: result.workspace, deps: {} };
             supabase
               .from("project_data")
               .upsert(
@@ -878,23 +897,19 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
                 { onConflict: "project_id,collection" }
               )
               .then(({ error }) => {
-                if (error) console.warn("[BuildOrch] Failed to persist sandpack state:", error);
-                else console.log("[BuildOrch] ✅ Sandpack state persisted");
+                if (error) console.warn("[Compiler] Failed to persist sandpack state:", error);
+                else console.log("[Compiler] ✅ Sandpack state persisted");
               });
 
-            // Server-side build pipeline — validate, store artifacts, generate preview URL
             triggerBuild(
               currentProject.id,
-              result.files,
-              result.deps || {},
+              result.workspace,
+              {},
               { model: selectedModel, theme: selectedTheme }
             ).then((buildResult) => {
-              console.log(`[BuildOrch] ✅ Server build ${buildResult.build_id}: ${buildResult.status} (${buildResult.duration_ms}ms)`);
-              if (buildResult.preview_url) {
-                console.log(`[BuildOrch] 🌐 Preview URL: ${buildResult.preview_url}`);
-              }
+              console.log(`[Compiler] ✅ Server build ${buildResult.build_id}: ${buildResult.status}`);
             }).catch((err) => {
-              console.warn("[BuildOrch] Server-side build failed (non-blocking):", err);
+              console.warn("[Compiler] Server-side build failed (non-blocking):", err);
             });
           }
 
@@ -908,10 +923,13 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
             });
           }
         },
-        onError: (err) => {
-          handleOnError(err);
-        },
-      });
+      };
+
+      try {
+        await compile(compileOptions, compileCallbacks);
+      } catch (err: any) {
+        handleOnError(err.message || "Compiler error");
+      }
     } catch (e) {
       console.error("[BuildOrch] sendMessage error:", e);
       setIsLoading(false);
