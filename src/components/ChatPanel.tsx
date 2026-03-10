@@ -1686,9 +1686,10 @@ ${Object.entries(files).map(([path, code]) => `--- ${path}\n${code}`).join("\n\n
               projectId: buildProjectId,
               techStack: currentProject.tech_stack || "react-cdn",
               schemas,
-              model: "google/gemini-3-flash-preview", // Use fastest model for polish
+              model: "google/gemini-3-flash-preview",
               designTheme: themeInfo?.prompt,
               templateContext: templateCtx || undefined,
+              irContext: irContext || undefined,
               onDelta: upsert,
               onDone: async (responseText) => {
                 // Parse and apply the polished files — but validate first
