@@ -80,24 +80,9 @@ export function useSelfHealing(config: SelfHealingConfig) {
     });
   }, [isHealing, healAttempts, previewErrors, sendMessage, sandpackFilesRef, isSendingRef, isLoadingRef]);
 
-  // Auto-trigger self-heal 4 seconds after build finishes if errors exist
-  useEffect(() => {
-    if (postBuildHealTimerRef.current) {
-      clearTimeout(postBuildHealTimerRef.current);
-      postBuildHealTimerRef.current = null;
-    }
-    if (!isBuildingValue && !isLoading && previewErrors.length > 0 && healAttempts < MAX_HEAL_ATTEMPTS && !isHealing) {
-      postBuildHealTimerRef.current = setTimeout(() => {
-        if (previewErrors.length > 0 && !isLoadingRef.current && !isSendingRef.current) {
-          console.log(`[SelfHeal] Auto-triggering heal: ${previewErrors.length} error(s) detected post-build`);
-          triggerSelfHeal();
-        }
-      }, 4000);
-    }
-    return () => {
-      if (postBuildHealTimerRef.current) clearTimeout(postBuildHealTimerRef.current);
-    };
-  }, [isBuildingValue, isLoading, previewErrors.length, healAttempts, isHealing, triggerSelfHeal, isLoadingRef, isSendingRef]);
+  // Self-heal is now OPT-IN — no auto-trigger to save AI costs.
+  // Users click "Fix errors" button or the auto-fix button manually.
+  // Previously this auto-triggered after 4s, costing up to 3 extra AI calls per build.
 
   const handleAutoFix = useCallback(() => {
     setHealAttempts(0);
