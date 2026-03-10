@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useRef, useEffect } from "react";
 import { FolderOpen, Trash2, Copy, Star, Clock, Grid3X3, ChevronLeft, ChevronRight } from "lucide-react";
 import { Project, useProjects } from "@/contexts/ProjectContext";
 import { formatDistanceToNow } from "date-fns";
@@ -12,7 +12,7 @@ type FilterTab = "all" | "recent" | "starred";
 
 const ITEMS_PER_PAGE = 9;
 
-const CARD_GRADIENTS = [
+const FALLBACK_GRADIENTS = [
   "from-[hsl(var(--primary))] to-[hsl(var(--accent))]",
   "from-[hsl(265,89%,62%)] to-[hsl(300,80%,55%)]",
   "from-[hsl(142,71%,45%)] to-[hsl(170,80%,40%)]",
