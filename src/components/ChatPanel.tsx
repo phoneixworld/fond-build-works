@@ -401,7 +401,7 @@ const ChatPanel = forwardRef<ChatPanelHandle, { initialPrompt?: string; onVersio
               setSandpackFiles(state.files);
               syncSandpackToVirtualFS(state.files);
               if (state.deps) setSandpackDeps(state.deps);
-              setPreviewMode("sandpack");
+              setPreviewMode("esm");
             }
           }
         });
