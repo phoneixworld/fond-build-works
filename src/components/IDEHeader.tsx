@@ -1,5 +1,5 @@
-import { Zap, LogOut, ArrowLeft, ChevronDown, Settings, Pencil, ArrowLeftRight, Lock, User, CreditCard, HelpCircle, Globe, RefreshCw, ExternalLink, ChevronLeft, ChevronRight, Monitor, Tablet, Smartphone, FileText, Code2, MapPin } from "lucide-react";
-import { useState, useCallback, useRef, useMemo, useEffect } from "react";
+import { Zap, LogOut, ArrowLeft, ChevronDown, Settings, Pencil, ArrowLeftRight, Lock, User, CreditCard, HelpCircle } from "lucide-react";
+import { RefObject } from "react";
 import { TechStackId } from "@/lib/techStacks";
 import PresenceAvatars from "@/components/PresenceAvatars";
 import PublishExportButtons from "@/components/PublishExportButtons";
