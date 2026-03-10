@@ -733,7 +733,7 @@ async function runDirectBuild(
     ? buildFullCodeContext(config.existingFiles) 
     : buildFullCodeContext(getBaseTemplate(config.domainModel));
   
-  const result = await executeSingleTask(prompt, config, existingCode, callbacks.onDelta);
+  const result = await executeSingleTask(prompt, config, existingCode, callbacks.onDelta, 0, undefined, undefined, prompt);
   
   if (Object.keys(result.files).length === 0) {
     completeTask(taskMetrics, { fileCount: 0, totalFileSize: 0, modelLatencyMs: result.modelMs, validationLatencyMs: 0, mergeLatencyMs: 0, retryCount: 0, cached: result.cached, status: "failed" });
