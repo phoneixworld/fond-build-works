@@ -200,6 +200,7 @@ export async function compile(
     callbacks.onPhase("repairing", `Repair round ${repairRound}: ${actions.length} issues...`);
     trace.repairActions.push(...actions);
 
+    cloudLog.warn(`Repair round ${repairRound}: ${actions.length} actions`, "compiler");
     console.log(`[Compiler] Repair round ${repairRound}: ${actions.length} actions`);
 
     for (const action of actions) {
