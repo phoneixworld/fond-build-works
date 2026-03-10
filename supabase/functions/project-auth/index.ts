@@ -60,7 +60,7 @@ serve(async (req) => {
           throw error;
         }
         const tk = generateToken(user.id, project_id);
-        return new Response(JSON.stringify({ data: { user, token: tk } }), {
+        return new Response(JSON.stringify({ user, token: tk }), {
           status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
