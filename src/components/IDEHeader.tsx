@@ -1,4 +1,4 @@
-import { Zap, LogOut, ArrowLeft, ChevronDown, Command as CommandIcon, MessageCircle, Settings, Pencil, ArrowLeftRight, Lock, User, CreditCard, HelpCircle } from "lucide-react";
+import { Zap, LogOut, ArrowLeft, ChevronDown, Settings, Pencil, ArrowLeftRight, Lock, User, CreditCard, HelpCircle } from "lucide-react";
 import { forwardRef } from "react";
 import { TechStackId } from "@/lib/techStacks";
 import PresenceAvatars from "@/components/PresenceAvatars";
@@ -158,17 +158,6 @@ const IDEHeader = ({
 
       {/* Right: Presence + Actions + User menu */}
       <div className="flex items-center gap-1 shrink-0">
-        <PresenceAvatars onlineUsers={onlineUsers} currentUserEmail={userEmail} myColor={myColor} onToggleChat={onTeamChatToggle} />
-
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <button onClick={onTeamChatToggle} className="p-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors">
-              <MessageCircle className="w-3.5 h-3.5" />
-            </button>
-          </TooltipTrigger>
-          <TooltipContent side="bottom" className="text-xs">Team Chat</TooltipContent>
-        </Tooltip>
-
         {onSwapLayout && (
           <Tooltip>
             <TooltipTrigger asChild>
@@ -182,7 +171,7 @@ const IDEHeader = ({
           </Tooltip>
         )}
 
-        {/* Project Settings shortcut */}
+        {/* Project Settings */}
         <Tooltip>
           <TooltipTrigger asChild>
             <button onClick={onProjectSettingsClick} className="p-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors">
@@ -190,16 +179,6 @@ const IDEHeader = ({
             </button>
           </TooltipTrigger>
           <TooltipContent side="bottom" className="text-xs">Project Settings</TooltipContent>
-        </Tooltip>
-
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <button onClick={onCmdOpen} className="flex items-center gap-1 px-2 py-1 rounded-md text-[10px] text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors">
-              <CommandIcon className="w-3 h-3" />
-              <kbd className="font-mono">K</kbd>
-            </button>
-          </TooltipTrigger>
-          <TooltipContent side="bottom" className="text-xs">Command palette (⌘K)</TooltipContent>
         </Tooltip>
 
         <PublishExportButtons ref={publishRef} />
