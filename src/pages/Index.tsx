@@ -238,18 +238,18 @@ const IDELayout = () => {
           onRevert={handleRevert}
         />
 
-        <div className="flex-1 overflow-hidden group/resize">
+        <div className="flex-1 overflow-hidden group/resize p-1.5 pt-0">
           <style>{`.group\\/resize:has([data-resize-handle-active]) iframe { pointer-events: none !important; }`}</style>
-          <ResizablePanelGroup direction="horizontal">
+          <ResizablePanelGroup direction="horizontal" className="gap-1.5">
             {layoutSwapped ? (
               <>
-                <ResizablePanel defaultSize={50} minSize={10} className="!overflow-hidden">
+                <ResizablePanel defaultSize={50} minSize={10} className="!overflow-hidden rounded-lg border border-border">
                   <div className="h-full w-full overflow-hidden">
                     {renderPanel()}
                   </div>
                 </ResizablePanel>
                 <ResizableHandle />
-                <ResizablePanel defaultSize={50} minSize={10}>
+                <ResizablePanel defaultSize={50} minSize={10} className="rounded-lg border border-border overflow-hidden">
                   <ErrorBoundary fallbackTitle="Chat">
                     <ChatPanel ref={chatRef} initialPrompt={initialPrompt} onVersionCreated={handleVersionCreated} />
                   </ErrorBoundary>
@@ -257,13 +257,13 @@ const IDELayout = () => {
               </>
             ) : (
               <>
-                <ResizablePanel defaultSize={50} minSize={10}>
+                <ResizablePanel defaultSize={50} minSize={10} className="rounded-lg border border-border overflow-hidden">
                   <ErrorBoundary fallbackTitle="Chat">
                     <ChatPanel ref={chatRef} initialPrompt={initialPrompt} onVersionCreated={handleVersionCreated} />
                   </ErrorBoundary>
                 </ResizablePanel>
                 <ResizableHandle />
-                <ResizablePanel defaultSize={50} minSize={10} className="!overflow-hidden">
+                <ResizablePanel defaultSize={50} minSize={10} className="!overflow-hidden rounded-lg border border-border">
                   <div className="h-full w-full overflow-hidden">
                     {renderPanel()}
                   </div>
