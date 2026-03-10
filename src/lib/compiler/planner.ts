@@ -64,7 +64,7 @@ export function planTaskGraph(ctx: BuildContext): TaskGraph {
         `/hooks/use${entity.name}.jsx`,
         `/services/${entity.name.toLowerCase()}Service.js`,
       ],
-      dependsOn: authTaskId ? [infraTask.id, authTaskId] : [infraTask.id],
+      dependsOn: [infraTask.id, authTaskId],
       priority: 2,
     });
     tasks.push(modelTask);
