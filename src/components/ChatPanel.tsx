@@ -915,10 +915,10 @@ const CONTEXT_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
   // All 4 DB queries run in parallel (Promise.allSettled) and the result is
   // cached per project for CONTEXT_CACHE_TTL_MS so subsequent messages are
   // instant — no DB round-trips at send time.
-  const fetchProjectContext = useCallback(async (projectId: string): Promise<{ schemas: any[]; knowledge: string[] }> => {
+  const fetchProjectContext = useCallback(async (projectId: string): Promise<{ schemas: any[]; knowledge: string[]; irContext: string }> => {
     const cache = projectContextCacheRef.current;
     if (cache && cache.projectId === projectId && (Date.now() - cache.fetchedAt) < CONTEXT_CACHE_TTL_MS) {
-      return { schemas: cache.schemas, knowledge: cache.knowledge };
+      return { schemas: cache.schemas, knowledge: cache.knowledge, irContext: cache.irContext };
     }
 
     const [schemasRes, knowledgeRes, decisionsRes, governanceRes, irRes] = await Promise.allSettled([
