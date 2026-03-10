@@ -98,6 +98,27 @@ const ChatPanel = forwardRef<ChatPanelHandle, { initialPrompt?: string; onVersio
   // Undo/Redo system
   const { createCheckpoint, undo, redo, canUndo, canRedo } = useUndoRedo();
 
+  // ─── Extracted Hooks ─────────────────────────────────────────────────────
+  // Project context cache (schemas, knowledge, IR state)
+  const { fetchProjectContext, invalidateCache: invalidateContextCache } = useProjectContextCache(currentProject?.id);
+
+  // Intent classification (fast local + server, follow-up questions)
+  const {
+    followUpQuestions, setFollowUpQuestions,
+    followUpAnswers, setFollowUpAnswers,
+    pendingFollowUpPrompt, setPendingFollowUpPrompt,
+    analysisResult, setAnalysisResult,
+    isAnalyzing, setIsAnalyzing,
+    classifyUserIntent, fastClassifyLocal,
+    resetClassificationState,
+  } = useIntentClassification(
+    currentSandpackFiles,
+    currentPreviewHtml || "",
+    messages.length,
+    setPipelineStep,
+  );
+
+
   // Listen for refactor actions from CodeEditor
   useEffect(() => {
     const handler = (e: Event) => {
