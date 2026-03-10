@@ -189,8 +189,16 @@ export default function App() {
     <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", background: "linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #0f172a 100%)", fontFamily: "'Inter', system-ui, sans-serif" }}>
       <div style={{ textAlign: "center", maxWidth: 420, padding: "0 24px" }}>
         <div style={{ position: "relative", width: 80, height: 80, margin: "0 auto 32px" }}>
-          <div style={{ width: 80, height: 80, borderRadius: 22, background: "linear-gradient(135deg, #4f46e5, #7c3aed)", boxShadow: "0 0 40px rgba(99,102,241,0.4)", display: "flex", alignItems: "center", justifyContent: "center", animation: "pulse 2s ease-in-out infinite" }}>
-            <span style={{ fontSize: 36, fontWeight: 800, color: "#fff", letterSpacing: "-0.03em" }}>P</span>
+          <div style={{ width: 80, height: 80, borderRadius: 22, background: "linear-gradient(135deg, #4f46e5, #7c3aed)", boxShadow: "0 0 40px rgba(99,102,241,0.4)", display: "flex", alignItems: "center", justifyContent: "center", animation: "pulse 2s ease-in-out infinite", overflow: "hidden" }}>
+            <svg viewBox="0 0 200 200" width="56" height="56" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <defs>
+                <linearGradient id="birdGrad" x1="60" y1="20" x2="140" y2="180" gradientUnits="userSpaceOnUse">
+                  <stop offset="0%" stopColor="#38bdf8"/>
+                  <stop offset="100%" stopColor="#a855f7"/>
+                </linearGradient>
+              </defs>
+              <path d="M120 25c-8 0-18 6-22 14-6 12-4 28 4 38l-12 16c-20-8-38 2-46 18-8 16-4 38 10 50 14 12 34 16 50 8l8-4c4 6 10 12 18 14 10 2 20-2 26-10 8-12 6-28-2-38l4-8c12 4 26 0 34-10 10-14 8-34-4-46-10-10-24-14-36-10l-6-14c8-6 12-16 8-26-4-10-16-16-26-16l-8 8zm-14 60c6 0 12 4 14 10 2 8-2 16-10 18-8 2-16-2-18-10-2-8 2-16 10-18h4z" fill="url(#birdGrad)"/>
+            </svg>
           </div>
           <div style={{ position: "absolute", inset: -5, borderRadius: 27, border: "2px solid rgba(99,102,241,0.25)", animation: "spin 8s linear infinite" }} />
         </div>
