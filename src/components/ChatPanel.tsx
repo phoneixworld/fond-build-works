@@ -49,8 +49,6 @@ type Msg = { role: "user" | "assistant"; content: MsgContent; timestamp?: number
 
 const MAX_IMAGE_SIZE = 4 * 1024 * 1024;
 
-const MAX_IMAGE_SIZE = 4 * 1024 * 1024;
-
 export interface ChatPanelHandle {
   clearChat: () => void;
   sendMessage: (text: string) => void;
