@@ -20,6 +20,7 @@ import { runBuildEngine, type EngineConfig, type EngineProgress } from "@/lib/bu
 import { matchTemplate, type PageTemplate } from "@/lib/pageTemplates";
 import { getSnippetsPromptContext } from "@/lib/componentSnippets";
 import { DESIGN_THEMES, type AIModelId } from "@/lib/aiModels";
+import { clientRouteModel } from "@/lib/costRouter";
 import { supabase } from "@/integrations/supabase/client";
 import { toExportPath } from "@/lib/pathNormalizer";
 import { StreamingPreviewController } from "@/lib/streamingPreview";
