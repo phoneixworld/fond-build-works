@@ -775,8 +775,48 @@ Deno.serve(async (req) => {
         .eq("project_id", projectId)
         .order("phase_number", { ascending: true });
 
+      // If no formal phased requirements, extract from chat history
       if (!allReqs || allReqs.length === 0) {
-        return json({ error: "No requirements to compile", context: "", buildReadiness: { isReady: false, score: 0 } }, 400);
+        const { data: project } = await supabase
+          .from("projects")
+          .select("chat_history, name")
+          .eq("id", projectId)
+          .single();
+
+        const chatHistory = (project?.chat_history || []) as Array<{ role: string; content: string }>;
+        
+        // Extract meaningful messages (skip short "go ahead" type messages)
+        const substantiveMessages = chatHistory.filter(
+          (m: any) => m.content && m.content.length > 30
+        );
+
+        if (substantiveMessages.length === 0) {
+          return json({ error: "No requirements to compile", context: "", buildReadiness: { isReady: false, score: 0 } }, 400);
+        }
+
+        // Build context from chat history
+        let chatContext = `# APPLICATION REQUIREMENTS (extracted from conversation)\n\n`;
+        chatContext += `## Project: ${project?.name || "Untitled"}\n\n`;
+        chatContext += `## CONVERSATION CONTEXT\n\n`;
+        for (const msg of substantiveMessages) {
+          chatContext += `**${msg.role === "user" ? "User" : "Assistant"}:**\n${msg.content}\n\n`;
+        }
+        chatContext += `\n## BUILD INSTRUCTION\n`;
+        chatContext += `Build the COMPLETE application based on the conversation above.\n`;
+        chatContext += `Implement every feature, page, and module discussed. Do NOT simplify or skip features.\n`;
+
+        // Transition to building
+        await transitionState(supabase, projectId, "building", {}, userId, "Build from chat context (no formal requirements)");
+
+        return json({
+          context: chatContext,
+          structuredContext: { ir: null, mergedRequirements: null, readiness: { score: 60, isReady: true }, phaseCount: 0 },
+          compiledIR: null,
+          mergedNormalized: null,
+          buildReadiness: { isReady: true, score: 60, checks: [], recommendation: "Building from conversation context" },
+          requirementCount: 0,
+          source: "chat_history",
+        });
       }
 
       // Merge all normalized requirements (for readiness check only)
