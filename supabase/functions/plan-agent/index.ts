@@ -148,10 +148,31 @@ Use the create_plan tool to return your structured plan.`;
     const toolCall = data.choices?.[0]?.message?.tool_calls?.[0];
 
     if (toolCall?.function?.arguments) {
-      const plan = JSON.parse(toolCall.function.arguments);
+      let planJson = toolCall.function.arguments;
+      let plan;
+      try {
+        plan = JSON.parse(planJson);
+      } catch {
+        // Attempt JSON repair for truncated output
+        console.warn("[plan-agent] JSON truncated, attempting repair...");
+        planJson = repairTruncatedJson(planJson);
+        plan = JSON.parse(planJson);
+      }
       return new Response(JSON.stringify(plan), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
+    }
+
+    // Fallback: check if content has JSON directly
+    const content = data.choices?.[0]?.message?.content;
+    if (content) {
+      const jsonMatch = content.match(/\{[\s\S]*\}/);
+      if (jsonMatch) {
+        const plan = JSON.parse(jsonMatch[0]);
+        return new Response(JSON.stringify(plan), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
     }
 
     throw new Error("No plan generated");
