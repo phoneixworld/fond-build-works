@@ -263,6 +263,8 @@ export async function compile(
     status = "failed";
   }
 
+  cloudLog.info(`Build ${status}: ${doneTasks}/${totalTasks} tasks, ${workspace.fileCount()} files`, "compiler");
+
   // Build summary
   const summary = [
     `Build ${status}: ${doneTasks}/${totalTasks} tasks completed`,
