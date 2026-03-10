@@ -341,7 +341,8 @@ async function executeSingleTask(
   onDelta: (chunk: string) => void,
   retryCount = 0,
   maxTokens?: number,
-  taskType?: string
+  taskType?: string,
+  originalUserPrompt?: string
 ): Promise<{ files: Record<string, string>; deps: Record<string, string>; chatText: string; modelMs: number; cached: boolean }> {
   const cacheKey = getTaskCacheKey(prompt, accumulatedCode);
   const cached = getCachedTaskOutput(cacheKey);
