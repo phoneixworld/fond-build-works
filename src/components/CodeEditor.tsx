@@ -47,7 +47,7 @@ const CodeEditor = () => {
   const [copied, setCopied] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
-  const [editing, setEditing] = useState(false);
+  const [editing, setEditing] = useState(true);
   const [editContent, setEditContent] = useState("");
   const [dirty, setDirty] = useState(false);
   const [viewMode, setViewMode] = useState<"all" | "frontend" | "backend">("all");
