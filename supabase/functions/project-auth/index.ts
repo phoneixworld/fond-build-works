@@ -38,7 +38,7 @@ serve(async (req) => {
 
   try {
     const body = await req.json();
-    const { project_id, action, email, password, display_name, token } = body;
+    const { project_id, action, email, password, display_name, name, token } = body;
 
     if (!project_id || !action) {
       return new Response(JSON.stringify({ error: "project_id and action are required" }), {
@@ -52,7 +52,7 @@ serve(async (req) => {
         const hash = await hashPassword(password);
         const { data: user, error } = await supabase
           .from("project_users")
-          .insert({ project_id, email: email.toLowerCase(), password_hash: hash, display_name: display_name || email.split("@")[0] })
+          .insert({ project_id, email: email.toLowerCase(), password_hash: hash, display_name: display_name || name || email.split("@")[0] })
           .select("id, email, display_name, created_at")
           .single();
         if (error) {
@@ -60,7 +60,7 @@ serve(async (req) => {
           throw error;
         }
         const tk = generateToken(user.id, project_id);
-        return new Response(JSON.stringify({ data: { user, token: tk } }), {
+        return new Response(JSON.stringify({ user, token: tk }), {
           status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
@@ -77,7 +77,7 @@ serve(async (req) => {
           .single();
         if (error || !user) throw new Error("Invalid email or password");
         const tk = generateToken(user.id, project_id);
-        return new Response(JSON.stringify({ data: { user, token: tk } }), {
+        return new Response(JSON.stringify({ user, token: tk }), {
           status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
@@ -104,7 +104,7 @@ serve(async (req) => {
             status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
           });
         }
-        return new Response(JSON.stringify({ data: { user } }), {
+        return new Response(JSON.stringify({ user }), {
           status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
