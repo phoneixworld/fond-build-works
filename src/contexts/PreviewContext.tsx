@@ -91,6 +91,8 @@ export const PreviewProvider = ({ children }: { children: ReactNode }) => {
     });
   }, []);
 
+  const triggerRefresh = useCallback(() => setRefreshKey(k => k + 1), []);
+
   const contextValue = useMemo(() => ({
     previewHtml, setPreviewHtml,
     sandpackFiles, setSandpackFiles,
@@ -100,9 +102,13 @@ export const PreviewProvider = ({ children }: { children: ReactNode }) => {
     previewMode, setPreviewMode,
     buildMetrics, setBuildMetrics,
     snapshots, saveSnapshot, restoreSnapshot,
+    viewport, setViewport,
+    refreshKey, triggerRefresh,
+    currentPath, setCurrentPath,
   }), [
     previewHtml, sandpackFiles, sandpackDeps, isBuilding, buildStep,
     previewMode, buildMetrics, snapshots, saveSnapshot, restoreSnapshot,
+    viewport, refreshKey, triggerRefresh, currentPath,
   ]);
 
   return (
