@@ -301,66 +301,7 @@ const CONTEXT_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
     window.addEventListener("message", handler);
     return () => window.removeEventListener("message", handler);
   }, []);
-
-  // ─── Self-Healing: Auto-fix runtime errors after build completes ──────────
-  // Triggers 4s after build finishes IF preview errors are detected.
-  // Guards: max 3 attempts, never during loading/healing, debounced to avoid loops.
-  const postBuildHealTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  const triggerSelfHeal = useCallback(() => {
-    if (isLoadingRef.current || isHealing || isSendingRef.current || healAttempts >= MAX_HEAL_ATTEMPTS || previewErrors.length === 0) return;
-    setIsHealing(true);
-    setHealAttempts(prev => prev + 1);
-    const attempt = healAttempts + 1;
-    setHealingStatus(`Self-healing attempt ${attempt}/${MAX_HEAL_ATTEMPTS}...`);
-    const errorSummary = previewErrors.slice(0, 5).join("\n"); // limit to 5 most recent
-    const currentFiles = sandpackFilesRef.current;
-    // Include relevant file snippets for context
-    let fileContext = "";
-    if (currentFiles) {
-      const errorFiles = new Set<string>();
-      for (const err of previewErrors) {
-        const match = err.match(/\/([\w/.-]+\.\w+)/);
-        if (match) errorFiles.add(`/${match[1]}`);
-      }
-      // Always include App.jsx
-      errorFiles.add("/App.jsx");
-      for (const filePath of errorFiles) {
-        const code = currentFiles[filePath];
-        if (code) {
-          fileContext += `\n--- ${filePath} (current) ---\n${code.slice(0, 2000)}\n`;
-        }
-      }
-    }
-    const healPrompt = `🔧 AUTO-FIX (attempt ${attempt}/${MAX_HEAL_ATTEMPTS}): The preview detected these runtime errors:\n${errorSummary}\n${fileContext ? `\nRelevant current code:${fileContext}` : ""}\n\nFix ALL these errors. Output the COMPLETE corrected files. Do not skip any file that needs changes.`;
-    setPreviewErrors([]);
-    sendMessage(healPrompt).finally(() => {
-      setIsHealing(false);
-      setHealingStatus("");
-    });
-  }, [isHealing, healAttempts, previewErrors]);
-
-  // Auto-trigger self-heal 4 seconds after build finishes if errors exist
-  useEffect(() => {
-    // Clear any pending timer
-    if (postBuildHealTimerRef.current) {
-      clearTimeout(postBuildHealTimerRef.current);
-      postBuildHealTimerRef.current = null;
-    }
-    // When build just finished (isBuilding went false) and errors are present
-    if (!isBuildingValue && !isLoading && previewErrors.length > 0 && healAttempts < MAX_HEAL_ATTEMPTS && !isHealing) {
-      postBuildHealTimerRef.current = setTimeout(() => {
-        // Re-check conditions before firing (state may have changed)
-        if (previewErrors.length > 0 && !isLoadingRef.current && !isSendingRef.current) {
-          console.log(`[SelfHeal] Auto-triggering heal: ${previewErrors.length} error(s) detected post-build`);
-          triggerSelfHeal();
-        }
-      }, 4000); // 4 second debounce — gives Sandpack time to settle
-    }
-    return () => {
-      if (postBuildHealTimerRef.current) clearTimeout(postBuildHealTimerRef.current);
-    };
-  }, [isBuildingValue, isLoading, previewErrors.length, healAttempts, isHealing]);
+   // Self-healing is now handled by useSelfHealing hook
 
   // Classify intent using the dedicated classifier agent
   const classifyUserIntent = useCallback(async (prompt: string): Promise<{ intent: AgentIntent; questions?: any[] } | null> => {
