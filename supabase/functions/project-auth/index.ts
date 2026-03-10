@@ -52,7 +52,7 @@ serve(async (req) => {
         const hash = await hashPassword(password);
         const { data: user, error } = await supabase
           .from("project_users")
-          .insert({ project_id, email: email.toLowerCase(), password_hash: hash, display_name: display_name || email.split("@")[0] })
+          .insert({ project_id, email: email.toLowerCase(), password_hash: hash, display_name: display_name || name || email.split("@")[0] })
           .select("id, email, display_name, created_at")
           .single();
         if (error) {
