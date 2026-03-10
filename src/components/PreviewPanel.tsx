@@ -63,7 +63,7 @@ const PreviewPanel = () => {
   const buildStepHistory = useBuildStepHistory(buildStep, isBuilding);
 
   const currentViewport = VIEWPORTS_MAP[viewport];
-  const hasContent = previewMode === "sandpack" ? !!sandpackFiles : !!previewHtml;
+  const hasContent = previewMode === "sandpack" || previewMode === "esm" ? !!sandpackFiles : !!previewHtml;
 
   // Listen for route changes from inside the Sandpack iframe
   useEffect(() => {
