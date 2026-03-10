@@ -165,17 +165,13 @@ function sanitizeImports(code: string, filePath: string): string {
     (match, pkg) => isAllowedPkg(pkg) ? match : `undefined /* BLOCKED: ${pkg} */`
   );
 
-  // Final safety: try to repair truncated code, fall back to stub if unrecoverable
-  const repaired = quickSyntaxCheckAndRepair(code);
-  if (repaired === null) {
-    console.warn(`[SandpackPreview] Unrecoverable syntax in ${filePath}, using safe stub`);
+  // Final safety: if code is obviously broken (truncated/malformed), replace with stub
+  if (!quickSyntaxCheck(code)) {
+    console.warn(`[SandpackPreview] Broken syntax detected in ${filePath}, using safe stub`);
     return makeSafeStub(filePath);
   }
-  if (repaired !== code) {
-    console.info(`[SandpackPreview] Auto-repaired truncated code in ${filePath}`);
-  }
 
-  return repaired;
+  return code;
 }
 
 const DEFAULT_APP = `import React from "react";
