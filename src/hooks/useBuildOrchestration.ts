@@ -83,7 +83,7 @@ export interface BuildOrchestrationConfig {
   // Conversation state machine
   conversationAnalyze?: (text: string, hasImages: boolean) => { action: "gather" | "build" | "chat" | "continue"; reason: string };
   conversationAddPhase?: (text: string, hasImages: boolean, imageUrls?: string[]) => any;
-  conversationGetRequirements?: () => string;
+  conversationGetRequirements?: () => Promise<string> | string;
   conversationStartBuilding?: () => void;
   conversationCompleteBuild?: (result: any) => void;
   conversationGenerateAck?: (phase: any) => string;
@@ -954,7 +954,7 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
 
       // ── GATHER: User is providing requirements ──
       if (convResult.action === "gather") {
-        const phase = conversationAddPhase?.(finalText, hasImages, images);
+        const phase = conversationAddPhase?.(finalText, hasImages, images); // 3rd arg = imageUrls
         const ackText = conversationGenerateAck?.(phase) || "✅ Got it! Send the next phase when ready, or say **\"build it\"** to start.";
 
         const content = buildMessageContent(finalText, images);
@@ -977,8 +977,14 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
         if (conversationMode === "gathering" || conversationMode === "ready") {
           console.log("[SmartSend] Building with accumulated requirements (server FSM approved)");
           conversationStartBuilding?.();
-          const requirements = conversationGetRequirements?.() || "";
+          
+          // Get server-compiled requirements (includes extracted image text)
+          const requirements = await Promise.resolve(conversationGetRequirements?.() || "");
           const buildPrompt = requirements + "\n\n" + finalText;
+          
+          // Route model based on FULL build prompt (not just "build it")
+          console.log(`[SmartSend] Build prompt length: ${buildPrompt.length} chars`);
+          
           setCurrentAgent("build");
           setPipelineStep("planning");
           sendMessage(buildPrompt, images);
