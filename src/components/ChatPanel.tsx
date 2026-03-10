@@ -1847,14 +1847,11 @@ ${Object.entries(files).map(([path, code]) => `--- ${path}\n${code}`).join("\n\n
         let domainModel: any = undefined;
         
         // Priority 1: Derive domain model from IR (zero latency, no network)
-        if (irContext) {
+        if (irContext && currentProject?.ir_state) {
           try {
             const { irToDomainModel } = await import("@/lib/irToDomain");
             const { hasIRContent } = await import("@/lib/irSerializer");
-            const irState = (irRes.status === "fulfilled" && irRes.value.data)
-              ? (irRes.value.data as any).ir_state
-              : null;
-            
+            const irState = currentProject.ir_state as any;
             if (irState && hasIRContent(irState)) {
               const irDerived = irToDomainModel(irState);
               if (irDerived && irDerived.entities.length > 0) {
