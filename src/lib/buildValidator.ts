@@ -181,7 +181,6 @@ export function autoCreateStubFiles(
       "/components/ui/DataTable.jsx", "/components/ui/DataTable.js",
     ];
     if (sharedUIFiles.some(f => filePath === f || filePath.endsWith(f))) {
-      // Restore the real Toast/Spinner/DataTable from scaffold templates
       const sharedUI = getSharedUIComponents();
       const matchingKey = Object.keys(sharedUI).find(k => filePath.endsWith(k.replace(/^\//, "")) || filePath === k);
       if (matchingKey && sharedUI[matchingKey]) {
@@ -189,6 +188,19 @@ export function autoCreateStubFiles(
         console.log("[BuildValidator] Restored shared UI component from scaffold: " + filePath);
         continue;
       }
+    }
+
+    // CRITICAL: Never stub context files — a generic stub named "AuthContext"
+    // collides with the `const AuthContext = createContext(...)` declaration,
+    // causing "Identifier has already been declared" errors.
+    const contextFiles = [
+      "/contexts/AuthContext.jsx", "/contexts/AuthContext.js",
+      "/contexts/CartContext.jsx", "/contexts/CartContext.js",
+      "/contexts/ThemeContext.jsx", "/contexts/ThemeContext.js",
+    ];
+    if (contextFiles.some(f => filePath === f || filePath.endsWith(f))) {
+      console.log("[BuildValidator] Skipped stub for context file (would cause naming collision): " + filePath);
+      continue;
     }
 
     if (/^[A-Z]/.test(componentName)) {
