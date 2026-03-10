@@ -219,35 +219,10 @@ const LandingPage = ({ onStartProject, onOpenProject }: LandingPageProps) => {
               )}
             </motion.div>
 
-            {/* Mobile-only recent projects (below hero) */}
-            {hasProjects && (
-              <motion.div
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.4, delay: 0.3 }}
-                className="w-full max-w-2xl mt-14 md:hidden"
-              >
-                <h2 className="text-sm font-semibold text-muted-foreground mb-3">Recent Projects</h2>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                  {projects.slice(0, 4).map((project) => {
-                    const stackInfo = TECH_STACKS.find(s => s.id === project.tech_stack);
-                    const StackIcon = stackInfo?.icon || FolderOpen;
-                    return (
-                      <div key={project.id} onClick={() => onOpenProject(project.id)} className="group flex items-center gap-3 p-3 rounded-xl border border-border hover:border-[hsl(var(--primary)/0.3)] hover:bg-secondary/50 cursor-pointer transition-all">
-                        <div className="w-8 h-8 rounded-lg bg-secondary flex items-center justify-center shrink-0">
-                          <StackIcon className="w-4 h-4 text-muted-foreground" />
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm font-medium text-foreground truncate">{project.name}</p>
-                          <p className="text-xs text-muted-foreground">{formatDistanceToNow(new Date(project.updated_at), { addSuffix: true })}</p>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </motion.div>
-            )}
           </section>
+
+          {/* ─── PROJECT GALLERY ─── */}
+          {hasProjects && <ProjectGallery onOpenProject={onOpenProject} />}
 
           {/* ─── WHAT NO ONE ELSE OFFERS ─── */}
           <section className="px-6 py-20 relative overflow-hidden">
