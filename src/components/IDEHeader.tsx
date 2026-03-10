@@ -21,7 +21,7 @@ import {
 import { LucideIcon } from "lucide-react";
 import { RefObject } from "react";
 
-export type PanelId = "code" | "preview" | "cloud";
+export type PanelId = "code" | "preview" | "cloud" | "marketing";
 
 const VIEWPORTS = [
   { id: "desktop" as const, label: "Desktop", icon: Monitor },
@@ -33,6 +33,7 @@ interface TabDef {
   id: PanelId;
   label: string;
   icon: LucideIcon;
+  iconOnly?: boolean;
 }
 
 interface IDEHeaderProps {

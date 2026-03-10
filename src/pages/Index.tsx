@@ -164,6 +164,7 @@ const IDELayout = () => {
       if (rightPanel === "preview") return <PreviewPanel />;
       if (rightPanel === "code") return <CodeEditor />;
       if (rightPanel === "cloud") return <CloudPanel />;
+      if (rightPanel === "marketing") return <BrandKitGenerator />;
       return <PreviewPanel />;
     })();
 
