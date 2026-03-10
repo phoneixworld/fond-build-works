@@ -6,6 +6,8 @@ import {
 } from "@/components/ui/resizable";
 import { Code, Eye, Cloud, Clock, Brain, Activity, Users, Palette, FlaskConical, Puzzle, Tag, GitBranch, Globe, ListChecks, Shield, Search, Layers } from "lucide-react";
 import { forwardRef, lazy, Suspense } from "react";
+import { usePanelLocking } from "@/hooks/usePanelLocking";
+import PanelLockOverlay from "@/components/PanelLockOverlay";
 import ErrorBoundary from "@/components/ErrorBoundary";
 import { PreviewProvider } from "@/contexts/PreviewContext";
 import { VirtualFSProvider } from "@/contexts/VirtualFSContext";
@@ -106,6 +108,7 @@ const IDELayout = () => {
   const chatRef = useRef<{ clearChat: () => void; sendMessage: (text: string) => void } | null>(null);
   const { toast } = useToast();
   const { onlineUsers, setTyping, myColor } = useRealtimePresence(rightPanel);
+  const { isLocked, getLockOwner } = usePanelLocking(onlineUsers);
 
   // Derive IDE mode from whether a project is selected
   const inIDE = !!currentProject;
@@ -203,9 +206,14 @@ const IDELayout = () => {
       return Component ? <Component /> : <PreviewPanel />;
     })();
 
+    const lockOwner = getLockOwner(rightPanel);
+
     return (
       <ErrorBoundary fallbackTitle={rightPanel.charAt(0).toUpperCase() + rightPanel.slice(1)}>
-        {panel}
+        <div className="relative h-full w-full">
+          {panel}
+          {lockOwner && <PanelLockOverlay lock={lockOwner} />}
+        </div>
       </ErrorBoundary>
     );
   };
@@ -262,6 +270,8 @@ const IDELayout = () => {
           myColor={myColor}
           layoutSwapped={layoutSwapped}
           onSwapLayout={() => setLayoutSwapped(prev => !prev)}
+          isLocked={isLocked}
+          getLockOwner={getLockOwner}
         />
 
         <div className="flex-1 overflow-hidden">
