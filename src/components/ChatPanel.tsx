@@ -1727,11 +1727,7 @@ ${Object.entries(files).map(([path, code]) => `--- ${path}\n${code}`).join("\n\n
     e.target.style.height = Math.min(e.target.scrollHeight, 160) + "px";
   };
 
-  const handleAutoFix = () => {
-    setHealAttempts(0);
-    const errorSummary = previewErrors.join("\n");
-    sendMessage(`The app preview has these errors, please fix them:\n${errorSummary}`);
-  };
+  // handleAutoFix is now provided by useSelfHealing hook
 
   const handleSendClick = () => {
     if (input.trim() || attachedImages.length > 0) {
