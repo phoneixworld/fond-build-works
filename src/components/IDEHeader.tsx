@@ -21,7 +21,7 @@ import {
 import { LucideIcon } from "lucide-react";
 import { RefObject } from "react";
 
-export type PanelId = "code" | "preview" | "cloud";
+export type PanelId = "code" | "preview" | "cloud" | "marketing";
 
 const VIEWPORTS = [
   { id: "desktop" as const, label: "Desktop", icon: Monitor },
@@ -33,6 +33,7 @@ interface TabDef {
   id: PanelId;
   label: string;
   icon: LucideIcon;
+  iconOnly?: boolean;
 }
 
 interface IDEHeaderProps {
@@ -210,7 +211,7 @@ const IDEHeader = ({
                 <TooltipTrigger asChild>
                   <button
                     onClick={() => setRightPanel(tab.id)}
-                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-[11px] font-medium transition-all relative ${
+                    className={`flex items-center gap-1.5 ${tab.iconOnly ? 'px-2' : 'px-3'} py-1.5 rounded-md text-[11px] font-medium transition-all relative ${
                       isActive
                         ? "bg-background text-foreground shadow-sm ring-1 ring-border/50"
                         : locked
@@ -219,18 +220,20 @@ const IDEHeader = ({
                     }`}
                   >
                     <Icon className="w-3.5 h-3.5" />
-                    {tab.label}
+                    {!tab.iconOnly && tab.label}
                     {locked && lockOwner && (
                       <span className="w-2 h-2 rounded-full ring-1 ring-background absolute -top-0.5 -right-0.5" style={{ backgroundColor: lockOwner.color }} />
                     )}
                   </button>
                 </TooltipTrigger>
-                {locked && lockOwner && (
+                {locked && lockOwner ? (
                   <TooltipContent side="bottom" className="text-xs">
                     <Lock className="w-3 h-3 inline mr-1" />
                     {lockOwner.email.split("@")[0]} is editing
                   </TooltipContent>
-                )}
+                ) : tab.iconOnly ? (
+                  <TooltipContent side="bottom" className="text-xs">{tab.label}</TooltipContent>
+                ) : null}
               </Tooltip>
             );
           })}

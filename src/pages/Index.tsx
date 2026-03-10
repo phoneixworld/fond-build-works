@@ -4,7 +4,7 @@ import {
   ResizablePanel,
   ResizablePanelGroup,
 } from "@/components/ui/resizable";
-import { Code, Eye, Cloud } from "lucide-react";
+import { Code, Eye, Cloud, Palette } from "lucide-react";
 import { forwardRef } from "react";
 import { usePanelLocking } from "@/hooks/usePanelLocking";
 import PanelLockOverlay from "@/components/PanelLockOverlay";
@@ -17,6 +17,7 @@ import { useRealtimePresence } from "@/hooks/useRealtimePresence";
 import ChatPanel from "@/components/ChatPanel";
 import CodeEditor from "@/components/CodeEditor";
 import CloudPanel from "@/components/CloudPanel";
+import BrandKitGenerator from "@/components/BrandKitGenerator";
 import PreviewPanel from "@/components/PreviewPanel";
 import LandingPage from "@/components/LandingPage";
 import CommandPalette from "@/components/CommandPalette";
@@ -31,10 +32,11 @@ import { useToast } from "@/hooks/use-toast";
 import { AnimatePresence } from "framer-motion";
 import { TooltipProvider } from "@/components/ui/tooltip";
 
-const PRIMARY_TABS: { id: PanelId; label: string; icon: any }[] = [
+const PRIMARY_TABS: { id: PanelId; label: string; icon: any; iconOnly?: boolean }[] = [
   { id: "preview", label: "Preview", icon: Eye },
-  { id: "code", label: "Code", icon: Code },
-  { id: "cloud", label: "Cloud", icon: Cloud },
+  { id: "code", label: "Code", icon: Code, iconOnly: true },
+  { id: "cloud", label: "Cloud", icon: Cloud, iconOnly: true },
+  { id: "marketing", label: "Brand", icon: Palette, iconOnly: true },
 ];
 
 const IDELayout = () => {
@@ -163,6 +165,7 @@ const IDELayout = () => {
       if (rightPanel === "preview") return <PreviewPanel />;
       if (rightPanel === "code") return <CodeEditor />;
       if (rightPanel === "cloud") return <CloudPanel />;
+      if (rightPanel === "marketing") return <BrandKitGenerator />;
       return <PreviewPanel />;
     })();
 
