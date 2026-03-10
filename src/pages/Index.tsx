@@ -5,7 +5,8 @@ import {
   ResizablePanelGroup,
 } from "@/components/ui/resizable";
 import { Code, Eye, Cloud, Clock, Brain, Activity, Users, Palette, FlaskConical, Puzzle, Tag, GitBranch, Globe, ListChecks, Shield, Search, Layers } from "lucide-react";
-import { forwardRef } from "react";
+import { forwardRef, lazy, Suspense } from "react";
+import ErrorBoundary from "@/components/ErrorBoundary";
 import { PreviewProvider } from "@/contexts/PreviewContext";
 import { VirtualFSProvider } from "@/contexts/VirtualFSContext";
 import { ProjectProvider, useProjects } from "@/contexts/ProjectContext";
@@ -183,22 +184,30 @@ const IDELayout = () => {
   }
 
   const renderPanel = () => {
-    if (rightPanel === "preview") return <PreviewPanel />;
-    if (rightPanel === "history") {
-      return <VersionHistory versions={versions} onRevert={handleRevert} onClose={() => setRightPanel("preview")} />;
-    }
-    if (rightPanel === "planning") {
-      return (
-        <PlanningPanel
-          onExecuteTask={(prompt) => {
-            chatRef.current?.sendMessage(prompt);
-            setRightPanel("preview");
-          }}
-        />
-      );
-    }
-    const Component = PANEL_COMPONENTS[rightPanel];
-    return Component ? <Component /> : <PreviewPanel />;
+    const panel = (() => {
+      if (rightPanel === "preview") return <PreviewPanel />;
+      if (rightPanel === "history") {
+        return <VersionHistory versions={versions} onRevert={handleRevert} onClose={() => setRightPanel("preview")} />;
+      }
+      if (rightPanel === "planning") {
+        return (
+          <PlanningPanel
+            onExecuteTask={(prompt) => {
+              chatRef.current?.sendMessage(prompt);
+              setRightPanel("preview");
+            }}
+          />
+        );
+      }
+      const Component = PANEL_COMPONENTS[rightPanel];
+      return Component ? <Component /> : <PreviewPanel />;
+    })();
+
+    return (
+      <ErrorBoundary fallbackTitle={rightPanel.charAt(0).toUpperCase() + rightPanel.slice(1)}>
+        {panel}
+      </ErrorBoundary>
+    );
   };
 
   const nameParts = getNameParts();
@@ -266,13 +275,17 @@ const IDELayout = () => {
                 </ResizablePanel>
                 <ResizableHandle className="w-px bg-border hover:bg-primary transition-colors" />
                 <ResizablePanel defaultSize={50} minSize={30} maxSize={65}>
-                  <ChatPanel ref={chatRef} initialPrompt={initialPrompt} onVersionCreated={handleVersionCreated} />
+                  <ErrorBoundary fallbackTitle="Chat">
+                    <ChatPanel ref={chatRef} initialPrompt={initialPrompt} onVersionCreated={handleVersionCreated} />
+                  </ErrorBoundary>
                 </ResizablePanel>
               </>
             ) : (
               <>
                 <ResizablePanel defaultSize={50} minSize={30} maxSize={65}>
-                  <ChatPanel ref={chatRef} initialPrompt={initialPrompt} onVersionCreated={handleVersionCreated} />
+                  <ErrorBoundary fallbackTitle="Chat">
+                    <ChatPanel ref={chatRef} initialPrompt={initialPrompt} onVersionCreated={handleVersionCreated} />
+                  </ErrorBoundary>
                 </ResizablePanel>
                 <ResizableHandle className="w-px bg-border hover:bg-primary transition-colors" />
                 <ResizablePanel defaultSize={50} className="!overflow-hidden">

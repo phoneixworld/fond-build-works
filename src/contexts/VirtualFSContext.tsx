@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useCallback, ReactNode } from "react";
+import { createContext, useContext, useState, useCallback, useMemo, ReactNode } from "react";
 
 export interface VirtualFile {
   path: string;
@@ -116,7 +116,7 @@ export const VirtualFSProvider = ({ children }: { children: ReactNode }) => {
     });
   }, []);
 
-  const fileTree = buildTree(files);
+  const fileTree = useMemo(() => buildTree(files), [files]);
 
   return (
     <VirtualFSContext.Provider value={{ files, fileTree, setFiles, updateFile, addFile, removeFile, getFile, activeFile, setActiveFile }}>
