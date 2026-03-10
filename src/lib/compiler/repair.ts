@@ -72,6 +72,14 @@ function issueToRepairAction(
         prompt: buildFixExportPrompt(issue, workspace),
       };
 
+    case "invalid_import_syntax":
+      return {
+        type: "fix_import_syntax",
+        targetFile: issue.file,
+        issue,
+        prompt: buildFixImportSyntaxPrompt(issue, workspace),
+      };
+
     case "empty_stub":
       return {
         type: "remove_empty_stub",
