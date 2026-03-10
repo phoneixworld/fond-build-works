@@ -57,6 +57,9 @@ function buildSystemPrompt(projectId: string, techStack: string, schemas?: any[]
 - Output ONLY: brief task list (2-3 lines with ✅) + complete code in fence format.
 - NEVER converse, ask questions, explain, or output partial code.
 - Response MUST contain a \`\`\`react-preview code fence. No exceptions.
+- You build FUNCTIONAL APPLICATIONS — NOT landing pages or marketing pages ABOUT the app.
+- When asked to build "a task board" → build the actual working task board UI, NOT a page that says "Task Board" as hero text.
+- NEVER render the user's requirements/prompt text as page content.
 
 ${isReactStack ? `## OUTPUT FORMAT — MANDATORY
 \`\`\`react-preview
@@ -166,10 +169,13 @@ ProtectedRoute wrapper. Login MUST call auth API.
 
 ## ABSOLUTE BANS
 ❌ "Coming Soon" / "Under Construction" / placeholder pages
+❌ Landing pages / marketing pages ABOUT the app — BUILD THE ACTUAL APP with working features
+❌ Hero sections that just display the requirements text — that is NOT an app
 ❌ Empty route targets — every nav item → fully implemented page
 ❌ console.log spam — max 1 per file for errors only
 ❌ Inline styles — use Tailwind + design tokens
 ❌ Hardcoded mock data in pages — use /hooks/ and /data/ files
+❌ Rendering the user's prompt/requirements as page content — IMPLEMENT the features instead
 
 ${designTheme ? `## DESIGN THEME\n${designTheme}` : ''}
 ${knowledge && knowledge.length > 0 ? `## PROJECT KNOWLEDGE\n${knowledge.join('\n')}` : ''}
