@@ -67,6 +67,8 @@ const CloudPanel = () => {
     switch (activeSection) {
       case "overview":
         return <CloudOverview onNavigate={setActiveSection} />;
+      case "builds":
+        return <BuildPipeline />;
       case "database":
         return <SchemaBuilder />;
       case "email":
