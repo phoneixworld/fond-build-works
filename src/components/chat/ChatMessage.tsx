@@ -1,6 +1,6 @@
 import React, { useState } from "react";
-import { motion } from "framer-motion";
-import { Bot, ChevronDown, ChevronRight, CheckCircle2, Circle, Pencil, RotateCcw, Brain, Sparkles, Wrench, Copy, Check, Lightbulb, History, Bookmark, ArrowRight, ThumbsUp, ThumbsDown, MoreHorizontal } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
+import { Bot, ChevronDown, ChevronRight, CheckCircle2, Circle, Pencil, RotateCcw, Brain, Sparkles, Wrench, Copy, Check, Lightbulb, History, Bookmark, ArrowRight, ThumbsUp, ThumbsDown, MoreHorizontal, Code2, Eye, EyeOff } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import {
   Tooltip,
@@ -280,6 +280,145 @@ function stripContextMarkers(text: string): string {
   return text.replace(/\[CONTEXT:\s*[^\]]+\]\s*/gi, "").trim();
 }
 
+// --- Strip raw HTML/code from AI responses ---
+
+interface CodeExtraction {
+  cleanText: string;
+  codeBlocks: { language: string; code: string }[];
+  hadRawHtml: boolean;
+}
+
+function extractAndStripCode(text: string): CodeExtraction {
+  const codeBlocks: { language: string; code: string }[] = [];
+  let hadRawHtml = false;
+
+  // 1. Extract fenced code blocks (```lang ... ```)
+  let cleaned = text.replace(/```(\w*)\n([\s\S]*?)```/g, (_match, lang, code) => {
+    const trimmedCode = code.trim();
+    if (trimmedCode.length > 50) {
+      codeBlocks.push({ language: lang || "code", code: trimmedCode });
+      return ""; // Remove from visible text
+    }
+    // Keep short inline code snippets
+    return _match;
+  });
+
+  // 2. Detect and strip raw HTML documents (<!DOCTYPE, <html, full <head>/<body> blocks)
+  const htmlDocPattern = /<!DOCTYPE\s+html[\s\S]*?<\/html>/gi;
+  const htmlMatch = cleaned.match(htmlDocPattern);
+  if (htmlMatch) {
+    hadRawHtml = true;
+    htmlMatch.forEach(block => {
+      codeBlocks.push({ language: "html", code: block.trim() });
+    });
+    cleaned = cleaned.replace(htmlDocPattern, "");
+  }
+
+  // 3. Strip orphaned HTML tags that leaked (e.g. <script>, <style>, <div id="root">)
+  const leakedTagPatterns = [
+    /<script[\s\S]*?<\/script>/gi,
+    /<style[\s\S]*?<\/style>/gi,
+    /<link\s+[^>]*>/gi,
+    /<meta\s+[^>]*>/gi,
+  ];
+  for (const pattern of leakedTagPatterns) {
+    if (pattern.test(cleaned)) {
+      hadRawHtml = true;
+      cleaned = cleaned.replace(pattern, "");
+    }
+  }
+
+  // 4. Strip lines that are clearly CSS/JS artifacts (e.g. "✨ font-family: ...")
+  cleaned = cleaned.replace(/^✨\s*[\w\-]+[:=].*$/gm, "").trim();
+  // Strip lines like "💡 { font" or "✨ <meta" etc
+  cleaned = cleaned.replace(/^[✨💡]\s*[<{@].*$/gm, "").trim();
+
+  // 5. Clean up excessive blank lines
+  cleaned = cleaned.replace(/\n{4,}/g, "\n\n\n");
+
+  return { cleanText: cleaned.trim(), codeBlocks, hadRawHtml };
+}
+
+// --- Collapsible code block viewer ---
+
+const CollapsibleCodeView = ({ codeBlocks, hadRawHtml }: { codeBlocks: { language: string; code: string }[]; hadRawHtml: boolean }) => {
+  const [expanded, setExpanded] = useState(false);
+  const [copiedIdx, setCopiedIdx] = useState<number | null>(null);
+
+  if (codeBlocks.length === 0) return null;
+
+  const totalLines = codeBlocks.reduce((sum, b) => sum + b.code.split("\n").length, 0);
+
+  const handleCopy = (code: string, idx: number) => {
+    navigator.clipboard.writeText(code);
+    setCopiedIdx(idx);
+    setTimeout(() => setCopiedIdx(null), 2000);
+  };
+
+  return (
+    <div className="mt-3 rounded-xl border border-border/40 bg-card/40 overflow-hidden">
+      <button
+        onClick={() => setExpanded(!expanded)}
+        className="w-full flex items-center justify-between px-4 py-2.5 hover:bg-muted/10 transition-colors"
+      >
+        <div className="flex items-center gap-2">
+          <Code2 className="w-4 h-4 text-primary/60" />
+          <span className="text-xs font-medium text-foreground/70">
+            {hadRawHtml ? "Generated Code" : `${codeBlocks.length} code block${codeBlocks.length > 1 ? "s" : ""}`}
+          </span>
+          <span className="text-[10px] text-muted-foreground/50 bg-muted/20 px-1.5 py-0.5 rounded">
+            {totalLines} lines
+          </span>
+        </div>
+        <div className="flex items-center gap-1.5">
+          {expanded ? (
+            <EyeOff className="w-3.5 h-3.5 text-muted-foreground/40" />
+          ) : (
+            <Eye className="w-3.5 h-3.5 text-muted-foreground/40" />
+          )}
+          {expanded ? (
+            <ChevronDown className="w-3.5 h-3.5 text-muted-foreground/40" />
+          ) : (
+            <ChevronRight className="w-3.5 h-3.5 text-muted-foreground/40" />
+          )}
+        </div>
+      </button>
+
+      <AnimatePresence>
+        {expanded && (
+          <motion.div
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: "auto", opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.2 }}
+          >
+            <div className="border-t border-border/30 max-h-[400px] overflow-y-auto">
+              {codeBlocks.map((block, idx) => (
+                <div key={idx} className="relative group/code">
+                  {codeBlocks.length > 1 && (
+                    <div className="px-4 py-1.5 bg-muted/10 border-b border-border/20 flex items-center justify-between">
+                      <span className="text-[10px] font-mono text-muted-foreground/50 uppercase">{block.language}</span>
+                    </div>
+                  )}
+                  <pre className="px-4 py-3 text-xs font-[JetBrains_Mono] text-foreground/80 leading-relaxed overflow-x-auto whitespace-pre">
+                    {block.code}
+                  </pre>
+                  <button
+                    onClick={() => handleCopy(block.code, idx)}
+                    className="absolute top-2 right-2 p-1.5 rounded-lg bg-muted/30 text-muted-foreground/50 hover:text-foreground hover:bg-muted/50 opacity-0 group-hover/code:opacity-100 transition-all"
+                  >
+                    {copiedIdx === idx ? <Check className="w-3.5 h-3.5 text-[hsl(var(--ide-success))]" /> : <Copy className="w-3.5 h-3.5" />}
+                  </button>
+                </div>
+              ))}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+};
+
 const ContextBadges = ({ hints }: { hints: ContextHint[] }) => {
   if (hints.length === 0) return null;
   const colorMap = {
@@ -439,7 +578,13 @@ const ChatMessage = ({ content, role, timestamp, isLoading, onEdit, onRegenerate
   
   const contextHints = !isUser ? detectContextHints(textContent) : [];
   const cleanText = !isUser ? stripContextMarkers(textContent) : textContent;
-  const { suggestions, cleanText: textWithoutSuggestions } = !isUser ? parseSuggestions(cleanText) : { suggestions: [], cleanText: cleanText };
+  
+  // Extract and strip raw HTML/code from AI responses
+  const { cleanText: strippedText, codeBlocks, hadRawHtml } = !isUser 
+    ? extractAndStripCode(cleanText) 
+    : { cleanText: cleanText, codeBlocks: [], hadRawHtml: false };
+  
+  const { suggestions, cleanText: textWithoutSuggestions } = !isUser ? parseSuggestions(strippedText) : { suggestions: [], cleanText: strippedText };
   const sections = !isUser ? parseStructuredResponse(textWithoutSuggestions, isLoading) : [];
 
   return (
@@ -542,6 +687,9 @@ const ChatMessage = ({ content, role, timestamp, isLoading, onEdit, onRegenerate
                 }
               })}
             </div>
+            
+            {/* Collapsible code view */}
+            <CollapsibleCodeView codeBlocks={codeBlocks} hadRawHtml={hadRawHtml} />
             
             {/* Suggestion buttons */}
             <SuggestionButtons suggestions={suggestions} onClick={onSuggestionClick} />
