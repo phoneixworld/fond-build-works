@@ -79,20 +79,27 @@ export function useIntentClassification(
   const fastClassifyLocal = useCallback((text: string): AgentIntent | null => {
     const t = text.trim().toLowerCase();
 
-    // Long requirement documents (>3000 chars) are always "build" — skip keyword matching
-    // which can falsely match chat patterns in spec documents
+    // Long requirement documents (>3000 chars) are always "build"
     if (text.length > 3000) return "build";
 
-    // Clear build commands
-    if (/^(build|create|make|add|generate|design|implement|develop|set up|scaffold|wire up)\b/i.test(t)) return "build";
-    // Descriptive app prompts
-    if (/\b(app|website|dashboard|landing page|erp|portal|system|platform|page|form|module|component)\b/i.test(t) && t.length > 20) return "build";
-    // Modification commands
+    // ── Chat patterns (check FIRST to avoid false build matches) ──
+    // Questions starting with interrogative words — with or without "?"
+    if (/^(what|how|why|can you|could you|should|is it|tell me|explain|help me understand|describe|what's|how's|why's|when|where|who)\b/i.test(t)) return "chat";
+    // Conversational phrases
+    if (/^(thanks|thank you|got it|i see|okay so|i understand|that makes sense|cool|great|nice|awesome|perfect|no worries)/i.test(t)) return "chat";
+    // Asking about something (even without question mark)
+    if (/\b(what does|how does|how do|what is|what are|can i|should i|is there|would it|will it)\b/i.test(t)) return "chat";
+
+    // ── Build patterns ──
+    // Clear build commands (verb-first)
+    if (/^(build|create|make|add|generate|implement|develop|set up|scaffold|wire up)\b/i.test(t)) return "build";
+    // Modification commands (verb-first)
     if (/^(change|update|fix|modify|replace|remove|delete|move|rename|resize|recolor|restyle)\b/i.test(t)) return "build";
-    // Affirmative confirmations
-    if (/^(yes|go ahead|do it|build it|sounds good|ok|sure|let's go|proceed)/i.test(t)) return "build";
-    // Clear chat intents
-    if (/^(what|how|why|can you|could you|should|is it|tell me|explain|help me understand)\b/i.test(t) && t.endsWith("?")) return "chat";
+    // Descriptive app prompts — require a build verb AND a target noun
+    if (/\b(build|create|make|generate|design)\b/i.test(t) && /\b(app|website|dashboard|landing page|portal|system|platform|page|form|module|component)\b/i.test(t)) return "build";
+    // Affirmative confirmations (only short ones — long "yes" messages might be specs)
+    if (/^(yes|go ahead|do it|build it|sounds good|sure|let's go|proceed)\b/i.test(t) && t.length < 100) return "build";
+
     return null;
   }, []);
 
