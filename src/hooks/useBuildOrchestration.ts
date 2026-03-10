@@ -20,6 +20,7 @@ import { runBuildEngine, type EngineConfig, type EngineProgress } from "@/lib/bu
 import { matchTemplate, type PageTemplate } from "@/lib/pageTemplates";
 import { getSnippetsPromptContext } from "@/lib/componentSnippets";
 import { DESIGN_THEMES, type AIModelId } from "@/lib/aiModels";
+import { clientRouteModel } from "@/lib/costRouter";
 import { supabase } from "@/integrations/supabase/client";
 import { toExportPath } from "@/lib/pathNormalizer";
 import { StreamingPreviewController } from "@/lib/streamingPreview";
@@ -738,11 +739,15 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
         ? liveSandpackFiles
         : undefined;
 
+      // Dynamic model routing — picks cheapest capable model based on complexity
+      const fileCount = safeExistingFiles ? Object.keys(safeExistingFiles).length : 0;
+      const routedModel = clientRouteModel(userText, "build", fileCount, selectedModel !== "google/gemini-2.5-pro" ? selectedModel : undefined);
+
       const engineConfig: EngineConfig = {
         projectId: buildProjectId,
         techStack: currentProject.tech_stack || "react-cdn",
         schemas: schemas.length > 0 ? schemas : undefined,
-        model: selectedModel,
+        model: routedModel,
         designTheme: themeInfo?.prompt,
         knowledge: knowledge.length > 0 ? knowledge : undefined,
         snippetsContext: snippetsContext || undefined,
