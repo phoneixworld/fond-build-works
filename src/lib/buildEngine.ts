@@ -45,33 +45,9 @@ import { getPromptConfigKey, getCachedSystemPrompt, setCachedSystemPrompt } from
 import { detectTruncation } from "@/lib/truncationRecovery";
 import { resolveImportedDependencies, getDependencyDiff } from "@/lib/dependencyResolver";
 
-// ─── Base Template (mandatory scaffold for all new builds) ────────────────
-//
-// PATH CONVENTION:
-// All generated files use bare "/" paths (e.g., /App.jsx, /components/Hero.jsx).
-// This is required by Sandpack which expects files at root.
-// The pathNormalizer module handles mapping to src/ for:
-//   - VirtualFS display (file tree shows src/App.jsx)
-//   - GitHub push/pull (exports as src/App.jsx)
-//   - Android/ZIP export (bundles under src/)
-// DO NOT change these paths to src/ — it will break preview rendering.
-
+// ─── Templates (extracted to src/lib/templates/scaffoldTemplates.ts) ──────
+import { getBaseTemplate, getSharedUIComponents, getUseApiHook, getGlobalStyles } from "@/lib/templates/scaffoldTemplates";
 import { type DomainModel } from "@/lib/domainTemplates";
-
-/**
- * Returns the mandatory base file scaffold for new React builds.
- * When a DomainModel is provided, generates entity-specific pages, hooks,
- * sidebar nav, and optional auth context — so the AI extends the correct
- * structure from the start instead of a generic Dashboard shell.
- */
-function getBaseTemplate(domainModel?: DomainModel | null): Record<string, string> {
-  // If no domain model, fall back to the generic scaffold
-  if (!domainModel) {
-    return getGenericScaffold();
-  }
-
-  return buildDomainScaffold(domainModel);
-}
 
 /** Builds a scaffold dynamically from a matched domain template */
 function buildDomainScaffold(model: DomainModel): Record<string, string> {
