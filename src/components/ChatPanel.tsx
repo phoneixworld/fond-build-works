@@ -72,9 +72,7 @@ const ChatPanel = forwardRef<ChatPanelHandle, { initialPrompt?: string; onVersio
   
   const [buildStreamContent, setBuildStreamContent] = useState("");
   // Self-healing state
-  const [healAttempts, setHealAttempts] = useState(0);
-  const [isHealing, setIsHealing] = useState(false);
-  const [healingStatus, setHealingStatus] = useState<string>("");
+  // healAttempts, isHealing, healingStatus provided by useSelfHealing hook below
   // Build retry state
   const [buildRetryCount, setBuildRetryCount] = useState(0);
   // Follow-up questions state
