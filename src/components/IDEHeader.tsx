@@ -131,129 +131,129 @@ const IDEHeader = ({
   const ViewportIcon = VIEWPORTS.find(v => v.id === viewport)!.icon;
 
   return (
-    <header className="h-11 flex items-center px-3 shrink-0 z-10 relative bg-ide-panel-header">
-      {/* Left: Back + Project name + Tabs */}
-      <div className="flex items-center gap-2 min-w-0 shrink-0">
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <button onClick={onBack} className="text-muted-foreground hover:text-foreground transition-colors p-1 rounded-md hover:bg-secondary shrink-0">
-              <ArrowLeft className="w-4 h-4" />
-            </button>
-          </TooltipTrigger>
-          <TooltipContent side="bottom" className="text-xs">Back to projects</TooltipContent>
-        </Tooltip>
+    <header className="h-11 flex items-center shrink-0 z-10 relative bg-ide-panel-header px-1.5">
+      {/* Left column — aligns with chat panel */}
+      <div className="flex items-center gap-2 min-w-0 flex-1">
+        <div className="flex items-center gap-2 min-w-0 shrink-0 pl-1.5">
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <button onClick={onBack} className="text-muted-foreground hover:text-foreground transition-colors p-1 rounded-md hover:bg-secondary shrink-0">
+                <ArrowLeft className="w-4 h-4" />
+              </button>
+            </TooltipTrigger>
+            <TooltipContent side="bottom" className="text-xs">Back to projects</TooltipContent>
+          </Tooltip>
 
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <button onClick={onRenameClick} className="flex items-center gap-2 px-2 py-1 rounded-lg hover:bg-secondary/60 transition-colors min-w-0 group">
-              <div className="w-5 h-5 rounded-md bg-gradient-to-br from-primary to-accent flex items-center justify-center shrink-0">
-                <Zap className="w-3 h-3 text-primary-foreground" />
-              </div>
-              <span className="text-xs font-semibold text-foreground truncate max-w-[120px]">
-                {currentProject?.name || "Project"}
-              </span>
-              <Pencil className="w-3 h-3 text-muted-foreground/0 group-hover:text-muted-foreground transition-colors shrink-0" />
-            </button>
-          </TooltipTrigger>
-          <TooltipContent side="bottom" className="text-xs">Click to rename</TooltipContent>
-        </Tooltip>
-
-        {/* Version History */}
-        <Popover>
-          <PopoverTrigger asChild>
-            <button className="relative p-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors">
-              <Clock className="w-3.5 h-3.5" />
-              {versions.length > 0 && (
-                <span className="absolute -top-0.5 -right-0.5 w-3.5 h-3.5 rounded-full bg-primary text-[8px] font-bold text-primary-foreground flex items-center justify-center">
-                  {versions.length > 9 ? "9+" : versions.length}
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <button onClick={onRenameClick} className="flex items-center gap-2 px-2 py-1 rounded-lg hover:bg-secondary/60 transition-colors min-w-0 group">
+                <div className="w-5 h-5 rounded-md bg-gradient-to-br from-primary to-accent flex items-center justify-center shrink-0">
+                  <Zap className="w-3 h-3 text-primary-foreground" />
+                </div>
+                <span className="text-xs font-semibold text-foreground truncate max-w-[120px]">
+                  {currentProject?.name || "Project"}
                 </span>
+                <Pencil className="w-3 h-3 text-muted-foreground/0 group-hover:text-muted-foreground transition-colors shrink-0" />
+              </button>
+            </TooltipTrigger>
+            <TooltipContent side="bottom" className="text-xs">Click to rename</TooltipContent>
+          </Tooltip>
+
+          {/* Version History */}
+          <Popover>
+            <PopoverTrigger asChild>
+              <button className="relative p-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors">
+                <Clock className="w-3.5 h-3.5" />
+                {versions.length > 0 && (
+                  <span className="absolute -top-0.5 -right-0.5 w-3.5 h-3.5 rounded-full bg-primary text-[8px] font-bold text-primary-foreground flex items-center justify-center">
+                    {versions.length > 9 ? "9+" : versions.length}
+                  </span>
+                )}
+              </button>
+            </PopoverTrigger>
+            <PopoverContent side="bottom" align="start" className="w-[320px] p-0 max-h-[400px] overflow-hidden">
+              <div className="px-3 py-2 border-b border-border bg-muted/30">
+                <div className="flex items-center gap-2">
+                  <Clock className="w-3.5 h-3.5 text-primary" />
+                  <span className="text-xs font-semibold text-foreground">Version History</span>
+                  <span className="text-[10px] text-muted-foreground">({versions.length})</span>
+                </div>
+              </div>
+              {versions.length === 0 ? (
+                <div className="p-6 text-center text-muted-foreground">
+                  <Clock className="w-6 h-6 mx-auto mb-2 opacity-30" />
+                  <p className="text-xs">No versions yet</p>
+                  <p className="text-[10px] mt-1 text-muted-foreground/60">Created after each AI build</p>
+                </div>
+              ) : (
+                <div className="overflow-y-auto max-h-[340px] p-2 space-y-0.5">
+                  {versions.map((version, i) => (
+                    <button
+                      key={version.id}
+                      onClick={() => onRevert?.(version)}
+                      className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-md text-left hover:bg-secondary/60 transition-colors group"
+                    >
+                      <div className={`w-2 h-2 rounded-full shrink-0 ${i === 0 ? "bg-primary" : "bg-border group-hover:bg-primary/50"}`} />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-[11px] font-medium text-foreground truncate">{version.label}</p>
+                        <p className="text-[10px] text-muted-foreground">{formatDistanceToNow(new Date(version.timestamp), { addSuffix: true })}</p>
+                      </div>
+                      <RotateCcw className="w-3 h-3 text-muted-foreground/0 group-hover:text-primary transition-colors shrink-0" />
+                    </button>
+                  ))}
+                </div>
               )}
-            </button>
-          </PopoverTrigger>
-          <PopoverContent side="bottom" align="start" className="w-[320px] p-0 max-h-[400px] overflow-hidden">
-            <div className="px-3 py-2 border-b border-border bg-muted/30">
-              <div className="flex items-center gap-2">
-                <Clock className="w-3.5 h-3.5 text-primary" />
-                <span className="text-xs font-semibold text-foreground">Version History</span>
-                <span className="text-[10px] text-muted-foreground">({versions.length})</span>
-              </div>
-            </div>
-            {versions.length === 0 ? (
-              <div className="p-6 text-center text-muted-foreground">
-                <Clock className="w-6 h-6 mx-auto mb-2 opacity-30" />
-                <p className="text-xs">No versions yet</p>
-                <p className="text-[10px] mt-1 text-muted-foreground/60">Created after each AI build</p>
-              </div>
-            ) : (
-              <div className="overflow-y-auto max-h-[340px] p-2 space-y-0.5">
-                {versions.map((version, i) => (
-                  <button
-                    key={version.id}
-                    onClick={() => onRevert?.(version)}
-                    className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-md text-left hover:bg-secondary/60 transition-colors group"
-                  >
-                    <div className={`w-2 h-2 rounded-full shrink-0 ${i === 0 ? "bg-primary" : "bg-border group-hover:bg-primary/50"}`} />
-                    <div className="flex-1 min-w-0">
-                      <p className="text-[11px] font-medium text-foreground truncate">{version.label}</p>
-                      <p className="text-[10px] text-muted-foreground">{formatDistanceToNow(new Date(version.timestamp), { addSuffix: true })}</p>
-                    </div>
-                    <RotateCcw className="w-3 h-3 text-muted-foreground/0 group-hover:text-primary transition-colors shrink-0" />
-                  </button>
-                ))}
-              </div>
-            )}
-          </PopoverContent>
-        </Popover>
+            </PopoverContent>
+          </Popover>
 
-        <div className="w-px h-4 bg-border mx-0.5" />
+          <div className="w-px h-4 bg-border mx-0.5" />
 
-        {/* Tabs */}
-        <div className="flex items-center gap-0.5 bg-secondary/40 rounded-lg p-0.5 shrink-0">
-          {primaryTabs.map((tab) => {
-            const Icon = tab.icon;
-            const isActive = rightPanel === tab.id;
-            const locked = isLocked?.(tab.id);
-            const lockOwner = getLockOwner?.(tab.id);
-            return (
-              <Tooltip key={tab.id}>
-                <TooltipTrigger asChild>
-                  <button
-                    onClick={() => setRightPanel(tab.id)}
-                    className={`flex items-center gap-1.5 ${tab.iconOnly ? 'px-2' : 'px-3'} py-1.5 rounded-md text-[11px] font-medium transition-all relative ${
-                      isActive
-                        ? "bg-background text-foreground shadow-sm ring-1 ring-border/50"
-                        : locked
-                        ? "text-muted-foreground/40 cursor-not-allowed"
-                        : "text-muted-foreground hover:text-foreground"
-                    }`}
-                  >
-                    <Icon className="w-3.5 h-3.5" />
-                    {!tab.iconOnly && tab.label}
-                    {locked && lockOwner && (
-                      <span className="w-2 h-2 rounded-full ring-1 ring-background absolute -top-0.5 -right-0.5" style={{ backgroundColor: lockOwner.color }} />
-                    )}
-                  </button>
-                </TooltipTrigger>
-                {locked && lockOwner ? (
-                  <TooltipContent side="bottom" className="text-xs">
-                    <Lock className="w-3 h-3 inline mr-1" />
-                    {lockOwner.email.split("@")[0]} is editing
-                  </TooltipContent>
-                ) : tab.iconOnly ? (
-                  <TooltipContent side="bottom" className="text-xs">{tab.label}</TooltipContent>
-                ) : null}
-              </Tooltip>
-            );
-          })}
+          {/* Tabs */}
+          <div className="flex items-center gap-0.5 bg-secondary/40 rounded-lg p-0.5 shrink-0">
+            {primaryTabs.map((tab) => {
+              const Icon = tab.icon;
+              const isActive = rightPanel === tab.id;
+              const locked = isLocked?.(tab.id);
+              const lockOwner = getLockOwner?.(tab.id);
+              return (
+                <Tooltip key={tab.id}>
+                  <TooltipTrigger asChild>
+                    <button
+                      onClick={() => setRightPanel(tab.id)}
+                      className={`flex items-center gap-1.5 ${tab.iconOnly ? 'px-2' : 'px-3'} py-1.5 rounded-md text-[11px] font-medium transition-all relative ${
+                        isActive
+                          ? "bg-background text-foreground shadow-sm ring-1 ring-border/50"
+                          : locked
+                          ? "text-muted-foreground/40 cursor-not-allowed"
+                          : "text-muted-foreground hover:text-foreground"
+                      }`}
+                    >
+                      <Icon className="w-3.5 h-3.5" />
+                      {!tab.iconOnly && tab.label}
+                      {locked && lockOwner && (
+                        <span className="w-2 h-2 rounded-full ring-1 ring-background absolute -top-0.5 -right-0.5" style={{ backgroundColor: lockOwner.color }} />
+                      )}
+                    </button>
+                  </TooltipTrigger>
+                  {locked && lockOwner ? (
+                    <TooltipContent side="bottom" className="text-xs">
+                      <Lock className="w-3 h-3 inline mr-1" />
+                      Locked by {lockOwner.email}
+                    </TooltipContent>
+                  ) : (
+                    <TooltipContent side="bottom" className="text-xs">{tab.label}</TooltipContent>
+                  )}
+                </Tooltip>
+              );
+            })}
+          </div>
         </div>
       </div>
 
-      {/* Right: Preview controls (when preview active) + Actions + User menu */}
-      <div className="flex items-center gap-1 ml-auto shrink-0">
-        {/* Preview controls — right side, only when preview tab active */}
+      {/* Right column — aligns with preview panel */}
+      <div className="flex items-center gap-1 shrink-0 pr-1.5">
         {isPreview && (
           <>
-            {/* Viewport cycle */}
             <Tooltip>
               <TooltipTrigger asChild>
                 <button
@@ -270,7 +270,6 @@ const IDEHeader = ({
               <TooltipContent side="bottom" className="text-xs">{VIEWPORTS.find(v => v.id === viewport)!.label} — click to switch</TooltipContent>
             </Tooltip>
 
-            {/* Nav arrows */}
             <Tooltip>
               <TooltipTrigger asChild>
                 <button onClick={() => { const iframe = document.querySelector('.sp-preview-iframe') as HTMLIFrameElement; iframe?.contentWindow?.history.back(); }} className="p-1 text-muted-foreground hover:text-foreground transition-colors rounded-md hover:bg-muted/50">
@@ -288,7 +287,6 @@ const IDEHeader = ({
               <TooltipContent side="bottom" className="text-xs">Forward</TooltipContent>
             </Tooltip>
 
-            {/* URL bar */}
             <div className="flex items-center gap-1.5 bg-secondary rounded-lg px-2 py-1 min-w-0 w-[320px]">
               <Globe className="w-3 h-3 text-muted-foreground flex-shrink-0" />
               {isEditingUrl ? (
@@ -315,7 +313,6 @@ const IDEHeader = ({
               )}
             </div>
 
-            {/* Open in new tab */}
             <Tooltip>
               <TooltipTrigger asChild>
                 <button className="p-1.5 text-muted-foreground hover:text-foreground transition-colors rounded-md hover:bg-muted/50">
@@ -325,7 +322,6 @@ const IDEHeader = ({
               <TooltipContent side="bottom" className="text-xs">Open in new tab</TooltipContent>
             </Tooltip>
 
-            {/* Refresh */}
             <Tooltip>
               <TooltipTrigger asChild>
                 <button onClick={triggerRefresh} className="p-1.5 text-muted-foreground hover:text-foreground transition-colors rounded-md hover:bg-muted/50">
