@@ -20,6 +20,7 @@ import { verifyWorkspace } from "./verifier";
 import { classifyRepairActions, buildRepairSummary, MAX_REPAIR_ROUNDS } from "./repair";
 import { fixBrokenImports } from "./importFixer";
 import { repairMissingModules } from "./missingModuleGen";
+import { injectMissingProviders } from "./providerInjector";
 import {
   createTrace, startPass, endPass,
   traceTaskStart, traceTaskEnd, finalizeTrace, printTrace,
