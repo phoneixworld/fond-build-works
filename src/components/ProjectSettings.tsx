@@ -202,6 +202,20 @@ const ProjectSettings = ({ onRenameClick, onClone, onExport }: ProjectSettingsPr
             </span>
           </button>
 
+          {/* Export */}
+          <button
+            onClick={onExport}
+            className="w-full flex items-center justify-between px-4 py-3 rounded-lg hover:bg-secondary/50 transition-colors text-left group"
+          >
+            <div>
+              <p className="text-sm font-medium text-foreground">Export as ZIP</p>
+              <p className="text-xs text-muted-foreground">Download all project files as a ZIP archive.</p>
+            </div>
+            <span className="text-xs font-medium px-3 py-1.5 rounded-md bg-primary text-primary-foreground opacity-0 group-hover:opacity-100 transition-opacity">
+              <Download className="w-3.5 h-3.5 inline mr-1" /> Export
+            </span>
+          </button>
+
           <Separator />
 
           {/* Danger Zone */}
