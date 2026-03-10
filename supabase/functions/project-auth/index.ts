@@ -77,7 +77,7 @@ serve(async (req) => {
           .single();
         if (error || !user) throw new Error("Invalid email or password");
         const tk = generateToken(user.id, project_id);
-        return new Response(JSON.stringify({ data: { user, token: tk } }), {
+        return new Response(JSON.stringify({ user, token: tk }), {
           status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
