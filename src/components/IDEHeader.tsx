@@ -1,4 +1,4 @@
-import { Zap, LogOut, ArrowLeft, ChevronDown, Command as CommandIcon, MessageCircle, Settings, Pencil, GitBranch, Globe, Tag, Clock, Brain, Activity, Users, Palette, FlaskConical, Puzzle, User, CreditCard, HelpCircle, ArrowLeftRight, Lock } from "lucide-react";
+import { Zap, LogOut, ArrowLeft, ChevronDown, Command as CommandIcon, MessageCircle, Settings, Pencil, GitBranch, Globe, Tag, Clock, Brain, Activity, Users, Palette, FlaskConical, Puzzle, User, CreditCard, HelpCircle, ArrowLeftRight, Lock, SlidersHorizontal } from "lucide-react";
 import { forwardRef } from "react";
 import { TECH_STACKS, TechStackId } from "@/lib/techStacks";
 import PresenceAvatars from "@/components/PresenceAvatars";
@@ -148,6 +148,10 @@ const IDEHeader = ({
             <DropdownMenuItem onClick={onRenameClick} className="text-xs gap-2">
               <Pencil className="w-3.5 h-3.5" />
               Rename project
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => setRightPanel("settings")} className={`text-xs gap-2 ${rightPanel === "settings" ? "text-primary font-medium" : ""}`}>
+              <SlidersHorizontal className="w-3.5 h-3.5" />
+              Project Settings
             </DropdownMenuItem>
 
             {/* Tech Stack sub-menu */}
