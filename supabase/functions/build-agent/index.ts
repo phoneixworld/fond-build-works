@@ -137,6 +137,24 @@ POST JSON to ${apiBase}/project-api:
 Auth: ${apiBase}/project-auth — actions: "signup"|"login"|"me"
 Functions: ${apiBase}/project-exec — function_name + params
 
+### RUNTIME GLOBALS (available in browser at runtime)
+The host environment injects these globals before your code runs:
+- window.__PROJECT_ID__ — the current project's UUID (use this for project_id in ALL API calls)
+- window.__SUPABASE_URL__ — the API base URL
+- window.__SUPABASE_KEY__ — the anon/public API key
+
+**CRITICAL**: In your AuthContext and data hooks, ALWAYS read project_id from \`window.__PROJECT_ID__\`, API base from \`window.__SUPABASE_URL__\`, and API key from \`window.__SUPABASE_KEY__\`. Do NOT hardcode these values. Example:
+\`\`\`
+const projectId = window.__PROJECT_ID__;
+const apiBase = window.__SUPABASE_URL__;
+const apiKey = window.__SUPABASE_KEY__;
+fetch(\`\${apiBase}/functions/v1/project-auth\`, {
+  method: "POST",
+  headers: { "Content-Type": "application/json", "Authorization": \`Bearer \${apiKey}\` },
+  body: JSON.stringify({ project_id: projectId, action: "signup", email, password })
+});
+\`\`\`
+
 ### Backend Rules:
 - ANY app with persistent data MUST use Data API — NEVER mock arrays or localStorage
 - Dashboard pages → fetch real data with skeleton loading

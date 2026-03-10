@@ -45,8 +45,8 @@ ${workspaceContext ? `### Current code:\n${workspaceContext}` : ""}
 ### RULES:
 1. Generate ONLY the files listed above
 2. Import from existing workspace files — do NOT recreate them
-3. Use the project's data API pattern: fetch('/functions/v1/project-api', { body: { project_id, action, collection, data } })
-4. For auth, use the AuthContext pattern: import { useAuth } from '../contexts/AuthContext'
+3. Use the project's data API pattern: fetch(\`\${window.__SUPABASE_URL__}/functions/v1/project-api\`, { body: { project_id: window.__PROJECT_ID__, action, collection, data } })
+4. For auth, use the AuthContext pattern: import { useAuth } from '../contexts/AuthContext' — AuthContext MUST read window.__PROJECT_ID__, window.__SUPABASE_URL__, window.__SUPABASE_KEY__ for API calls
 5. Output complete, working code — no placeholders, no TODOs, no stubs
 6. Every component must have a default export
 7. Use Tailwind CSS with design tokens (var(--color-*)) for all styling`;
