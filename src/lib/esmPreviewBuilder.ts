@@ -209,6 +209,7 @@ function rewriteToRegistry(
   const lines = code.split("\n");
   const result: string[] = [];
   const defaultExportNames: string[] = [];
+  const namedExportNames: string[] = []; // Deferred to end of module
   
   for (let i = 0; i < lines.length; i++) {
     const trimmed = lines[i].trim();
@@ -236,10 +237,13 @@ function rewriteToRegistry(
     }
     
     // export const/let/var/function/class Name
+    // CRITICAL: Defer the __exports__ assignment to the END of the module,
+    // because the declaration may span multiple lines (arrow functions, etc.)
+    // and inserting immediately would place the assignment inside the function body.
     const ed = trimmed.match(/^export\s+(const|let|var|function|class)\s+(\w+)/);
     if (ed) {
       result.push(lines[i].replace(/^(\s*)export\s+/, "$1"));
-      result.push(`__exports__.${ed[2]} = ${ed[2]};`);
+      namedExportNames.push(ed[2]);
       continue;
     }
     
@@ -248,7 +252,7 @@ function rewriteToRegistry(
     if (eb) {
       for (const n of eb[1].split(",").map(s => s.trim()).filter(Boolean)) {
         const [from, as] = n.split(/\s+as\s+/);
-        result.push(`__exports__.${as || from} = ${from};`);
+        namedExportNames.push(`${as || from}=${from}`);
       }
       continue;
     }
@@ -256,9 +260,18 @@ function rewriteToRegistry(
     result.push(lines[i]);
   }
   
-  // Add deferred default exports
+  // Add ALL deferred exports at the end of the module
   for (const name of defaultExportNames) {
     result.push(`__exports__.default = ${name};`);
+  }
+  for (const entry of namedExportNames) {
+    if (entry.includes("=")) {
+      // export { X as Y } case
+      const [exportName, localName] = entry.split("=");
+      result.push(`__exports__.${exportName} = ${localName};`);
+    } else {
+      result.push(`__exports__.${entry} = ${entry};`);
+    }
   }
   
   return result.join("\n");
