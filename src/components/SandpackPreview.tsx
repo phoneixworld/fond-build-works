@@ -87,34 +87,7 @@ function isAllowedPkg(pkg: string): boolean {
   return ALLOWED_PACKAGES.has(base);
 }
 
-/**
- * Quick syntax check — returns true if code is likely parseable.
- * Checks brace/bracket/paren balance skipping strings.
- * Tolerant of minor imbalances (±3) to avoid false positives.
- */
-function quickSyntaxCheck(code: string): boolean {
-  let braces = 0, brackets = 0, parens = 0;
-  let inString = false;
-  let stringChar = '';
-  for (let i = 0; i < code.length; i++) {
-    const c = code[i];
-    if (inString) {
-      if (c === stringChar && code[i - 1] !== '\\') inString = false;
-      continue;
-    }
-    if (c === '"' || c === "'" || c === '`') { inString = true; stringChar = c; continue; }
-    if (c === '{') braces++;
-    else if (c === '}') braces--;
-    else if (c === '[') brackets++;
-    else if (c === ']') brackets--;
-    else if (c === '(') parens++;
-    else if (c === ')') parens--;
-  }
-  // If significantly unbalanced, it's broken
-  if (Math.abs(braces) > 3 || Math.abs(brackets) > 3 || Math.abs(parens) > 3) return false;
-  if (inString) return false;
-  return true;
-}
+// Sucrase-based syntax validation is used instead of heuristic brace counting.
 
 /**
  * Generate a safe stub component when code is broken.
