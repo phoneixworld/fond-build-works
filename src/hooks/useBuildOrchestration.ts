@@ -971,27 +971,31 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
         return;
       }
 
-      // ── BUILD: Only allowed if server FSM is in gathering/ready mode ──
+      // ── BUILD: Include accumulated requirements if any phases exist ──
       if (convResult.action === "build") {
-        // Gate: only build if we were gathering/ready (server FSM check)
-        if (conversationMode === "gathering" || conversationMode === "ready") {
-          console.log("[SmartSend] Building with accumulated requirements (server FSM approved)");
+        // Always try to include accumulated requirements when phases exist
+        const hasAccumulatedPhases = conversationMode === "gathering" || conversationMode === "ready" || conversationMode === "complete";
+        
+        if (hasAccumulatedPhases) {
+          console.log(`[SmartSend] Building with accumulated requirements (mode=${conversationMode})`);
           conversationStartBuilding?.();
           
           // Get server-compiled requirements (includes extracted image text)
           const requirements = await Promise.resolve(conversationGetRequirements?.() || "");
-          const buildPrompt = requirements + "\n\n" + finalText;
           
-          // Route model based on FULL build prompt (not just "build it")
-          console.log(`[SmartSend] Build prompt length: ${buildPrompt.length} chars`);
-          
-          setCurrentAgent("build");
-          setPipelineStep("planning");
-          sendMessage(buildPrompt, images);
-          return;
+          if (requirements && requirements.length > 50) {
+            const buildPrompt = requirements + "\n\n" + finalText;
+            console.log(`[SmartSend] Build prompt length: ${buildPrompt.length} chars (requirements: ${requirements.length})`);
+            
+            setCurrentAgent("build");
+            setPipelineStep("planning");
+            sendMessage(buildPrompt, images);
+            return;
+          } else {
+            console.log(`[SmartSend] No substantial requirements found (${requirements.length} chars), proceeding as direct build`);
+          }
         } else {
-          // Mode is idle/complete/building — treat as a direct build (no accumulated phases)
-          console.log(`[SmartSend] Build requested but mode=${conversationMode}, proceeding as direct build`);
+          console.log(`[SmartSend] Build requested, mode=${conversationMode}, proceeding as direct build`);
         }
       }
 
