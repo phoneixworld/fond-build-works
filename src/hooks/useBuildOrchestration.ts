@@ -409,7 +409,7 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
                   setSandpackFiles(retryResult.files);
                   syncSandpackToVirtualFS(retryResult.files);
                   if (Object.keys(retryResult.deps).length > 0) setSandpackDeps(retryResult.deps);
-                  setPreviewMode("sandpack");
+                  setPreviewMode("esm");
 
                   const retryChatText = retryResult.chatText || "✅ Fixed and rebuilt successfully";
                   setMessages((prev) => {
