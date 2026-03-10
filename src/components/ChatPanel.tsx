@@ -167,8 +167,13 @@ const ChatPanel = forwardRef<ChatPanelHandle, { initialPrompt?: string; onVersio
   useEffect(() => { sendMessageRef.current = sendMessage; }, [sendMessage]);
   useEffect(() => { setPipelineStepRef.current = setPipelineStep; }, [setPipelineStep]);
 
+  const handleClearChat = useCallback(() => {
+    orchClearChat();
+    conversationState.reset();
+  }, [orchClearChat, conversationState]);
+
   // Expose handle
-  useImperativeHandle(ref, () => ({ clearChat: orchClearChat, sendMessage: (text: string) => sendMessage(text) }), [orchClearChat, sendMessage]);
+  useImperativeHandle(ref, () => ({ clearChat: handleClearChat, sendMessage: (text: string) => sendMessage(text) }), [handleClearChat, sendMessage]);
 
   // Listen for refactor actions from CodeEditor
   useEffect(() => {
