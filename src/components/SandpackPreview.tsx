@@ -189,9 +189,7 @@ export default function App() {
     <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", background: "linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #0f172a 100%)", fontFamily: "'Inter', system-ui, sans-serif" }}>
       <div style={{ textAlign: "center", maxWidth: 420, padding: "0 24px" }}>
         <div style={{ position: "relative", width: 72, height: 72, margin: "0 auto 32px" }}>
-          <div style={{ width: 72, height: 72, borderRadius: 20, background: "linear-gradient(135deg, #6366f1, #a855f7, #ec4899)", display: "flex", alignItems: "center", justifyContent: "center", boxShadow: "0 0 40px rgba(99,102,241,0.3)", animation: "pulse 2s ease-in-out infinite" }}>
-            <span style={{ fontSize: 28, fontWeight: 800, color: "#fff", letterSpacing: -1 }}>P</span>
-          </div>
+          <img src="/logo.png" alt="Phoneix" style={{ width: 72, height: 72, borderRadius: 20, boxShadow: "0 0 40px rgba(99,102,241,0.3)", animation: "pulse 2s ease-in-out infinite" }} />
           <div style={{ position: "absolute", inset: -4, borderRadius: 24, border: "2px solid rgba(99,102,241,0.2)", animation: "spin 8s linear infinite" }} />
         </div>
         <h1 style={{ fontSize: 22, fontWeight: 700, color: "#f1f5f9", margin: "0 0 8px", letterSpacing: "-0.02em" }}>Phoneix is building your app</h1>
