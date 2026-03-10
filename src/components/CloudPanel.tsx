@@ -9,6 +9,7 @@ import {
   Terminal,
   ScrollText,
   Download,
+  Hammer,
   Brain,
   GitBranch,
   ShieldCheck,
