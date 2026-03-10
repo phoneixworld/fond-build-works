@@ -62,6 +62,8 @@ interface IDEHeaderProps {
   myColor: string;
   layoutSwapped?: boolean;
   onSwapLayout?: () => void;
+  versions?: Version[];
+  onRevert?: (version: Version) => void;
   isLocked?: (panelId: PanelId) => boolean;
   getLockOwner?: (panelId: PanelId) => { email: string; color: string } | null;
 }
