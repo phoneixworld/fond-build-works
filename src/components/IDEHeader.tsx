@@ -131,7 +131,7 @@ const IDEHeader = ({
   const ViewportIcon = VIEWPORTS.find(v => v.id === viewport)!.icon;
 
   return (
-    <header className="h-11 flex items-center px-3 border-b border-border shrink-0 z-10 relative bg-ide-panel-header">
+    <header className="h-11 flex items-center px-3 shrink-0 z-10 relative bg-ide-panel-header">
       {/* Left: Back + Project name + Tabs */}
       <div className="flex items-center gap-2 min-w-0 shrink-0">
         <Tooltip>
