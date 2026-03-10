@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useRef, forwardRef } from "react";
 import { ScrollText, RefreshCw, Trash2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useProjects } from "@/contexts/ProjectContext";
@@ -15,94 +15,81 @@ const LEVEL_STYLES: Record<string, string> = {
   error: "text-destructive",
 };
 
-const CloudLogs = () => {
+const CloudLogs = forwardRef<HTMLDivElement>((_, ref) => {
   const { currentProject } = useProjects();
   const [logs, setLogs] = useState<LogEntry[]>([]);
   const [autoRefresh, setAutoRefresh] = useState(true);
   const bottomRef = useRef<HTMLDivElement>(null);
 
-  const addLog = useCallback((level: LogEntry["level"], message: string) => {
-    setLogs(prev => [...prev, { timestamp: new Date().toISOString(), level, message }]);
-  }, []);
-
   const fetchActivity = useCallback(async () => {
     if (!currentProject) return;
 
-    // Fetch recent data activity
-    const { data: recentData, error: dataErr } = await supabase
-      .from("project_data")
-      .select("id, collection, created_at, updated_at")
-      .eq("project_id", currentProject.id)
-      .order("updated_at", { ascending: false })
-      .limit(20);
-
-    if (dataErr) {
-      addLog("error", `Failed to fetch data activity: ${dataErr.message}`);
-      return;
-    }
-
-    const { data: recentUsers } = await supabase
-      .from("project_users")
-      .select("id, email, created_at")
-      .eq("project_id", currentProject.id)
-      .order("created_at", { ascending: false })
-      .limit(10);
-
-    const { data: recentFunctions } = await supabase
-      .from("project_functions")
-      .select("id, name, created_at")
-      .eq("project_id", currentProject.id)
-      .order("created_at", { ascending: false })
-      .limit(10);
-
+    const pid = currentProject.id;
     const entries: LogEntry[] = [
       { timestamp: new Date().toISOString(), level: "info", message: `Cloud panel initialized for "${currentProject.name}"` },
     ];
 
-    (recentData || []).forEach((row: any) => {
-      entries.push({
-        timestamp: row.updated_at || row.created_at,
-        level: "info",
-        message: `Data record in "${row.collection}" (${row.id.slice(0, 8)}…) updated`,
-      });
+    // Fetch all sources in parallel
+    const [dataRes, usersRes, fnRes, buildRes, auditRes, deployRes] = await Promise.all([
+      supabase.from("project_data").select("id, collection, created_at, updated_at").eq("project_id", pid).order("updated_at", { ascending: false }).limit(20),
+      supabase.from("project_users").select("id, email, created_at").eq("project_id", pid).order("created_at", { ascending: false }).limit(10),
+      supabase.from("project_functions").select("id, name, created_at").eq("project_id", pid).order("created_at", { ascending: false }).limit(10),
+      supabase.from("build_jobs").select("id, status, created_at, completed_at, error, build_duration_ms").eq("project_id", pid).order("created_at", { ascending: false }).limit(15),
+      supabase.from("project_audit_log").select("id, action, entity_type, agent_name, created_at").eq("project_id", pid).order("created_at", { ascending: false }).limit(20),
+      supabase.from("deploy_history").select("id, to_env, status, deployed_by_email, created_at").eq("project_id", pid).order("created_at", { ascending: false }).limit(10),
+    ]);
+
+    if (dataRes.error) {
+      entries.push({ timestamp: new Date().toISOString(), level: "error", message: `Failed to fetch data: ${dataRes.error.message}` });
+    }
+
+    (dataRes.data || []).forEach((row: any) => {
+      entries.push({ timestamp: row.updated_at || row.created_at, level: "info", message: `Data record in "${row.collection}" (${row.id.slice(0, 8)}…) updated` });
     });
 
-    (recentUsers || []).forEach((user: any) => {
-      entries.push({
-        timestamp: user.created_at,
-        level: "info",
-        message: `User "${user.email}" registered`,
-      });
+    (usersRes.data || []).forEach((user: any) => {
+      entries.push({ timestamp: user.created_at, level: "info", message: `User "${user.email}" registered` });
     });
 
-    (recentFunctions || []).forEach((fn: any) => {
-      entries.push({
-        timestamp: fn.created_at,
-        level: "info",
-        message: `Function "${fn.name}" created`,
-      });
+    (fnRes.data || []).forEach((fn: any) => {
+      entries.push({ timestamp: fn.created_at, level: "info", message: `Function "${fn.name}" created` });
     });
 
-    // Sort by timestamp desc
+    (buildRes.data || []).forEach((build: any) => {
+      const dur = build.build_duration_ms ? ` (${(build.build_duration_ms / 1000).toFixed(1)}s)` : "";
+      const lvl: LogEntry["level"] = build.status === "failed" ? "error" : build.status === "building" ? "warn" : "info";
+      const msg = build.error
+        ? `Build ${build.id.slice(0, 8)}… failed: ${build.error.slice(0, 80)}`
+        : `Build ${build.id.slice(0, 8)}… ${build.status}${dur}`;
+      entries.push({ timestamp: build.completed_at || build.created_at, level: lvl, message: msg });
+    });
+
+    (auditRes.data || []).forEach((log: any) => {
+      entries.push({ timestamp: log.created_at, level: "info", message: `[${log.agent_name}] ${log.action} on ${log.entity_type}` });
+    });
+
+    (deployRes.data || []).forEach((dep: any) => {
+      const lvl: LogEntry["level"] = dep.status === "failed" ? "error" : "info";
+      entries.push({ timestamp: dep.created_at, level: lvl, message: `Deploy to ${dep.to_env} ${dep.status}${dep.deployed_by_email ? ` by ${dep.deployed_by_email}` : ""}` });
+    });
+
     entries.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
     setLogs(entries);
-  }, [currentProject, addLog]);
+  }, [currentProject]);
 
   useEffect(() => { fetchActivity(); }, [fetchActivity]);
 
-  // Auto-refresh every 10s
   useEffect(() => {
     if (!autoRefresh) return;
     const interval = setInterval(fetchActivity, 10000);
     return () => clearInterval(interval);
   }, [autoRefresh, fetchActivity]);
 
-  // Auto-scroll
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [logs]);
 
-  // Realtime subscription for live logs
+  // Realtime subscription
   useEffect(() => {
     if (!currentProject) return;
     const channel = supabase
@@ -110,14 +97,19 @@ const CloudLogs = () => {
       .on("postgres_changes", { event: "*", schema: "public", table: "project_data", filter: `project_id=eq.${currentProject.id}` }, (payload) => {
         const evt = payload.eventType;
         const collection = (payload.new as any)?.collection || (payload.old as any)?.collection || "unknown";
-        addLog("info", `[realtime] ${evt.toUpperCase()} on "${collection}"`);
+        setLogs(prev => [{ timestamp: new Date().toISOString(), level: "info", message: `[realtime] ${evt.toUpperCase()} on "${collection}"` }, ...prev]);
+      })
+      .on("postgres_changes", { event: "*", schema: "public", table: "build_jobs", filter: `project_id=eq.${currentProject.id}` }, (payload) => {
+        const build = (payload.new as any) || {};
+        const lvl: LogEntry["level"] = build.status === "failed" ? "error" : "info";
+        setLogs(prev => [{ timestamp: new Date().toISOString(), level: lvl, message: `[realtime] Build ${build.id?.slice(0, 8) || ""}… ${build.status || payload.eventType}` }, ...prev]);
       })
       .subscribe();
     return () => { supabase.removeChannel(channel); };
-  }, [currentProject, addLog]);
+  }, [currentProject]);
 
   return (
-    <div className="flex flex-col h-full">
+    <div ref={ref} className="flex flex-col h-full">
       <div className="px-5 py-3 border-b border-border bg-ide-panel-header flex items-center justify-between">
         <div className="flex items-center gap-2">
           <ScrollText className="w-4 h-4 text-primary" />
@@ -164,6 +156,8 @@ const CloudLogs = () => {
       </div>
     </div>
   );
-};
+});
+
+CloudLogs.displayName = "CloudLogs";
 
 export default CloudLogs;
