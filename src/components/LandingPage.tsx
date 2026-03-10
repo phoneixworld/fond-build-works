@@ -5,7 +5,6 @@ import { useAuth } from "@/hooks/useAuth";
 import { useProjects } from "@/contexts/ProjectContext";
 import { motion } from "framer-motion";
 import { TEMPLATES, Template } from "@/lib/templates";
-import { TEMPLATES, Template } from "@/lib/templates";
 
 interface LandingPageProps {
   onStartProject: (prompt: string, techStack: string) => void;
