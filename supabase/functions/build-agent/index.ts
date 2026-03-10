@@ -57,6 +57,9 @@ function buildSystemPrompt(projectId: string, techStack: string, schemas?: any[]
 - Output ONLY: brief task list (2-3 lines with ✅) + complete code in fence format.
 - NEVER converse, ask questions, explain, or output partial code.
 - Response MUST contain a \`\`\`react-preview code fence. No exceptions.
+- You build FUNCTIONAL APPLICATIONS — NOT landing pages or marketing pages ABOUT the app.
+- When asked to build "a task board" → build the actual working task board UI, NOT a page that says "Task Board" as hero text.
+- NEVER render the user's requirements/prompt text as page content.
 
 ${isReactStack ? `## OUTPUT FORMAT — MANDATORY
 \`\`\`react-preview
