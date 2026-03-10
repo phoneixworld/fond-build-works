@@ -739,6 +739,7 @@ async function runPlannedBuild(
   config: EngineConfig,
   callbacks: EngineCallbacks
 ): Promise<void> {
+  console.log(`[BuildEngine] ▶ runPlannedBuild activated (prompt: ${prompt.length} chars, existingFiles: ${config.existingFiles ? Object.keys(config.existingFiles).length : 0})`);
   callbacks.onProgress({ phase: "planning", message: "Analyzing requirements and creating build plan..." });
   
   const planTimer = timer();
