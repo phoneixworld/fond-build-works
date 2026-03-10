@@ -409,63 +409,7 @@ const CONTEXT_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentProject?.id, setPreviewHtml]);
 
-  // ─── fetchProjectContext ──────────────────────────────────────────────────
-  // All 4 DB queries run in parallel (Promise.allSettled) and the result is
-  // cached per project for CONTEXT_CACHE_TTL_MS so subsequent messages are
-  // instant — no DB round-trips at send time.
-  const fetchProjectContext = useCallback(async (projectId: string): Promise<{ schemas: any[]; knowledge: string[]; irContext: string }> => {
-    const cache = projectContextCacheRef.current;
-    if (cache && cache.projectId === projectId && (Date.now() - cache.fetchedAt) < CONTEXT_CACHE_TTL_MS) {
-      return { schemas: cache.schemas, knowledge: cache.knowledge, irContext: cache.irContext };
-    }
-
-    const [schemasRes, knowledgeRes, decisionsRes, governanceRes, irRes] = await Promise.allSettled([
-      supabase.from("project_schemas" as any).select("collection_name, schema").eq("project_id", projectId),
-      supabase.from("project_knowledge" as any).select("title, content").eq("project_id", projectId).eq("is_active", true),
-      supabase.from("project_decisions" as any).select("category, title, description").eq("project_id", projectId).eq("is_active", true),
-      supabase.from("project_governance_rules" as any).select("category, name, description, severity").eq("project_id", projectId).eq("is_active", true),
-      supabase.from("projects").select("ir_state").eq("id", projectId).single(),
-    ]);
-
-    const schemas = schemasRes.status === "fulfilled" ? (schemasRes.value.data || []) : [];
-    const knowledge: string[] = knowledgeRes.status === "fulfilled"
-      ? (knowledgeRes.value.data || []).map((k: any) => `[${k.title}]: ${k.content}`)
-      : [];
-
-    if (decisionsRes.status === "fulfilled" && decisionsRes.value.data?.length) {
-      knowledge.push("[PROJECT DECISIONS - Follow these architectural decisions]:");
-      decisionsRes.value.data.forEach((d: any) => {
-        knowledge.push(`  [${d.category}] ${d.title}${d.description ? ': ' + d.description : ''}`);
-      });
-    }
-    if (governanceRes.status === "fulfilled" && governanceRes.value.data?.length) {
-      knowledge.push("[GOVERNANCE RULES - Enforce these standards in generated code]:");
-      governanceRes.value.data.forEach((r: any) => {
-        knowledge.push(`  [${r.severity.toUpperCase()}] ${r.name}${r.description ? ': ' + r.description : ''}`);
-      });
-    }
-
-    // Serialize IR state if present
-    let irContext = "";
-    if (irRes.status === "fulfilled" && irRes.value.data) {
-      const { serializeIR } = await import("@/lib/irSerializer");
-      irContext = serializeIR((irRes.value.data as any).ir_state);
-    }
-
-    projectContextCacheRef.current = { projectId, schemas, knowledge, irContext, fetchedAt: Date.now() };
-    return { schemas, knowledge, irContext };
-  }, []);
-
-  // Prefetch context when a project is loaded — so the FIRST message has zero DB wait
-  useEffect(() => {
-    if (currentProject?.id) {
-      // Invalidate cache on project switch
-      if (projectContextCacheRef.current?.projectId !== currentProject.id) {
-        projectContextCacheRef.current = null;
-      }
-      fetchProjectContext(currentProject.id);
-    }
-  }, [currentProject?.id, fetchProjectContext]);
+  // fetchProjectContext is now provided by useProjectContextCache hook
 
   useEffect(() => {
     const handlePaste = (e: ClipboardEvent) => {
