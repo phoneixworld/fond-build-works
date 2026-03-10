@@ -65,3 +65,12 @@ verify_jwt = false
 
 [functions.project-email]
 verify_jwt = false
+
+[functions.build-orchestrator]
+verify_jwt = false
+
+[functions.build-preview]
+verify_jwt = false
+
+[functions.android-export]
+verify_jwt = false
