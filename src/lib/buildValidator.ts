@@ -181,7 +181,6 @@ export function autoCreateStubFiles(
       "/components/ui/DataTable.jsx", "/components/ui/DataTable.js",
     ];
     if (sharedUIFiles.some(f => filePath === f || filePath.endsWith(f))) {
-      // Restore the real Toast/Spinner/DataTable from scaffold templates
       const sharedUI = getSharedUIComponents();
       const matchingKey = Object.keys(sharedUI).find(k => filePath.endsWith(k.replace(/^\//, "")) || filePath === k);
       if (matchingKey && sharedUI[matchingKey]) {
@@ -189,6 +188,19 @@ export function autoCreateStubFiles(
         console.log("[BuildValidator] Restored shared UI component from scaffold: " + filePath);
         continue;
       }
+    }
+
+    // CRITICAL: Never stub context files — a generic stub named "AuthContext"
+    // collides with the `const AuthContext = createContext(...)` declaration,
+    // causing "Identifier has already been declared" errors.
+    const contextFiles = [
+      "/contexts/AuthContext.jsx", "/contexts/AuthContext.js",
+      "/contexts/CartContext.jsx", "/contexts/CartContext.js",
+      "/contexts/ThemeContext.jsx", "/contexts/ThemeContext.js",
+    ];
+    if (contextFiles.some(f => filePath === f || filePath.endsWith(f))) {
+      console.log("[BuildValidator] Skipped stub for context file (would cause naming collision): " + filePath);
+      continue;
     }
 
     if (/^[A-Z]/.test(componentName)) {
@@ -402,7 +414,31 @@ export function makeCSSSub(): string {
 
 export function stubBrokenFiles(files: Record<string, string>, errors: { file: string; error: string }[]): Record<string, string> {
   const result = { ...files };
+  
+  // Context files must NOT be stubbed — a stub named "AuthContext" collides
+  // with the createContext variable, causing "already been declared" errors.
+  const contextPatterns = ["/contexts/AuthContext", "/contexts/CartContext", "/contexts/ThemeContext"];
+  const sharedUIPatterns = ["/components/ui/Toast", "/components/ui/Spinner", "/components/ui/DataTable"];
+  
   for (const { file, error } of errors) {
+    // Skip context files — removing them is safer than a broken stub
+    if (contextPatterns.some(p => file.includes(p))) {
+      console.warn(`[BuildValidator] Context file "${file}" has errors — removing instead of stubbing to avoid naming collision`);
+      delete result[file];
+      continue;
+    }
+    
+    // Restore shared UI from scaffolds instead of stubbing
+    if (sharedUIPatterns.some(p => file.includes(p))) {
+      const sharedUI = getSharedUIComponents();
+      const matchingKey = Object.keys(sharedUI).find(k => file.endsWith(k.replace(/^\//, "")) || file === k);
+      if (matchingKey && sharedUI[matchingKey]) {
+        result[file] = sharedUI[matchingKey];
+        console.log("[BuildValidator] Restored shared UI from scaffold instead of stubbing: " + file);
+        continue;
+      }
+    }
+    
     console.warn(`[BuildValidator] Stubbing broken file "${file}": ${error}`);
     if (file.match(/\.css$/)) {
       result[file] = makeCSSSub();
