@@ -38,7 +38,7 @@ serve(async (req) => {
 
   try {
     const body = await req.json();
-    const { project_id, action, email, password, display_name, token } = body;
+    const { project_id, action, email, password, display_name, name, token } = body;
 
     if (!project_id || !action) {
       return new Response(JSON.stringify({ error: "project_id and action are required" }), {
