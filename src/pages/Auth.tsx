@@ -6,7 +6,7 @@ import { useToast } from "@/hooks/use-toast";
 
 const Auth = () => {
   const { user, loading, signIn, signUp } = useAuth();
-  const [isSignUp, setIsSignUp] = useState(false);
+  const isSignUp = false;
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [displayName, setDisplayName] = useState("");
@@ -26,9 +26,7 @@ const Auth = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setSubmitting(true);
-    const { error } = isSignUp
-      ? await signUp(email, password, displayName)
-      : await signIn(email, password);
+    const { error } = await signIn(email, password);
 
     if (error) {
       toast({ title: "Error", description: error.message, variant: "destructive" });
@@ -138,21 +136,6 @@ const Auth = () => {
 
           {/* Form */}
           <form onSubmit={handleSubmit} className="space-y-4">
-            {isSignUp && (
-              <div className="space-y-1.5">
-                <label className="text-xs font-medium text-muted-foreground">Display name</label>
-                <div className="relative">
-                  <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground/60" />
-                  <input
-                    type="text"
-                    placeholder="John Doe"
-                    value={displayName}
-                    onChange={(e) => setDisplayName(e.target.value)}
-                    className="w-full pl-10 pr-4 py-2.5 bg-secondary border border-border rounded-lg text-sm text-foreground placeholder:text-muted-foreground/40 outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary/50 transition-all"
-                  />
-                </div>
-              </div>
-            )}
             <div className="space-y-1.5">
               <label className="text-xs font-medium text-muted-foreground">Email</label>
               <div className="relative">
@@ -189,28 +172,9 @@ const Auth = () => {
               className="w-full py-2.5 bg-primary text-primary-foreground rounded-lg text-sm font-semibold hover:bg-primary/90 disabled:opacity-50 transition-all flex items-center justify-center gap-2 shadow-lg shadow-primary/20"
             >
               {submitting && <Loader2 className="w-4 h-4 animate-spin" />}
-              {isSignUp ? "Create Account" : "Sign In"}
+              Sign In
             </button>
           </form>
-
-          <div className="relative">
-            <div className="absolute inset-0 flex items-center">
-              <div className="w-full border-t border-border" />
-            </div>
-            <div className="relative flex justify-center text-xs">
-              <span className="px-3 bg-background text-muted-foreground/60">or</span>
-            </div>
-          </div>
-
-          <p className="text-center text-sm text-muted-foreground">
-            {isSignUp ? "Already have an account?" : "Don't have an account?"}{" "}
-            <button
-              onClick={() => setIsSignUp(!isSignUp)}
-              className="text-primary font-medium hover:underline"
-            >
-              {isSignUp ? "Sign in" : "Sign up"}
-            </button>
-          </p>
         </div>
       </div>
     </div>
