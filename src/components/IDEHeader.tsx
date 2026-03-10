@@ -114,48 +114,8 @@ const IDEHeader = ({
   isLocked,
   getLockOwner,
 }: IDEHeaderProps) => {
-  const { viewport, setViewport, triggerRefresh, isBuilding, previewMode, setPreviewMode, sandpackFiles, currentPath, setCurrentPath } = usePreview();
-
-  const [urlInput, setUrlInput] = useState("/");
-  const [isEditingUrl, setIsEditingUrl] = useState(false);
-  const urlInputRef = useRef<HTMLInputElement>(null);
-
-  const detectedRoutes = useMemo(() => detectRoutes(sandpackFiles), [sandpackFiles]);
-  const hasRoutes = detectedRoutes.length > 1;
-
-  const navigateToRoute = useCallback((path: string) => {
-    setCurrentPath(path);
-    setUrlInput(path);
-    const sandpackIframe = document.querySelector('.sp-preview-iframe') as HTMLIFrameElement;
-    if (sandpackIframe?.contentWindow) {
-      sandpackIframe.contentWindow.postMessage({ type: "navigate", path }, "*");
-    }
-  }, [setCurrentPath]);
-
-  const handleUrlSubmit = useCallback(() => {
-    setIsEditingUrl(false);
-    if (urlInput.startsWith("/")) navigateToRoute(urlInput);
-  }, [urlInput, navigateToRoute]);
-
-  // Sync urlInput with currentPath
-  useEffect(() => {
-    if (!isEditingUrl) setUrlInput(currentPath);
-  }, [currentPath, isEditingUrl]);
-
-  // Listen for route changes from Sandpack iframe
-  useEffect(() => {
-    const handler = (e: MessageEvent) => {
-      if (e.data?.type === "route-change" && typeof e.data.path === "string") {
-        setCurrentPath(e.data.path);
-      }
-    };
-    window.addEventListener("message", handler);
-    return () => window.removeEventListener("message", handler);
-  }, [setCurrentPath]);
 
   const getInitials = (email: string) => email.slice(0, 2).toUpperCase();
-
-  const isPreview = rightPanel === "preview";
 
   return (
     <header className="h-11 flex items-center px-3 border-b border-border shrink-0 z-10 relative bg-ide-panel-header">
