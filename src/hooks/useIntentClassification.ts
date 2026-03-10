@@ -83,6 +83,10 @@ export function useIntentClassification(
     if (text.length > 3000) return "build";
 
     // ── Chat patterns (check FIRST to avoid false build matches) ──
+    // Phased/incremental work signals — user wants to discuss before building
+    if (/\b(phase by phase|step by step|i'll give you|ill give you|one at a time|let me explain|first let me|i'll share|ill share|i'll provide|ill provide|wait for my|before you start)\b/i.test(t)) return "chat";
+    // "These are the..." / "Here are the..." — user is providing info, not requesting a build
+    if (/^(these are|here are|here is|this is|below are|following are|attached are)\b/i.test(t)) return "chat";
     // Questions starting with interrogative words — with or without "?"
     if (/^(what|how|why|can you|could you|should|is it|tell me|explain|help me understand|describe|what's|how's|why's|when|where|who)\b/i.test(t)) return "chat";
     // Conversational phrases
