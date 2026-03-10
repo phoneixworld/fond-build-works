@@ -1,6 +1,7 @@
-import { Plus, FolderOpen, Trash2, Loader2 } from "lucide-react";
+import { Plus, FolderOpen, Trash2, Loader2, Users } from "lucide-react";
 import { useProjects } from "@/contexts/ProjectContext";
 import { formatDistanceToNow } from "date-fns";
+import PendingInvites from "@/components/PendingInvites";
 
 const ProjectList = () => {
   const { projects, currentProject, loading, selectProject, createProject, deleteProject } = useProjects();
