@@ -163,7 +163,7 @@ export async function executeTask(
 function extractFilesFromOutput(text: string): Record<string, string> | null {
   const files: Record<string, string> = {};
   const separatorRegex = /^-{3}\s+(\/?\w[\w/.-]*\.(?:jsx?|tsx?|css))\s*-{0,3}\s*$/;
-  const depsSeparator = /^-{3}\s+dependencies\s*$/i;
+  const depsSeparator = /^-{3}\s+\/?dependencies\s*$/i;
 
   // Find code fence
   const fencePatterns = ["```react-preview", "```jsx-preview", "```react", "```jsx"];
