@@ -270,6 +270,8 @@ const IDELayout = () => {
           myColor={myColor}
           layoutSwapped={layoutSwapped}
           onSwapLayout={() => setLayoutSwapped(prev => !prev)}
+          isLocked={isLocked}
+          getLockOwner={getLockOwner}
         />
 
         <div className="flex-1 overflow-hidden">
