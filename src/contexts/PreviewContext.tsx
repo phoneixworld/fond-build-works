@@ -62,6 +62,9 @@ export const PreviewProvider = ({ children }: { children: ReactNode }) => {
   const [previewMode, setPreviewMode] = useState<"html" | "sandpack">("html");
   const [buildMetrics, setBuildMetrics] = useState<BuildMetrics | null>(null);
   const [snapshots, setSnapshots] = useState<BuildSnapshot[]>([]);
+  const [viewport, setViewport] = useState<ViewportId>("desktop");
+  const [refreshKey, setRefreshKey] = useState(0);
+  const [currentPath, setCurrentPath] = useState("/");
 
   const saveSnapshot = useCallback((label: string) => {
     if (!sandpackFiles) return;
