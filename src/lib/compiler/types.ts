@@ -171,7 +171,8 @@ export type RepairActionType =
   | "fix_import"
   | "fix_import_syntax"
   | "fix_syntax"
-  | "remove_empty_stub";
+  | "remove_empty_stub"
+  | "generate_missing_module";
 
 export interface RepairAction {
   type: RepairActionType;
