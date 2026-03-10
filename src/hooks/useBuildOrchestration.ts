@@ -836,7 +836,7 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
             const mergedFiles = { ...currentFiles, ...files };
             setSandpackFiles(mergedFiles);
             syncSandpackToVirtualFS(mergedFiles);
-            setPreviewMode("sandpack");
+            setPreviewMode("esm");
           }
         },
         onTaskError: (task, error) => {
