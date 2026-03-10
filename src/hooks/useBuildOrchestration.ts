@@ -781,14 +781,9 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
 
       saveSnapshot(`Pre-build: ${userText.slice(0, 50)}`);
 
-      streamingControllerRef.current = new StreamingPreviewController((files, deps) => {
-        if (lastProjectIdRef.current !== buildProjectId) return;
-        const currentFiles = sandpackFilesRef.current || {};
-        setSandpackFiles({ ...currentFiles, ...files });
-        if (Object.keys(deps).length > 0) setSandpackDeps(deps);
-        setPreviewMode("sandpack");
-      }, 500);
-      streamingControllerRef.current.start();
+      // NOTE: Streaming preview disabled — partial file updates cause Sandpack
+      // to rebundle every 500ms, which causes severe flickering and crashes.
+      // Files are now only sent to Sandpack on task completion (onFilesReady).
 
       await runBuildEngine(userText, engineConfig, {
         onProgress: (progress: EngineProgress) => {
