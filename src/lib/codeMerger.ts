@@ -355,12 +355,22 @@ function mergeBackendFiles(
     incoming.match(/export\s+(function|const|default)\s+(\w+)/g) || [];
 
   const existingNames = new Set(
-    existingExports.map(e => e.match(/(\w+)$/)?.[1])
+    existingExports.map(e => e.match(/(\w+)$/)?.[1]).filter(Boolean)
   );
-  const hasNewExports = incomingExports.some(e => {
-    const name = e.match(/(\w+)$/)?.[1];
-    return name && !existingNames.has(name);
-  });
+  const incomingNames = new Set(
+    incomingExports.map(e => e.match(/(\w+)$/)?.[1]).filter(Boolean)
+  );
+
+  // CRITICAL: Check for duplicate declarations (e.g., AuthContext defined in both).
+  // If both files export the same names, the incoming version replaces entirely
+  // to avoid "Identifier has already been declared" errors.
+  const hasDuplicateExports = [...incomingNames].some(name => name && existingNames.has(name));
+  if (hasDuplicateExports) {
+    console.log(`[CodeMerger] Backend file has overlapping exports — using incoming version to avoid duplicates`);
+    return incoming;
+  }
+
+  const hasNewExports = [...incomingNames].some(name => name && !existingNames.has(name));
 
   if (hasNewExports) {
     const mergedImports = deduplicateImports([

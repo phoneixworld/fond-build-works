@@ -18,6 +18,7 @@ import postcss from "postcss";
 import {
   isFileValidated, markFileValidated,
 } from "@/lib/buildCache";
+import { getSharedUIComponents } from "@/lib/templates/scaffoldTemplates";
 
 // ─── File Validation ──────────────────────────────────────────────────────
 
@@ -172,15 +173,27 @@ export function autoCreateStubFiles(
 
     if (allFiles[filePath]) continue;
 
+    // CRITICAL: Check shared UI components BEFORE PascalCase generic stub.
+    // Toast, Spinner, DataTable must get real implementations, not empty stubs.
+    const sharedUIFiles = [
+      "/components/ui/Toast.jsx", "/components/ui/Toast.js",
+      "/components/ui/Spinner.jsx", "/components/ui/Spinner.js",
+      "/components/ui/DataTable.jsx", "/components/ui/DataTable.js",
+    ];
+    if (sharedUIFiles.some(f => filePath === f || filePath.endsWith(f))) {
+      // Restore the real Toast/Spinner/DataTable from scaffold templates
+      const sharedUI = getSharedUIComponents();
+      const matchingKey = Object.keys(sharedUI).find(k => filePath.endsWith(k.replace(/^\//, "")) || filePath === k);
+      if (matchingKey && sharedUI[matchingKey]) {
+        allFiles[filePath] = sharedUI[matchingKey];
+        console.log("[BuildValidator] Restored shared UI component from scaffold: " + filePath);
+        continue;
+      }
+    }
+
     if (/^[A-Z]/.test(componentName)) {
       allFiles[filePath] = `import React from "react";\n\nexport default function ${componentName}({ children }) {\n  return (\n    <div className="p-4">\n      {children || <p className="text-gray-400">${componentName} loading...</p>}\n    </div>\n  );\n}\n`;
     } else {
-      // Don't overwrite shared UI components with empty stubs
-      const sharedUIFiles = ["/components/ui/Toast.jsx", "/components/ui/Toast.js", "/components/ui/Spinner.jsx", "/components/ui/DataTable.jsx"];
-      if (sharedUIFiles.some(f => filePath === f || filePath.endsWith(f))) {
-        console.log("[BuildValidator] Skipped stub for shared UI component: " + filePath);
-        continue;
-      }
       allFiles[filePath] = `// Auto-generated stub for ${componentName}\nexport default {};\n`;
     }
     console.log("[BuildValidator] Auto-created stub: " + filePath);
