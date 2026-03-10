@@ -124,37 +124,6 @@ const IDEHeader = ({
               <SlidersHorizontal className="w-3.5 h-3.5" />
               Project Settings
             </DropdownMenuItem>
-
-            {/* Tech Stack sub-menu */}
-            <DropdownMenuSub>
-              <DropdownMenuSubTrigger className="text-xs gap-2">
-                {currentStackInfo?.icon && <currentStackInfo.icon className="w-3.5 h-3.5" />}
-                Stack: {currentStackInfo?.label}
-              </DropdownMenuSubTrigger>
-              <DropdownMenuSubContent className="min-w-[200px]">
-                <DropdownMenuLabel className="text-[10px] uppercase tracking-wider text-muted-foreground/60">Frontend</DropdownMenuLabel>
-                {TECH_STACKS.filter(s => s.category === "frontend").map((stack) => {
-                  const Icon = stack.icon;
-                  return (
-                    <DropdownMenuItem key={stack.id} onClick={() => onTechStackChange(stack.id)} className={`text-xs gap-2 ${currentStack === stack.id ? "text-primary font-medium" : ""}`}>
-                      <Icon className="w-3.5 h-3.5" />
-                      {stack.label}
-                    </DropdownMenuItem>
-                  );
-                })}
-                <DropdownMenuSeparator />
-                <DropdownMenuLabel className="text-[10px] uppercase tracking-wider text-muted-foreground/60">Full-Stack</DropdownMenuLabel>
-                {TECH_STACKS.filter(s => s.category === "fullstack").map((stack) => {
-                  const Icon = stack.icon;
-                  return (
-                    <DropdownMenuItem key={stack.id} onClick={() => onTechStackChange(stack.id)} className={`text-xs gap-2 ${currentStack === stack.id ? "text-primary font-medium" : ""}`}>
-                      <Icon className="w-3.5 h-3.5" />
-                      {stack.label}
-                    </DropdownMenuItem>
-                  );
-                })}
-              </DropdownMenuSubContent>
-            </DropdownMenuSub>
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
