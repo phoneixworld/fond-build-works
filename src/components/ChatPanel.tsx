@@ -65,7 +65,7 @@ const ChatPanel = forwardRef<ChatPanelHandle, { initialPrompt?: string; onVersio
   const [pendingPrompt, setPendingPrompt] = useState<string | null>(null);
   const [selectedModel, setSelectedModel] = useState<AIModelId>(DEFAULT_MODEL);
   const [selectedTheme, setSelectedTheme] = useState<string>("minimal");
-  const [previewErrors, setPreviewErrors] = useState<string[]>([]);
+  // previewErrors, healAttempts, isHealing, healingStatus provided by useSelfHealing hook below
   const [attachedImages, setAttachedImages] = useState<string[]>([]);
   const [isDragOver, setIsDragOver] = useState(false);
   const [showScrollBtn, setShowScrollBtn] = useState(false);
