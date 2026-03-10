@@ -77,8 +77,6 @@ const IDEHeader = ({
   isLocked,
   getLockOwner,
 }: IDEHeaderProps) => {
-  const currentStack = (currentProject as any)?.tech_stack || "html-tailwind";
-  const currentStackInfo = TECH_STACKS.find(s => s.id === currentStack);
 
   const getInitials = (email: string) => email.slice(0, 2).toUpperCase();
 
