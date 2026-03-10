@@ -1028,7 +1028,7 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
     // GATE: If server FSM is in "gathering" mode, DO NOT build — gather instead
     if (conversationMode === "gathering") {
       // Treat as additional requirements
-      const phase = conversationAddPhase?.(finalText, hasImages);
+      const phase = conversationAddPhase?.(finalText, hasImages, images);
       const ackText = conversationGenerateAck?.(phase) || "✅ Got it! Send the next phase when ready, or say **\"build it\"** to start.";
 
       const content = buildMessageContent(finalText, images);
