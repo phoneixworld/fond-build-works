@@ -441,7 +441,7 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
                 setSandpackFiles(reactResult.files!);
                 syncSandpackToVirtualFS(reactResult.files!);
                 if (Object.keys(reactResult.deps).length > 0) setSandpackDeps(reactResult.deps);
-                setPreviewMode("sandpack");
+                setPreviewMode("esm");
                 setIsLoading(false);
                 setIsBuilding(false);
                 setBuildStep("");
