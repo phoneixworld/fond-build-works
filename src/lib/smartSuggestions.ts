@@ -1,7 +1,13 @@
 /**
- * Smart Suggestion Engine
- * Analyzes chat history + generated code to produce context-aware
- * "quick action" suggestions tailored to each project.
+ * Smart Suggestion Engine v2
+ * 
+ * Generates context-aware quick actions based on:
+ * 1. Recent conversation (what was just built/discussed)
+ * 2. Project type & build state
+ * 3. What's missing vs. what exists
+ * 
+ * Key change from v1: suggestions follow from the LAST action,
+ * not from a static feature checklist.
  */
 
 export interface SmartSuggestion {
@@ -10,203 +16,323 @@ export interface SmartSuggestion {
   icon: string;
 }
 
-// ─── Feature detection from code ────────────────────────────────────────────
+// ─── Conversation-Aware Analysis ──────────────────────────────────────────
 
-interface DetectedFeatures {
-  hasAuth: boolean;
-  hasNavbar: boolean;
-  hasForms: boolean;
-  hasCharts: boolean;
-  hasDarkMode: boolean;
-  hasAnimations: boolean;
-  hasCart: boolean;
-  hasFooter: boolean;
-  hasAPI: boolean;
-  hasCRUD: boolean;
-  hasSearch: boolean;
-  hasImages: boolean;
-  hasPagination: boolean;
-  hasModals: boolean;
-  hasTabs: boolean;
-  hasTable: boolean;
-  hasMobileMenu: boolean;
-  framework: "react" | "html" | "unknown";
+interface ProjectState {
+  projectType: string;
+  recentAction: string;        // what the user just did / asked
+  buildPhase: "empty" | "initial" | "iterating" | "polishing";
+  detectedFeatures: Set<string>;
+  recentTopics: string[];       // last 3 user messages' topics
 }
 
-function detectFeatures(code: string): DetectedFeatures {
-  const lower = code.toLowerCase();
-  return {
-    hasAuth: /login|signup|sign.?in|sign.?up|password|auth|useauth|authcontext/i.test(code),
-    hasNavbar: /navbar|nav.?bar|navigation|header.*nav|<nav/i.test(code),
-    hasForms: /form|input.*type|textarea|onsubmit|handlesubmit|useform/i.test(code),
-    hasCharts: /chart|recharts|d3|graph|bar.?chart|line.?chart|pie.?chart/i.test(code),
-    hasDarkMode: /dark.?mode|theme.?toggle|useTheme|dark:|\.dark\s/i.test(code),
-    hasAnimations: /framer.?motion|animate|transition|keyframes|@keyframes/i.test(code),
-    hasCart: /cart|shopping|checkout|add.?to.?cart|basket|product/i.test(code),
-    hasFooter: /footer|<footer/i.test(code),
-    hasAPI: /fetch\(|axios|api\/|endpoint|supabase|usequery/i.test(code),
-    hasCRUD: /create|update|delete|insert|\.post\(|\.put\(|\.delete\(/i.test(code),
-    hasSearch: /search|filter|query.*input|searchbar/i.test(code),
-    hasImages: /gallery|image.*grid|carousel|slideshow|lightbox/i.test(code),
-    hasPagination: /pagination|page.*number|next.*page|prev.*page|loadmore/i.test(code),
-    hasModals: /modal|dialog|popup|overlay|drawer/i.test(code),
-    hasTabs: /tabs|tab.*panel|tablist/i.test(code),
-    hasTable: /table|thead|tbody|data.?table|datagrid/i.test(code),
-    hasMobileMenu: /mobile.*menu|hamburger|menu.*toggle|responsive.*nav/i.test(code),
-    framework: /import.*react|useState|useEffect|jsx/i.test(code) ? "react" 
-      : /<html|<!doctype/i.test(code) ? "html" : "unknown",
-  };
-}
+function analyzeProject(
+  code: string,
+  chatMessages: Array<{ role: string; content: string }>
+): ProjectState {
+  const userMessages = chatMessages
+    .filter(m => m.role === "user")
+    .map(m => typeof m.content === "string" ? m.content : "");
 
-// ─── Topic detection from chat history ──────────────────────────────────────
-
-interface ChatContext {
-  topics: string[];
-  lastUserMessage: string;
-  messageCount: number;
-  hasAskedAboutDesign: boolean;
-  hasAskedAboutBugs: boolean;
-  projectType: "ecommerce" | "dashboard" | "blog" | "portfolio" | "saas" | "social" | "general";
-}
-
-function analyzeChatHistory(messages: Array<{ role: string; content: string }>): ChatContext {
-  const userMessages = messages.filter(m => m.role === "user").map(m => 
-    typeof m.content === "string" ? m.content : ""
-  );
+  const lastMsg = userMessages[userMessages.length - 1] || "";
+  const last3 = userMessages.slice(-3).join(" ").toLowerCase();
   const allText = userMessages.join(" ").toLowerCase();
+  const lower = code.toLowerCase();
 
-  const projectType: ChatContext["projectType"] = 
-    /e.?commerce|shop|product|cart|store|checkout/i.test(allText) ? "ecommerce" :
-    /dashboard|analytics|metric|chart|admin/i.test(allText) ? "dashboard" :
-    /blog|article|post|writing|cms/i.test(allText) ? "blog" :
-    /portfolio|resume|personal|showcase/i.test(allText) ? "portfolio" :
-    /saas|subscription|pricing|tier|plan/i.test(allText) ? "saas" :
-    /social|feed|profile|follow|comment|like/i.test(allText) ? "social" :
-    "general";
+  // Detect what type of project this is
+  const projectType = detectProjectType(allText, lower);
 
-  return {
-    topics: extractTopics(allText),
-    lastUserMessage: userMessages[userMessages.length - 1] || "",
-    messageCount: userMessages.length,
-    hasAskedAboutDesign: /design|style|color|theme|look|ui|ux|beautiful/i.test(allText),
-    hasAskedAboutBugs: /bug|fix|error|broken|issue|problem/i.test(allText),
-    projectType,
-  };
+  // Detect recent action from last message
+  const recentAction = categorizeAction(lastMsg);
+
+  // Determine build phase
+  const buildPhase: ProjectState["buildPhase"] =
+    !code && userMessages.length === 0 ? "empty" :
+    userMessages.length <= 2 ? "initial" :
+    userMessages.length <= 6 ? "iterating" : "polishing";
+
+  // Detect features present in the code
+  const detectedFeatures = detectFeatures(lower);
+
+  // Extract recent topics
+  const recentTopics = extractRecentTopics(last3);
+
+  return { projectType, recentAction, buildPhase, detectedFeatures, recentTopics };
 }
 
-function extractTopics(text: string): string[] {
-  const topics: string[] = [];
-  const patterns: [RegExp, string][] = [
-    [/landing.?page|hero|cta/, "landing-page"],
-    [/auth|login|signup/, "authentication"],
-    [/form|contact|input/, "forms"],
-    [/responsive|mobile/, "responsive"],
-    [/animation|motion|transition/, "animations"],
-    [/dark.?mode|theme/, "theming"],
-    [/api|backend|data/, "api-integration"],
-    [/seo|meta|og:/, "seo"],
-    [/payment|stripe|billing/, "payments"],
-    [/notification|toast|alert/, "notifications"],
-    [/testing|test|spec/, "testing"],
+function detectProjectType(chat: string, code: string): string {
+  const combined = chat + " " + code;
+  const types: [RegExp, string][] = [
+    [/kanban|board|task|trello|project.?manage/i, "project-management"],
+    [/e.?commerce|shop|product|cart|store|checkout/i, "ecommerce"],
+    [/dashboard|analytics|metric|admin.?panel/i, "dashboard"],
+    [/blog|article|post|writing|cms/i, "blog"],
+    [/portfolio|resume|personal|showcase/i, "portfolio"],
+    [/saas|subscription|pricing|tier/i, "saas"],
+    [/social|feed|profile|follow|timeline/i, "social"],
+    [/chat|messaging|conversation|inbox/i, "chat-app"],
+    [/crm|customer|lead|pipeline|sales/i, "crm"],
+    [/todo|task.?list|checklist/i, "todo"],
+    [/booking|appointment|calendar|schedule/i, "booking"],
+    [/survey|form.?builder|questionnaire/i, "forms"],
   ];
-  for (const [rx, topic] of patterns) {
+  for (const [rx, type] of types) {
+    if (rx.test(combined)) return type;
+  }
+  return "general";
+}
+
+function categorizeAction(lastMsg: string): string {
+  const l = lastMsg.toLowerCase();
+  if (!l) return "none";
+  if (/fix|bug|error|broken|issue|problem|crash|not.?work/i.test(l)) return "debugging";
+  if (/build|create|make|generate|add/i.test(l)) return "building";
+  if (/change|update|modify|edit|tweak|adjust/i.test(l)) return "modifying";
+  if (/design|style|color|theme|look|prettier|beautiful|ui/i.test(l)) return "designing";
+  if (/deploy|publish|ship|launch/i.test(l)) return "deploying";
+  if (/test|verify|check/i.test(l)) return "testing";
+  return "general";
+}
+
+function detectFeatures(code: string): Set<string> {
+  const features = new Set<string>();
+  const checks: [RegExp, string][] = [
+    [/login|signup|sign.?in|auth|useauth|authcontext/i, "auth"],
+    [/navbar|nav.?bar|navigation|<nav/i, "nav"],
+    [/footer|<footer/i, "footer"],
+    [/dark.?mode|theme.?toggle|usetheme/i, "darkmode"],
+    [/framer.?motion|animate|keyframes/i, "animations"],
+    [/chart|recharts|graph|bar.?chart/i, "charts"],
+    [/table|thead|datagrid/i, "table"],
+    [/search|filter/i, "search"],
+    [/modal|dialog|drawer/i, "modals"],
+    [/form|input.*type|onsubmit/i, "forms"],
+    [/cart|checkout|add.?to.?cart/i, "cart"],
+    [/pagination|loadmore|next.*page/i, "pagination"],
+    [/toast|notification|alert/i, "notifications"],
+    [/sidebar|sidenav/i, "sidebar"],
+    [/skeleton|spinner|loading/i, "loading-states"],
+    [/drag|dnd|sortable/i, "drag-drop"],
+    [/responsive|mobile.*menu|hamburger/i, "responsive"],
+  ];
+  for (const [rx, feature] of checks) {
+    if (rx.test(code)) features.add(feature);
+  }
+  return features;
+}
+
+function extractRecentTopics(text: string): string[] {
+  const topics: string[] = [];
+  const checks: [RegExp, string][] = [
+    [/auth|login|signup/, "auth"],
+    [/nav|header|menu/, "navigation"],
+    [/style|design|color|theme/, "design"],
+    [/data|api|fetch|backend/, "data"],
+    [/deploy|publish|domain/, "deployment"],
+    [/mobile|responsive/, "responsive"],
+    [/bug|fix|error/, "bugfix"],
+    [/page|route|screen/, "pages"],
+    [/button|click|action/, "interactions"],
+    [/image|photo|gallery/, "media"],
+  ];
+  for (const [rx, topic] of checks) {
     if (rx.test(text)) topics.push(topic);
   }
   return topics;
 }
 
-// ─── Suggestion generator ───────────────────────────────────────────────────
+// ─── Suggestion Rules ─────────────────────────────────────────────────────
 
-const ALL_SUGGESTIONS: Array<SmartSuggestion & { 
-  requires?: (f: DetectedFeatures, c: ChatContext) => boolean;
-  priority?: number;
-}> = [
-  // Missing essential features
-  { label: "Add navigation", prompt: "Add a responsive navigation bar with logo, menu links, and a mobile hamburger menu", icon: "🧭",
-    requires: (f) => !f.hasNavbar && f.framework !== "unknown", priority: 10 },
-  { label: "Add footer", prompt: "Add a professional footer with links, social icons, and copyright", icon: "📋",
-    requires: (f) => !f.hasFooter && f.hasNavbar, priority: 8 },
-  { label: "Add auth", prompt: "Add a login and signup page with form validation and protected routes", icon: "🔐",
-    requires: (f) => !f.hasAuth, priority: 9 },
-  { label: "Make responsive", prompt: "Make the entire app fully responsive for mobile, tablet, and desktop", icon: "📱",
-    requires: (f) => !f.hasMobileMenu && f.hasNavbar, priority: 9 },
-  { label: "Add dark mode", prompt: "Add a dark mode toggle with smooth transitions and persistent preference", icon: "🌙",
-    requires: (f) => !f.hasDarkMode, priority: 7 },
-  { label: "Add animations", prompt: "Add smooth entrance animations, hover effects, and micro-interactions using Framer Motion", icon: "✨",
-    requires: (f) => !f.hasAnimations, priority: 6 },
+interface SuggestionRule {
+  label: string;
+  prompt: string;
+  icon: string;
+  /** Returns a relevance score (0 = don't show, higher = more relevant) */
+  score: (state: ProjectState) => number;
+}
 
-  // Project-type specific
-  { label: "Add product grid", prompt: "Add a product listing grid with images, prices, and Add to Cart buttons", icon: "🛍️",
-    requires: (_, c) => c.projectType === "ecommerce" && !_.hasCart, priority: 10 },
-  { label: "Add checkout", prompt: "Add a checkout flow with cart summary, shipping form, and order confirmation", icon: "💳",
-    requires: (f, c) => c.projectType === "ecommerce" && f.hasCart, priority: 10 },
-  { label: "Add charts", prompt: "Add data visualization with bar charts, line charts, and summary stat cards using Recharts", icon: "📊",
-    requires: (f, c) => c.projectType === "dashboard" && !f.hasCharts, priority: 10 },
-  { label: "Add data table", prompt: "Add a sortable, filterable data table with pagination", icon: "📋",
-    requires: (f, c) => c.projectType === "dashboard" && !f.hasTable, priority: 9 },
-  { label: "Add blog posts", prompt: "Add a blog post listing page with article cards, tags, and a reading view", icon: "📝",
-    requires: (_, c) => c.projectType === "blog", priority: 10 },
-  { label: "Add pricing page", prompt: "Add a pricing page with 3 tiers, feature comparison, and CTA buttons", icon: "💰",
-    requires: (_, c) => c.projectType === "saas", priority: 10 },
-  { label: "Add user feed", prompt: "Add a social feed with posts, likes, and comments", icon: "📰",
-    requires: (_, c) => c.projectType === "social", priority: 10 },
-  { label: "Add project gallery", prompt: "Add a project showcase gallery with filtering, hover effects, and detail modals", icon: "🖼️",
-    requires: (_, c) => c.projectType === "portfolio", priority: 10 },
+const RULES: SuggestionRule[] = [
+  // ── Post-build follow-ups (highest priority — react to what just happened) ──
+  {
+    label: "Test it out",
+    prompt: "Please verify the app works correctly end-to-end — check all pages, forms, and interactions",
+    icon: "✅",
+    score: (s) => s.recentAction === "building" ? 20 : 0,
+  },
+  {
+    label: "Fix remaining issues",
+    prompt: "Check for any bugs, broken imports, or missing functionality and fix them",
+    icon: "🔧",
+    score: (s) => s.recentAction === "debugging" ? 18 : 0,
+  },
+  {
+    label: "Improve the design",
+    prompt: "Polish the visual design — improve spacing, colors, typography, and add subtle animations for a professional feel",
+    icon: "🎨",
+    score: (s) => s.recentAction === "building" ? 12 :
+                  s.recentAction === "modifying" ? 10 : 0,
+  },
 
-  // Enhancement suggestions
-  { label: "Add search", prompt: "Add a search bar with real-time filtering and highlighted results", icon: "🔍",
-    requires: (f) => !f.hasSearch && (f.hasTable || f.hasCRUD), priority: 7 },
-  { label: "Add notifications", prompt: "Add a toast notification system for success, error, and info messages", icon: "🔔",
-    requires: (f) => !f.hasModals && f.hasForms, priority: 6 },
-  { label: "Improve design", prompt: "Improve the overall design — better colors, spacing, typography, and visual hierarchy", icon: "🎨",
-    priority: 5 },
-  { label: "Add loading states", prompt: "Add skeleton loaders, spinners, and error states throughout the app", icon: "⏳",
-    requires: (f) => f.hasAPI || f.hasCRUD, priority: 6 },
-  { label: "Fix bugs", prompt: "Review the current app for any bugs or issues and fix them", icon: "🐛",
-    requires: (_, c) => c.hasAskedAboutBugs || c.messageCount > 5, priority: 5 },
-  { label: "Add SEO", prompt: "Add proper meta tags, Open Graph tags, semantic HTML, and JSON-LD structured data", icon: "🏷️",
-    requires: (f) => f.framework === "html", priority: 4 },
-  { label: "Add pagination", prompt: "Add pagination or infinite scroll to lists and tables", icon: "📄",
-    requires: (f) => !f.hasPagination && (f.hasTable || f.hasCRUD), priority: 5 },
+  // ── Project-type specific next steps ──
+  {
+    label: "Add board columns",
+    prompt: "Add drag-and-drop columns to the board (To Do, In Progress, Done) with the ability to move cards between them",
+    icon: "📋",
+    score: (s) => s.projectType === "project-management" && !s.detectedFeatures.has("drag-drop") ? 15 : 0,
+  },
+  {
+    label: "Add task details",
+    prompt: "Add a task detail modal with description, due date, assignee, labels, and comments",
+    icon: "📝",
+    score: (s) => s.projectType === "project-management" && s.detectedFeatures.has("modals") ? 0 :
+                  s.projectType === "project-management" ? 13 : 0,
+  },
+  {
+    label: "Add product catalog",
+    prompt: "Add a product grid with images, prices, categories, and an Add to Cart button on each card",
+    icon: "🛍️",
+    score: (s) => s.projectType === "ecommerce" && !s.detectedFeatures.has("cart") ? 15 : 0,
+  },
+  {
+    label: "Add checkout flow",
+    prompt: "Add a checkout page with cart summary, shipping form, payment section, and order confirmation",
+    icon: "💳",
+    score: (s) => s.projectType === "ecommerce" && s.detectedFeatures.has("cart") ? 15 : 0,
+  },
+  {
+    label: "Add analytics charts",
+    prompt: "Add interactive charts (line, bar, pie) with real-time data and summary stat cards on the dashboard",
+    icon: "📊",
+    score: (s) => s.projectType === "dashboard" && !s.detectedFeatures.has("charts") ? 15 : 0,
+  },
+  {
+    label: "Add data table",
+    prompt: "Add a sortable, filterable data table with row actions, bulk select, and export functionality",
+    icon: "📋",
+    score: (s) => s.projectType === "dashboard" && !s.detectedFeatures.has("table") ? 13 : 0,
+  },
+  {
+    label: "Add blog editor",
+    prompt: "Add a rich text editor for creating and editing blog posts with image uploads and preview",
+    icon: "✍️",
+    score: (s) => s.projectType === "blog" ? 14 : 0,
+  },
+  {
+    label: "Add pricing tiers",
+    prompt: "Add a pricing page with 3 tiers, feature comparison table, and highlighted recommended plan",
+    icon: "💰",
+    score: (s) => s.projectType === "saas" ? 14 : 0,
+  },
+  {
+    label: "Add user profiles",
+    prompt: "Add user profile pages with avatar, bio, activity feed, and settings",
+    icon: "👤",
+    score: (s) => s.projectType === "social" ? 14 : 0,
+  },
+  {
+    label: "Add message thread",
+    prompt: "Add real-time message threads with typing indicators, read receipts, and message reactions",
+    icon: "💬",
+    score: (s) => s.projectType === "chat-app" ? 14 : 0,
+  },
+
+  // ── Common missing features (medium priority) ──
+  {
+    label: "Add authentication",
+    prompt: "Add login and signup pages with form validation, error handling, and protected routes",
+    icon: "🔐",
+    score: (s) => !s.detectedFeatures.has("auth") && s.buildPhase !== "empty" ? 11 : 0,
+  },
+  {
+    label: "Add navigation",
+    prompt: "Add a responsive navigation bar with logo, links, and a mobile hamburger menu",
+    icon: "🧭",
+    score: (s) => !s.detectedFeatures.has("nav") && s.buildPhase !== "empty" ? 10 : 0,
+  },
+  {
+    label: "Add search & filter",
+    prompt: "Add a search bar with real-time filtering, category filters, and sort options",
+    icon: "🔍",
+    score: (s) => !s.detectedFeatures.has("search") && (s.detectedFeatures.has("table") || s.detectedFeatures.has("cart")) ? 9 : 0,
+  },
+  {
+    label: "Add dark mode",
+    prompt: "Add a dark mode toggle with smooth color transitions and persistent user preference",
+    icon: "🌙",
+    score: (s) => !s.detectedFeatures.has("darkmode") && s.buildPhase === "polishing" ? 8 : 0,
+  },
+  {
+    label: "Make it responsive",
+    prompt: "Make the app fully responsive — optimize layouts for mobile, tablet, and desktop breakpoints",
+    icon: "📱",
+    score: (s) => !s.detectedFeatures.has("responsive") && s.buildPhase !== "empty" ? 8 : 0,
+  },
+  {
+    label: "Add animations",
+    prompt: "Add smooth page transitions, entrance animations, and hover micro-interactions using Framer Motion",
+    icon: "✨",
+    score: (s) => !s.detectedFeatures.has("animations") && s.buildPhase === "polishing" ? 7 : 0,
+  },
+  {
+    label: "Add loading states",
+    prompt: "Add skeleton loaders, spinners, and error boundaries throughout the app for better UX",
+    icon: "⏳",
+    score: (s) => !s.detectedFeatures.has("loading-states") && s.buildPhase === "iterating" ? 7 : 0,
+  },
+  {
+    label: "Add notifications",
+    prompt: "Add a toast notification system for success, error, and info feedback on user actions",
+    icon: "🔔",
+    score: (s) => !s.detectedFeatures.has("notifications") && s.detectedFeatures.has("forms") ? 6 : 0,
+  },
 ];
 
-// ─── Public API ─────────────────────────────────────────────────────────────
+// ─── Starter suggestions (empty project) ──────────────────────────────────
+
+const STARTERS: SmartSuggestion[] = [
+  { label: "Landing page", prompt: "Build a modern landing page with hero section, features grid, testimonials, and call-to-action", icon: "🚀" },
+  { label: "Dashboard", prompt: "Build a data dashboard with sidebar navigation, charts, stat cards, and a data table", icon: "📊" },
+  { label: "E-commerce", prompt: "Build an online store with product listing, shopping cart, and checkout page", icon: "🛒" },
+  { label: "Task board", prompt: "Build a Kanban-style task board with drag-and-drop columns and task cards", icon: "📋" },
+];
+
+// ─── Public API ───────────────────────────────────────────────────────────
 
 /**
- * Generate smart suggestions based on project code + chat history.
- * Returns 4 suggestions sorted by relevance.
+ * Generate context-aware suggestions that follow logically
+ * from what the user just did.
  */
 export function generateSmartSuggestions(
   code: string,
   chatMessages: Array<{ role: string; content: string }>,
   maxSuggestions = 4
 ): SmartSuggestion[] {
-  // Empty project — return starter suggestions
+  // Empty project → starters
   if (!code && chatMessages.length === 0) {
-    return [
-      { label: "Landing page", prompt: "Build a modern landing page with hero section, features grid, testimonials, and CTA", icon: "🚀" },
-      { label: "Dashboard", prompt: "Build a data dashboard with sidebar navigation, charts, and summary cards", icon: "📊" },
-      { label: "E-commerce", prompt: "Build a modern product listing with shopping cart and checkout", icon: "🛒" },
-      { label: "Portfolio", prompt: "Build a personal portfolio with project showcase, about section, and contact form", icon: "🎨" },
-    ];
+    return STARTERS;
   }
 
-  const features = detectFeatures(code);
-  const chatContext = analyzeChatHistory(chatMessages);
+  const state = analyzeProject(code, chatMessages);
 
-  // Score and filter suggestions
-  const scored = ALL_SUGGESTIONS
-    .filter(s => {
-      if (s.requires) return s.requires(features, chatContext);
-      return true;
-    })
-    .map(s => ({
-      label: s.label,
-      prompt: s.prompt,
-      icon: s.icon,
-      score: s.priority || 5,
-    }))
-    .sort((a, b) => b.score - a.score);
+  // Score all rules, filter out zero-score, sort descending
+  const scored = RULES
+    .map(rule => ({ ...rule, s: rule.score(state) }))
+    .filter(r => r.s > 0)
+    .sort((a, b) => b.s - a.s)
+    .slice(0, maxSuggestions)
+    .map(({ label, prompt, icon }) => ({ label, prompt, icon }));
 
-  return scored.slice(0, maxSuggestions);
+  // If we have fewer than 2 suggestions, pad with generic ones
+  if (scored.length < 2) {
+    const fallbacks: SmartSuggestion[] = [
+      { label: "Improve design", prompt: "Polish the visual design — improve spacing, colors, typography, and add subtle animations", icon: "🎨" },
+      { label: "Add a new page", prompt: "Add a new page to the app with navigation link and appropriate content", icon: "📄" },
+    ];
+    for (const fb of fallbacks) {
+      if (scored.length >= maxSuggestions) break;
+      if (!scored.some(s => s.label === fb.label)) scored.push(fb);
+    }
+  }
+
+  return scored;
 }
