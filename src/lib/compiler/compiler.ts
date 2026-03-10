@@ -84,6 +84,7 @@ export async function compile(
 
   const taskGraph = planTaskGraph(ctx);
 
+  cloudLog.info(`Task graph: ${taskGraph.tasks.length} tasks across ${taskGraph.passes.length} passes`, "compiler");
   console.log(`[Compiler] Task graph: ${taskGraph.tasks.length} tasks, ${taskGraph.passes.length} passes`);
   for (let i = 0; i < taskGraph.passes.length; i++) {
     const passTaskLabels = taskGraph.passes[i].map(id =>
