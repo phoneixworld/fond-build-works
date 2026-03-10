@@ -151,6 +151,7 @@ export async function compile(
           cacheHit: false,
         });
 
+        cloudLog.info(`Task '${task.label}' completed: ${producedFiles.length} files`, "compiler");
         console.log(`[Compiler] ✅ Task '${task.label}' done: ${producedFiles.length} files`);
       } catch (err: any) {
         task.status = "failed";
