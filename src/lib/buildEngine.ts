@@ -45,665 +45,9 @@ import { getPromptConfigKey, getCachedSystemPrompt, setCachedSystemPrompt } from
 import { detectTruncation } from "@/lib/truncationRecovery";
 import { resolveImportedDependencies, getDependencyDiff } from "@/lib/dependencyResolver";
 
-// ─── Base Template (mandatory scaffold for all new builds) ────────────────
-//
-// PATH CONVENTION:
-// All generated files use bare "/" paths (e.g., /App.jsx, /components/Hero.jsx).
-// This is required by Sandpack which expects files at root.
-// The pathNormalizer module handles mapping to src/ for:
-//   - VirtualFS display (file tree shows src/App.jsx)
-//   - GitHub push/pull (exports as src/App.jsx)
-//   - Android/ZIP export (bundles under src/)
-// DO NOT change these paths to src/ — it will break preview rendering.
-
+// ─── Templates (extracted to src/lib/templates/scaffoldTemplates.ts) ──────
+import { getBaseTemplate, getSharedUIComponents, getUseApiHook, getGlobalStyles } from "@/lib/templates/scaffoldTemplates";
 import { type DomainModel } from "@/lib/domainTemplates";
-
-/**
- * Returns the mandatory base file scaffold for new React builds.
- * When a DomainModel is provided, generates entity-specific pages, hooks,
- * sidebar nav, and optional auth context — so the AI extends the correct
- * structure from the start instead of a generic Dashboard shell.
- */
-function getBaseTemplate(domainModel?: DomainModel | null): Record<string, string> {
-  // If no domain model, fall back to the generic scaffold
-  if (!domainModel) {
-    return getGenericScaffold();
-  }
-
-  return buildDomainScaffold(domainModel);
-}
-
-/** Builds a scaffold dynamically from a matched domain template */
-function buildDomainScaffold(model: DomainModel): Record<string, string> {
-  const files: Record<string, string> = {};
-
-  // ── 1. Extract pages & routes from domain model ──
-  const pages = model.suggestedPages || [];
-  const navItems = model.suggestedNavItems || [];
-  const entities = model.entities || [];
-
-  // Determine the index route (first page or "/dashboard" or "/")
-  const indexPage = pages.find(p => p.path === "/") || pages.find(p => p.path === "/dashboard") || pages[0];
-  const indexPath = indexPage?.path || "/";
-
-  // ── 2. Generate /pages/<Entity>/<Entity>List.jsx and /pages/<Entity>/<Entity>Detail.jsx ──
-  const routeImports: string[] = [];
-  const routeElements: string[] = [];
-  const generatedPageComponents = new Set<string>();
-
-  for (const page of pages) {
-    if (page.path.includes(":")) continue; // Detail routes handled below via entity
-
-    const pageName = page.title.replace(/[^a-zA-Z0-9]/g, "");
-    if (generatedPageComponents.has(pageName)) continue;
-    generatedPageComponents.add(pageName);
-
-    const dirName = pageName;
-    const fileName = pageName;
-    const filePath = `/pages/${dirName}/${fileName}.jsx`;
-
-    // Generate page stub based on type
-    if (page.type === "dashboard") {
-      files[filePath] = generateDashboardPage(pageName, model.templateName, entities);
-    } else if (page.type === "list" && page.entity) {
-      files[filePath] = generateListPage(pageName, page.entity, page.title);
-    } else if (page.type === "form" && page.entity) {
-      files[filePath] = generateFormPage(pageName, page.entity, page.title);
-    } else {
-      files[filePath] = generateStaticPage(pageName, page.title);
-    }
-
-    const routePath = page.path === "/" || page.path === indexPath ? "" : page.path.replace(/^\//, "");
-    routeImports.push(`import ${pageName} from "./pages/${dirName}/${fileName}";`);
-
-    if (page.path === "/" || page.path === indexPath) {
-      routeElements.push(`          <Route index element={<${pageName} />} />`);
-    } else {
-      routeElements.push(`          <Route path="${routePath}" element={<${pageName} />} />`);
-    }
-  }
-
-  // Generate detail pages for entities that have detail routes
-  for (const page of pages) {
-    if (!page.path.includes(":") || !page.entity) continue;
-    const entityName = page.entity;
-    const detailName = `${entityName}Detail`;
-    if (generatedPageComponents.has(detailName)) continue;
-    generatedPageComponents.add(detailName);
-
-    const filePath = `/pages/${entityName}/${detailName}.jsx`;
-    files[filePath] = generateDetailPage(detailName, entityName);
-
-    const routePath = page.path.replace(/^\//, "");
-    routeImports.push(`import ${detailName} from "./pages/${entityName}/${detailName}";`);
-    routeElements.push(`          <Route path="${routePath}" element={<${detailName} />} />`);
-  }
-
-  // ── 3. Generate App.jsx with all routes ──
-  const authImport = model.requiresAuth ? `import { AuthProvider } from "./contexts/AuthContext";\n` : "";
-  const authWrapOpen = model.requiresAuth ? `      <AuthProvider>\n` : "";
-  const authWrapClose = model.requiresAuth ? `      </AuthProvider>\n` : "";
-
-  files["/App.jsx"] = `import React from "react";
-import { HashRouter, Routes, Route, Navigate } from "react-router-dom";
-import AppLayout from "./layout/AppLayout";
-${authImport}${routeImports.join("\n")}
-
-export default function App() {
-  return (
-${authWrapOpen}    <HashRouter>
-      <Routes>
-        <Route path="/" element={<AppLayout />}>
-${routeElements.join("\n")}
-          <Route path="*" element={<Navigate to="${indexPath}" />} />
-        </Route>
-      </Routes>
-    </HashRouter>
-${authWrapClose}  );
-}
-`;
-
-  // ── 4. Generate /layout/Sidebar.jsx with domain nav items ──
-  const iconImports = new Set<string>(["LayoutDashboard"]);
-  for (const nav of navItems) {
-    if (nav.icon) iconImports.add(nav.icon);
-  }
-
-  const sidebarNavItems = navItems.map(nav =>
-    `  { to: "${nav.path}", icon: ${nav.icon || "LayoutDashboard"}, label: "${nav.label}" },`
-  ).join("\n");
-
-  files["/layout/Sidebar.jsx"] = `import React from "react";
-import { NavLink } from "react-router-dom";
-import { ${[...iconImports].join(", ")} } from "lucide-react";
-
-const navItems = [
-${sidebarNavItems}
-];
-
-export default function Sidebar() {
-  return (
-    <nav className="w-64 bg-[var(--color-sidebar)] text-[var(--color-sidebar-text)] flex flex-col">
-      <div className="p-4 border-b border-[var(--color-sidebar-border)]">
-        <h1 className="text-lg font-bold text-[var(--color-sidebar-text-active)]">${model.templateName}</h1>
-      </div>
-      <div className="flex-1 py-2">
-        {navItems.map(({ to, icon: ItemIcon, label }) => (
-          <NavLink
-            key={to}
-            to={to}
-            end={to === "/"}
-            className={({ isActive }) =>
-              \`flex items-center gap-3 px-4 py-2.5 text-sm transition-colors \${
-                isActive ? "bg-[var(--color-sidebar-active)] text-[var(--color-sidebar-text-active)]" : "text-[var(--color-sidebar-text)] hover:text-[var(--color-sidebar-text-active)] hover:bg-[var(--color-sidebar-hover)]"
-              }\`
-            }
-          >
-            <ItemIcon className="w-4 h-4" />
-            {label}
-          </NavLink>
-        ))}
-      </div>
-    </nav>
-  );
-}
-`;
-
-  // ── 5. Generate /layout/AppLayout.jsx ──
-  files["/layout/AppLayout.jsx"] = `import React from "react";
-import { Outlet } from "react-router-dom";
-import Sidebar from "./Sidebar";
-
-export default function AppLayout() {
-  return (
-    <div className="flex h-screen bg-[var(--color-bg-secondary)]">
-      <Sidebar />
-      <main className="flex-1 overflow-auto">
-        <Outlet />
-      </main>
-    </div>
-  );
-}
-`;
-
-  // ── 6. Generate /hooks/use<Entity>.js for each entity ──
-  for (const entity of entities) {
-    const hookName = `use${entity.name}`;
-    files[`/hooks/${hookName}.js`] = generateEntityHook(entity.name, entity.pluralName);
-  }
-
-  // ── 7. Generate /contexts/AuthContext.jsx if auth required ──
-  if (model.requiresAuth) {
-    files["/contexts/AuthContext.jsx"] = generateAuthContext();
-  }
-
-  // ── 8. Add shared UI components (same as generic scaffold) ──
-  Object.assign(files, getSharedUIComponents());
-
-  // ── 9. Add hooks/useApi.js and styles/globals.css ──
-  files["/hooks/useApi.js"] = getUseApiHook();
-  files["/styles/globals.css"] = getGlobalStyles();
-
-  return files;
-}
-
-// ─── Page Generators ──────────────────────────────────────────────────────
-
-function generateDashboardPage(name: string, templateName: string, entities: DomainModel["entities"]): string {
-  const statCards = entities.slice(0, 4).map(e =>
-    `        <div className="card">
-          <h3 className="text-sm font-medium text-[var(--color-text-secondary)]">${e.pluralName}</h3>
-          <p className="text-2xl font-semibold text-[var(--color-text)] mt-1">0</p>
-        </div>`
-  ).join("\n");
-
-  return `import React from "react";
-
-export default function ${name}() {
-  return (
-    <div className="p-8">
-      <h1 className="text-2xl font-light tracking-wide text-[var(--color-text)] mb-6">${templateName} Dashboard</h1>
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-${statCards}
-      </div>
-      <p className="text-[var(--color-text-muted)]">Loading content...</p>
-    </div>
-  );
-}
-`;
-}
-
-function generateListPage(name: string, entity: string, title: string): string {
-  return `import React from "react";
-
-export default function ${name}() {
-  return (
-    <div className="p-8">
-      <div className="flex items-center justify-between mb-6">
-        <h1 className="text-2xl font-light tracking-wide text-gray-800">${title}</h1>
-        <button className="px-4 py-2 bg-blue-500 text-white rounded-lg text-sm hover:bg-blue-600 transition-colors">
-          Add ${entity}
-        </button>
-      </div>
-      <div className="bg-white rounded-lg border border-gray-100 p-6">
-        <p className="text-gray-400">Loading ${title.toLowerCase()}...</p>
-      </div>
-    </div>
-  );
-}
-`;
-}
-
-function generateDetailPage(name: string, entity: string): string {
-  return `import React from "react";
-import { useParams } from "react-router-dom";
-
-export default function ${name}() {
-  const { id } = useParams();
-  return (
-    <div className="p-8">
-      <h1 className="text-2xl font-light tracking-wide text-gray-800 mb-6">${entity} Detail</h1>
-      <div className="bg-white rounded-lg border border-gray-100 p-6">
-        <p className="text-gray-400">Loading ${entity.toLowerCase()} {id}...</p>
-      </div>
-    </div>
-  );
-}
-`;
-}
-
-function generateFormPage(name: string, entity: string, title: string): string {
-  return `import React from "react";
-
-export default function ${name}() {
-  return (
-    <div className="p-8">
-      <h1 className="text-2xl font-light tracking-wide text-gray-800 mb-6">${title}</h1>
-      <div className="bg-white rounded-lg border border-gray-100 p-6 max-w-2xl">
-        <p className="text-gray-400">Loading form...</p>
-      </div>
-    </div>
-  );
-}
-`;
-}
-
-function generateStaticPage(name: string, title: string): string {
-  return `import React from "react";
-
-export default function ${name}() {
-  return (
-    <div className="p-8">
-      <h1 className="text-2xl font-light tracking-wide text-gray-800 mb-6">${title}</h1>
-      <div className="bg-white rounded-lg border border-gray-100 p-6">
-        <p className="text-gray-400">Content loading...</p>
-      </div>
-    </div>
-  );
-}
-`;
-}
-
-// ─── Hook & Context Generators ────────────────────────────────────────────
-
-function generateEntityHook(entityName: string, pluralName: string): string {
-  return `import { useState, useEffect, useCallback } from "react";
-
-const API_BASE = window.__SUPABASE_URL__ || "";
-const API_KEY = window.__SUPABASE_KEY__ || "";
-
-export default function use${entityName}(projectId) {
-  const [${pluralName}, set${entityName}s] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-
-  const fetch${entityName}s = useCallback(async () => {
-    if (!API_BASE || !projectId) { setLoading(false); return; }
-    try {
-      setLoading(true);
-      const res = await fetch(\`\${API_BASE}/functions/v1/project-api\`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", "Authorization": \`Bearer \${API_KEY}\` },
-        body: JSON.stringify({ project_id: projectId, collection: "${pluralName}", action: "list" }),
-      });
-      const json = await res.json();
-      set${entityName}s(json.data || []);
-    } catch (e) {
-      setError(e.message);
-    } finally {
-      setLoading(false);
-    }
-  }, [projectId]);
-
-  useEffect(() => { fetch${entityName}s(); }, [fetch${entityName}s]);
-
-  const create${entityName} = useCallback(async (data) => {
-    const res = await fetch(\`\${API_BASE}/functions/v1/project-api\`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json", "Authorization": \`Bearer \${API_KEY}\` },
-      body: JSON.stringify({ project_id: projectId, collection: "${pluralName}", action: "create", data }),
-    });
-    const json = await res.json();
-    if (json.data) set${entityName}s(prev => [...prev, json.data]);
-    return json.data;
-  }, [projectId]);
-
-  return { ${pluralName}, loading, error, refetch: fetch${entityName}s, create${entityName} };
-}
-`;
-}
-
-function generateAuthContext(): string {
-  return `import React, { createContext, useContext, useState, useCallback } from "react";
-
-const AuthContext = createContext(null);
-
-export function AuthProvider({ children }) {
-  const [user, setUser] = useState(null);
-  const [loading, setLoading] = useState(false);
-
-  const login = useCallback(async (email, password) => {
-    setLoading(true);
-    try {
-      const API_BASE = window.__SUPABASE_URL__ || "";
-      const API_KEY = window.__SUPABASE_KEY__ || "";
-      const res = await fetch(\`\${API_BASE}/functions/v1/project-auth\`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", "Authorization": \`Bearer \${API_KEY}\` },
-        body: JSON.stringify({ action: "login", email, password }),
-      });
-      const json = await res.json();
-      if (json.user) setUser(json.user);
-      return json;
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  const logout = useCallback(() => setUser(null), []);
-
-  return (
-    <AuthContext.Provider value={{ user, loading, login, logout, isAuthenticated: !!user }}>
-      {children}
-    </AuthContext.Provider>
-  );
-}
-
-export function useAuth() {
-  const ctx = useContext(AuthContext);
-  if (!ctx) throw new Error("useAuth must be used within AuthProvider");
-  return ctx;
-}
-`;
-}
-
-// ─── Shared scaffolding (used by both generic and domain scaffolds) ───────
-
-function getSharedUIComponents(): Record<string, string> {
-  return {
-    "/components/ui/Card.jsx": `import React from "react";
-
-export default function Card({ children, className = "" }) {
-  return (
-    <div className={\`bg-white rounded-lg border border-gray-100 p-6 \${className}\`}>
-      {children}
-    </div>
-  );
-}
-`,
-    "/components/ui/Button.jsx": `import React from "react";
-
-export default function Button({ children, onClick, variant = "primary", className = "", ...props }) {
-  const variants = {
-    primary: "bg-blue-500 text-white hover:bg-blue-600",
-    secondary: "bg-gray-100 text-gray-700 hover:bg-gray-200",
-    danger: "bg-red-500 text-white hover:bg-red-600",
-    ghost: "text-gray-600 hover:bg-gray-100",
-  };
-  return (
-    <button
-      onClick={onClick}
-      className={\`px-4 py-2 rounded-lg text-sm font-medium transition-colors \${variants[variant] || variants.primary} \${className}\`}
-      {...props}
-    >
-      {children}
-    </button>
-  );
-}
-`,
-    "/components/ui/Modal.jsx": `import React from "react";
-import { X } from "lucide-react";
-
-export default function Modal({ isOpen, onClose, title, children }) {
-  if (!isOpen) return null;
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center">
-      <div className="fixed inset-0 bg-black/40" onClick={onClose} />
-      <div className="relative bg-white rounded-lg shadow-lg w-full max-w-lg mx-4 p-6">
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-lg font-medium text-gray-800">{title}</h2>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
-            <X className="w-5 h-5" />
-          </button>
-        </div>
-        {children}
-      </div>
-    </div>
-  );
-}
-`,
-    "/components/ui/DataTable.jsx": `import React from "react";
-
-export default function DataTable({ columns, data, onRowClick }) {
-  return (
-    <div className="overflow-x-auto border border-gray-100 rounded-lg">
-      <table className="w-full text-sm">
-        <thead>
-          <tr className="border-b border-gray-100">
-            {columns.map((col) => (
-              <th key={col.key} className="text-left px-4 py-3 text-gray-500 font-medium">{col.label}</th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          {data.map((row, i) => (
-            <tr
-              key={row.id || i}
-              onClick={() => onRowClick && onRowClick(row)}
-              className="border-b border-gray-50 hover:bg-gray-50 cursor-pointer transition-colors"
-            >
-              {columns.map((col) => (
-                <td key={col.key} className="px-4 py-3 text-gray-700">
-                  {col.render ? col.render(row[col.key], row) : row[col.key]}
-                </td>
-              ))}
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
-  );
-}
-`,
-    "/components/ui/Toast.jsx": `import React, { useState, useEffect } from "react";
-
-let toastHandler = null;
-
-export function showToast(message, type = "success") {
-  if (toastHandler) toastHandler({ message, type });
-}
-
-export default function ToastContainer() {
-  const [toast, setToast] = useState(null);
-
-  useEffect(() => {
-    toastHandler = (t) => {
-      setToast(t);
-      setTimeout(() => setToast(null), 3000);
-    };
-    return () => { toastHandler = null; };
-  }, []);
-
-  if (!toast) return null;
-
-  const colors = {
-    success: "bg-emerald-500",
-    error: "bg-red-500",
-    info: "bg-blue-500",
-  };
-
-  return (
-    <div className={\`fixed bottom-4 right-4 z-50 px-4 py-3 rounded-lg text-white text-sm shadow-lg \${colors[toast.type] || colors.success}\`}>
-      {toast.message}
-    </div>
-  );
-}
-`,
-    "/components/ui/Spinner.jsx": `import React from "react";
-
-export default function Spinner({ size = "md", className = "" }) {
-  const sizes = { sm: "w-4 h-4", md: "w-6 h-6", lg: "w-8 h-8" };
-  return (
-    <div className={\`\${sizes[size] || sizes.md} border-2 border-gray-200 border-t-blue-500 rounded-full animate-spin \${className}\`} />
-  );
-}
-`,
-  };
-}
-
-function getUseApiHook(): string {
-  return `import { useState, useEffect, useCallback } from "react";
-
-const API_BASE = window.__SUPABASE_URL__ || "";
-const API_KEY = window.__SUPABASE_KEY__ || "";
-
-export function useApi(collection, projectId) {
-  const [data, setData] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-
-  const fetchData = useCallback(async () => {
-    if (!API_BASE || !projectId) { setLoading(false); return; }
-    try {
-      setLoading(true);
-      const res = await fetch(\`\${API_BASE}/functions/v1/project-api\`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", "Authorization": \`Bearer \${API_KEY}\` },
-        body: JSON.stringify({ project_id: projectId, collection, action: "list" }),
-      });
-      const json = await res.json();
-      setData(json.data || []);
-    } catch (e) {
-      setError(e.message);
-    } finally {
-      setLoading(false);
-    }
-  }, [collection, projectId]);
-
-  useEffect(() => { fetchData(); }, [fetchData]);
-
-  return { data, loading, error, refetch: fetchData };
-}
-`;
-}
-
-function getGlobalStyles(): string {
-  return DESIGN_SYSTEM_CSS;
-}
-
-/** The original generic scaffold (no domain model) */
-function getGenericScaffold(): Record<string, string> {
-  const files: Record<string, string> = {};
-
-  files["/App.jsx"] = `import React from "react";
-import { HashRouter, Routes, Route, Navigate } from "react-router-dom";
-import AppLayout from "./layout/AppLayout";
-import Dashboard from "./pages/Dashboard/Dashboard";
-
-export default function App() {
-  return (
-    <HashRouter>
-      <Routes>
-        <Route path="/" element={<AppLayout />}>
-          <Route index element={<Dashboard />} />
-          <Route path="*" element={<Navigate to="/" />} />
-        </Route>
-      </Routes>
-    </HashRouter>
-  );
-}
-`;
-
-  files["/layout/AppLayout.jsx"] = `import React from "react";
-import { Outlet } from "react-router-dom";
-import Sidebar from "./Sidebar";
-
-export default function AppLayout() {
-  return (
-    <div className="flex h-screen bg-[var(--color-bg-secondary)]">
-      <Sidebar />
-      <main className="flex-1 overflow-auto">
-        <Outlet />
-      </main>
-    </div>
-  );
-}
-`;
-
-  files["/layout/Sidebar.jsx"] = `import React from "react";
-import { NavLink } from "react-router-dom";
-import { LayoutDashboard } from "lucide-react";
-
-const navItems = [
-  { to: "/", icon: LayoutDashboard, label: "Dashboard" },
-];
-
-export default function Sidebar() {
-  return (
-    <nav className="w-64 bg-[var(--color-sidebar)] text-[var(--color-sidebar-text)] flex flex-col">
-      <div className="p-4 border-b border-[var(--color-sidebar-border)]">
-        <h1 className="text-lg font-bold text-[var(--color-sidebar-text-active)]">App</h1>
-      </div>
-      <div className="flex-1 py-2">
-        {navItems.map(({ to, icon: ItemIcon, label }) => (
-          <NavLink
-            key={to}
-            to={to}
-            end={to === "/"}
-            className={({ isActive }) =>
-              \`flex items-center gap-3 px-4 py-2.5 text-sm transition-colors \${
-                isActive ? "bg-[var(--color-sidebar-active)] text-[var(--color-sidebar-text-active)]" : "text-[var(--color-sidebar-text)] hover:text-[var(--color-sidebar-text-active)] hover:bg-[var(--color-sidebar-hover)]"
-              }\`
-            }
-          >
-            <ItemIcon className="w-4 h-4" />
-            {label}
-          </NavLink>
-        ))}
-      </div>
-    </nav>
-  );
-}
-`;
-
-  files["/pages/Dashboard/Dashboard.jsx"] = `import React from "react";
-
-export default function Dashboard() {
-  return (
-    <div className="p-8">
-      <h1 className="text-2xl font-light tracking-wide text-[var(--color-text)] mb-6">Dashboard</h1>
-      <p className="text-[var(--color-text-muted)]">Loading content...</p>
-    </div>
-  );
-}
-`;
-
-  Object.assign(files, getSharedUIComponents());
-  files["/hooks/useApi.js"] = getUseApiHook();
-  files["/styles/globals.css"] = getGlobalStyles();
-
-  return files;
-}
 
 // ─── Auto-Schema Detection ────────────────────────────────────────────────
 
@@ -711,15 +55,12 @@ async function autoDetectAndCreateSchemas(files: Record<string, string>, project
   try {
     const allCode = Object.values(files).join("\n");
     
-    // Method 1: Explicit Data API collection references
     const collectionMatches = allCode.matchAll(/collection:\s*["'](\w+)["']/g);
     const collections = new Set<string>();
     for (const match of collectionMatches) {
       collections.add(match[1]);
     }
     
-    // Method 2: Infer entities from page/component file names and mock data patterns
-    // e.g., /pages/Students/StudentList.jsx → "students" collection
     const fileNames = Object.keys(files);
     const entityInferenceMap: Record<string, string[]> = {};
     
@@ -727,7 +68,6 @@ async function autoDetectAndCreateSchemas(files: Record<string, string>, project
       const pageMatch = filePath.match(/\/pages\/(\w+)\//);
       if (pageMatch) {
         const entity = pageMatch[1].toLowerCase();
-        // Skip generic pages
         if (!['dashboard', 'home', 'settings', 'profile', 'login', 'signup', 'auth'].includes(entity)) {
           collections.add(entity);
           entityInferenceMap[entity] = entityInferenceMap[entity] || [];
@@ -735,13 +75,10 @@ async function autoDetectAndCreateSchemas(files: Record<string, string>, project
       }
     }
     
-    // Method 3: Detect mock data arrays to infer fields
-    // Patterns like: const students = [...] or useState([{name: "...", class: "..."}])
     for (const [filePath, code] of Object.entries(files)) {
       const pageEntity = filePath.match(/\/pages\/(\w+)\//)?.[1]?.toLowerCase();
       if (!pageEntity || ['dashboard', 'home', 'settings'].includes(pageEntity)) continue;
       
-      // Find array patterns with object shapes
       const arrayPatterns = code.matchAll(/(?:const|let)\s+\w+\s*=\s*\[[\s\S]*?\{([^}]{10,300})\}/g);
       for (const m of arrayPatterns) {
         const objBlock = m[1];
@@ -758,7 +95,6 @@ async function autoDetectAndCreateSchemas(files: Record<string, string>, project
     
     const fieldsByCollection: Record<string, Set<string>> = {};
     
-    // From explicit Data API patterns
     for (const collection of collections) {
       fieldsByCollection[collection] = new Set<string>(entityInferenceMap[collection] || []);
       
@@ -826,12 +162,10 @@ async function autoDetectAndCreateSchemas(files: Record<string, string>, project
       }
     }
 
-    // ── Auto-detect auth usage and create summary ──
     const usesAuth = allCode.includes("project-auth") || allCode.includes("useAuth") || allCode.includes("AuthProvider") || allCode.includes("AuthContext");
     const usesDataApi = allCode.includes("project-api") || collections.size > 0;
     const usesCustomFunctions = allCode.includes("project-exec");
 
-    // Create a summary of backend capabilities for the Cloud panel
     const backendSummary = {
       collections: [...collections],
       usesAuth,
@@ -841,7 +175,6 @@ async function autoDetectAndCreateSchemas(files: Record<string, string>, project
     };
     console.log("[AutoSchema] Backend summary:", backendSummary);
 
-    // Save backend capabilities to project_data for the Cloud panel to read
     await supabase
       .from("project_data")
       .upsert(
@@ -888,7 +221,7 @@ export interface EngineConfig {
   existingFiles?: Record<string, string>;
   templateContext?: string;
   chatHistory?: Array<{ role: string; content: string }>;
-  domainModel?: any; // Domain model from Requirements Agent
+  domainModel?: any;
 }
 
 export type EnginePhase = 
@@ -934,21 +267,17 @@ export interface EngineResult {
 function validateAllFiles(files: Record<string, string>): { file: string; error: string }[] {
   const errors: { file: string; error: string }[] = [];
   
-  // Available packages that provide named/default exports usable as JSX components
   const availablePackages = new Set([
     "react", "react-dom", "lucide-react", "framer-motion", "date-fns",
     "recharts", "react-router-dom", "clsx", "tailwind-merge",
   ]);
   
-  // Collect all exported component names across generated files
   const definedComponents = new Set<string>(["React", "Fragment"]);
   for (const [, code] of Object.entries(files)) {
-    // Match: export default function Foo / export function Foo / function Foo (top-level)
     const exportDefaultMatch = code.matchAll(/export\s+default\s+function\s+(\w+)/g);
     for (const m of exportDefaultMatch) definedComponents.add(m[1]);
     const exportNamedMatch = code.matchAll(/export\s+(?:const|function|class)\s+(\w+)/g);
     for (const m of exportNamedMatch) definedComponents.add(m[1]);
-    // Match top-level function declarations (may be exported elsewhere)
     const fnMatch = code.matchAll(/^function\s+([A-Z]\w+)/gm);
     for (const m of fnMatch) definedComponents.add(m[1]);
     const constMatch = code.matchAll(/^(?:export\s+)?const\s+([A-Z]\w+)\s*=/gm);
@@ -956,7 +285,6 @@ function validateAllFiles(files: Record<string, string>): { file: string; error:
   }
   
   for (const [filePath, code] of Object.entries(files)) {
-    // Skip if this exact content was already validated
     if (isFileValidated(filePath, code)) continue;
 
     if (filePath.match(/\.(jsx?|tsx?)$/)) {
@@ -967,7 +295,6 @@ function validateAllFiles(files: Record<string, string>): { file: string; error:
         continue;
       }
       
-      // Check for imports referencing files that don't exist — auto-stub them
       const missingImports = findMissingFileImports(code, filePath, files);
       if (missingImports.length > 0) {
         const unresolvable = autoCreateStubFiles(missingImports, filePath, files);
@@ -978,11 +305,9 @@ function validateAllFiles(files: Record<string, string>): { file: string; error:
           });
           continue;
         }
-        // Stubs were created — re-validate this file on next pass
         console.log(`[BuildEngine] Auto-created stubs for ${missingImports.length} missing imports from ${filePath}`);
       }
       
-      // Check for undefined JSX components (PascalCase tags used but not imported/defined)
       const undefinedRefs = findUndefinedJSXReferences(code, filePath, files, definedComponents, availablePackages);
       if (undefinedRefs.length > 0) {
         errors.push({ 
@@ -1019,7 +344,6 @@ function findMissingFileImports(
   let m;
   while ((m = importPathRegex.exec(code)) !== null) {
     const importPath = m[1];
-    // Resolve the import relative to the current file's directory
     const currentDir = filePath.substring(0, filePath.lastIndexOf("/")) || "";
     let resolved = importPath;
     if (importPath.startsWith("./")) {
@@ -1033,16 +357,13 @@ function findMissingFileImports(
       }
       resolved = "/" + parts.concat(relParts).join("/");
     }
-    // Normalize: ensure leading slash
     if (!resolved.startsWith("/")) resolved = "/" + resolved;
     
-    // Check if the file exists (with or without extension)
     const extensions = ["", ".jsx", ".js", ".tsx", ".ts"];
     const found = extensions.some(ext => {
       const candidate = resolved + ext;
       return allFiles[candidate] !== undefined;
     });
-    // Also check index files in directory
     const indexFound = extensions.some(ext => {
       return allFiles[resolved + "/index" + ext] !== undefined;
     });
@@ -1056,7 +377,6 @@ function findMissingFileImports(
 
 /**
  * Auto-create stub files for missing imports to prevent runtime errors.
- * Returns any import paths that couldn't be resolved.
  */
 function autoCreateStubFiles(
   missingImports: string[],
@@ -1109,10 +429,8 @@ function findUndefinedJSXReferences(
   definedComponents: Set<string>,
   availablePackages: Set<string>
 ): string[] {
-  // Collect locally defined/imported names
   const localNames = new Set<string>();
   
-  // Imports: import Foo from "..."; import { Foo, Bar } from "...";
   const importRegex = /import\s+(?:(\w+)(?:\s*,\s*)?)?(?:\{([^}]+)\})?\s+from\s+["'][^"']+["']/g;
   let m;
   while ((m = importRegex.exec(code)) !== null) {
@@ -1125,19 +443,16 @@ function findUndefinedJSXReferences(
     }
   }
   
-  // Local function/const declarations
   const localDeclRegex = /(?:function|const|let|var|class)\s+([A-Z]\w+)/g;
   while ((m = localDeclRegex.exec(code)) !== null) {
     localNames.add(m[1]);
   }
   
-  // Destructured renames: { icon: Icon, foo: Bar } — common pattern in .map() callbacks
   const destructureRenameRegex = /\w+\s*:\s*([A-Z]\w+)/g;
   while ((m = destructureRenameRegex.exec(code)) !== null) {
     localNames.add(m[1]);
   }
   
-  // Arrow/function parameters with PascalCase (e.g., ({ Icon }) => ...)
   const paramRegex = /\(\s*\{([^}]+)\}\s*\)/g;
   while ((m = paramRegex.exec(code)) !== null) {
     m[1].split(",").forEach(p => {
@@ -1146,10 +461,8 @@ function findUndefinedJSXReferences(
     });
   }
   
-  // Built-in HTML-like React components to skip
   const builtins = new Set(["React", "Fragment", "Suspense", "StrictMode"]);
   
-  // Find all PascalCase JSX tags: <ComponentName or <ComponentName>
   const jsxTagRegex = /<([A-Z]\w+)[\s/>]/g;
   const undefinedRefs = new Set<string>();
   while ((m = jsxTagRegex.exec(code)) !== null) {
@@ -1157,7 +470,6 @@ function findUndefinedJSXReferences(
     if (builtins.has(name)) continue;
     if (localNames.has(name)) continue;
     if (definedComponents.has(name)) continue;
-    // Check if it could be from a dotted import (e.g., motion.div) — skip
     undefinedRefs.add(name);
   }
   
@@ -1166,41 +478,19 @@ function findUndefinedJSXReferences(
 
 /**
  * Enforce mandatory folder structure by relocating misplaced files.
- * Rules:
- * - Non-page components inside /pages/X/ → move to /components/ or /components/ui/
- * - Toast/context providers → /contexts/ only for data, /components/ui/ for UI
- * - Charts, widgets inside /pages/ → move to /components/
- * - Flat /pages/X.jsx → /pages/X/X.jsx
  */
 function enforceFileStructure(files: Record<string, string>): Record<string, string> {
-  // ── Step 0: Fix concatenated paths (AI sometimes merges folder/file into one name) ──
-  // e.g. /components/uiBadge.jsx → /components/ui/Badge.jsx
-  //      /stylesglobals.css → /styles/globals.css
   const normalized: Record<string, string> = {};
   
-  // Known folder prefixes the AI concatenates with filenames
   const CONCAT_FIXES: Array<{ pattern: RegExp; replacement: string }> = [
-    // /components/uiX.jsx → /components/ui/X.jsx (lowercase "ui" prefix on PascalCase name)
     { pattern: /^\/components\/ui([A-Z]\w+)\.(jsx?|tsx?|css)$/, replacement: "/components/ui/$1.$2" },
-    // /componentsX.jsx → /components/X.jsx (missing slash after "components")
     { pattern: /^\/components([A-Z]\w+)\.(jsx?|tsx?|css)$/, replacement: "/components/$1.$2" },
-    // /componentsuiX.jsx → /components/ui/X.jsx
     { pattern: /^\/componentsui([A-Z]\w+)\.(jsx?|tsx?|css)$/, replacement: "/components/ui/$1.$2" },
-    // /stylesglobals.css → /styles/globals.css
     { pattern: /^\/styles(\w+)\.(css)$/, replacement: "/styles/$1.$2" },
-    // /layoutAppLayout.jsx → /layout/AppLayout.jsx
     { pattern: /^\/layout([A-Z]\w+)\.(jsx?|tsx?)$/, replacement: "/layout/$1.$2" },
-    // /layoutSidebar.jsx → /layout/Sidebar.jsx
-    { pattern: /^\/layout([A-Z]\w+)\.(jsx?|tsx?)$/, replacement: "/layout/$1.$2" },
-    // /hooksuseFetch.js → /hooks/useFetch.js  
     { pattern: /^\/hooks(use\w+)\.(jsx?|tsx?|js)$/, replacement: "/hooks/$1.$2" },
-    // /hooksuseApi.js → /hooks/useApi.js  
-    { pattern: /^\/hooks(use\w+)\.(jsx?|tsx?|js)$/, replacement: "/hooks/$1.$2" },
-    // /pagesX.jsx → /pages/X/X.jsx
     { pattern: /^\/pages([A-Z]\w+)\.(jsx?|tsx?)$/, replacement: "/pages/$1/$1.$2" },
-    // /pagesDashboardDashboard.jsx → /pages/Dashboard/Dashboard.jsx
     { pattern: /^\/pages([A-Z]\w+)([A-Z]\w+)\.(jsx?|tsx?)$/, replacement: "/pages/$1/$2.$3" },
-    // /contextsSomeContext.jsx → /contexts/SomeContext.jsx
     { pattern: /^\/contexts([A-Z]\w+)\.(jsx?|tsx?)$/, replacement: "/contexts/$1.$2" },
   ];
 
@@ -1217,20 +507,16 @@ function enforceFileStructure(files: Record<string, string>): Record<string, str
 
   const result: Record<string, string> = {};
   
-  // Known page-level suffixes (these stay in /pages/)
   const pagePatterns = /(?:Page|List|Detail|Details|Manager|View|Form|Editor|Settings|Profile|History)\.jsx?$/;
   
   for (const [path, code] of Object.entries(normalized)) {
     let newPath = path;
     
-    // Rule 1: Flat /pages/X.jsx → /pages/X/X.jsx (already handled in parser, but double-check)
     const flatPageMatch = newPath.match(/^\/pages\/([A-Z]\w+)\.(jsx?|tsx?)$/);
     if (flatPageMatch) {
       newPath = `/pages/${flatPageMatch[1]}/${flatPageMatch[1]}.${flatPageMatch[2]}`;
     }
     
-    // Rule 2: Non-page component inside /pages/Module/Component.jsx
-    // e.g., /pages/Dashboard/OrderStatusChart.jsx → /components/OrderStatusChart.jsx
     const nestedPageFileMatch = newPath.match(/^\/pages\/([A-Z]\w+)\/([A-Z]\w+)\.(jsx?|tsx?)$/);
     if (nestedPageFileMatch) {
       const [, moduleName, fileName, ext] = nestedPageFileMatch;
@@ -1240,7 +526,6 @@ function enforceFileStructure(files: Record<string, string>): Record<string, str
       }
     }
     
-    // Rule 3: ToastContext.jsx / toast provider → /components/ui/Toast.jsx
     if (newPath.match(/\/contexts\/Toast/i) && code.includes("toast")) {
       newPath = `/components/ui/Toast.jsx`;
     }
@@ -1248,7 +533,6 @@ function enforceFileStructure(files: Record<string, string>): Record<string, str
     result[newPath] = code;
   }
   
-  // Fix cross-file imports for any relocated files
   return fixRelocatedImports(files, result);
 }
 
@@ -1259,14 +543,12 @@ function fixRelocatedImports(
   originalFiles: Record<string, string>,
   relocatedFiles: Record<string, string>
 ): Record<string, string> {
-  // Build a map of old path → new path
   const pathMap = new Map<string, string>();
   const origPaths = Object.keys(originalFiles);
   const newPaths = Object.keys(relocatedFiles);
   
   for (let i = 0; i < origPaths.length; i++) {
     if (origPaths[i] !== newPaths[i]) {
-      // Map old import path (without extension) to new import path
       const oldImport = origPaths[i].replace(/\.(jsx?|tsx?)$/, "");
       const newImport = newPaths[i].replace(/\.(jsx?|tsx?)$/, "");
       pathMap.set(oldImport, newImport);
@@ -1279,14 +561,12 @@ function fixRelocatedImports(
   for (const [path, code] of Object.entries(relocatedFiles)) {
     let fixedCode = code;
     for (const [oldImport, newImport] of pathMap) {
-      // Replace relative imports — convert to path relative from current file
       const oldRelative = makeRelative(path, oldImport);
       const newRelative = makeRelative(path, newImport);
       fixedCode = fixedCode.replace(
         new RegExp(`(from\\s+["'])${escapeRegex(oldRelative)}(["'])`, "g"),
         `$1${newRelative}$2`
       );
-      // Also try the bare old path form
       fixedCode = fixedCode.replace(
         new RegExp(`(from\\s+["'])\\.${escapeRegex(oldImport)}(["'])`, "g"),
         `$1.${newImport}$2`
@@ -1299,10 +579,9 @@ function fixRelocatedImports(
 }
 
 function makeRelative(fromPath: string, toPath: string): string {
-  const fromParts = fromPath.split("/").slice(0, -1); // directory
+  const fromParts = fromPath.split("/").slice(0, -1);
   const toParts = toPath.split("/");
   
-  // Find common prefix
   let common = 0;
   while (common < fromParts.length && common < toParts.length && fromParts[common] === toParts[common]) {
     common++;
@@ -1356,7 +635,6 @@ function parseReactFilesFromOutput(text: string): {
     console.log(`[BuildEngine:parser] Strategy: ${result.parseStrategy}, files: ${result.files ? Object.keys(result.files).length : 0}`);
   }
   
-  // Enforce mandatory folder structure (relocate misplaced files)
   if (result.files && Object.keys(result.files).length > 0) {
     const structuredFiles = enforceFileStructure(result.files);
     return {
@@ -1384,7 +662,6 @@ async function executeSingleTask(
   maxTokens?: number,
   taskType?: string
 ): Promise<{ files: Record<string, string>; deps: Record<string, string>; chatText: string; modelMs: number; cached: boolean }> {
-  // ── Check in-memory cache first, then persistent cache ──
   const cacheKey = getTaskCacheKey(prompt, accumulatedCode);
   const cached = getCachedTaskOutput(cacheKey);
   if (cached && retryCount === 0) {
@@ -1405,9 +682,7 @@ async function executeSingleTask(
   return new Promise((resolve, reject) => {
     let fullText = "";
     
-    // Build messages: use compressed project memory + last 2-3 user messages
     const historyMessages = buildSmartChatHistory(config.chatHistory || [], 3).map(m => ({ role: m.role as "user" | "assistant", content: m.content }));
-    // Check if the last history message is already the same prompt to avoid duplication
     const lastHistoryMsg = historyMessages[historyMessages.length - 1];
     const promptAlreadyInHistory = lastHistoryMsg && lastHistoryMsg.role === "user" && lastHistoryMsg.content === prompt;
     const buildMessages = promptAlreadyInHistory
@@ -1436,7 +711,6 @@ async function executeSingleTask(
         const parsed = parseReactFilesFromOutput(responseText);
         
         if (parsed.files && Object.keys(parsed.files).length > 0) {
-          // ── Truncation Recovery ──
           const truncation = detectTruncation(responseText, parsed.files);
           if (truncation.isTruncated && retryCount < 2) {
             console.warn(`[BuildEngine] Truncation detected: ${truncation.reason}`);
@@ -1450,7 +724,6 @@ async function executeSingleTask(
               maxTokens,
               taskType
             ).then(continuationResult => {
-              // Merge continuation files with original parsed files
               const mergedFiles = { ...parsed.files!, ...continuationResult.files };
               const mergedDeps = { ...parsed.deps, ...continuationResult.deps };
               resolve({ files: mergedFiles, deps: mergedDeps, chatText: parsed.chatText, modelMs: modelMs + continuationResult.modelMs, cached: false });
@@ -1480,21 +753,18 @@ async function executeSingleTask(
               finalFiles = stubBrokenFiles(parsed.files, validationErrors);
             }
 
-            // ── Smart Dependency Resolution ──
             const resolvedDeps = resolveImportedDependencies(finalFiles, parsed.deps);
             const depDiff = getDependencyDiff(parsed.deps, resolvedDeps);
             if (depDiff.added.length > 0) {
               console.log(`[BuildEngine] Auto-resolved ${depDiff.added.length} dependencies: ${depDiff.added.join(", ")}`);
             }
 
-            // Cache successful output (memory + persistent)
             const output = { files: finalFiles, deps: resolvedDeps, chatText: parsed.chatText };
             setCachedTaskOutput(cacheKey, { ...output, timestamp: Date.now() });
             persistTaskOutput(cacheKey, output).catch(() => {});
             resolve({ ...output, modelMs, cached: false });
           }
         } else if (retryCount < 2) {
-          // ── Check for truncation even when no files parsed ──
           const truncation = detectTruncation(responseText, null);
           if (truncation.isTruncated) {
             console.warn(`[BuildEngine] Response truncated with no parseable files: ${truncation.reason}`);
@@ -1527,7 +797,6 @@ async function executeSingleTask(
         }
       },
       onError: (err) => {
-        // Don't retry on usage/rate limit errors — surface immediately
         const isQuotaError = err.includes("Usage limit") || err.includes("Rate limited");
         if (isQuotaError) {
           reject(new Error("⚠️ AI usage limit reached. Please add credits in Settings → Workspace → Usage, then try again."));
@@ -1551,8 +820,6 @@ async function executeSingleTask(
 
 /**
  * Group sorted tasks into parallel execution groups.
- * Tasks in the same group have no dependencies on each other
- * AND no overlapping filesAffected.
  */
 function buildParallelGroups(sortedTasks: PlanTask[]): PlanTask[][] {
   const groups: PlanTask[][] = [];
@@ -1566,11 +833,8 @@ function buildParallelGroups(sortedTasks: PlanTask[]): PlanTask[][] {
     const nextRemaining: PlanTask[] = [];
 
     for (const task of remaining) {
-      // All deps must be completed
       const depsReady = task.dependsOn.every(dep => completed.has(dep));
-      // No file conflicts with current group
       const hasFileConflict = task.filesAffected.some(f => groupFiles.has(f));
-      // Don't run App.jsx producers in parallel — they need smart merge
       const touchesApp = task.filesAffected.some(f => /App\.(jsx?|tsx?)$/.test(f));
       const groupTouchesApp = group.some(g => g.filesAffected.some(f => /App\.(jsx?|tsx?)$/.test(f)));
 
@@ -1583,7 +847,6 @@ function buildParallelGroups(sortedTasks: PlanTask[]): PlanTask[][] {
     }
 
     if (group.length === 0) {
-      // Deadlock safety — force the first remaining task
       const forced = nextRemaining.shift()!;
       group.push(forced);
     }
@@ -1714,7 +977,6 @@ export async function runBuildEngine(
   
   const hasExistingCode = config.existingFiles && Object.keys(config.existingFiles).length > 0;
   
-  // Clear validation cache for fresh builds
   clearValidationCache();
   
   try {
@@ -1752,8 +1014,6 @@ async function runDirectBuild(
     return;
   }
 
-  // Merge with existing if applicable
-  // Merge with existing or base template
   let finalFiles = result.files;
   let conflicts: string[] = [];
   const mergeTimer = timer();
@@ -1767,7 +1027,6 @@ async function runDirectBuild(
   conflicts = merged.conflicts;
   const mergeMs = mergeTimer.elapsed();
   
-  // Final validation
   callbacks.onProgress({ phase: "validating", message: "Validating code..." });
   const valTimer = timer();
   const postMergeErrors = validateAllFiles(finalFiles);
@@ -1789,7 +1048,6 @@ async function runDirectBuild(
     status: postMergeErrors.length > 0 ? "stubbed" : "success",
   });
   
-  // Design system lint pass — replace raw colors with semantic tokens
   const linted = lintDesignTokens(finalFiles);
   finalFiles = linted.files;
   if (linted.replacements > 0) {
@@ -1815,7 +1073,6 @@ async function runPlannedBuild(
   config: EngineConfig,
   callbacks: EngineCallbacks
 ): Promise<void> {
-  // ── Planning ──
   callbacks.onProgress({ phase: "planning", message: "Analyzing requirements and creating build plan..." });
   
   const planTimer = timer();
@@ -1840,7 +1097,6 @@ async function runPlannedBuild(
     });
   } catch (err) {
     const errMsg = err instanceof Error ? err.message : String(err);
-    // Don't fallback on quota errors — surface them directly
     if (errMsg.includes("Usage limit") || errMsg.includes("Rate limited")) {
       throw new Error("⚠️ AI usage limit reached. Please add credits in Settings → Workspace → Usage, then try again.");
     }
@@ -1849,7 +1105,6 @@ async function runPlannedBuild(
     return;
   }
 
-  // ── Adaptive task splitting ──
   const splitResult = applyAdaptiveSplitting(plan.tasks);
   if (splitResult.splitCount > 0) {
     console.log(`[BuildEngine] Split ${splitResult.splitCount} oversized tasks: ${splitResult.originalCount} → ${splitResult.totalAfterSplit}`);
@@ -1873,11 +1128,7 @@ async function runPlannedBuild(
   let lastChatText = "";
   let globalTaskIndex = 0;
 
-  // ── Execute groups (parallel within each group, sequential across groups) ──
   for (const group of parallelGroups) {
-    // Use incremental context per task instead of full codebase
-
-    // Run all tasks in this group concurrently
     const taskPromises = group.map(async (task, groupIdx) => {
       const taskIdx = globalTaskIndex + groupIdx;
       const taskMet = startTask(task.id, task.title);
@@ -1899,9 +1150,7 @@ async function runPlannedBuild(
       
       const taskType = (task as any).taskType || "frontend";
 
-      // ── Route by task type ──
       if ((taskType === "schema" || taskType === "backend") && config.domainModel) {
-        // Route schema/backend tasks to Backend Agent
         try {
           const backendResult = await executeBackendTask(task, config, callbacks.onDelta);
           const totalSize = Object.values(backendResult.files).reduce((s, c) => s + c.length, 0);
@@ -1918,11 +1167,9 @@ async function runPlannedBuild(
           return { task, result: backendResult };
         } catch (err) {
           console.error(`[BuildEngine] Backend task "${task.title}" failed, falling back to build agent:`, err);
-          // Fall through to regular build agent
         }
       }
 
-      // ── Frontend tasks (and fallback) go to regular Build Agent ──
       const taskPrompt = `## TASK: ${task.title}
 ## TASK TYPE: ${taskType}
 
@@ -1975,7 +1222,6 @@ ${task.filesAffected.map(f => `- ${f}`).join("\n")}
     const results = await Promise.all(taskPromises);
     globalTaskIndex += group.length;
 
-    // ── Merge results from this group into accumulated files ──
     const mergeT = timer();
     for (const { task, result } of results) {
       if (!result || Object.keys(result.files).length === 0) {
@@ -1983,8 +1229,6 @@ ${task.filesAffected.map(f => `- ${f}`).join("\n")}
         continue;
       }
 
-      // Protect backend files from being overwritten by frontend tasks
-      // Use 3-way diff merge with the pre-group snapshot as base
       const isFrontendTask = (task as any).taskType === "frontend";
       const merged = mergeFiles(accumulatedFiles, result.files, isFrontendTask, previousFiles || undefined);
       accumulatedFiles = merged.files;
@@ -1995,7 +1239,6 @@ ${task.filesAffected.map(f => `- ${f}`).join("\n")}
       console.log(`[BuildEngine] Task "${task.title}" done: +${Object.keys(result.files).length} files, total: ${Object.keys(accumulatedFiles).length}`);
     }
 
-    // ── Batch file update: only send to preview once per group ──
     const diff = computeFileDiff(previousFiles, accumulatedFiles);
     if (!isDiffEmpty(diff)) {
       callbacks.onFilesReady(accumulatedFiles, allDeps);
@@ -2009,7 +1252,6 @@ ${task.filesAffected.map(f => `- ${f}`).join("\n")}
     return;
   }
 
-  // ── Final validation ──
   callbacks.onProgress({ phase: "validating", message: "Validating assembled app..." });
   const finalErrors = validateAllFiles(accumulatedFiles);
   if (finalErrors.length > 0) {
@@ -2017,20 +1259,17 @@ ${task.filesAffected.map(f => `- ${f}`).join("\n")}
     accumulatedFiles = stubBrokenFiles(accumulatedFiles, finalErrors);
   }
 
-  // Design system lint pass — replace raw colors with semantic tokens
   const lintResult = lintDesignTokens(accumulatedFiles);
   accumulatedFiles = lintResult.files;
   if (lintResult.replacements > 0) {
     console.log(`[BuildEngine:planned] Design lint: ${lintResult.replacements} raw color(s) → semantic tokens`);
   }
 
-  // ── Assembly ──
   callbacks.onProgress({ phase: "assembling", message: "Connecting all modules..." });
   const asmTimer = timer();
   accumulatedFiles = await assembleApp(accumulatedFiles, config, callbacks.onDelta);
   if (metrics) metrics.assemblyLatencyMs = asmTimer.elapsed();
   
-  // Final diff-based update
   const finalDiff = computeFileDiff(previousFiles, accumulatedFiles);
   if (!isDiffEmpty(finalDiff)) {
     callbacks.onFilesReady(accumulatedFiles, allDeps);
