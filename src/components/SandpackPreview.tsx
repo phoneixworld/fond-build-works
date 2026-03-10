@@ -137,27 +137,30 @@ function sanitizeImports(code: string, filePath: string): string {
     (match, pkg) => isAllowedPkg(pkg) ? match : `undefined /* BLOCKED: ${pkg} */`
   );
 
-  // Final safety: use Sucrase to actually parse the code — catches real syntax errors
+  // Final safety: use Sucrase to parse the code — catches real syntax errors
   // that would crash Sandpack's bundler with "Cannot assign to read only property 'message'"
+  // IMPORTANT: Only use ["jsx"] transform — do NOT add "imports" as it converts
+  // ES modules to CommonJS (import→require) which breaks Sandpack completely.
   try {
     transform(code, {
-      transforms: ["jsx", "imports"],
+      transforms: ["jsx"],
       jsxRuntime: "automatic",
       production: true,
     });
-  } catch (e) {
-    // Try again with just JSX transform in case imports transform is too strict
-    try {
-      transform(code, {
-        transforms: ["jsx"],
-        jsxRuntime: "automatic",
-        production: true,
-      });
-    } catch {
-      // Only stub if BOTH transforms fail — this is a real syntax error
-      console.warn(`[SandpackPreview] Syntax error in ${filePath}, using safe stub:`, (e as Error).message?.slice(0, 100));
-      return makeSafeStub(filePath);
+  } catch {
+    // Sucrase couldn't parse it — but DON'T stub it out.
+    // Let Sandpack try to handle it — a Sandpack error overlay is better than a blank screen.
+    // Only stub truly catastrophic files (unclosed strings, completely broken syntax)
+    const hasDefaultExport = /export\s+default\b/.test(code);
+    const hasOpenTags = /<\w/.test(code);
+    if (hasDefaultExport && hasOpenTags) {
+      // Has basic structure — let Sandpack try
+      console.warn(`[SandpackPreview] Sucrase parse warning in ${filePath}, passing through to Sandpack`);
+      return code;
     }
+    // Truly broken — use stub
+    console.warn(`[SandpackPreview] Syntax error in ${filePath}, using safe stub`);
+    return makeSafeStub(filePath);
   }
 
   return code;
