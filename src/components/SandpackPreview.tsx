@@ -141,14 +141,23 @@ function sanitizeImports(code: string, filePath: string): string {
   // that would crash Sandpack's bundler with "Cannot assign to read only property 'message'"
   try {
     transform(code, {
-      transforms: ["jsx"],
+      transforms: ["jsx", "imports"],
       jsxRuntime: "automatic",
       production: true,
     });
-  } catch {
-    // Sucrase failed — code has real syntax errors, use stub
-    console.warn(`[SandpackPreview] Syntax error in ${filePath}, using safe stub`);
-    return makeSafeStub(filePath);
+  } catch (e) {
+    // Try again with just JSX transform in case imports transform is too strict
+    try {
+      transform(code, {
+        transforms: ["jsx"],
+        jsxRuntime: "automatic",
+        production: true,
+      });
+    } catch {
+      // Only stub if BOTH transforms fail — this is a real syntax error
+      console.warn(`[SandpackPreview] Syntax error in ${filePath}, using safe stub:`, (e as Error).message?.slice(0, 100));
+      return makeSafeStub(filePath);
+    }
   }
 
   return code;
