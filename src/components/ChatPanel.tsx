@@ -2,44 +2,26 @@ import { useState, useRef, useEffect, useCallback, forwardRef, useImperativeHand
 import { useSelfHealing } from "@/hooks/useSelfHealing";
 import { useProjectContextCache } from "@/hooks/useProjectContextCache";
 import { useIntentClassification } from "@/hooks/useIntentClassification";
+import { useBuildOrchestration } from "@/hooks/useBuildOrchestration";
 import { Version } from "@/components/VersionHistory";
 import { User, Sparkles, AlertTriangle, Wand2, ImagePlus, X, ArrowDown, Zap, ShieldCheck, Square } from "lucide-react";
-import VoiceInput from "@/components/VoiceInput";
-import { streamChat } from "@/lib/streamChat";
-import { classifyIntent, streamChatAgent, streamBuildAgent, validateReactCode, hasBuildConfirmation, stripBuildMarker, formatRetryContext, MAX_BUILD_RETRIES, type AgentIntent, type PipelineStep } from "@/lib/agentPipeline";
-import { generatePlan, type BuildPlan, type PlanTask } from "@/lib/planningAgent";
-import { executePlan } from "@/lib/taskExecutor";
-import { runBuildEngine, type EngineConfig, type EngineProgress } from "@/lib/buildEngine";
-import { matchTemplate, PAGE_TEMPLATES, type PageTemplate } from "@/lib/pageTemplates";
-import { COMPONENT_SNIPPETS, getSnippetsPromptContext } from "@/lib/componentSnippets";
 import { AI_MODELS, DEFAULT_MODEL, PROMPT_SUGGESTIONS, QUICK_ACTIONS, CONTEXT_SUGGESTIONS, DESIGN_THEMES, type AIModelId } from "@/lib/aiModels";
-import { generateSmartSuggestions, type SmartSuggestion } from "@/lib/smartSuggestions";
+import { generateSmartSuggestions } from "@/lib/smartSuggestions";
 import { useUndoRedo } from "@/hooks/useUndoRedo";
-import DiffPreview from "@/components/DiffPreview";
 import { motion, AnimatePresence } from "framer-motion";
 import { usePreview } from "@/contexts/PreviewContext";
 import { useProjects } from "@/contexts/ProjectContext";
-import { useVirtualFS, parseMultiFileOutput } from "@/contexts/VirtualFSContext";
+import { useVirtualFS } from "@/contexts/VirtualFSContext";
 import { supabase } from "@/integrations/supabase/client";
-import { toExportPath } from "@/lib/pathNormalizer";
-import { StreamingPreviewController } from "@/lib/streamingPreview";
+import { PAGE_TEMPLATES } from "@/lib/pageTemplates";
 import ChatMessage from "@/components/chat/ChatMessage";
 import BuildPipelineCard from "@/components/chat/BuildPipelineCard";
 import ClarifyingQuestions from "@/components/chat/ClarifyingQuestions";
-import ChatWelcome from "@/components/chat/ChatWelcome";
 import ChatInput from "@/components/chat/ChatInput";
-import ReactMarkdown from "react-markdown";
 import {
   type MsgContent,
   getTextContent,
-  getImageUrls,
-  parseResponse,
-  parseReactFiles,
-  postProcessHtml,
-  sanitizeImports,
   fileToDataUrl,
-  formatTime,
-  buildMessageContent,
 } from "@/lib/codeParser";
 import {
   Tooltip,
@@ -61,51 +43,40 @@ const ChatPanel = forwardRef<ChatPanelHandle, { initialPrompt?: string; onVersio
   const { currentProject, saveProject } = useProjects();
   const [messages, setMessages] = useState<Msg[]>([]);
   const [input, setInput] = useState("");
-  const [isLoading, setIsLoading] = useState(false);
   const [pendingPrompt, setPendingPrompt] = useState<string | null>(null);
   const [selectedModel, setSelectedModel] = useState<AIModelId>(DEFAULT_MODEL);
   const [selectedTheme, setSelectedTheme] = useState<string>("minimal");
-  // previewErrors, healAttempts, isHealing, healingStatus provided by useSelfHealing hook below
   const [attachedImages, setAttachedImages] = useState<string[]>([]);
   const [isDragOver, setIsDragOver] = useState(false);
   const [showScrollBtn, setShowScrollBtn] = useState(false);
-  
-  const [buildStreamContent, setBuildStreamContent] = useState("");
-  // Self-healing state
-  // healAttempts, isHealing, healingStatus provided by useSelfHealing hook below
-  // Build retry state
-  const [buildRetryCount, setBuildRetryCount] = useState(0);
+
   // Follow-up questions state
   const [followUpQuestions, setFollowUpQuestions] = useState<any[]>([]);
   const [followUpAnswers, setFollowUpAnswers] = useState<Record<string, string>>({});
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [pendingFollowUpPrompt, setPendingFollowUpPrompt] = useState<string>("");
   const [analysisResult, setAnalysisResult] = useState<any>(null);
-  // Agent pipeline state
-  const [currentAgent, setCurrentAgent] = useState<AgentIntent | null>(null);
-  const [pipelineStep, setPipelineStep] = useState<PipelineStep | null>(null);
-  const [pendingBuildPrompt, setPendingBuildPrompt] = useState<string | null>(null);
-  // Planning agent state
-  const [currentPlan, setCurrentPlan] = useState<BuildPlan | null>(null);
-  const [currentTaskIndex, setCurrentTaskIndex] = useState(0);
-  const [totalPlanTasks, setTotalPlanTasks] = useState(0);
+
+  // Edit/regenerate state
+  const [editingIndex, setEditingIndex] = useState<number | null>(null);
+  const [editText, setEditText] = useState("");
+
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const hasProcessedInitialRef = useRef(false);
+
   const { previewHtml: currentPreviewHtml, sandpackFiles: currentSandpackFiles, setPreviewHtml, setIsBuilding, setBuildStep, setSandpackFiles, setSandpackDeps, setPreviewMode, setBuildMetrics, saveSnapshot } = usePreview();
   const { setFiles: setVirtualFiles } = useVirtualFS();
-  const lastProjectIdRef = useRef<string | null>(null);
-  const hasProcessedInitialRef = useRef(false);
-  const buildSafetyTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  // FIX: Track sandpack files via ref to prevent stale closure reads during project switches
-  const sandpackFilesRef = useRef<Record<string, string> | null>(null);
-  sandpackFilesRef.current = currentSandpackFiles;
-
-  // Streaming preview controller — renders partial output during builds
-  const streamingControllerRef = useRef<StreamingPreviewController | null>(null);
 
   // Undo/Redo system
   const { createCheckpoint, undo, redo, canUndo, canRedo } = useUndoRedo();
+
+  // Refs to break circular dependency between hooks
+  const resetHealingRef = useRef<() => void>(() => {});
+  const sendMessageRef = useRef<(text: string) => void>(() => {});
+  const setPipelineStepRef = useRef<(step: any) => void>(() => {});
+  const setPipelineStepProxy = useCallback((step: any) => setPipelineStepRef.current(step), []);
 
   // Project context cache hook
   const { fetchProjectContext, invalidateCache: invalidateContextCache } = useProjectContextCache(currentProject?.id);
@@ -115,9 +86,77 @@ const ChatPanel = forwardRef<ChatPanelHandle, { initialPrompt?: string; onVersio
     currentSandpackFiles,
     currentPreviewHtml,
     messages.length,
-    setPipelineStep,
+    setPipelineStepProxy,
   );
 
+  // Self-healing hook (declared first, uses sendMessage ref)
+  const {
+    previewErrors, setPreviewErrors,
+    healAttempts, setHealAttempts,
+    isHealing, healingStatus,
+    handleAutoFix,
+    resetHealing,
+    MAX_HEAL_ATTEMPTS,
+  } = useSelfHealing({
+    isBuildingValue: usePreview().isBuilding,
+    isLoading: false, // will be synced via ref
+    sandpackFilesRef: { current: currentSandpackFiles } as React.RefObject<Record<string, string> | null>,
+    isSendingRef: { current: false } as React.RefObject<boolean>,
+    isLoadingRef: { current: false } as React.RefObject<boolean>,
+    sendMessage: (text: string) => sendMessageRef.current(text),
+  });
+
+  // Keep ref in sync
+  useEffect(() => { resetHealingRef.current = resetHealing; }, [resetHealing]);
+
+  // Build orchestration hook
+  const buildOrch = useBuildOrchestration({
+    currentProject,
+    saveProject,
+    onVersionCreated,
+    setPreviewHtml,
+    setIsBuilding,
+    setBuildStep,
+    setSandpackFiles,
+    setSandpackDeps,
+    setPreviewMode,
+    setBuildMetrics,
+    saveSnapshot,
+    currentPreviewHtml,
+    currentSandpackFiles,
+    setVirtualFiles,
+    messages,
+    setMessages,
+    setInput,
+    setAttachedImages,
+    setPreviewErrors: (errs: any) => setPreviewErrors(errs),
+    setHealAttempts: (n: number) => setHealAttempts(n),
+    resetHealing: () => resetHealingRef.current(),
+    inputRef,
+    selectedModel,
+    selectedTheme,
+    fetchProjectContext,
+    classifyUserIntent,
+    fastClassifyLocal,
+  });
+
+  const {
+    isLoading, buildStreamContent, currentAgent, pipelineStep, setPipelineStep,
+    currentPlan, currentTaskIndex, totalPlanTasks,
+    selectedTemplate, setSelectedTemplate, buildRetryCount,
+    isSendingRef, isLoadingRef, messagesRef, sandpackFilesRef, abortControllerRef, lastProjectIdRef,
+    sendMessage, sendChatMessage, handleSmartSend, clearChat: orchClearChat, abortBuild,
+    syncSandpackToVirtualFS,
+    setCurrentAgent, setCurrentPlan, setCurrentTaskIndex, setTotalPlanTasks,
+    setBuildStreamContent, setBuildRetryCount, setPendingBuildPrompt, setIsLoading,
+  } = buildOrch;
+
+  // Sync refs after both hooks are initialized
+  useEffect(() => { sendMessageRef.current = sendMessage; }, [sendMessage]);
+  useEffect(() => { setPipelineStepRef.current = setPipelineStep; }, [setPipelineStep]);
+
+  // Expose handle
+  useImperativeHandle(ref, () => ({ clearChat: orchClearChat, sendMessage: (text: string) => sendMessage(text) }), [orchClearChat, sendMessage]);
 
   // Listen for refactor actions from CodeEditor
   useEffect(() => {
@@ -129,7 +168,7 @@ const ChatPanel = forwardRef<ChatPanelHandle, { initialPrompt?: string; onVersio
     };
     window.addEventListener("refactor-action", handler);
     return () => window.removeEventListener("refactor-action", handler);
-  }, []);
+  }, [handleSmartSend]);
 
   const handleUndo = useCallback(() => {
     const checkpoint = undo();
@@ -155,78 +194,8 @@ const ChatPanel = forwardRef<ChatPanelHandle, { initialPrompt?: string; onVersio
     }
   }, [redo, setSandpackFiles, setPreviewHtml, setPreviewMode]);
 
-  const syncSandpackToVirtualFS = useCallback((sandpackFiles: Record<string, string>) => {
-    const virtualFiles: Record<string, { path: string; content: string; language: string }> = {};
-    for (const [path, content] of Object.entries(sandpackFiles)) {
-      const cleanPath = path.startsWith("/") ? path.slice(1) : path;
-      // Map sandpack paths to src/ structure for display
-      const displayPath = toExportPath(cleanPath);
-      const ext = displayPath.split(".").pop()?.toLowerCase() || "";
-      const langMap: Record<string, string> = {
-        tsx: "typescript", ts: "typescript", jsx: "javascript", js: "javascript",
-        css: "css", html: "html", json: "json",
-      };
-      virtualFiles[displayPath] = { path: displayPath, content, language: langMap[ext] || "text" };
-    }
-    setVirtualFiles(virtualFiles);
-  }, [setVirtualFiles]);
-
-const healTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-// Self-healing hook
-const {
-  previewErrors, setPreviewErrors,
-  healAttempts, setHealAttempts,
-  isHealing, healingStatus,
-  handleAutoFix,
-  resetHealing,
-  MAX_HEAL_ATTEMPTS,
-} = useSelfHealing({
-  isBuildingValue: usePreview().isBuilding,
-  isLoading,
-  sandpackFilesRef,
-  isSendingRef: { current: false } as React.RefObject<boolean>, // wired below
-  isLoadingRef: { current: false } as React.RefObject<boolean>, // wired below  
-  sendMessage: (text: string) => sendMessageRef.current(text),
-});
-
-// Auto-clear safety timeout when isBuilding goes false
-const isBuildingValue = usePreview().isBuilding;
-useEffect(() => {
-  if (!isBuildingValue && buildSafetyTimeoutRef.current) {
-    clearTimeout(buildSafetyTimeoutRef.current);
-    buildSafetyTimeoutRef.current = null;
-  }
-}, [isBuildingValue]);
-// ─── Project context cache — avoids re-fetching on every message ───────────
-const projectContextCacheRef = useRef<{
-  projectId: string;
-  schemas: any[];
-  knowledge: string[];
-  irContext: string;
-  fetchedAt: number;
-} | null>(null);
-const CONTEXT_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
-  // Edit/regenerate state
-  const [editingIndex, setEditingIndex] = useState<number | null>(null);
-  const [editText, setEditText] = useState("");
-  const [selectedTemplate, setSelectedTemplate] = useState<PageTemplate | null>(null);
-  
-  // FIX: Use refs to avoid stale closures in sendMessage
-  const messagesRef = useRef<Msg[]>([]);
-  messagesRef.current = messages;
-  const isLoadingRef = useRef(false);
-  isLoadingRef.current = isLoading;
-  // FIX: Abort controller for cancelling in-flight requests
-  const abortControllerRef = useRef<AbortController | null>(null);
-  // FIX: Guard against duplicate sends
-  const isSendingRef = useRef(false);
-
-  // Elapsed time timer during loading
-  // Timer moved to BuildPipelineCard — no more per-second re-renders here
-
-  // Auto-create checkpoint when a build completes
-  const prevPipelineStep = useRef<PipelineStep | null>(null);
+  // Auto-create checkpoint when build completes
+  const prevPipelineStep = useRef<any>(null);
   useEffect(() => {
     if (prevPipelineStep.current !== "complete" && pipelineStep === "complete") {
       const lastUserMsg = messagesRef.current.filter(m => m.role === "user").pop();
@@ -253,7 +222,7 @@ const CONTEXT_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
     return () => window.removeEventListener("keydown", handler);
   }, [handleUndo, handleRedo]);
 
-  // Scroll detection for scroll-to-bottom button
+  // Scroll detection
   useEffect(() => {
     const el = scrollRef.current;
     if (!el) return;
@@ -274,7 +243,7 @@ const CONTEXT_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
     return () => el.removeEventListener("scroll", onScroll);
   }, []);
 
-  // Auto-scroll to bottom on new messages
+  // Auto-scroll
   useEffect(() => {
     const el = scrollRef.current;
     if (!el) return;
@@ -286,34 +255,24 @@ const CONTEXT_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
     }
   }, [messages.length, buildStreamContent, isLoading]);
 
-  // Preview error listening is now handled by useSelfHealing hook
-   // Self-healing is now handled by useSelfHealing hook
-
-  // classifyUserIntent is now provided by useIntentClassification hook
-
-  const handleFollowUpAnswer = (questionId: string, value: string) => {
-    setFollowUpAnswers(prev => ({ ...prev, [questionId]: value }));
-  };
-
+  // Follow-up answers
   const submitFollowUpAnswers = useCallback(() => {
     const answersText = followUpQuestions.map(q => {
       const answer = followUpAnswers[q.id];
       const option = q.options.find((o: any) => o.value === answer);
       return `${q.text} → ${option?.label || answer || "Not specified"}`;
     }).join("\n");
-    
+
     const enrichedPrompt = `${pendingFollowUpPrompt}\n\n--- Additional Requirements ---\n${answersText}`;
-    
+
     setFollowUpQuestions([]);
     setFollowUpAnswers({});
     setPendingFollowUpPrompt("");
     setAnalysisResult(null);
-    // IMPORTANT: Go directly to build agent — skip classification since user already answered
     setCurrentAgent("build");
     setPipelineStep("planning");
-    // Use ref to avoid block-scoped declaration issue
-    setTimeout(() => sendMessageRef.current(enrichedPrompt), 0);
-  }, [followUpQuestions, followUpAnswers, pendingFollowUpPrompt]);
+    setTimeout(() => sendMessage(enrichedPrompt), 0);
+  }, [followUpQuestions, followUpAnswers, pendingFollowUpPrompt, sendMessage, setCurrentAgent, setPipelineStep]);
 
   const skipFollowUpQuestions = useCallback(() => {
     const prompt = pendingFollowUpPrompt;
@@ -321,12 +280,12 @@ const CONTEXT_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
     setFollowUpAnswers({});
     setPendingFollowUpPrompt("");
     setAnalysisResult(null);
-    // Skip classification — user explicitly chose to skip, go straight to build
     setCurrentAgent("build");
     setPipelineStep("planning");
-    setTimeout(() => sendMessageRef.current(prompt), 0);
-  }, [pendingFollowUpPrompt]);
+    setTimeout(() => sendMessage(prompt), 0);
+  }, [pendingFollowUpPrompt, sendMessage, setCurrentAgent, setPipelineStep]);
 
+  // Initial prompt
   useEffect(() => {
     if (initialPrompt && !hasProcessedInitialRef.current) {
       hasProcessedInitialRef.current = true;
@@ -334,21 +293,19 @@ const CONTEXT_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
     }
   }, [initialPrompt]);
 
+  // Project switch
   useEffect(() => {
     if (currentProject && currentProject.id !== lastProjectIdRef.current) {
       lastProjectIdRef.current = currentProject.id;
       const history = currentProject.chat_history ?? [];
       setMessages(history);
       setPreviewHtml(currentProject.html_content || "");
-      // ─── FULL RESET: Clear ALL state from previous project ───
       setSandpackFiles(null);
       setSandpackDeps({});
       setPreviewMode("html");
       setPreviewErrors([]);
       setAttachedImages([]);
-      // Clear VirtualFS so old files don't bleed into new project
       setVirtualFiles({});
-      // Reset all build/pipeline state
       setHealAttempts(0);
       resetHealing();
       setBuildStreamContent("");
@@ -358,21 +315,18 @@ const CONTEXT_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
       setCurrentAgent(null);
       setPipelineStep(null);
       setBuildRetryCount(0);
-      // Clear follow-up questions from previous project
       setFollowUpQuestions([]);
       setFollowUpAnswers({});
       setPendingFollowUpPrompt("");
       setAnalysisResult(null);
-      // Invalidate context cache so old schemas/knowledge don't leak
       invalidateContextCache();
-      // Abort any in-flight request from previous project
       if (abortControllerRef.current) {
         abortControllerRef.current.abort();
         abortControllerRef.current = null;
       }
       isSendingRef.current = false;
 
-      // Restore persisted sandpack state from project_data
+      // Restore persisted sandpack state
       const restoreProjectId = currentProject.id;
       supabase
         .from("project_data")
@@ -381,7 +335,6 @@ const CONTEXT_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
         .eq("collection", "sandpack_state")
         .maybeSingle()
         .then(({ data: row }) => {
-          // Guard: only apply if still on the same project
           if (lastProjectIdRef.current !== restoreProjectId) return;
           if (row?.data && typeof row.data === "object") {
             const state = row.data as any;
@@ -404,13 +357,11 @@ const CONTEXT_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
       setPreviewErrors([]);
       setAttachedImages([]);
       setVirtualFiles({});
-      projectContextCacheRef.current = null;
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentProject?.id, setPreviewHtml]);
 
-  // fetchProjectContext is now provided by useProjectContextCache hook
-
+  // Paste handler
   useEffect(() => {
     const handlePaste = (e: ClipboardEvent) => {
       const items = e.clipboardData?.items;
@@ -435,18 +386,6 @@ const CONTEXT_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
     } catch {}
   };
 
-  const uploadAppAsset = async (file: File): Promise<string | null> => {
-    if (!currentProject) return null;
-    try {
-      const ext = file.name.split(".").pop() || "png";
-      const path = `${currentProject.id}/${Date.now()}.${ext}`;
-      const { error } = await supabase.storage.from("app-assets").upload(path, file, { upsert: true });
-      if (error) { console.error("Upload error:", error); return null; }
-      const { data } = supabase.storage.from("app-assets").getPublicUrl(path);
-      return data?.publicUrl || null;
-    } catch { return null; }
-  };
-
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files) return;
@@ -469,16 +408,6 @@ const CONTEXT_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
     setAttachedImages((prev) => prev.filter((_, i) => i !== index));
   };
 
-  const buildMessageContent = (text: string, images: string[]): MsgContent => {
-    if (images.length === 0) return text;
-    const parts: Array<{ type: "text"; text: string } | { type: "image_url"; image_url: { url: string } }> = [];
-    parts.push({ type: "text", text });
-    for (const img of images) {
-      parts.push({ type: "image_url", image_url: { url: img } });
-    }
-    return parts;
-  };
-
   const scrollToBottom = useCallback(() => {
     if (!scrollRef.current) return;
     requestAnimationFrame(() => {
@@ -486,1034 +415,18 @@ const CONTEXT_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
     });
   }, []);
 
-  const clearChat = useCallback(() => {
-    if (!currentProject || isLoading) return;
-    // Abort any in-flight request
-    if (abortControllerRef.current) {
-      abortControllerRef.current.abort();
-      abortControllerRef.current = null;
+  // pendingPrompt effect
+  useEffect(() => {
+    if (pendingPrompt && currentProject && !isLoadingRef.current && !isSendingRef.current && messagesRef.current.length === 0) {
+      const prompt = pendingPrompt;
+      setPendingPrompt(null);
+      sendMessage(prompt);
     }
-    setMessages([]);
-    setPreviewHtml("");
-    setSandpackFiles(null);
-    setSandpackDeps({});
-    setPreviewMode("html");
-    setPreviewErrors([]);
-    setHealAttempts(0);
-    resetHealing();
-    setCurrentAgent(null);
-    setPipelineStep(null);
-    setPendingBuildPrompt(null);
-    setCurrentPlan(null);
-    setCurrentTaskIndex(0);
-    setTotalPlanTasks(0);
-    isSendingRef.current = false;
-    saveProject({ chat_history: [], html_content: "" });
-  }, [currentProject, isLoading, setPreviewHtml, saveProject]);
+  }, [pendingPrompt, currentProject, sendMessage]);
 
-  // sendMessage is defined below — use a stable ref so useImperativeHandle doesn't need it in deps
-  const sendMessageRef = useRef<(text: string, images?: string[]) => void>(() => {});
-  useImperativeHandle(ref, () => ({ clearChat, sendMessage: (text: string) => sendMessageRef.current(text) }), [clearChat]);
-
-  const sendMessage = useCallback(async (text: string, images: string[] = []) => {
-    if (!text || !currentProject) return;
-    
-    // FIX: Guard against duplicate concurrent sends
-    if (isSendingRef.current || isLoadingRef.current) {
-      console.warn("[ChatPanel] Blocked duplicate send while already sending");
-      return;
-    }
-    isSendingRef.current = true;
-
-    // Reset self-healing counter on manual user messages (not auto-fix)
-    if (!text.startsWith("🔧 AUTO-FIX")) {
-      setHealAttempts(0);
-    }
-
-    const content = buildMessageContent(text, images);
-    const userMsg: Msg = { role: "user", content, timestamp: Date.now() };
-    setInput("");
-    setAttachedImages([]);
-    setPreviewErrors([]);
-    if (inputRef.current) inputRef.current.style.height = "60px";
-    setMessages((prev) => [...prev, userMsg]);
-    setIsLoading(true);
-    setBuildStreamContent("");
-    setIsBuilding(true);
-    setBuildStep(images.length > 0 ? "🖼️ Analyzing image..." : "🏗️ Build agent generating code...");
-    setPipelineStep("generating");
-
-    // Safety timeout: if build doesn't complete in 300 seconds, force reset
-    if (buildSafetyTimeoutRef.current) clearTimeout(buildSafetyTimeoutRef.current);
-    buildSafetyTimeoutRef.current = setTimeout(() => {
-      console.warn("[ChatPanel] Build safety timeout — forcing isBuilding=false");
-      setIsBuilding(false);
-      setIsLoading(false);
-      setBuildStep("");
-      setPipelineStep(null);
-      setCurrentAgent(null);
-      isSendingRef.current = false;
-      setMessages((prev) => {
-        const msg = "⚠️ Build timed out after 5 minutes. The AI model may be under heavy load — please try again, or break the request into smaller steps.";
-        const last = prev[prev.length - 1];
-        if (last?.role === "assistant") {
-          return prev.map((m, i) => (i === prev.length - 1 ? { ...m, content: msg } : m));
-        }
-        return [...prev, { role: "assistant", content: msg, timestamp: Date.now() }];
-      });
-    }, 300_000);
-
-    // FIX: Create abort controller for this request
-    const abortController = new AbortController();
-    abortControllerRef.current = abortController;
-
-    let fullResponse = "";
-    let hasSetAnalyzing = false;
-    let hasSetBuilding = false;
-
-    let streamParseCount = 0;
-    const upsert = (chunk: string) => {
-      if (abortController.signal.aborted) return;
-      fullResponse += chunk;
-      setBuildStreamContent(fullResponse);
-      
-      // Try React files first, then HTML
-      const reactResult = parseReactFiles(fullResponse);
-      const [chatText, htmlCode] = reactResult.files ? [reactResult.chatText, null] : parseResponse(fullResponse);
-      const displayChat = reactResult.files ? reactResult.chatText : chatText;
-
-      if (!hasSetAnalyzing && fullResponse.length > 20) {
-        setBuildStep("🔨 Build agent: generating components...");
-        setPipelineStep("generating");
-        hasSetAnalyzing = true;
-      }
-      
-      if (reactResult.files) {
-        if (!hasSetBuilding) {
-          const fileNames = Object.keys(reactResult.files);
-          const totalChars = Object.values(reactResult.files).join('').length;
-          console.log(`[upsert] ✅ First React parse success: files=${fileNames.join(',')}, chars=${totalChars}`);
-          setBuildStep("📦 Bundling & validating...");
-          setPipelineStep("bundling");
-          hasSetBuilding = true;
-        }
-        streamParseCount++;
-        // NOTE: Do NOT push partial files to Sandpack during streaming.
-        // Incomplete code causes "Something went wrong" errors in the preview.
-        // Files are only set on build completion (onDone).
-        setPreviewMode("sandpack");
-      } else if (htmlCode) {
-        if (!hasSetBuilding) {
-          setBuildStep("Building your app...");
-          hasSetBuilding = true;
-        }
-        setPreviewMode("html");
-      }
-
-      setMessages((prev) => {
-        const text = displayChat || "Building...";
-        const last = prev[prev.length - 1];
-        if (last?.role === "assistant") {
-          return prev.map((m, i) => (i === prev.length - 1 ? { ...m, content: text } : m));
-        }
-        return [...prev, { role: "assistant", content: text, timestamp: Date.now() }];
-      });
-    };
-
-    try {
-      // ─── Context: served from in-memory cache (populated at project load) ───────
-      const { schemas, knowledge, irContext } = await fetchProjectContext(currentProject.id);
-
-      // ─── Current code context: smart file prioritization ─────────────────────
-      // FIX: For brand new projects (no prior messages), don't send stale sandpack files
-      // from a previous project that may still be in React state (async flush race)
-      const isFirstMessage = messagesRef.current.filter(m => m.role === "user").length <= 1;
-      const hasPersistedHistory = (currentProject.chat_history ?? []).length > 0;
-      const shouldIncludeCurrentCode = !isFirstMessage || hasPersistedHistory;
-      
-      let currentCodeSummary = "";
-      // FIX: Use ref to read latest sandpack files (avoids stale closure from project switch)
-      const safeSandpackFiles = sandpackFilesRef.current;
-      if (shouldIncludeCurrentCode && safeSandpackFiles && Object.keys(safeSandpackFiles).length > 0) {
-        const fileEntries = Object.entries(safeSandpackFiles);
-        const totalChars = fileEntries.reduce((sum, [, code]) => sum + code.length, 0);
-        if (totalChars <= 16000) {
-          currentCodeSummary = fileEntries.map(([path, code]) => `--- ${path}\n${code}`).join("\n\n");
-        } else {
-          const ENTRY_PATTERNS = ["/App.jsx", "/App.tsx", "/App.js"];
-          const keyFiles = fileEntries.filter(([p]) => ENTRY_PATTERNS.some(k => p.endsWith(k)));
-          const otherFiles = fileEntries.filter(([p]) => !ENTRY_PATTERNS.some(k => p.endsWith(k)));
-          const keyCode = keyFiles.map(([path, code]) => `--- ${path}\n${code}`).join("\n\n");
-          let remainingBudget = 14000 - keyCode.length;
-          const otherCode = otherFiles.map(([path, code]) => {
-            if (remainingBudget <= 0) return `--- ${path} (${code.length} chars — omitted for token budget)`;
-            if (code.length <= remainingBudget) {
-              remainingBudget -= code.length;
-              return `--- ${path}\n${code}`;
-            }
-            const snippet = code.slice(0, Math.max(200, Math.floor(remainingBudget * 0.6)));
-            remainingBudget = 0;
-            return `--- ${path} (${code.length} chars)\n${snippet}\n...[truncated]`;
-          }).join("\n\n");
-          currentCodeSummary = `${keyCode}\n\n${otherCode}`;
-        }
-      } else if (shouldIncludeCurrentCode && currentPreviewHtml && currentPreviewHtml.length > 0) {
-        currentCodeSummary = currentPreviewHtml.length < 16000
-          ? currentPreviewHtml
-          : currentPreviewHtml.slice(0, 12000) + `\n...[truncated — ${Math.round(currentPreviewHtml.length / 1000)}k chars total]`;
-      }
-
-      // Get component snippets reference for AI
-      const snippetsContext = getSnippetsPromptContext();
-
-      // FIX: Read messages from ref to avoid stale closures
-      const currentMessages = messagesRef.current;
-      const apiMessages = [...currentMessages, userMsg].map(m => ({
-        role: m.role,
-        content: m.content,
-      }));
-
-      const themeInfo = DESIGN_THEMES.find(t => t.id === selectedTheme);
-      
-      const userText = typeof text === "string" ? text : "";
-      const template = selectedTemplate || (currentMessages.length === 0 ? matchTemplate(userText) : null);
-      let templateCtx = "";
-      if (template) {
-        templateCtx = `## MATCHED TEMPLATE: ${template.name}\n\nUse this as your structural blueprint:\n${template.blueprint}\n\nCustomize the content, colors, and details based on the user's specific request. Do NOT copy the blueprint literally — adapt it creatively.`;
-        console.log(`[Template Matched] ${template.emoji} ${template.name}`);
-        setSelectedTemplate(null);
-      }
-
-      // ─── Shared onDone handler for both build-agent and chat paths ───
-      const handleOnDone = async (responseText: string) => {
-        if (abortController.signal.aborted) return;
-        fullResponse = responseText;
-        
-        console.log(`[ChatPanel:onDone] Response length: ${fullResponse.length}`);
-        
-        const reactResult = parseReactFiles(fullResponse);
-        let finalHtml: string | null = null;
-        
-        if (reactResult.files) {
-          setPipelineStep("validating");
-          setBuildStep("✅ Validating code...");
-          const validation = validateReactCode(reactResult.files);
-          
-          if (!validation.valid && buildRetryCount < MAX_BUILD_RETRIES) {
-            console.warn(`[ChatPanel:onDone] Validation failed (attempt ${buildRetryCount + 1}):`, validation.errors);
-            setPipelineStep("retrying");
-            setBuildStep(`🔄 Auto-fixing ${validation.errors.length} issue(s)...`);
-            setBuildRetryCount(prev => prev + 1);
-            
-            setMessages((prev) => {
-              const retryMsg = `⚠️ Found ${validation.errors.length} issue(s), auto-fixing...`;
-              const last = prev[prev.length - 1];
-              if (last?.role === "assistant") {
-                return prev.map((m, i) => (i === prev.length - 1 ? { ...m, content: retryMsg } : m));
-              }
-              return [...prev, { role: "assistant", content: retryMsg, timestamp: Date.now() }];
-            });
-            
-            const retryContext = formatRetryContext(validation.errors, buildRetryCount + 1);
-            let retryFullResponse = "";
-            
-            await streamBuildAgent({
-              messages: apiMessages,
-              projectId: currentProject.id,
-              techStack: currentProject.tech_stack || "react-cdn",
-              schemas,
-              model: selectedModel,
-              designTheme: themeInfo?.prompt,
-              knowledge,
-              currentCode: currentCodeSummary || undefined,
-              snippetsContext: snippetsContext || undefined,
-              irContext: irContext || undefined,
-              retryContext,
-              onDelta: (chunk) => {
-                retryFullResponse += chunk;
-                setBuildStreamContent(retryFullResponse);
-              },
-              onDone: (retryText) => {
-                const retryResult = parseReactFiles(retryText);
-                if (retryResult.files) {
-                  setSandpackFiles(retryResult.files);
-                  syncSandpackToVirtualFS(retryResult.files);
-                  if (Object.keys(retryResult.deps).length > 0) setSandpackDeps(retryResult.deps);
-                  setPreviewMode("sandpack");
-                  
-                  const retryChatText = retryResult.chatText || "✅ Fixed and rebuilt successfully";
-                  setMessages((prev) => {
-                    const last = prev[prev.length - 1];
-                    if (last?.role === "assistant") {
-                      return prev.map((m, i) => (i === prev.length - 1 ? { ...m, content: retryChatText } : m));
-                    }
-                    return prev;
-                  });
-                }
-                
-                setIsLoading(false);
-                setIsBuilding(false);
-                setBuildStep("");
-                setPipelineStep("complete");
-                setCurrentAgent(null);
-                setBuildRetryCount(0);
-                isSendingRef.current = false;
-                setTimeout(() => setBuildStreamContent(""), 3000);
-                
-                const persistMessages = messagesRef.current.map(m => ({
-                  role: m.role,
-                  content: typeof m.content === "string" ? m.content : getTextContent(m.content),
-                }));
-                saveProject({ chat_history: persistMessages });
-              },
-              onError: (err) => {
-                console.error("[ChatPanel:retry] Retry failed:", err);
-                setSandpackFiles(reactResult.files!);
-                syncSandpackToVirtualFS(reactResult.files!);
-                if (Object.keys(reactResult.deps).length > 0) setSandpackDeps(reactResult.deps);
-                setPreviewMode("sandpack");
-                setIsLoading(false);
-                setIsBuilding(false);
-                setBuildStep("");
-                setPipelineStep("complete");
-                setCurrentAgent(null);
-                setBuildRetryCount(0);
-                isSendingRef.current = false;
-              },
-            });
-            return;
-          }
-          
-          if (!validation.valid) {
-            console.warn("[ChatPanel:onDone] Validation warnings (max retries reached):", validation.errors);
-          }
-          
-          const fileNames = Object.keys(reactResult.files);
-          console.log(`[ChatPanel:onDone] ✅ React files:`, fileNames);
-          setSandpackFiles(reactResult.files);
-          syncSandpackToVirtualFS(reactResult.files);
-          if (Object.keys(reactResult.deps).length > 0) setSandpackDeps(reactResult.deps);
-          setPreviewMode("sandpack");
-          setBuildRetryCount(0);
-        } else {
-          console.log("[ChatPanel:onDone] No React files — falling back to HTML");
-          const { files: parsedFiles, html: htmlCode, chatText } = parseMultiFileOutput(fullResponse);
-          
-          if (Object.keys(parsedFiles).length > 0) setVirtualFiles(parsedFiles);
-          if (htmlCode) setPreviewHtml(postProcessHtml(htmlCode));
-
-          finalHtml = htmlCode;
-          
-          // If NO code was generated at all (neither React nor HTML), the AI gave a text-only response.
-          // Auto-retry with an explicit instruction to generate code.
-          if (!htmlCode && buildRetryCount < MAX_BUILD_RETRIES) {
-            console.warn("[ChatPanel:onDone] No code in response — auto-retrying with code generation instruction");
-            setBuildStep("🔄 Re-generating with code output...");
-            setBuildRetryCount(prev => prev + 1);
-            
-            setMessages((prev) => {
-              const last = prev[prev.length - 1];
-              if (last?.role === "assistant") {
-                return prev.map((m, i) => (i === prev.length - 1 ? { ...m, content: "⏳ Generating code... (retry)" } : m));
-              }
-              return prev;
-            });
-            
-            const retryMessages = [
-              ...apiMessages,
-              { role: "assistant" as const, content: fullResponse },
-              { role: "user" as const, content: "Your previous response did not contain any code. You MUST output complete working React code inside ```react-preview fences with --- /App.jsx file markers. Generate the full application code NOW. Do not describe what you plan to build — just output the code." },
-            ];
-            
-            let retryFullResponse = "";
-            await streamBuildAgent({
-              messages: retryMessages,
-              projectId: currentProject.id,
-              techStack: currentProject.tech_stack || "react-cdn",
-              schemas,
-              model: selectedModel,
-              designTheme: themeInfo?.prompt,
-              knowledge,
-              currentCode: currentCodeSummary || undefined,
-              snippetsContext: snippetsContext || undefined,
-              irContext: irContext || undefined,
-              onDelta: (chunk) => {
-                retryFullResponse += chunk;
-                setBuildStreamContent(retryFullResponse);
-              },
-              onDone: (retryText) => {
-                const retryResult = parseReactFiles(retryText);
-                if (retryResult.files) {
-                  setSandpackFiles(retryResult.files);
-                  syncSandpackToVirtualFS(retryResult.files);
-                  if (Object.keys(retryResult.deps).length > 0) setSandpackDeps(retryResult.deps);
-                  setPreviewMode("sandpack");
-                  
-                  const retryChatText = retryResult.chatText || "✅ Code generated successfully";
-                  setMessages((prev) => {
-                    const last = prev[prev.length - 1];
-                    if (last?.role === "assistant") {
-                      return prev.map((m, i) => (i === prev.length - 1 ? { ...m, content: retryChatText } : m));
-                    }
-                    return prev;
-                  });
-                } else {
-                  // Still no code — show user-friendly message
-                  setMessages((prev) => {
-                    const last = prev[prev.length - 1];
-                    const msg = "⚠️ The AI returned a planning response instead of code. Please try a more specific request like: \"Build the Dashboard and Student Management modules with sidebar navigation\"";
-                    if (last?.role === "assistant") {
-                      return prev.map((m, i) => (i === prev.length - 1 ? { ...m, content: msg } : m));
-                    }
-                    return [...prev, { role: "assistant" as const, content: msg, timestamp: Date.now() }];
-                  });
-                }
-                
-                setIsLoading(false);
-                setIsBuilding(false);
-                setBuildStep("");
-                setPipelineStep("complete");
-                setCurrentAgent(null);
-                setBuildRetryCount(0);
-                isSendingRef.current = false;
-                setTimeout(() => setBuildStreamContent(""), 3000);
-                
-                const persistMessages = messagesRef.current.map(m => ({
-                  role: m.role,
-                  content: typeof m.content === "string" ? m.content : getTextContent(m.content),
-                }));
-                saveProject({ chat_history: persistMessages });
-              },
-              onError: (err) => {
-                console.error("[ChatPanel:code-retry] Retry failed:", err);
-                setIsLoading(false);
-                setIsBuilding(false);
-                setBuildStep("");
-                setPipelineStep("complete");
-                setCurrentAgent(null);
-                setBuildRetryCount(0);
-                isSendingRef.current = false;
-              },
-            });
-            return;
-          }
-          
-          if (htmlCode && htmlCode.length > 200 && currentMessages.length === 0) {
-            setBuildStep("Reviewing & polishing...");
-            try {
-              const reviewResp = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/review-code`, {
-                method: "POST",
-                headers: {
-                  "Content-Type": "application/json",
-                  Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
-                },
-                body: JSON.stringify({ html: htmlCode }),
-              });
-              if (reviewResp.ok) {
-                const reviewData = await reviewResp.json();
-                if (reviewData.reviewed && reviewData.html && reviewData.html.length > 200) {
-                  finalHtml = reviewData.html;
-                  setPreviewHtml(postProcessHtml(finalHtml));
-                }
-              }
-            } catch (e) {
-              console.warn("[Phase 3] Review pass skipped:", e);
-            }
-          }
-        }
-
-        setIsLoading(false);
-        setIsBuilding(false);
-        setBuildStep("");
-        setPipelineStep("complete");
-        setCurrentAgent(null);
-        isSendingRef.current = false;
-        setTimeout(() => setBuildStreamContent(""), 3000);
-
-        const processedHtml = finalHtml ? postProcessHtml(finalHtml) : null;
-
-        if (processedHtml && currentProject?.id) {
-          supabase
-            .from("project_environments" as any)
-            .update({ html_snapshot: processedHtml, status: "active", updated_at: new Date().toISOString() } as any)
-            .eq("project_id", currentProject.id)
-            .eq("name", "development")
-            .then(() => {});
-        }
-
-        if (processedHtml && onVersionCreated) {
-          onVersionCreated({
-            id: crypto.randomUUID(),
-            timestamp: Date.now(),
-            label: getTextContent(userMsg.content).slice(0, 60) || "Build update",
-            html: processedHtml,
-            messageIndex: currentMessages.length,
-          });
-        }
-
-        const finalChatText = reactResult.files ? reactResult.chatText : (() => {
-          const { chatText: ct } = parseMultiFileOutput(fullResponse);
-          return ct;
-        })();
-
-        setMessages((prev) => {
-          const final = finalChatText
-            ? prev.map((m, i) => (i === prev.length - 1 && m.role === "assistant" ? { ...m, content: finalChatText } : m))
-            : prev;
-
-          const persistMessages = final.map(m => ({
-            role: m.role,
-            content: typeof m.content === "string" ? m.content : getTextContent(m.content),
-          }));
-
-          const isFirstMessage = persistMessages.filter(m => m.role === "user").length === 1;
-          if (isFirstMessage && currentProject.name === "Untitled Project") {
-            const userPromptText = persistMessages[0]?.content || "";
-            fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/project-name`, {
-              method: "POST",
-              headers: { "Content-Type": "application/json", Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}` },
-              body: JSON.stringify({ prompt: userPromptText }),
-            })
-              .then(r => r.json())
-              .then(({ name, emoji }) => {
-                const fullName = emoji ? `${emoji} ${name}` : name;
-                supabase.from("projects").update({ name: fullName, updated_at: new Date().toISOString() } as any).eq("id", currentProject.id).then(() => saveProject({ name: fullName } as any));
-              })
-              .catch(() => {});
-          }
-
-          saveProject({ chat_history: persistMessages, html_content: finalHtml || currentProject.html_content || "" });
-          
-          // Persist sandpack files for session restoration (direct chat build path)
-          if (reactResult.files && Object.keys(reactResult.files).length > 0) {
-            const payload = { files: reactResult.files, deps: reactResult.deps || {} };
-            supabase
-              .from("project_data")
-              .upsert(
-                { project_id: currentProject.id, collection: "sandpack_state", data: payload as any },
-                { onConflict: "project_id,collection" }
-              )
-              .then(({ error }) => {
-                if (error) console.warn("[ChatPanel] Failed to persist sandpack state:", error);
-              });
-          }
-          
-          return final;
-        });
-      };
-
-      const handleOnError = (err: string) => {
-        if (abortController.signal.aborted) return;
-        setMessages((prev) => [...prev, { role: "assistant", content: `⚠️ ${err}`, timestamp: Date.now() }]);
-        setIsLoading(false);
-        setIsBuilding(false);
-        setBuildStep("");
-        setPipelineStep("error");
-        setCurrentAgent(null);
-        isSendingRef.current = false;
-        // Stop streaming preview on error
-        streamingControllerRef.current?.stop();
-        streamingControllerRef.current = null;
-      };
-
-      // ─── Cleanup helper for plan-based builds ───
-      const handleOnDone_cleanup = () => {
-        setIsLoading(false);
-        setIsBuilding(false);
-        setBuildStep("");
-        setPipelineStep("complete");
-        setCurrentAgent(null);
-        isSendingRef.current = false;
-        setBuildRetryCount(0);
-        setCurrentPlan(null);
-        setTimeout(() => setBuildStreamContent(""), 3000);
-
-        const persistMessages = messagesRef.current.map(m => ({
-          role: m.role,
-          content: typeof m.content === "string" ? m.content : getTextContent(m.content),
-        }));
-        saveProject({ chat_history: persistMessages, html_content: currentProject.html_content || "" });
-      };
-
-      // ─── Intent Classification already handled by handleSmartSend ───
-      // Classification is done before sendMessage is called, so we skip it here.
-
-      // ─── CORE: Build engine for code generation ───
-        setCurrentAgent("build");
-        setPipelineStep("planning");
-        
-        const buildProjectId = currentProject.id;
-        const liveSandpackFiles = sandpackFilesRef.current;
-        const isFirstBuild = !liveSandpackFiles || Object.keys(liveSandpackFiles).length === 0;
-
-        // ─── INSTANT PATH: Pre-built templates render in <1 second ───
-        // When a template matched and we have a pre-built instant template,
-        // render it immediately, then fire an AI polish pass in the background.
-        const isSimpleBuild = isFirstBuild && !!template;
-        
-        if (isSimpleBuild || isFirstBuild) {
-          const { findInstantTemplate, hydrateTemplate } = await import("@/lib/instantTemplates");
-          // If no template matched, default to saas-landing for any first build
-          const templateId = template?.id || "saas-landing";
-          const templateName = template?.name || "Landing Page";
-          const instantTemplate = findInstantTemplate(templateId);
-          
-          if (instantTemplate) {
-            console.log(`[ChatPanel] ⚡ INSTANT PATH: Rendering "${templateName}" in <1s`);
-            setBuildStep("⚡ Instant preview loading...");
-            setPipelineStep("bundling");
-            
-            // Extract a description from the user's prompt
-            const promptDesc = userText.replace(/build|create|make|website|app|called|named|beautiful|simple/gi, "").trim();
-            const projectName = currentProject.name || "My App";
-            const { files, deps } = hydrateTemplate(instantTemplate, projectName, promptDesc || "Build applications at the speed of thought");
-            
-            // Instantly render the template
-            setSandpackFiles(files);
-            syncSandpackToVirtualFS(files);
-            if (Object.keys(deps).length > 0) setSandpackDeps(deps);
-            setPreviewMode("sandpack");
-            
-            // Show success message immediately
-            const fileCount = Object.keys(files).length;
-            const instantMsg = `⚡ **Instant Preview** — ${fileCount} files rendered in under 1 second!\n\nYour ${templateName} is ready. I'm now polishing the content based on your prompt...`;
-            setMessages((prev) => {
-              const last = prev[prev.length - 1];
-              if (last?.role === "assistant") {
-                return prev.map((m, i) => (i === prev.length - 1 ? { ...m, content: instantMsg } : m));
-              }
-              return [...prev, { role: "assistant", content: instantMsg, timestamp: Date.now() }];
-            });
-            
-            // Persist the instant template immediately
-            const payload = { files, deps };
-            supabase
-              .from("project_data")
-              .upsert(
-                { project_id: buildProjectId, collection: "sandpack_state", data: payload as any },
-                { onConflict: "project_id,collection" }
-              )
-              .then(({ error }) => {
-                if (error) console.warn("[ChatPanel] Instant template persist failed:", error);
-              });
-
-            // Now fire AI polish pass in the background to customize content
-            setBuildStep("🎨 AI is customizing your content...");
-            setPipelineStep("generating");
-            
-            const polishContext = `## INSTANT TEMPLATE LOADED
-The user already sees a live preview of a ${templateName} template. Your job is to CUSTOMIZE the existing template files with the user's specific content, branding, and requirements.
-
-## USER REQUEST
-"${userText}"
-
-## CURRENT FILES (already rendered)
-${Object.entries(files).map(([path, code]) => `--- ${path}\n${code}`).join("\n\n")}
-
-## INSTRUCTIONS
-1. Keep the EXACT same file structure and component architecture
-2. Customize ALL placeholder text to match the user's specific request
-3. Adjust colors, content, and details to fit their brand/idea
-4. Output ALL files (even unchanged ones) in \`\`\`react-preview format
-5. Do NOT add new files unless necessary — focus on content customization`;
-            
-            await streamBuildAgent({
-              messages: [{ role: "user" as const, content: polishContext }],
-              projectId: buildProjectId,
-              techStack: currentProject.tech_stack || "react-cdn",
-              schemas,
-              model: "google/gemini-3-flash-preview",
-              designTheme: themeInfo?.prompt,
-              templateContext: templateCtx || undefined,
-              irContext: irContext || undefined,
-              onDelta: upsert,
-              onDone: async (responseText) => {
-                // Parse and apply the polished files — but validate first
-                const reactResult = parseReactFiles(responseText);
-                if (reactResult.files && Object.keys(reactResult.files).length > 0) {
-                  // Quick validation: check for JSX syntax errors using Sucrase
-                  let hasErrors = false;
-                  try {
-                    const { transform } = await import("sucrase");
-                    for (const [fPath, fCode] of Object.entries(reactResult.files)) {
-                      if (fPath.match(/\.(jsx?|tsx?)$/)) {
-                        try {
-                          transform(fCode, { transforms: ["jsx", "imports"], filePath: fPath });
-                        } catch {
-                          hasErrors = true;
-                          break;
-                        }
-                        // Check for missing local imports — auto-create stubs instead of failing
-                        const importPathRegex2 = /import\s+(?:[\w{},\s*]+\s+from\s+)?["'](\.[^"']+)["']/g;
-                        let m2;
-                        while ((m2 = importPathRegex2.exec(fCode)) !== null) {
-                          const importPath = m2[1];
-                          const currentDir = fPath.substring(0, fPath.lastIndexOf("/")) || "";
-                          let resolved = importPath.startsWith("./") ? currentDir + importPath.substring(1) : importPath;
-                          if (importPath.startsWith("../")) {
-                            const parts = currentDir.split("/").filter(Boolean);
-                            let relParts = importPath.split("/");
-                            while (relParts[0] === "..") { parts.pop(); relParts.shift(); }
-                            resolved = "/" + parts.concat(relParts).join("/");
-                          }
-                          if (!resolved.startsWith("/")) resolved = "/" + resolved;
-                          const exts = ["", ".jsx", ".js", ".tsx", ".ts"];
-                          const found = exts.some(ext => reactResult.files![resolved + ext] !== undefined);
-                          const indexFound = exts.some(ext => reactResult.files![resolved + "/index" + ext] !== undefined);
-                          if (!found && !indexFound) {
-                            // Auto-create stub instead of failing
-                            const segments = resolved.split("/");
-                            const compName = segments[segments.length - 1].replace(/\.\w+$/, "");
-                            const stubPath = resolved.match(/\.\w+$/) ? resolved : resolved + ".jsx";
-                            if (/^[A-Z]/.test(compName)) {
-                              reactResult.files![stubPath] = `import React from "react";\n\nexport default function ${compName}({ children }) {\n  return <div className="p-4">{children || "${compName}"}</div>;\n}\n`;
-                            } else {
-                              reactResult.files![stubPath] = `export default {};\n`;
-                            }
-                            console.log("[ChatPanel] Auto-created stub for polish pass:", stubPath);
-                          }
-                        }
-                      }
-                    }
-                  } catch {
-                    // If Sucrase import fails, skip validation
-                  }
-                  
-                  if (hasErrors) {
-                    // Polish produced broken code — keep the working instant template
-                    console.warn("[ChatPanel] Polish pass produced broken code, keeping instant template");
-                    // Do NOT persist broken code — leave the working instant template in place
-                  } else {
-                    setSandpackFiles(reactResult.files);
-                    syncSandpackToVirtualFS(reactResult.files);
-                    if (Object.keys(reactResult.deps).length > 0) setSandpackDeps(reactResult.deps);
-                    
-                    // Only persist when code is valid
-                    const polishedPayload = { files: reactResult.files, deps: reactResult.deps || {} };
-                    supabase
-                      .from("project_data")
-                      .upsert(
-                        { project_id: buildProjectId, collection: "sandpack_state", data: polishedPayload as any },
-                        { onConflict: "project_id,collection" }
-                      )
-                      .then(({ error }) => { if (error) console.warn("Polish persist error:", error); });
-                  }
-                  
-                  const polishedMsg = reactResult.chatText || `✅ **${templateName} customized!** Your site is ready with personalized content.`;
-                  setMessages((prev) => {
-                    const last = prev[prev.length - 1];
-                    if (last?.role === "assistant") {
-                      return prev.map((m, i) => (i === prev.length - 1 ? { ...m, content: polishedMsg } : m));
-                    }
-                    return [...prev, { role: "assistant", content: polishedMsg, timestamp: Date.now() }];
-                  });
-                } else {
-                  // Polish didn't produce files — keep the instant template (it's already good)
-                  setMessages((prev) => {
-                    const last = prev[prev.length - 1];
-                    const msg = `✅ **${templateName} is ready!** Your site is live with all sections.`;
-                    if (last?.role === "assistant") {
-                      return prev.map((m, i) => (i === prev.length - 1 ? { ...m, content: msg } : m));
-                    }
-                    return [...prev, { role: "assistant", content: msg, timestamp: Date.now() }];
-                  });
-                }
-                
-                setIsLoading(false);
-                setIsBuilding(false);
-                setBuildStep("");
-                setPipelineStep("complete");
-                setCurrentAgent(null);
-                isSendingRef.current = false;
-                setBuildRetryCount(0);
-                
-                // Persist chat history
-                const persistMessages = messagesRef.current.map(m => ({
-                  role: m.role,
-                  content: typeof m.content === "string" ? m.content : getTextContent(m.content),
-                }));
-                saveProject({ chat_history: persistMessages, html_content: currentProject.html_content || "" });
-              },
-              onError: (err) => {
-                // Even if polish fails, user already has the instant template
-                console.warn("[ChatPanel] Polish pass failed, keeping instant template:", err);
-                setMessages((prev) => {
-                  const last = prev[prev.length - 1];
-                  const msg = `✅ **${templateName} is ready!** (AI customization skipped — your template is still fully functional)`;
-                  if (last?.role === "assistant") {
-                    return prev.map((m, i) => (i === prev.length - 1 ? { ...m, content: msg } : m));
-                  }
-                  return [...prev, { role: "assistant", content: msg, timestamp: Date.now() }];
-                });
-                setIsLoading(false);
-                setIsBuilding(false);
-                setBuildStep("");
-                setPipelineStep("complete");
-                setCurrentAgent(null);
-                isSendingRef.current = false;
-              },
-            });
-            return;
-          }
-          
-          // No instant template found — fall back to direct AI build
-          console.log(`[ChatPanel] ⚡ FAST PATH: Direct build with template "${template.name}" (no instant template)`);
-          setBuildStep("⚡ Fast building with template...");
-          setPipelineStep("generating");
-          
-          await streamBuildAgent({
-            messages: apiMessages,
-            projectId: buildProjectId,
-            techStack: currentProject.tech_stack || "react-cdn",
-            schemas,
-            model: selectedModel,
-            designTheme: themeInfo?.prompt,
-            knowledge,
-            templateContext: templateCtx || undefined,
-            snippetsContext: snippetsContext || undefined,
-            irContext: irContext || undefined,
-            onDelta: upsert,
-            onDone: handleOnDone,
-            onError: handleOnError,
-          });
-          return;
-        }
-
-        // ─── FULL PATH: Requirements Agent + Build Engine ───
-        let domainModel: any = undefined;
-        
-        // Priority 1: Derive domain model from IR (zero latency, no network)
-        if (irContext && currentProject?.ir_state) {
-          try {
-            const { irToDomainModel } = await import("@/lib/irToDomain");
-            const { hasIRContent } = await import("@/lib/irSerializer");
-            const irState = currentProject.ir_state as any;
-            if (irState && hasIRContent(irState)) {
-              const irDerived = irToDomainModel(irState);
-              if (irDerived && irDerived.entities.length > 0) {
-                domainModel = irDerived;
-                console.log(`[ChatPanel] ⚡ IR-derived domain model: ${irDerived.entities.length} entities, ${irDerived.suggestedPages.length} pages, auth: ${irDerived.requiresAuth} (zero latency)`);
-              }
-            }
-          } catch (err) {
-            console.warn("[ChatPanel] IR-to-domain conversion failed, falling back:", err);
-          }
-        }
-        
-        // Priority 2: Keyword matching + Requirements Agent (for first builds without IR)
-        if (!domainModel && isFirstBuild) {
-          try {
-            setBuildStep("🧠 Analyzing domain requirements...");
-            const { matchDomainTemplate, serializeDomainModel } = await import("@/lib/domainTemplates");
-            const templateMatch = matchDomainTemplate(userText);
-            
-            if (templateMatch.template) {
-              console.log(`[ChatPanel] Domain template matched: ${templateMatch.template.name} (confidence: ${templateMatch.confidence}, keywords: ${templateMatch.matchedKeywords.join(", ")})`);
-              
-              // Call requirements agent to customize the template
-              const reqResp = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/requirements-agent`, {
-                method: "POST",
-                headers: {
-                  "Content-Type": "application/json",
-                  Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
-                },
-                body: JSON.stringify({
-                  prompt: userText,
-                  matchedTemplate: templateMatch.template.model,
-                  existingSchemas: schemas,
-                }),
-              });
-              
-              if (reqResp.ok) {
-                domainModel = await reqResp.json();
-                console.log(`[ChatPanel] ✅ Domain model extracted: ${domainModel.entities?.length || 0} entities, auth: ${domainModel.requiresAuth}`);
-              } else {
-                console.warn("[ChatPanel] Requirements agent failed, using template directly");
-                domainModel = templateMatch.template.model;
-              }
-            } else {
-              console.log("[ChatPanel] No domain template matched, using direct build");
-            }
-          } catch (err) {
-            console.warn("[ChatPanel] Requirements agent error, proceeding without domain model:", err);
-          }
-        }
-        
-        // FIX: Guard against project switch — if project changed during async ops, abort
-        if (lastProjectIdRef.current !== buildProjectId) {
-          console.warn("[ChatPanel] Project switched during build setup, aborting");
-          setIsLoading(false);
-          setIsBuilding(false);
-          return;
-        }
-        
-        // FIX: Use ref-based files to prevent stale data from previous project
-        const safeExistingFiles = shouldIncludeCurrentCode && liveSandpackFiles && Object.keys(liveSandpackFiles).length > 0
-          ? liveSandpackFiles
-          : undefined;
-        
-        const engineConfig: EngineConfig = {
-          projectId: buildProjectId,
-          techStack: currentProject.tech_stack || "react-cdn",
-          schemas: schemas.length > 0 ? schemas : undefined,
-          model: selectedModel,
-          designTheme: themeInfo?.prompt,
-          knowledge: knowledge.length > 0 ? knowledge : undefined,
-          snippetsContext: snippetsContext || undefined,
-          existingFiles: safeExistingFiles,
-          templateContext: templateCtx || undefined,
-          chatHistory: currentMessages.map(m => ({
-            role: m.role,
-            content: typeof m.content === "string" ? m.content : getTextContent(m.content),
-          })),
-          domainModel,
-        };
-
-        // Save rollback snapshot before build
-        saveSnapshot(`Pre-build: ${userText.slice(0, 50)}`);
-
-        // Start streaming preview controller
-        streamingControllerRef.current = new StreamingPreviewController((files, deps) => {
-          if (lastProjectIdRef.current !== buildProjectId) return;
-          // Merge streaming files with existing
-          const currentFiles = sandpackFilesRef.current || {};
-          setSandpackFiles({ ...currentFiles, ...files });
-          if (Object.keys(deps).length > 0) setSandpackDeps(deps);
-          setPreviewMode("sandpack");
-        }, 500);
-        streamingControllerRef.current.start();
-
-        await runBuildEngine(userText, engineConfig, {
-          onProgress: (progress: EngineProgress) => {
-            setBuildStep(progress.message);
-            
-            if (progress.plan) setCurrentPlan(progress.plan);
-            if (progress.totalTasks !== undefined) setTotalPlanTasks(progress.totalTasks);
-            if (progress.taskIndex !== undefined) setCurrentTaskIndex(progress.taskIndex);
-            
-            // Update chat with progress
-            if (progress.phase === "planning" && progress.plan) {
-              const planSummary = `📋 **Build Plan** (${progress.plan.overallComplexity})\n${progress.plan.summary}\n\n${progress.plan.tasks.map((t, i) => `⏳ ${i + 1}. ${t.title}`).join("\n")}`;
-              setMessages((prev) => {
-                const last = prev[prev.length - 1];
-                if (last?.role === "assistant") {
-                  return prev.map((m, i) => (i === prev.length - 1 ? { ...m, content: planSummary } : m));
-                }
-                return [...prev, { role: "assistant", content: planSummary, timestamp: Date.now() }];
-              });
-            } else if (progress.phase === "executing" && progress.plan) {
-              const progressMsg = `📋 **Building** (${progress.plan.overallComplexity})\n${progress.plan.summary}\n\n${progress.plan.tasks.map((t, i) => {
-                const idx = progress.taskIndex ?? 0;
-                const status = i < idx ? "✅" : i === idx ? "🔨" : "⏳";
-                return `${status} ${i + 1}. ${t.title}`;
-              }).join("\n")}`;
-              setMessages((prev) => {
-                const last = prev[prev.length - 1];
-                if (last?.role === "assistant") {
-                  return prev.map((m, i) => (i === prev.length - 1 ? { ...m, content: progressMsg } : m));
-                }
-                return prev;
-              });
-            }
-          },
-          onDelta: (chunk) => {
-            setBuildStreamContent(prev => prev + chunk);
-            // Feed streaming preview controller
-            streamingControllerRef.current?.addChunk(chunk);
-          },
-          onFilesReady: (files, deps) => {
-            // FIX: Guard against project switch during build
-            if (lastProjectIdRef.current !== buildProjectId) return;
-            setSandpackFiles(files);
-            syncSandpackToVirtualFS(files);
-            if (Object.keys(deps).length > 0) setSandpackDeps(deps);
-            setPreviewMode("sandpack");
-            
-            // Persist incrementally during build so navigation away doesn't lose progress
-            if (Object.keys(files).length > 0) {
-              const payload = { files, deps: deps || {} };
-              supabase
-                .from("project_data")
-                .upsert(
-                  { project_id: buildProjectId, collection: "sandpack_state", data: payload as any },
-                  { onConflict: "project_id,collection" }
-                )
-                .then(({ error }) => {
-                  if (error) console.warn("[ChatPanel] Incremental persist failed:", error);
-                });
-            }
-          },
-          onComplete: (result) => {
-            setMessages((prev) => {
-              const last = prev[prev.length - 1];
-              const msg = result.chatText;
-              if (last?.role === "assistant") {
-                return prev.map((m, i) => (i === prev.length - 1 ? { ...m, content: msg } : m));
-              }
-              return [...prev, { role: "assistant", content: msg, timestamp: Date.now() }];
-            });
-            
-            setIsLoading(false);
-            setIsBuilding(false);
-            setBuildStep("");
-            setPipelineStep("complete");
-            setCurrentAgent(null);
-            setCurrentPlan(result.plan || null);
-            isSendingRef.current = false;
-            setBuildRetryCount(0);
-            if (result.metrics) setBuildMetrics(result.metrics);
-            // Stop streaming preview controller
-            streamingControllerRef.current?.stop();
-            streamingControllerRef.current = null;
-            setTimeout(() => setBuildStreamContent(""), 3000);
-            
-            const persistMessages = messagesRef.current.map(m => ({
-              role: m.role,
-              content: typeof m.content === "string" ? m.content : getTextContent(m.content),
-            }));
-            saveProject({ chat_history: persistMessages, html_content: currentProject.html_content || "" });
-            
-            // Persist sandpack files to project_data for session restoration
-            if (result.files && Object.keys(result.files).length > 0) {
-              const payload = { files: result.files, deps: result.deps || {} };
-              supabase
-                .from("project_data")
-                .upsert(
-                  { project_id: currentProject.id, collection: "sandpack_state", data: payload as any },
-                  { onConflict: "project_id,collection" }
-                )
-                .then(({ error }) => {
-                  if (error) console.warn("[ChatPanel] Failed to persist sandpack state:", error);
-                  else console.log("[ChatPanel] ✅ Sandpack state persisted");
-                });
-            }
-            
-            if (onVersionCreated) {
-              onVersionCreated({
-                id: crypto.randomUUID(),
-                timestamp: Date.now(),
-                label: userText.slice(0, 60) || "Build update",
-                html: "",
-                messageIndex: currentMessages.length,
-              });
-            }
-          },
-          onError: (err) => {
-            handleOnError(err);
-          },
-        });
-    } catch (e) {
-      console.error("[ChatPanel] sendMessage error:", e);
-      setIsLoading(false);
-      setIsBuilding(false);
-      setBuildStep("");
-      isSendingRef.current = false;
-    }
-  }, [currentProject, saveProject, setPreviewHtml, setIsBuilding, setBuildStep, selectedModel, selectedTheme, onVersionCreated, setVirtualFiles]);
-
-  // Keep ref in sync so useImperativeHandle can call the latest version
-  sendMessageRef.current = sendMessage;
-
+  useEffect(() => {
+    scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
+  }, [messages]);
 
   const handleEditMessage = useCallback((index: number) => {
     const msg = messagesRef.current[index];
@@ -1533,7 +446,6 @@ ${Object.entries(files).map(([path, code]) => `--- ${path}\n${code}`).join("\n\n
     setMessages(truncated);
     setEditingIndex(null);
     setEditText("");
-    // Small delay to let state update before sending
     setTimeout(() => sendMessage(editText.trim()), 50);
   }, [editingIndex, editText, currentProject, sendMessage]);
 
@@ -1549,169 +461,6 @@ ${Object.entries(files).map(([path, code]) => `--- ${path}\n${code}`).join("\n\n
     setTimeout(() => sendMessage(userText), 50);
   }, [currentProject, sendMessage]);
 
-  // FIX: pendingPrompt effect — use isSendingRef to prevent double-fire
-  useEffect(() => {
-    if (pendingPrompt && currentProject && !isLoadingRef.current && !isSendingRef.current && messagesRef.current.length === 0) {
-      const prompt = pendingPrompt;
-      setPendingPrompt(null);
-      sendMessage(prompt);
-    }
-  }, [pendingPrompt, currentProject, sendMessage]);
-
-  useEffect(() => {
-    scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
-  }, [messages]);
-
-  // Chat-only agent — streams conversational response, no code
-  const sendChatMessage = useCallback(async (text: string, images: string[] = []) => {
-    if (!text || !currentProject) return;
-    if (isSendingRef.current || isLoadingRef.current) return;
-    isSendingRef.current = true;
-
-    const content = buildMessageContent(text, images);
-    const userMsg: Msg = { role: "user", content, timestamp: Date.now() };
-    setInput("");
-    setAttachedImages([]);
-    setMessages((prev) => [...prev, userMsg]);
-    setIsLoading(true);
-    setBuildStep("Thinking...");
-
-    let fullChatResponse = "";
-
-    const currentMessages = messagesRef.current;
-    const apiMessages = [...currentMessages, userMsg].map(m => ({
-      role: m.role,
-      content: m.content,
-    }));
-
-    // Fetch knowledge
-    let knowledge: string[] = [];
-    try {
-      const { data } = await supabase
-        .from("project_knowledge" as any)
-        .select("title, content")
-        .eq("project_id", currentProject.id)
-        .eq("is_active", true);
-      knowledge = (data || []).map((k: any) => `[${k.title}]: ${k.content}`);
-    } catch {}
-
-    await streamChatAgent({
-      messages: apiMessages,
-      projectId: currentProject.id,
-      techStack: currentProject.tech_stack || "react-cdn",
-      knowledge,
-      onDelta: (chunk) => {
-        fullChatResponse += chunk;
-        const displayText = stripBuildMarker(fullChatResponse);
-        setMessages((prev) => {
-          const last = prev[prev.length - 1];
-          if (last?.role === "assistant") {
-            return prev.map((m, i) => (i === prev.length - 1 ? { ...m, content: displayText } : m));
-          }
-          return [...prev, { role: "assistant", content: displayText, timestamp: Date.now() }];
-        });
-      },
-      onDone: (finalText) => {
-        setIsLoading(false);
-        setBuildStep("");
-        setPipelineStep("complete");
-        setCurrentAgent(null);
-        isSendingRef.current = false;
-
-        // Check if chat agent confirmed a build
-        if (hasBuildConfirmation(finalText)) {
-          // Store the original user prompt for the build agent
-          const userText = typeof text === "string" ? text : "";
-          setPendingBuildPrompt(userText);
-        }
-
-        // Persist
-        const displayText = stripBuildMarker(finalText);
-        setMessages((prev) => {
-          const final = prev.map((m, i) =>
-            i === prev.length - 1 && m.role === "assistant" ? { ...m, content: displayText } : m
-          );
-          const persistMessages = final.map(m => ({
-            role: m.role,
-            content: typeof m.content === "string" ? m.content : getTextContent(m.content),
-          }));
-          saveProject({ chat_history: persistMessages });
-          return final;
-        });
-      },
-      onError: (err) => {
-        setMessages((prev) => [...prev, { role: "assistant", content: `⚠️ ${err}`, timestamp: Date.now() }]);
-        setIsLoading(false);
-        setBuildStep("");
-        setPipelineStep(null);
-        setCurrentAgent(null);
-        isSendingRef.current = false;
-      },
-    });
-  }, [currentProject, saveProject, setBuildStep]);
-
-  // Auto-trigger build agent when chat agent confirms a build
-  useEffect(() => {
-    if (pendingBuildPrompt && !isLoadingRef.current && !isSendingRef.current) {
-      const prompt = pendingBuildPrompt;
-      setPendingBuildPrompt(null);
-      setCurrentAgent("build");
-      setPipelineStep("planning");
-      sendMessage(prompt);
-    }
-  }, [pendingBuildPrompt, sendMessage]);
-
-  // fastClassifyLocal is now provided by useIntentClassification hook
-
-  const handleSmartSend = useCallback(async (text: string, images: string[] = []) => {
-    if (!text && images.length === 0) return;
-    if (isSendingRef.current || isLoadingRef.current) return;
-    const finalText = text || "Replicate this design";
-    
-    const isAutoFix = finalText.startsWith("🔧");
-    const isShort = finalText.length < 15;
-    const hasImages = images.length > 0;
-    const isConfirmation = /^(yes|go ahead|do it|build it|sounds good|ok|sure)/i.test(finalText.trim());
-    const hasAnswers = finalText.includes("--- Additional Requirements ---");
-    
-    // Fast path: skip network classification for obvious intents
-    if (!isAutoFix && !isShort && !hasImages && !isConfirmation && !hasAnswers) {
-      const localIntent = fastClassifyLocal(finalText);
-      
-      if (localIntent === "chat") {
-        setCurrentAgent("chat");
-        setPipelineStep("chatting");
-        sendChatMessage(finalText, images);
-        return;
-      }
-      
-      if (localIntent === "build") {
-        // Skip classify-intent call entirely — save 1-2s
-        console.log("[FastClassify] Client-side build detection, skipping server classify");
-        setCurrentAgent("build");
-        setPipelineStep("planning");
-        sendMessage(finalText, images);
-        return;
-      }
-      
-      // Ambiguous: fall through to server classification
-      const classification = await classifyUserIntent(finalText);
-      if (classification?.intent === "clarify") return;
-      
-      if (classification?.intent === "chat") {
-        setCurrentAgent("chat");
-        setPipelineStep("chatting");
-        sendChatMessage(finalText, images);
-        return;
-      }
-    }
-    
-    // Default: route to build agent
-    setCurrentAgent("build");
-    setPipelineStep("planning");
-    sendMessage(finalText, images);
-  }, [classifyUserIntent, fastClassifyLocal, sendChatMessage, sendMessage]);
-
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
@@ -1720,14 +469,6 @@ ${Object.entries(files).map(([path, code]) => `--- ${path}\n${code}`).join("\n\n
       }
     }
   };
-
-  const handleInputChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-    setInput(e.target.value);
-    e.target.style.height = "60px";
-    e.target.style.height = Math.min(e.target.scrollHeight, 160) + "px";
-  };
-
-  // handleAutoFix is now provided by useSelfHealing hook
 
   const handleSendClick = () => {
     if (input.trim() || attachedImages.length > 0) {
@@ -1970,7 +711,7 @@ ${Object.entries(files).map(([path, code]) => `--- ${path}\n${code}`).join("\n\n
             })}
           </AnimatePresence>
 
-          {/* Build Pipeline Progress Card — shows for both chat and build agents */}
+          {/* Build Pipeline Progress Card */}
           {(buildStreamContent.length > 0 || currentAgent) && (isLoading || pipelineStep === "complete") && (
             <BuildPipelineCard
               isBuilding={isLoading}
@@ -1978,7 +719,6 @@ ${Object.entries(files).map(([path, code]) => `--- ${path}\n${code}`).join("\n\n
               pipelineStep={pipelineStep}
               currentAgent={currentAgent === "clarify" ? null : currentAgent}
               onShowPreview={() => {
-                // Switch to preview panel when Preview tab is clicked
                 const event = new CustomEvent("switch-panel", { detail: "preview" });
                 window.dispatchEvent(event);
               }}
@@ -2022,7 +762,7 @@ ${Object.entries(files).map(([path, code]) => `--- ${path}\n${code}`).join("\n\n
                     const option = q.options.find((o: any) => o.value === answer);
                     return `${q.text} → ${option?.label || answer || "Not specified"}`;
                   }).join("\n");
-                  
+
                   const enrichedPrompt = `${pendingFollowUpPrompt}\n\n--- Additional Requirements ---\n${answersText}`;
                   setFollowUpQuestions([]);
                   setFollowUpAnswers({});
@@ -2203,17 +943,16 @@ ${Object.entries(files).map(([path, code]) => `--- ${path}\n${code}`).join("\n\n
           )}
         </AnimatePresence>
 
-        {/* Smart context-aware suggestions — above input like Lovable */}
+        {/* Smart context-aware suggestions */}
         {!isLoading && followUpQuestions.length === 0 && !input && (
           <div className="px-3 pt-2 pb-1">
             <div className="flex flex-wrap gap-1.5">
               {(() => {
-                // Gather code from current preview/sandpack
-                const codeForAnalysis = currentPreviewHtml || 
+                const codeForAnalysis = currentPreviewHtml ||
                   (currentSandpackFiles ? Object.values(currentSandpackFiles).join("\n") : "");
-                const chatMsgs = messages.map(m => ({ 
-                  role: m.role, 
-                  content: typeof m.content === "string" ? m.content : "" 
+                const chatMsgs = messages.map(m => ({
+                  role: m.role,
+                  content: typeof m.content === "string" ? m.content : ""
                 }));
                 const suggestions = generateSmartSuggestions(codeForAnalysis, chatMsgs, 4);
                 return suggestions.map((s) => (
@@ -2237,14 +976,7 @@ ${Object.entries(files).map(([path, code]) => `--- ${path}\n${code}`).join("\n\n
           onSend={handleSendClick}
           onKeyDown={handleKeyDown}
           isLoading={isLoading}
-          onStop={() => {
-            abortControllerRef.current?.abort();
-            abortControllerRef.current = null;
-            setIsLoading(false);
-            setIsBuilding(false);
-            setBuildStep("");
-            isSendingRef.current = false;
-          }}
+          onStop={abortBuild}
           selectedModel={selectedModel}
           onModelChange={setSelectedModel}
           selectedTheme={selectedTheme}
@@ -2255,7 +987,7 @@ ${Object.entries(files).map(([path, code]) => `--- ${path}\n${code}`).join("\n\n
           canRedo={canRedo}
           onUndo={handleUndo}
           onRedo={handleRedo}
-          onClear={clearChat}
+          onClear={orchClearChat}
           messageCount={messages.filter(m => m.role === "user").length}
           attachedImages={attachedImages}
         />
