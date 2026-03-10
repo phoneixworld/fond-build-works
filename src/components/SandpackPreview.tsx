@@ -89,11 +89,9 @@ function isAllowedPkg(pkg: string): boolean {
 }
 
 /**
- * Quick syntax check using Function constructor heuristic.
- * Returns true if code is likely parseable, false if obviously broken.
+ * Count brace/bracket/paren balance in code, skipping strings.
  */
-function quickSyntaxCheck(code: string): boolean {
-  // Check for obvious truncation: unclosed braces/brackets
+function countBalances(code: string): { braces: number; brackets: number; parens: number; inString: boolean } {
   let braces = 0, brackets = 0, parens = 0;
   let inString = false;
   let stringChar = '';
@@ -111,13 +109,65 @@ function quickSyntaxCheck(code: string): boolean {
     else if (c === '(') parens++;
     else if (c === ')') parens--;
   }
-  // If significantly unbalanced, it's broken
-  if (braces > 2 || braces < -2 || brackets > 2 || brackets < -2 || parens > 2 || parens < -2) {
-    return false;
+  return { braces, brackets, parens, inString };
+}
+
+/**
+ * Attempt to repair truncated code by closing unclosed braces/brackets/parens.
+ * Returns repaired code or null if unrecoverable.
+ */
+function attemptRepair(code: string): string | null {
+  const { braces, brackets, parens, inString } = countBalances(code);
+
+  // If excess closers or way too many openers, unrecoverable
+  if (braces < -1 || brackets < -1 || parens < -1) return null;
+  if (braces > 10 || brackets > 10 || parens > 10) return null;
+
+  let repaired = code;
+
+  // Close unterminated string
+  if (inString) {
+    repaired += '"';
   }
-  // Check for unterminated strings (still inString at end)
-  if (inString) return false;
-  return true;
+
+  // Close unclosed parens, then brackets, then braces (reverse nesting order)
+  for (let i = 0; i < Math.max(0, parens); i++) repaired += ')';
+  for (let i = 0; i < Math.max(0, brackets); i++) repaired += ']';
+  for (let i = 0; i < Math.max(0, braces); i++) repaired += '}';
+
+  // Ensure there's a default export if it looks like a component file
+  if (!repaired.includes('export default') && !repaired.includes('export {')) {
+    // Find the last function/const component name
+    const fnMatch = repaired.match(/(?:function|const)\s+([A-Z]\w+)/);
+    if (fnMatch) {
+      repaired += `\nexport default ${fnMatch[1]};`;
+    }
+  }
+
+  // Verify repair worked
+  const after = countBalances(repaired);
+  if (Math.abs(after.braces) > 1 || Math.abs(after.brackets) > 1 || Math.abs(after.parens) > 1) {
+    return null; // repair failed
+  }
+
+  return repaired;
+}
+
+/**
+ * Quick syntax check + repair. Returns the code (possibly repaired) or null if broken.
+ */
+function quickSyntaxCheckAndRepair(code: string): string | null {
+  const { braces, brackets, parens, inString } = countBalances(code);
+  // Perfectly balanced
+  if (braces === 0 && brackets === 0 && parens === 0 && !inString) return code;
+  // Slightly unbalanced — try repair
+  if (braces >= 0 && brackets >= 0 && parens >= 0 && braces <= 8 && brackets <= 8 && parens <= 8) {
+    return attemptRepair(code);
+  }
+  // Excess closers beyond tolerance
+  if (braces < -2 || brackets < -2 || parens < -2) return null;
+  // Try repair as last resort
+  return attemptRepair(code);
 }
 
 /**
@@ -168,13 +218,17 @@ function sanitizeImports(code: string, filePath: string): string {
     (match, pkg) => isAllowedPkg(pkg) ? match : `undefined /* BLOCKED: ${pkg} */`
   );
 
-  // Final safety: if code is obviously broken (truncated/malformed), replace with stub
-  if (!quickSyntaxCheck(code)) {
-    console.warn(`[SandpackPreview] Broken syntax detected in ${filePath}, using safe stub`);
+  // Final safety: try to repair truncated code, fall back to stub if unrecoverable
+  const repaired = quickSyntaxCheckAndRepair(code);
+  if (repaired === null) {
+    console.warn(`[SandpackPreview] Unrecoverable syntax in ${filePath}, using safe stub`);
     return makeSafeStub(filePath);
   }
+  if (repaired !== code) {
+    console.info(`[SandpackPreview] Auto-repaired truncated code in ${filePath}`);
+  }
 
-  return code;
+  return repaired;
 }
 
 const DEFAULT_APP = `import React from "react";
