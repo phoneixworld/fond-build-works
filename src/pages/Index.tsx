@@ -205,6 +205,9 @@ const IDELayout = () => {
           />
         );
       }
+      if (rightPanel === "settings") {
+        return <ProjectSettings onRenameClick={() => setRenameOpen(true)} />;
+      }
       const Component = PANEL_COMPONENTS[rightPanel];
       return Component ? <Component /> : <PreviewPanel />;
     })();
