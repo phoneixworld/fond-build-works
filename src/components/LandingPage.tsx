@@ -2,10 +2,9 @@ import { useState, useRef } from "react";
 import { ArrowRight, Rocket, Database, Shield, Cloud, BarChart3, Globe, Lock, Users, Cpu, Eye, Wand2, MessageSquare, Layers, RefreshCw, Lightbulb, Sparkles, Server, FileCode, ShoppingCart, LayoutDashboard, PenTool, Briefcase, ChevronRight, Smartphone, Palette, MessagesSquare, GitBranch, ImageIcon, Puzzle, Brain } from "lucide-react";
 import ProjectGallery from "./ProjectGallery";
 import { useAuth } from "@/hooks/useAuth";
-import { useProjects, Project } from "@/contexts/ProjectContext";
-import { formatDistanceToNow } from "date-fns";
+import { useProjects } from "@/contexts/ProjectContext";
 import { motion } from "framer-motion";
-import { TECH_STACKS } from "@/lib/techStacks";
+import { TEMPLATES, Template } from "@/lib/templates";
 import { TEMPLATES, Template } from "@/lib/templates";
 
 interface LandingPageProps {
