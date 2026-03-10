@@ -75,6 +75,7 @@ export async function compile(
     model: options.model,
   });
 
+  cloudLog.info(`Build started: intent=${ctx.buildIntent}, ${ctx.ir.entities.length} entities, ${ctx.ir.routes.length} routes`, "compiler");
   console.log(`[Compiler] Context assembled: intent=${ctx.buildIntent}, entities=${ctx.ir.entities.length}, routes=${ctx.ir.routes.length}, modules=${ctx.ir.modules.length}`);
 
   // ── Phase 2: Planning ──────────────────────────────────────────────
