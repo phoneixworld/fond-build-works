@@ -51,7 +51,7 @@ const ProjectSettingsPage = ({ onBack, onRenameClick, onExport, versions, onReve
   const renderContent = () => {
     switch (activeTab) {
       case "general":
-        return <ProjectSettings onRenameClick={onRenameClick} />;
+        return <ProjectSettings onRenameClick={onRenameClick} onExport={onExport} />;
       case "cloud":
         return <CloudPanel />;
       case "integrations":
