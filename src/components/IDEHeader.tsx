@@ -323,23 +323,27 @@ const IDEHeader = ({
               )}
             </div>
 
-            {/* Viewport toggles */}
-            <div className="flex items-center gap-0.5 bg-secondary rounded-lg p-0.5 shrink-0">
-              {VIEWPORTS.map((vp) => {
-                const Icon = vp.icon;
-                const isActive = viewport === vp.id;
-                return (
-                  <Tooltip key={vp.id}>
-                    <TooltipTrigger asChild>
-                      <button onClick={() => setViewport(vp.id)} className={`p-1.5 rounded-md transition-all ${isActive ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"}`}>
-                        <Icon className="w-3.5 h-3.5" />
-                      </button>
-                    </TooltipTrigger>
-                    <TooltipContent side="bottom" className="text-xs">{vp.label}</TooltipContent>
-                  </Tooltip>
-                );
-              })}
-            </div>
+            {/* Viewport cycle toggle */}
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  onClick={() => {
+                    const order = VIEWPORTS.map(v => v.id);
+                    const idx = order.indexOf(viewport);
+                    setViewport(order[(idx + 1) % order.length]);
+                  }}
+                  className="p-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-all shrink-0"
+                >
+                  {(() => {
+                    const Icon = VIEWPORTS.find(v => v.id === viewport)!.icon;
+                    return <Icon className="w-3.5 h-3.5" />;
+                  })()}
+                </button>
+              </TooltipTrigger>
+              <TooltipContent side="bottom" className="text-xs">
+                {VIEWPORTS.find(v => v.id === viewport)!.label} — click to switch
+              </TooltipContent>
+            </Tooltip>
 
             {/* Open in new tab */}
             <Tooltip>
