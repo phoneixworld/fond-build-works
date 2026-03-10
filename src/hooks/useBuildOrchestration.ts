@@ -17,6 +17,7 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import { streamBuildAgent, validateReactCode, formatRetryContext, MAX_BUILD_RETRIES, type AgentIntent, type PipelineStep } from "@/lib/agentPipeline";
 import { runBuildEngine, type EngineConfig, type EngineProgress } from "@/lib/buildEngine";
+import { compile, type CompileOptions, type CompileCallbacks, type BuildResult } from "@/lib/compiler";
 import { matchTemplate, type PageTemplate } from "@/lib/pageTemplates";
 import { getSnippetsPromptContext } from "@/lib/componentSnippets";
 import { DESIGN_THEMES, type AIModelId } from "@/lib/aiModels";
