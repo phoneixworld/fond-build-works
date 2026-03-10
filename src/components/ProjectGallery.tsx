@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useRef, useEffect } from "react";
 import { FolderOpen, Trash2, Copy, Star, Clock, Grid3X3, ChevronLeft, ChevronRight } from "lucide-react";
 import { Project, useProjects } from "@/contexts/ProjectContext";
 import { formatDistanceToNow } from "date-fns";
@@ -12,7 +12,7 @@ type FilterTab = "all" | "recent" | "starred";
 
 const ITEMS_PER_PAGE = 9;
 
-const CARD_GRADIENTS = [
+const FALLBACK_GRADIENTS = [
   "from-[hsl(var(--primary))] to-[hsl(var(--accent))]",
   "from-[hsl(265,89%,62%)] to-[hsl(300,80%,55%)]",
   "from-[hsl(142,71%,45%)] to-[hsl(170,80%,40%)]",
@@ -112,7 +112,7 @@ const ProjectGallery = ({ onOpenProject }: ProjectGalleryProps) => {
               onStar={(e) => toggleStar(project.id, e)}
               onClone={(e) => { e.stopPropagation(); cloneProject(project.id); }}
               onDelete={(e) => { e.stopPropagation(); deleteProject(project.id); }}
-              gradient={CARD_GRADIENTS[i % CARD_GRADIENTS.length]}
+              fallbackGradient={FALLBACK_GRADIENTS[i % FALLBACK_GRADIENTS.length]}
             />
           ))}
         </motion.div>
@@ -169,15 +169,59 @@ interface ProjectCardProps {
   project: Project;
   index: number;
   isStarred: boolean;
-  gradient: string;
+  fallbackGradient: string;
   onOpen: () => void;
   onStar: (e: React.MouseEvent) => void;
   onClone: (e: React.MouseEvent) => void;
   onDelete: (e: React.MouseEvent) => void;
 }
 
-const ProjectCard = ({ project, index, isStarred, gradient, onOpen, onStar, onClone, onDelete }: ProjectCardProps) => {
-  // Extract emoji from name
+/** Live HTML preview thumbnail rendered via a scaled srcdoc iframe */
+const ProjectThumbnail = ({ html, fallbackGradient, emoji }: { html: string; fallbackGradient: string; emoji: string | null }) => {
+  const hasContent = html && html.trim().length > 50;
+
+  if (!hasContent) {
+    return (
+      <div className={`absolute inset-0 bg-gradient-to-br ${fallbackGradient}`}>
+        <div className="absolute inset-0 bg-black/10" />
+        <div className="absolute inset-0 opacity-10" style={{
+          backgroundImage: "radial-gradient(circle at 25% 25%, white 1px, transparent 1px), radial-gradient(circle at 75% 75%, white 1px, transparent 1px)",
+          backgroundSize: "24px 24px",
+        }} />
+        <div className="absolute inset-0 flex items-center justify-center">
+          {emoji ? (
+            <span className="text-5xl drop-shadow-lg">{emoji}</span>
+          ) : (
+            <FolderOpen className="w-10 h-10 text-white/50" />
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="absolute inset-0 overflow-hidden bg-background">
+      <iframe
+        srcDoc={html}
+        title="Project preview"
+        sandbox="allow-same-origin"
+        className="absolute top-0 left-0 border-0 pointer-events-none"
+        style={{
+          width: "1280px",
+          height: "800px",
+          transform: "scale(0.28)",
+          transformOrigin: "top left",
+        }}
+        tabIndex={-1}
+        loading="lazy"
+      />
+      {/* Fade overlay at bottom for smooth card transition */}
+      <div className="absolute bottom-0 left-0 right-0 h-8 bg-gradient-to-t from-card to-transparent" />
+    </div>
+  );
+};
+
+const ProjectCard = ({ project, index, isStarred, fallbackGradient, onOpen, onStar, onClone, onDelete }: ProjectCardProps) => {
   const nameMatch = project.name.match(/^(\p{Emoji})\s*/u);
   const emoji = nameMatch ? nameMatch[1] : null;
   const displayName = nameMatch ? project.name.slice(nameMatch[0].length) : project.name;
@@ -190,32 +234,23 @@ const ProjectCard = ({ project, index, isStarred, gradient, onOpen, onStar, onCl
       onClick={onOpen}
       className="group relative flex flex-col rounded-2xl border border-border bg-card overflow-hidden cursor-pointer hover:border-[hsl(var(--primary)/0.4)] hover:shadow-lg hover:shadow-[hsl(var(--primary)/0.06)] transition-all duration-300"
     >
-      {/* Thumbnail placeholder */}
-      <div className={`relative h-40 bg-gradient-to-br ${gradient} overflow-hidden`}>
-        <div className="absolute inset-0 bg-black/10" />
-        {/* Pattern overlay */}
-        <div className="absolute inset-0 opacity-10" style={{
-          backgroundImage: "radial-gradient(circle at 25% 25%, white 1px, transparent 1px), radial-gradient(circle at 75% 75%, white 1px, transparent 1px)",
-          backgroundSize: "24px 24px",
-        }} />
-        {/* Center emoji/icon */}
-        <div className="absolute inset-0 flex items-center justify-center">
-          {emoji ? (
-            <span className="text-5xl drop-shadow-lg">{emoji}</span>
-          ) : (
-            <FolderOpen className="w-10 h-10 text-white/50" />
-          )}
-        </div>
+      {/* Thumbnail – live iframe or gradient fallback */}
+      <div className="relative h-40 overflow-hidden">
+        <ProjectThumbnail
+          html={project.html_content}
+          fallbackGradient={fallbackGradient}
+          emoji={emoji}
+        />
         {/* Published badge */}
         {project.is_published && (
-          <span className="absolute bottom-2 left-3 text-[10px] font-semibold bg-black/40 backdrop-blur-sm text-white px-2.5 py-1 rounded-full">
+          <span className="absolute bottom-2 left-3 z-10 text-[10px] font-semibold bg-black/40 backdrop-blur-sm text-white px-2.5 py-1 rounded-full">
             Published
           </span>
         )}
         {/* Star button */}
         <button
           onClick={onStar}
-          className={`absolute top-2 right-2 p-1.5 rounded-full transition-all ${
+          className={`absolute top-2 right-2 z-10 p-1.5 rounded-full transition-all ${
             isStarred
               ? "bg-[hsl(var(--ide-warning)/0.9)] text-white"
               : "bg-black/20 backdrop-blur-sm text-white/60 opacity-0 group-hover:opacity-100 hover:text-white"
@@ -239,7 +274,7 @@ const ProjectCard = ({ project, index, isStarred, gradient, onOpen, onStar, onCl
       </div>
 
       {/* Hover actions */}
-      <div className="absolute top-2 left-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+      <div className="absolute top-2 left-2 z-10 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
         <button onClick={onClone} className="p-1.5 rounded-full bg-black/20 backdrop-blur-sm text-white/60 hover:text-white transition-colors" title="Clone">
           <Copy className="w-3.5 h-3.5" />
         </button>
