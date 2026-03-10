@@ -52,14 +52,15 @@ ${workspaceContext ? `### Current code:\n${workspaceContext}` : ""}
    - On app load, AuthContext checks localStorage for a saved token and calls "me" to restore the session
    - **CRITICAL**: If the "me" call fails (expired/invalid token), AuthContext MUST clear the token from localStorage, set user to null, and set loading to false — do NOT throw or crash
    - AuthContext must expose: { user, token, loading, login, signup, logout }
-   - The login/signup functions must save the token to localStorage on success
-   - The logout function must clear localStorage and set user to null
+   - The login/signup functions must save the token to localStorage on success and return the result (do NOT navigate inside AuthContext)
+   - The logout function must clear localStorage and set user to null (do NOT navigate inside AuthContext)
+   - **CRITICAL**: AuthContext must NOT import or call useNavigate(). Navigation must be handled by the consuming components (e.g. LoginPage calls navigate after login succeeds). AuthContext must be usable OUTSIDE a Router.
    - While loading is true, show a loading spinner — never render routes until loading is false
    - Protected routes must redirect to /login when user is null (not crash or go blank)
 5. Output complete, working code — no placeholders, no TODOs, no stubs
 6. Every component must have a default export
 7. Use Tailwind CSS with design tokens (var(--color-*)) for all styling
-8. App.jsx MUST wrap all routes in AuthContext provider and use BrowserRouter from react-router-dom
+8. App.jsx MUST wrap all routes in AuthContext provider. AuthProvider MUST be placed OUTSIDE HashRouter/BrowserRouter since it must not use useNavigate.
 9. Protected pages must check useAuth().user and redirect to /login if null`;
 }
 
