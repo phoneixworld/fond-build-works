@@ -5,6 +5,28 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
+function repairTruncatedJson(json: string): string {
+  // Try to close any open arrays/objects
+  let openBraces = 0, openBrackets = 0;
+  let inString = false, escaped = false;
+  for (const ch of json) {
+    if (escaped) { escaped = false; continue; }
+    if (ch === '\\') { escaped = true; continue; }
+    if (ch === '"') { inString = !inString; continue; }
+    if (inString) continue;
+    if (ch === '{') openBraces++;
+    if (ch === '}') openBraces--;
+    if (ch === '[') openBrackets++;
+    if (ch === ']') openBrackets--;
+  }
+  // If we're inside a string, close it
+  if (inString) json += '"';
+  // Close any open structures
+  for (let i = 0; i < openBrackets; i++) json += ']';
+  for (let i = 0; i < openBraces; i++) json += '}';
+  return json;
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
@@ -77,11 +99,12 @@ Use the create_plan tool to return your structured plan.`;
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "google/gemini-2.5-flash-lite",
+        model: "google/gemini-2.5-flash",
         temperature: 0.15,
+        max_tokens: 16384,
         messages: [
           { role: "system", content: systemPrompt },
-          { role: "user", content: prompt },
+          { role: "user", content: prompt.length > 30000 ? prompt.slice(0, 30000) + "\n\n[TRUNCATED — focus on the key entities, roles, and pages listed above]" : prompt },
         ],
         tools: [
           {
@@ -147,10 +170,31 @@ Use the create_plan tool to return your structured plan.`;
     const toolCall = data.choices?.[0]?.message?.tool_calls?.[0];
 
     if (toolCall?.function?.arguments) {
-      const plan = JSON.parse(toolCall.function.arguments);
+      let planJson = toolCall.function.arguments;
+      let plan;
+      try {
+        plan = JSON.parse(planJson);
+      } catch {
+        // Attempt JSON repair for truncated output
+        console.warn("[plan-agent] JSON truncated, attempting repair...");
+        planJson = repairTruncatedJson(planJson);
+        plan = JSON.parse(planJson);
+      }
       return new Response(JSON.stringify(plan), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
+    }
+
+    // Fallback: check if content has JSON directly
+    const content = data.choices?.[0]?.message?.content;
+    if (content) {
+      const jsonMatch = content.match(/\{[\s\S]*\}/);
+      if (jsonMatch) {
+        const plan = JSON.parse(jsonMatch[0]);
+        return new Response(JSON.stringify(plan), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
     }
 
     throw new Error("No plan generated");
