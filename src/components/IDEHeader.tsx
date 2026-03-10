@@ -231,7 +231,7 @@ const IDEHeader = ({
             </Tooltip>
 
             {/* URL bar */}
-            <div className="flex items-center gap-1.5 bg-secondary rounded-lg px-2 py-1 min-w-0 w-[180px]">
+            <div className="flex items-center gap-1.5 bg-secondary rounded-lg px-2 py-1 min-w-0 w-[320px]">
               <Globe className="w-3 h-3 text-muted-foreground flex-shrink-0" />
               {isEditingUrl ? (
                 <input
