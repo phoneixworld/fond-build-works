@@ -112,7 +112,7 @@ const ProjectGallery = ({ onOpenProject }: ProjectGalleryProps) => {
               onStar={(e) => toggleStar(project.id, e)}
               onClone={(e) => { e.stopPropagation(); cloneProject(project.id); }}
               onDelete={(e) => { e.stopPropagation(); deleteProject(project.id); }}
-              gradient={CARD_GRADIENTS[i % CARD_GRADIENTS.length]}
+              fallbackGradient={FALLBACK_GRADIENTS[i % FALLBACK_GRADIENTS.length]}
             />
           ))}
         </motion.div>
