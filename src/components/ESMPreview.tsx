@@ -4,6 +4,14 @@ import { useProjects } from "@/contexts/ProjectContext";
 import { buildESMPreview, revokeBlobUrls } from "@/lib/esmPreviewBuilder";
 import { AlertTriangle, RefreshCw } from "lucide-react";
 
+/** Check if the workspace has a real App entry point */
+function hasAppEntry(files: Record<string, string> | null): boolean {
+  if (!files) return false;
+  return Object.keys(files).some(p =>
+    /\/?(?:src\/)?App\.(tsx?|jsx?)$/.test(p)
+  );
+}
+
 interface ESMPreviewProps {
   viewport?: { width: string; maxWidth: string };
   initialPath?: string;
@@ -11,7 +19,7 @@ interface ESMPreviewProps {
 
 const ESMPreview = ({ viewport, initialPath }: ESMPreviewProps) => {
   const iframeRef = useRef<HTMLIFrameElement>(null);
-  const { sandpackFiles, sandpackDeps } = usePreview();
+  const { sandpackFiles, sandpackDeps, isBuilding } = usePreview();
   const { currentProject } = useProjects();
   const [error, setError] = useState<string | null>(null);
   const prevHtmlRef = useRef<string | null>(null);
@@ -20,8 +28,11 @@ const ESMPreview = ({ viewport, initialPath }: ESMPreviewProps) => {
   const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || "";
   const supabaseKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY || "";
 
+  // Don't attempt ESM build until we have a real App file
+  const ready = hasAppEntry(sandpackFiles) && !isBuilding;
+
   const buildResult = useMemo(() => {
-    if (!sandpackFiles || Object.keys(sandpackFiles).length === 0) return null;
+    if (!ready || !sandpackFiles) return null;
     
     try {
       const result = buildESMPreview(
@@ -37,7 +48,7 @@ const ESMPreview = ({ viewport, initialPath }: ESMPreviewProps) => {
       setError(e.message);
       return null;
     }
-  }, [sandpackFiles, sandpackDeps, projectId, supabaseUrl, supabaseKey]);
+  }, [ready, sandpackFiles, sandpackDeps, projectId, supabaseUrl, supabaseKey]);
 
   // Cleanup old blob URLs
   useEffect(() => {
@@ -81,7 +92,7 @@ const ESMPreview = ({ viewport, initialPath }: ESMPreviewProps) => {
   }
 
   if (!buildResult?.html) {
-    return null;
+    return null; // Let the loading overlay or EmptyState handle this
   }
 
   return (
