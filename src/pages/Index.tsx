@@ -240,13 +240,13 @@ const IDELayout = () => {
           <ResizablePanelGroup direction="horizontal">
             {layoutSwapped ? (
               <>
-                <ResizablePanel defaultSize={50} minSize={5} collapsible collapsedSize={0} className="!overflow-hidden">
+                <ResizablePanel defaultSize={50} minSize={20} className="!overflow-hidden">
                   <div className="h-full w-full overflow-hidden">
                     {renderPanel()}
                   </div>
                 </ResizablePanel>
                 <ResizableHandle className="w-px bg-border hover:bg-primary transition-colors" />
-                <ResizablePanel defaultSize={50} minSize={5} collapsible collapsedSize={0}>
+                <ResizablePanel defaultSize={50} minSize={20}>
                   <ErrorBoundary fallbackTitle="Chat">
                     <ChatPanel ref={chatRef} initialPrompt={initialPrompt} onVersionCreated={handleVersionCreated} />
                   </ErrorBoundary>
@@ -254,13 +254,13 @@ const IDELayout = () => {
               </>
             ) : (
               <>
-                <ResizablePanel defaultSize={50} minSize={5} collapsible collapsedSize={0}>
+                <ResizablePanel defaultSize={50} minSize={20}>
                   <ErrorBoundary fallbackTitle="Chat">
                     <ChatPanel ref={chatRef} initialPrompt={initialPrompt} onVersionCreated={handleVersionCreated} />
                   </ErrorBoundary>
                 </ResizablePanel>
                 <ResizableHandle className="w-px bg-border hover:bg-primary transition-colors" />
-                <ResizablePanel defaultSize={50} minSize={5} collapsible collapsedSize={0} className="!overflow-hidden">
+                <ResizablePanel defaultSize={50} minSize={20} className="!overflow-hidden">
                   <div className="h-full w-full overflow-hidden">
                     {renderPanel()}
                   </div>
