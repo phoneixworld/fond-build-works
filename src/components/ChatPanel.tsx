@@ -361,6 +361,10 @@ const ChatPanel = forwardRef<ChatPanelHandle, { initialPrompt?: string; onVersio
       setPendingFollowUpPrompt("");
       setAnalysisResult(null);
       invalidateContextCache();
+      conversationState.reset();
+
+      // Restore conversation state from server (durable, cross-device)
+      conversationState.restoreFromServer(currentProject.id);
       if (abortControllerRef.current) {
         abortControllerRef.current.abort();
         abortControllerRef.current = null;
