@@ -752,9 +752,15 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
         ? liveSandpackFiles
         : undefined;
 
-      // Dynamic model routing — picks cheapest capable model based on complexity
+      // FIX 2: CostRouter must score the FULL prompt (including accumulated requirements), not just "build it"
       const fileCount = safeExistingFiles ? Object.keys(safeExistingFiles).length : 0;
-      const routedModel = clientRouteModel(userText, "build", fileCount, selectedModel !== "google/gemini-2.5-pro" ? selectedModel : undefined);
+      // Don't pass user model override for complex builds — let CostRouter decide
+      const isComplexBuild = userText.length > 2000 || /Phase \d+/gi.test(userText);
+      const modelOverride = isComplexBuild ? undefined : (selectedModel !== "google/gemini-2.5-pro" ? selectedModel : undefined);
+      const routedModel = clientRouteModel(userText, "build", fileCount, modelOverride);
+      if (isComplexBuild) {
+        console.log(`[BuildOrch] Complex build detected (${userText.length} chars) — CostRouter will select model (no user override)`);
+      }
 
       const engineConfig: EngineConfig = {
         projectId: buildProjectId,

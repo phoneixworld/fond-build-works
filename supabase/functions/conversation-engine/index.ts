@@ -767,6 +767,7 @@ Deno.serve(async (req) => {
     }
 
     // ─── GET_COMPILED_REQUIREMENTS: Structured IR for build agent (Checklist #8) ───
+    // FIX 1: Raw requirements are PRIMARY context. AI semantic extraction replaces regex IR.
     if (action === "get_compiled_requirements") {
       const { data: allReqs } = await supabase
         .from("project_requirements")
@@ -778,7 +779,7 @@ Deno.serve(async (req) => {
         return json({ error: "No requirements to compile", context: "", buildReadiness: { isReady: false, score: 0 } }, 400);
       }
 
-      // Merge all normalized requirements
+      // Merge all normalized requirements (for readiness check only)
       let mergedNormalized: Record<string, any> = {};
       for (const r of allReqs) {
         mergedNormalized = mergeNormalized(mergedNormalized, r.normalized as Record<string, any>);
@@ -803,7 +804,6 @@ Deno.serve(async (req) => {
         });
       }
 
-      // Log override if applicable
       if (!readiness.isReady && override) {
         await logTelemetry(supabase, projectId, "build_override", {
           agent: "orchestrator",
@@ -812,7 +812,94 @@ Deno.serve(async (req) => {
         }, userId);
       }
 
-      // Build deterministic context (Checklist #8: structured IR, not raw chat)
+      // ── FIX 1: RAW REQUIREMENTS FIRST, then structured summary ──
+      // The AI model should read the full requirements FIRST for nuance,
+      // then use the structured summary as a checklist.
+      let context = `# APPLICATION REQUIREMENTS\n\n`;
+      context += `## RAW REQUIREMENTS (${allReqs.length} phases — READ THESE CAREFULLY)\n\n`;
+      for (const req of allReqs) {
+        context += `### Phase ${req.phase_number}\n${req.raw_text}\n\n`;
+      }
+
+      // Then add structured extraction as a BUILD CHECKLIST (not primary context)
+      context += `## BUILD CHECKLIST (extracted from above)\n\n`;
+      context += `**Entities to implement:** ${(compiledIR.dataModels || []).map((d: any) => `${d.collectionName} (${d.fields.map((f: any) => f.name).join(", ")})`).join("; ") || "infer from requirements"}\n`;
+      context += `**Routes needed:** ${(compiledIR.routes || []).map((r: any) => `${r.path} [${r.label}]${r.isProtected ? " 🔒" : ""}`).join(", ") || "infer from requirements"}\n`;
+      context += `**Auth:** ${compiledIR.auth?.enabled ? `Enabled (roles: ${compiledIR.auth.roles.map((r: any) => r.name).join(", ")})` : "Check requirements"}\n`;
+      context += `**UI Components mentioned:** ${mergedNormalized.uiLayout?.components?.join(", ") || "infer from requirements"}\n`;
+      context += `**Integrations:** ${mergedNormalized.integrations?.join(", ") || "none"}\n`;
+      context += `\n## BUILD INSTRUCTION\n`;
+      context += `Build readiness: ${readiness.score}% — ${readiness.recommendation}\n`;
+      context += `Build the COMPLETE application implementing EVERY feature described in the raw requirements above.\n`;
+      context += `Do NOT simplify or skip features. Every entity, role, workflow, and UI component mentioned MUST be implemented.\n`;
+
+      // Also try AI-powered semantic extraction for richer understanding
+      let aiExtractedContext = "";
+      try {
+        const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
+        if (LOVABLE_API_KEY && allReqs.length > 2) {
+          const allRawText = allReqs.map((r: any) => r.raw_text).join("\n\n");
+          // Only do AI extraction for complex requirements (> 1000 chars)
+          if (allRawText.length > 1000) {
+            const extractionResp = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+              method: "POST",
+              headers: {
+                Authorization: `Bearer ${LOVABLE_API_KEY}`,
+                "Content-Type": "application/json",
+              },
+              body: JSON.stringify({
+                model: "google/gemini-2.5-flash",
+                temperature: 0.1,
+                messages: [
+                  {
+                    role: "system",
+                    content: `You are a requirements analysis engine. Extract a precise build manifest from the requirements. Output JSON with:
+{
+  "modules": [{"name": "string", "description": "string", "entities": ["string"], "features": ["string"], "dependsOn": ["string"]}],
+  "buildOrder": ["module names in dependency order"],
+  "totalEntities": number,
+  "totalFeatures": number,
+  "complexity": "simple" | "medium" | "complex" | "enterprise"
+}
+Output ONLY valid JSON. No markdown, no explanation.`
+                  },
+                  { role: "user", content: allRawText.slice(0, 30000) }
+                ],
+                max_tokens: 4000,
+              }),
+            });
+
+            if (extractionResp.ok) {
+              const extractionData = await extractionResp.json();
+              const extracted = extractionData.choices?.[0]?.message?.content?.trim() || "";
+              try {
+                const cleaned = extracted.replace(/```json?\s*/g, "").replace(/```/g, "").trim();
+                const manifest = JSON.parse(cleaned);
+                if (manifest.modules && manifest.buildOrder) {
+                  aiExtractedContext = `\n\n## AI-EXTRACTED MODULE PLAN\n`;
+                  aiExtractedContext += `Complexity: ${manifest.complexity || "complex"}\n`;
+                  aiExtractedContext += `Total entities: ${manifest.totalEntities || "?"}, Total features: ${manifest.totalFeatures || "?"}\n`;
+                  aiExtractedContext += `\n### Module Build Order:\n`;
+                  for (const modName of manifest.buildOrder) {
+                    const mod = manifest.modules.find((m: any) => m.name === modName);
+                    if (mod) {
+                      aiExtractedContext += `\n**${mod.name}** — ${mod.description}\n`;
+                      if (mod.entities?.length) aiExtractedContext += `  Entities: ${mod.entities.join(", ")}\n`;
+                      if (mod.features?.length) aiExtractedContext += `  Features: ${mod.features.join(", ")}\n`;
+                      if (mod.dependsOn?.length) aiExtractedContext += `  Depends on: ${mod.dependsOn.join(", ")}\n`;
+                    }
+                  }
+                  context += aiExtractedContext;
+                  console.log(`[conversation-engine] AI extraction: ${manifest.modules?.length} modules, ${manifest.complexity} complexity`);
+                }
+              } catch { /* JSON parse failed, continue without */ }
+            }
+          }
+        }
+      } catch (err) {
+        console.warn("[conversation-engine] AI extraction failed (non-fatal):", err);
+      }
+
       const structuredContext = {
         ir: compiledIR,
         mergedRequirements: mergedNormalized,
@@ -820,24 +907,7 @@ Deno.serve(async (req) => {
         phaseCount: allReqs.length,
       };
 
-      // Also build a human-readable context for the build agent
-      let context = `📋 COMPILED REQUIREMENTS (${allReqs.length} phases):\n\n`;
-      context += `--- STRUCTURED IR ---\n`;
-      context += `Entities: ${(compiledIR.dataModels || []).map((d: any) => `${d.collectionName} (${d.fields.map((f: any) => f.name).join(", ")})`).join("; ") || "none"}\n`;
-      context += `Routes: ${(compiledIR.routes || []).map((r: any) => `${r.path} [${r.label}]${r.isProtected ? " 🔒" : ""}`).join(", ") || "none"}\n`;
-      context += `Auth: ${compiledIR.auth?.enabled ? `Enabled (roles: ${compiledIR.auth.roles.map((r: any) => r.name).join(", ")})` : "Disabled"}\n`;
-      context += `UI Components: ${mergedNormalized.uiLayout?.components?.join(", ") || "auto"}\n`;
-      context += `Integrations: ${mergedNormalized.integrations?.join(", ") || "none"}\n`;
-      context += `Workflows: ${mergedNormalized.workflows?.length || 0}\n`;
-      context += `Constraints: ${mergedNormalized.constraints?.join(", ") || "none"}\n`;
-      context += `\n--- RAW PHASES (for nuance) ---\n`;
-      for (const req of allReqs) {
-        context += `Phase ${req.phase_number}: ${req.raw_text}\n\n`;
-      }
-      context += `\nBuild readiness: ${readiness.score}% — ${readiness.recommendation}\n`;
-      context += `\nBuild the complete application incorporating ALL the above requirements.\n`;
-
-      // Transition to building + advance orchestrator agent
+      // Transition to building
       const { data: convState } = await supabase
         .from("project_conversation_state")
         .select("*")
@@ -853,13 +923,12 @@ Deno.serve(async (req) => {
 
       await transitionState(supabase, projectId, "building", { agentStates }, userId, `Build started (score: ${readiness.score}%)`);
 
-      // Audit
       await logTelemetry(supabase, projectId, "build_started", {
         agent: "orchestrator",
         entityType: "build",
         beforeState: { mode: convState?.mode },
         afterState: { mode: "building" },
-        metadata: { requirementCount: allReqs.length, readinessScore: readiness.score, isOverride: !readiness.isReady && !!override, compiledIR },
+        metadata: { requirementCount: allReqs.length, readinessScore: readiness.score, isOverride: !readiness.isReady && !!override, contextLength: context.length },
       }, userId);
 
       return json({ context, structuredContext, compiledIR, mergedNormalized, buildReadiness: readiness, requirementCount: allReqs.length });

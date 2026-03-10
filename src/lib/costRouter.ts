@@ -56,16 +56,23 @@ function scoreComplexity(input: CostRouteInput): number {
   let score = 0;
   const t = input.promptText.toLowerCase();
 
-  // ── Size-based scoring (0-30) ──
-  if (input.estimatedTokens > 20000) score += 30;
-  else if (input.estimatedTokens > 10000) score += 20;
-  else if (input.estimatedTokens > 5000) score += 10;
-  else if (input.estimatedTokens > 2000) score += 5;
+  // ── Size-based scoring (0-40) — accumulated requirements are large ──
+  if (input.estimatedTokens > 20000) score += 40;
+  else if (input.estimatedTokens > 10000) score += 30;
+  else if (input.estimatedTokens > 5000) score += 20;
+  else if (input.estimatedTokens > 2000) score += 10;
+  else if (input.estimatedTokens > 1000) score += 5;
+
+  // ── Multi-phase requirements (0-25) — phased builds are always complex ──
+  const phaseMatches = t.match(/phase\s*\d/gi);
+  if (phaseMatches && phaseMatches.length >= 5) score += 25;
+  else if (phaseMatches && phaseMatches.length >= 3) score += 20;
+  else if (phaseMatches && phaseMatches.length >= 2) score += 15;
 
   // ── Structural complexity (0-30) ──
-  // Multiple modules / pages mentioned
-  const moduleKeywords = t.match(/\b(module|page|section|tab|panel|screen|view|dashboard|form|table|chart)\b/gi);
-  if (moduleKeywords && moduleKeywords.length > 8) score += 20;
+  const moduleKeywords = t.match(/\b(module|page|section|tab|panel|screen|view|dashboard|form|table|chart|entity|model|schema|workflow|pipeline|assessment|competency|curriculum|attendance|grade|enrollment|report|analytics)\b/gi);
+  if (moduleKeywords && moduleKeywords.length > 15) score += 30;
+  else if (moduleKeywords && moduleKeywords.length > 8) score += 20;
   else if (moduleKeywords && moduleKeywords.length > 4) score += 12;
   else if (moduleKeywords && moduleKeywords.length > 2) score += 6;
 
@@ -93,6 +100,9 @@ function scoreComplexity(input: CostRouteInput): number {
 
   // Iteration bonus: modifying existing code is harder than fresh builds
   if (input.hasExistingCode) score += 5;
+
+  // ── Build manifest / AI extraction present (strong signal) ──
+  if (/MODULE PLAN|BUILD CHECKLIST|BUILD ORDER|AI-EXTRACTED/i.test(t)) score += 15;
 
   return Math.min(score, 100);
 }
