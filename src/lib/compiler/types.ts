@@ -132,6 +132,7 @@ export type IssueCategory =
   | "missing_file"
   | "missing_export"
   | "broken_import"
+  | "invalid_import_syntax"
   | "missing_route"
   | "empty_stub"
   | "missing_component";
