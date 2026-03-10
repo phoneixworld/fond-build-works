@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Settings, Copy, Check, Trash2, GitFork, Eye, EyeOff, Calendar, User, Hash, Globe, MessageCircle, Code2 } from "lucide-react";
 import { useProjects } from "@/contexts/ProjectContext";
+import { TECH_STACKS, TechStackId } from "@/lib/techStacks";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import { Switch } from "@/components/ui/switch";
