@@ -393,6 +393,200 @@ export type Database = {
           },
         ]
       }
+      project_audit_log: {
+        Row: {
+          action: string
+          after_state: Json | null
+          agent_name: string
+          before_state: Json | null
+          created_at: string
+          entity_id: string | null
+          entity_type: string
+          id: string
+          metadata: Json
+          project_id: string
+          user_id: string | null
+        }
+        Insert: {
+          action: string
+          after_state?: Json | null
+          agent_name?: string
+          before_state?: Json | null
+          created_at?: string
+          entity_id?: string | null
+          entity_type?: string
+          id?: string
+          metadata?: Json
+          project_id: string
+          user_id?: string | null
+        }
+        Update: {
+          action?: string
+          after_state?: Json | null
+          agent_name?: string
+          before_state?: Json | null
+          created_at?: string
+          entity_id?: string | null
+          entity_type?: string
+          id?: string
+          metadata?: Json
+          project_id?: string
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "project_audit_log_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      project_build_readiness: {
+        Row: {
+          checks: Json
+          created_at: string
+          id: string
+          incomplete_workflows: Json
+          is_ready: boolean
+          missing_constraints: Json
+          missing_fields: Json
+          project_id: string
+          recommendation: string
+          score: number
+          underspecified_components: Json
+          unresolved_roles: Json
+          updated_at: string
+        }
+        Insert: {
+          checks?: Json
+          created_at?: string
+          id?: string
+          incomplete_workflows?: Json
+          is_ready?: boolean
+          missing_constraints?: Json
+          missing_fields?: Json
+          project_id: string
+          recommendation?: string
+          score?: number
+          underspecified_components?: Json
+          unresolved_roles?: Json
+          updated_at?: string
+        }
+        Update: {
+          checks?: Json
+          created_at?: string
+          id?: string
+          incomplete_workflows?: Json
+          is_ready?: boolean
+          missing_constraints?: Json
+          missing_fields?: Json
+          project_id?: string
+          recommendation?: string
+          score?: number
+          underspecified_components?: Json
+          unresolved_roles?: Json
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "project_build_readiness_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: true
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      project_context: {
+        Row: {
+          context_key: string
+          context_type: string
+          context_value: Json
+          created_at: string
+          expires_at: string | null
+          id: string
+          project_id: string
+          updated_at: string
+          version: number
+        }
+        Insert: {
+          context_key?: string
+          context_type?: string
+          context_value?: Json
+          created_at?: string
+          expires_at?: string | null
+          id?: string
+          project_id: string
+          updated_at?: string
+          version?: number
+        }
+        Update: {
+          context_key?: string
+          context_type?: string
+          context_value?: Json
+          created_at?: string
+          expires_at?: string | null
+          id?: string
+          project_id?: string
+          updated_at?: string
+          version?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "project_context_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      project_conversation_state: {
+        Row: {
+          agent_states: Json
+          created_at: string
+          id: string
+          metadata: Json
+          mode: string
+          phases: Json
+          project_id: string
+          updated_at: string
+          version: number
+        }
+        Insert: {
+          agent_states?: Json
+          created_at?: string
+          id?: string
+          metadata?: Json
+          mode?: string
+          phases?: Json
+          project_id: string
+          updated_at?: string
+          version?: number
+        }
+        Update: {
+          agent_states?: Json
+          created_at?: string
+          id?: string
+          metadata?: Json
+          mode?: string
+          phases?: Json
+          project_id?: string
+          updated_at?: string
+          version?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "project_conversation_state_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       project_data: {
         Row: {
           collection: string
@@ -814,6 +1008,59 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "project_knowledge_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      project_requirements: {
+        Row: {
+          created_at: string
+          has_images: boolean
+          id: string
+          ir_mappings: Json
+          normalized: Json
+          parsed: Json
+          phase_number: number
+          project_id: string
+          raw_text: string
+          status: string
+          updated_at: string
+          version: number
+        }
+        Insert: {
+          created_at?: string
+          has_images?: boolean
+          id?: string
+          ir_mappings?: Json
+          normalized?: Json
+          parsed?: Json
+          phase_number?: number
+          project_id: string
+          raw_text?: string
+          status?: string
+          updated_at?: string
+          version?: number
+        }
+        Update: {
+          created_at?: string
+          has_images?: boolean
+          id?: string
+          ir_mappings?: Json
+          normalized?: Json
+          parsed?: Json
+          phase_number?: number
+          project_id?: string
+          raw_text?: string
+          status?: string
+          updated_at?: string
+          version?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "project_requirements_project_id_fkey"
             columns: ["project_id"]
             isOneToOne: false
             referencedRelation: "projects"
