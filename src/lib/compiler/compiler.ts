@@ -186,6 +186,22 @@ export async function compile(
     console.log(`[Compiler] 🔗 Import fixer: corrected ${importsFixed} broken import path(s)`);
   }
 
+  // ── Phase 3.6: Missing Module Generation ───────────────────────────
+
+  callbacks.onPhase("generating-stubs", "Generating missing modules...");
+
+  const { created: stubsCreated, issues: missingModules } = repairMissingModules(workspace);
+  if (stubsCreated.length > 0) {
+    cloudLog.warn(`Generated ${stubsCreated.length} missing module stub(s): ${stubsCreated.join(", ")}`, "compiler");
+    console.log(`[Compiler] 📦 Generated ${stubsCreated.length} missing module stub(s)`);
+    
+    // Re-run import fixer since new files may enable better path resolution
+    const extraFixes = fixBrokenImports(workspace);
+    if (extraFixes > 0) {
+      console.log(`[Compiler] 🔗 Post-stub import fixer: corrected ${extraFixes} more path(s)`);
+    }
+  }
+
   // ── Phase 4: Verification ──────────────────────────────────────────
 
   callbacks.onPhase("verifying", "Verifying workspace...");
