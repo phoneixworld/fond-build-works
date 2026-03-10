@@ -90,6 +90,9 @@ function rewriteImports(
   fileMap: Map<string, string>,
   blobUrls: Map<string, string>
 ): string {
+  // Strip CSS imports (they're handled via <style> injection)
+  code = code.replace(/^\s*import\s+['"][^'"]+\.css['"]\s*;?\s*$/gm, "// [CSS handled by style tag]");
+  
   // Rewrite relative imports to blob URLs
   return code.replace(
     /from\s+['"](\.[^'"]+)['"]/g,
@@ -100,18 +103,18 @@ function rewriteImports(
         return `from "${blobUrl}"`;
       }
       // Try common extensions
-      for (const ext of [".js", ".jsx", ".ts", ".tsx", "/index.js", "/index.tsx"]) {
-        const tryPath = resolved.replace(/\.\w+$/, "") + ext;
+      for (const ext of [".js", ".jsx", ".ts", ".tsx", "/index.js", "/index.jsx", "/index.tsx", "/index.ts"]) {
+        const noExt = resolved.replace(/\.\w+$/, "");
+        const tryPath = noExt + ext;
         const tryBlob = blobUrls.get(tryPath);
         if (tryBlob) return `from "${tryBlob}"`;
       }
-      // Also try without extension
-      const noExt = resolved.replace(/\.\w+$/, "");
+      // Try resolved path as-is with extensions
       for (const ext of [".js", ".jsx", ".ts", ".tsx"]) {
-        const tryBlob = blobUrls.get(noExt + ext);
+        const tryBlob = blobUrls.get(resolved + ext);
         if (tryBlob) return `from "${tryBlob}"`;
       }
-      console.warn(`[ESM] Unresolved import: ${importPath} from ${filePath}`);
+      console.warn(`[ESM] Unresolved import: ${importPath} from ${filePath} (resolved: ${resolved})`);
       return match;
     }
   );
@@ -217,28 +220,48 @@ export function buildESMPreview(
     }
   }
 
-  // Collect CSS
+  // Collect CSS (strip @tailwind directives since CDN handles them)
   const cssFiles: string[] = [];
-  for (const [path, code] of compiled) {
-    if (path.endsWith(".css")) {
-      cssFiles.push(code);
-    }
+  const allCssPaths = Array.from(compiled.keys()).filter(p => p.endsWith(".css"));
+  for (const path of allCssPaths) {
+    const code = compiled.get(path)!;
+    // Strip @tailwind and @import url() directives — handled by CDN/HTML
+    const cleaned = code
+      .replace(/^@tailwind\s+\w+;\s*$/gm, "")
+      .replace(/^@import\s+url\([^)]+\);\s*$/gm, "")
+      .trim();
+    if (cleaned) cssFiles.push(cleaned);
   }
-  // Also extract CSS imports that aren't files
+  // Also check non-compiled CSS entries
   for (const [path, code] of Object.entries(normalized)) {
     if (path.endsWith(".css") && !compiled.has(path)) {
-      cssFiles.push(code);
+      const cleaned = code
+        .replace(/^@tailwind\s+\w+;\s*$/gm, "")
+        .replace(/^@import\s+url\([^)]+\);\s*$/gm, "")
+        .trim();
+      if (cleaned) cssFiles.push(cleaned);
     }
   }
 
-  // Find entry point
-  const entryPath = ["/App.tsx", "/App.jsx", "/App.js", "/App.ts"]
-    .find(p => blobUrls.has(p));
+  // Find entry point — check multiple possible locations
+  const allBlobPaths = Array.from(blobUrls.keys());
+  console.log("[ESM] Compiled files:", allBlobPaths);
+  
+  const entryPath = [
+    "/App.tsx", "/App.jsx", "/App.js", "/App.ts",
+    "/src/App.tsx", "/src/App.jsx", "/src/App.js", "/src/App.ts",
+  ].find(p => blobUrls.has(p))
+    // Fallback: find any file named App in any directory
+    || allBlobPaths.find(p => /\/App\.(tsx?|jsx?)$/.test(p));
   
   if (!entryPath) {
+    const fileList = allBlobPaths.join(", ") || "(none)";
     errors.push("No App entry point found");
-    return { html: buildErrorPage("No App.tsx/jsx found in workspace"), fileCount: 0, errors };
+    console.error("[ESM] No App entry point. Available files:", fileList);
+    return { html: buildErrorPage(`No App found. Files: ${fileList}`), fileCount: compiled.size, errors };
   }
+  
+  console.log("[ESM] Entry point:", entryPath);
 
   const appBlobUrl = blobUrls.get(entryPath)!;
 
