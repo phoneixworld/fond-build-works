@@ -66,6 +66,8 @@ const PreviewPanel = () => {
   const hasAppFile = sandpackFiles ? Object.keys(sandpackFiles).some(p => /\/?(?:src\/)?App\.(tsx?|jsx?)$/.test(p)) : false;
   const hasContent = previewMode === "esm" ? hasAppFile && !isBuilding : previewMode === "sandpack" ? !!sandpackFiles : !!previewHtml;
 
+  console.log("[PreviewPanel] previewMode:", previewMode, "hasAppFile:", hasAppFile, "hasContent:", hasContent, "isBuilding:", isBuilding, "sandpackFiles:", sandpackFiles ? Object.keys(sandpackFiles).length : 0, "previewHtml:", !!previewHtml);
+
   // Listen for route changes from inside the Sandpack iframe
   useEffect(() => {
     const handler = (e: MessageEvent) => {
