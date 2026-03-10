@@ -1845,7 +1845,27 @@ ${Object.entries(files).map(([path, code]) => `--- ${path}\n${code}`).join("\n\n
 
         // ─── FULL PATH: Requirements Agent + Build Engine ───
         let domainModel: any = undefined;
-        if (isFirstBuild) {
+        
+        // Priority 1: Derive domain model from IR (zero latency, no network)
+        if (irContext && currentProject?.ir_state) {
+          try {
+            const { irToDomainModel } = await import("@/lib/irToDomain");
+            const { hasIRContent } = await import("@/lib/irSerializer");
+            const irState = currentProject.ir_state as any;
+            if (irState && hasIRContent(irState)) {
+              const irDerived = irToDomainModel(irState);
+              if (irDerived && irDerived.entities.length > 0) {
+                domainModel = irDerived;
+                console.log(`[ChatPanel] ⚡ IR-derived domain model: ${irDerived.entities.length} entities, ${irDerived.suggestedPages.length} pages, auth: ${irDerived.requiresAuth} (zero latency)`);
+              }
+            }
+          } catch (err) {
+            console.warn("[ChatPanel] IR-to-domain conversion failed, falling back:", err);
+          }
+        }
+        
+        // Priority 2: Keyword matching + Requirements Agent (for first builds without IR)
+        if (!domainModel && isFirstBuild) {
           try {
             setBuildStep("🧠 Analyzing domain requirements...");
             const { matchDomainTemplate, serializeDomainModel } = await import("@/lib/domainTemplates");
