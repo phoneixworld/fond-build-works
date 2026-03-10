@@ -285,46 +285,11 @@ function uid(): string {
   return `_${(++_uid).toString(36)}`;
 }
 
-interface ParsedImportClause {
-  default: string | null;
-  named: Array<{ name: string; alias?: string }>;
-  namespace: string | null;
-}
-
-function parseImportClause(clause: string): ParsedImportClause | null {
-  const result: ParsedImportClause = { default: null, named: [], namespace: null };
-  let remaining = clause.trim();
-  
-  // Namespace: * as X
-  const nsMatch = remaining.match(/^\*\s+as\s+(\w+)$/);
-  if (nsMatch) {
-    result.namespace = nsMatch[1];
-    return result;
-  }
-  
-  // Default, possibly followed by named
-  // e.g., "React, { useState, useEffect }" or just "React" or just "{ useState }"
-  
-  // Check for named part first
-  const braceMatch = remaining.match(/\{([^}]*)\}/);
-  if (braceMatch) {
-    const namedStr = braceMatch[1];
-    result.named = namedStr.split(",").map(s => {
-      const parts = s.trim().split(/\s+as\s+/);
-      return parts.length === 2 
-        ? { name: parts[0].trim(), alias: parts[1].trim() }
-        : { name: parts[0].trim() };
-    }).filter(n => n.name);
-    remaining = remaining.replace(/,?\s*\{[^}]*\}/, "").trim();
-  }
-  
-  // What's left is the default import
-  if (remaining && remaining !== ",") {
-    result.default = remaining.replace(/,\s*$/, "").trim();
-  }
-  
-  if (!result.default && result.named.length === 0 && !result.namespace) return null;
-  return result;
+function parseNamedList(named: string): string {
+  return named.split(",").map(s => {
+    const parts = s.trim().split(/\s+as\s+/);
+    return parts.length === 2 ? `${parts[0].trim()}: ${parts[1].trim()}` : parts[0].trim();
+  }).filter(Boolean).join(", ");
 }
 
 // ─── Build the full HTML document ──────────────────────────────────────────
