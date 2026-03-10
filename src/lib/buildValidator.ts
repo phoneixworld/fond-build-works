@@ -18,6 +18,7 @@ import postcss from "postcss";
 import {
   isFileValidated, markFileValidated,
 } from "@/lib/buildCache";
+import { getSharedUIComponents } from "@/lib/templates/scaffoldTemplates";
 
 // ─── File Validation ──────────────────────────────────────────────────────
 
