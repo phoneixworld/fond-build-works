@@ -16,6 +16,8 @@ export interface BuildSnapshot {
 
 const MAX_SNAPSHOTS = 10;
 
+export type ViewportId = "desktop" | "tablet" | "mobile";
+
 interface PreviewContextType {
   // Legacy HTML preview
   previewHtml: string;
@@ -40,6 +42,13 @@ interface PreviewContextType {
   snapshots: BuildSnapshot[];
   saveSnapshot: (label: string) => void;
   restoreSnapshot: (index: number) => void;
+  // Viewport & refresh (shared with header)
+  viewport: ViewportId;
+  setViewport: (vp: ViewportId) => void;
+  refreshKey: number;
+  triggerRefresh: () => void;
+  currentPath: string;
+  setCurrentPath: (path: string) => void;
 }
 
 const PreviewContext = createContext<PreviewContextType | null>(null);
@@ -53,6 +62,9 @@ export const PreviewProvider = ({ children }: { children: ReactNode }) => {
   const [previewMode, setPreviewMode] = useState<"html" | "sandpack">("html");
   const [buildMetrics, setBuildMetrics] = useState<BuildMetrics | null>(null);
   const [snapshots, setSnapshots] = useState<BuildSnapshot[]>([]);
+  const [viewport, setViewport] = useState<ViewportId>("desktop");
+  const [refreshKey, setRefreshKey] = useState(0);
+  const [currentPath, setCurrentPath] = useState("/");
 
   const saveSnapshot = useCallback((label: string) => {
     if (!sandpackFiles) return;
@@ -79,6 +91,8 @@ export const PreviewProvider = ({ children }: { children: ReactNode }) => {
     });
   }, []);
 
+  const triggerRefresh = useCallback(() => setRefreshKey(k => k + 1), []);
+
   const contextValue = useMemo(() => ({
     previewHtml, setPreviewHtml,
     sandpackFiles, setSandpackFiles,
@@ -88,9 +102,13 @@ export const PreviewProvider = ({ children }: { children: ReactNode }) => {
     previewMode, setPreviewMode,
     buildMetrics, setBuildMetrics,
     snapshots, saveSnapshot, restoreSnapshot,
+    viewport, setViewport,
+    refreshKey, triggerRefresh,
+    currentPath, setCurrentPath,
   }), [
     previewHtml, sandpackFiles, sandpackDeps, isBuilding, buildStep,
     previewMode, buildMetrics, snapshots, saveSnapshot, restoreSnapshot,
+    viewport, refreshKey, triggerRefresh, currentPath,
   ]);
 
   return (
