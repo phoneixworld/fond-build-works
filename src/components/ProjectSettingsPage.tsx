@@ -26,6 +26,7 @@ type SettingsTab = "general" | "cloud" | "integrations" | "team" | "analytics" |
 interface ProjectSettingsPageProps {
   onBack: () => void;
   onRenameClick: () => void;
+  onExport?: () => void;
   versions: Version[];
   onRevert: (v: Version) => void;
   onSendMessage?: (prompt: string) => void;
