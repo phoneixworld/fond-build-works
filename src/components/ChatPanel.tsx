@@ -727,15 +727,9 @@ const CONTEXT_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
           hasSetBuilding = true;
         }
         streamParseCount++;
-        // ─── Optimistic preview streaming: push partial code every 3 parses ───
-        if (streamParseCount % 3 === 0 && Object.keys(reactResult.files).length >= 1) {
-          const hasApp = reactResult.files["/App.jsx"] || reactResult.files["/App.tsx"];
-          if (hasApp) {
-            setSandpackFiles(reactResult.files);
-            syncSandpackToVirtualFS(reactResult.files);
-            if (Object.keys(reactResult.deps).length > 0) setSandpackDeps(reactResult.deps);
-          }
-        }
+        // NOTE: Do NOT push partial files to Sandpack during streaming.
+        // Incomplete code causes "Something went wrong" errors in the preview.
+        // Files are only set on build completion (onDone).
         setPreviewMode("sandpack");
       } else if (htmlCode) {
         if (!hasSetBuilding) {
