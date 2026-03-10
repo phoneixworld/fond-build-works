@@ -74,6 +74,7 @@ const SECONDARY_TABS = [
   { id: "plugins" as PanelId, label: "Plugins", icon: Puzzle },
   { id: "whitelabel" as PanelId, label: "White-label", icon: Tag },
   { id: "domains" as PanelId, label: "Domains", icon: Globe },
+  { id: "settings" as PanelId, label: "Settings", icon: Settings },
   { id: "history" as PanelId, label: "History", icon: Clock },
 ];
 
