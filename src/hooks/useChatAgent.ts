@@ -11,6 +11,7 @@ import { streamChatAgent, hasBuildConfirmation, stripBuildMarker } from "@/lib/a
 import type { PipelineStep } from "@/lib/agentPipeline";
 import { supabase } from "@/integrations/supabase/client";
 import { type MsgContent, getTextContent } from "@/lib/codeParser";
+import { semanticCacheGet, semanticCacheSet } from "@/lib/semanticCache";
 
 type Msg = { role: "user" | "assistant"; content: MsgContent; timestamp?: number };
 
@@ -69,6 +70,44 @@ export function useChatAgent(config: ChatAgentConfig) {
       knowledge = (data || []).map((k: any) => `[${k.title}]: ${k.content}`);
     } catch {}
 
+    // ─── Semantic Cache Check ─────────────────────────────────────────
+    const userText = typeof text === "string" ? text : "";
+    const cacheContext = knowledge.join("|").slice(0, 500);
+    
+    if (currentProject.id && userText.length > 5) {
+      try {
+        const cached = await semanticCacheGet(currentProject.id, userText, cacheContext);
+        if (cached.hit && cached.response) {
+          console.log(`[ChatAgent] Semantic cache ${cached.matchType} hit — saved ~${cached.tokensSaved} tokens`);
+          const displayText = stripBuildMarker(cached.response);
+          setMessages((prev) => [...prev, { role: "assistant", content: `${displayText}\n\n_⚡ Cached response_`, timestamp: Date.now() }]);
+          setIsLoading(false);
+          setBuildStep("");
+          setPipelineStep("complete");
+          setCurrentAgent(null);
+          isSendingRef.current = false;
+
+          if (hasBuildConfirmation(cached.response)) {
+            setPendingBuildPrompt(userText);
+          }
+
+          // Persist
+          setMessages((prev) => {
+            const persistMessages = prev.map(m => ({
+              role: m.role,
+              content: typeof m.content === "string" ? m.content : getTextContent(m.content),
+            }));
+            saveProject({ chat_history: persistMessages });
+            return prev;
+          });
+          return;
+        }
+      } catch (e) {
+        console.warn("[ChatAgent] Semantic cache check failed:", e);
+      }
+    }
+
+    // ─── Stream from AI ───────────────────────────────────────────────
     await streamChatAgent({
       messages: apiMessages,
       projectId: currentProject.id,
@@ -95,6 +134,14 @@ export function useChatAgent(config: ChatAgentConfig) {
         if (hasBuildConfirmation(finalText)) {
           const userText = typeof text === "string" ? text : "";
           setPendingBuildPrompt(userText);
+        }
+
+        // Cache the response for future use
+        if (currentProject.id && userText.length > 5) {
+          const estimatedTokens = Math.round(finalText.length / 4);
+          semanticCacheSet(
+            currentProject.id, userText, finalText, "chat-agent", estimatedTokens, cacheContext
+          ).catch(() => {});
         }
 
         const displayText = stripBuildMarker(finalText);
