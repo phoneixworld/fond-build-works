@@ -625,23 +625,28 @@ export async function runBuildEngine(
   config: EngineConfig,
   callbacks: EngineCallbacks
 ): Promise<void> {
-  // FIX 2: Detect complex builds from accumulated requirements, not just regex
+  // FIX 2: Detect complex builds from accumulated requirements
   const promptLength = userPrompt.length;
   const hasMultiplePhases = /Phase \d+/gi.test(userPrompt) && (userPrompt.match(/Phase \d+/gi) || []).length >= 2;
-  const hasModulePlan = /MODULE PLAN|BUILD CHECKLIST|BUILD ORDER/i.test(userPrompt);
+  const hasModulePlan = /MODULE PLAN|BUILD CHECKLIST|BUILD ORDER|AI-EXTRACTED/i.test(userPrompt);
   const hasStructuralComplexity = /\b(with|and|include|featuring|modules?|sections?)\b.*\b(with|and|include|featuring|modules?|sections?)\b/gi.test(userPrompt);
+  const hasChatContext = /APPLICATION REQUIREMENTS.*from conversation/i.test(userPrompt);
   
-  const isComplex = promptLength > 2000 || hasMultiplePhases || hasModulePlan || hasStructuralComplexity;
+  // A build is complex if it has substantial requirements context (not just "add a button")
+  const isComplex = promptLength > 5000 || hasMultiplePhases || hasModulePlan || (hasChatContext && promptLength > 2000);
   const hasExistingCode = config.existingFiles && Object.keys(config.existingFiles).length > 0;
   
   if (isComplex) {
-    console.log(`[BuildEngine] Complex build detected: length=${promptLength}, phases=${hasMultiplePhases}, modulePlan=${hasModulePlan}, structural=${hasStructuralComplexity}`);
+    console.log(`[BuildEngine] Complex build detected: length=${promptLength}, phases=${hasMultiplePhases}, modulePlan=${hasModulePlan}, chatContext=${hasChatContext}, structural=${hasStructuralComplexity}, existingFiles=${hasExistingCode}`);
   }
   
   clearValidationCache();
   
   try {
-    if (isComplex && !hasExistingCode) {
+    // FIXED: Complex builds use planned pipeline REGARDLESS of existing files.
+    // The planned build already handles existing files via accumulatedFiles workspace.
+    // Only skip planned builds for short/simple prompts (e.g., "change button color").
+    if (isComplex) {
       await runPlannedBuild(userPrompt, config, callbacks);
     } else {
       await runDirectBuild(userPrompt, config, callbacks);
