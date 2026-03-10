@@ -348,21 +348,25 @@ const ChatPanel = forwardRef<ChatPanelHandle, { initialPrompt?: string; onVersio
           }
         });
 
-      // Also re-fetch chat_history from DB in case it was saved after the project object was cached
+      // Always re-fetch chat_history from DB to ensure freshest data
       supabase
         .from("projects")
         .select("chat_history, html_content")
         .eq("id", restoreProjectId)
         .maybeSingle()
-        .then(({ data: row }) => {
+        .then(({ data: row, error }) => {
           if (lastProjectIdRef.current !== restoreProjectId) return;
+          if (error) {
+            console.error("[ChatPanel] Failed to fetch fresh project data:", error);
+            return;
+          }
           if (row) {
             const freshHistory = Array.isArray(row.chat_history) ? row.chat_history : [];
-            if (freshHistory.length > history.length) {
-              console.log("[ChatPanel] ✅ Restored fresher chat history:", freshHistory.length, "messages");
+            if (freshHistory.length > 0) {
+              console.log("[ChatPanel] ✅ Restored chat history:", freshHistory.length, "messages");
               setMessages(freshHistory as any);
             }
-            if (row.html_content && !currentProject.html_content) {
+            if (row.html_content) {
               setPreviewHtml(row.html_content);
             }
           }
