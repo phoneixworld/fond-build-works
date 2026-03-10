@@ -175,6 +175,16 @@ export async function compile(
     endPass(passTiming);
   }
 
+  // ── Phase 3.5: Deterministic Import Fix ─────────────────────────────
+
+  callbacks.onPhase("fixing-imports", "Fixing broken import paths...");
+
+  const importsFixed = fixBrokenImports(workspace);
+  if (importsFixed > 0) {
+    cloudLog.info(`Import fixer: corrected ${importsFixed} broken import path(s)`, "compiler");
+    console.log(`[Compiler] 🔗 Import fixer: corrected ${importsFixed} broken import path(s)`);
+  }
+
   // ── Phase 4: Verification ──────────────────────────────────────────
 
   callbacks.onPhase("verifying", "Verifying workspace...");
