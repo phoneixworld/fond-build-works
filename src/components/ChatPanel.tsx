@@ -3,6 +3,7 @@ import { useSelfHealing } from "@/hooks/useSelfHealing";
 import { useProjectContextCache } from "@/hooks/useProjectContextCache";
 import { useIntentClassification } from "@/hooks/useIntentClassification";
 import { useBuildOrchestration } from "@/hooks/useBuildOrchestration";
+import { useConversationState } from "@/hooks/useConversationState";
 import { Version } from "@/components/VersionHistory";
 import { User, Sparkles, Zap, ArrowDown } from "lucide-react";
 import { AI_MODELS, DEFAULT_MODEL, type AIModelId } from "@/lib/aiModels";
@@ -15,6 +16,7 @@ import { useVirtualFS } from "@/contexts/VirtualFSContext";
 import { supabase } from "@/integrations/supabase/client";
 import ChatMessage from "@/components/chat/ChatMessage";
 import BuildPipelineCard from "@/components/chat/BuildPipelineCard";
+import BuildCompletionCard from "@/components/chat/BuildCompletionCard";
 import ClarifyingQuestions from "@/components/chat/ClarifyingQuestions";
 import ChatInput from "@/components/chat/ChatInput";
 import ChatWelcomeScreen from "@/components/chat/ChatWelcomeScreen";
@@ -80,6 +82,9 @@ const ChatPanel = forwardRef<ChatPanelHandle, { initialPrompt?: string; onVersio
   // Project context cache hook
   const { fetchProjectContext, invalidateCache: invalidateContextCache } = useProjectContextCache(currentProject?.id);
 
+  // Conversation state machine
+  const conversationState = useConversationState();
+
   // Intent classification hook
   const { classifyUserIntent, fastClassifyLocal } = useIntentClassification(
     currentSandpackFiles,
@@ -137,6 +142,14 @@ const ChatPanel = forwardRef<ChatPanelHandle, { initialPrompt?: string; onVersio
     fetchProjectContext,
     classifyUserIntent,
     fastClassifyLocal,
+    // Conversation state machine
+    conversationAnalyze: conversationState.analyzeMessage,
+    conversationAddPhase: conversationState.addPhase,
+    conversationGetRequirements: conversationState.getRequirementsContext,
+    conversationStartBuilding: conversationState.startBuilding,
+    conversationCompleteBuild: conversationState.completeBuild,
+    conversationGenerateAck: conversationState.generateAcknowledgment,
+    conversationMode: conversationState.mode,
   });
 
   const {
@@ -154,8 +167,13 @@ const ChatPanel = forwardRef<ChatPanelHandle, { initialPrompt?: string; onVersio
   useEffect(() => { sendMessageRef.current = sendMessage; }, [sendMessage]);
   useEffect(() => { setPipelineStepRef.current = setPipelineStep; }, [setPipelineStep]);
 
+  const handleClearChat = useCallback(() => {
+    orchClearChat();
+    conversationState.reset();
+  }, [orchClearChat, conversationState]);
+
   // Expose handle
-  useImperativeHandle(ref, () => ({ clearChat: orchClearChat, sendMessage: (text: string) => sendMessage(text) }), [orchClearChat, sendMessage]);
+  useImperativeHandle(ref, () => ({ clearChat: handleClearChat, sendMessage: (text: string) => sendMessage(text) }), [handleClearChat, sendMessage]);
 
   // Listen for refactor actions from CodeEditor
   useEffect(() => {
@@ -193,13 +211,24 @@ const ChatPanel = forwardRef<ChatPanelHandle, { initialPrompt?: string; onVersio
     }
   }, [redo, setSandpackFiles, setPreviewHtml, setPreviewMode]);
 
-  // Auto-create checkpoint when build completes
+  // Auto-create checkpoint and record build completion when build completes
   const prevPipelineStep = useRef<any>(null);
   useEffect(() => {
     if (prevPipelineStep.current !== "complete" && pipelineStep === "complete") {
       const lastUserMsg = messagesRef.current.filter(m => m.role === "user").pop();
       const label = lastUserMsg ? (typeof lastUserMsg.content === "string" ? lastUserMsg.content.slice(0, 40) : "Build") : "Build";
       createCheckpoint(label, currentPreviewHtml || "", sandpackFilesRef.current);
+
+      // Record build completion in conversation state
+      const filesChanged = sandpackFilesRef.current ? Object.keys(sandpackFilesRef.current) : [];
+      const lastAssistant = messagesRef.current.filter(m => m.role === "assistant").pop();
+      const chatSummary = lastAssistant ? (typeof lastAssistant.content === "string" ? lastAssistant.content.slice(0, 200) : "Build completed") : "Build completed";
+      conversationState.completeBuild({
+        filesChanged,
+        totalFiles: filesChanged.length,
+        chatSummary: chatSummary.replace(/```[\s\S]*?```/g, "").trim().slice(0, 150),
+        timestamp: Date.now(),
+      });
     }
     prevPipelineStep.current = pipelineStep;
   }, [pipelineStep, createCheckpoint, currentPreviewHtml]);
@@ -624,6 +653,18 @@ const ChatPanel = forwardRef<ChatPanelHandle, { initialPrompt?: string; onVersio
             />
           )}
 
+          {/* Build Completion Card */}
+          {!isLoading && pipelineStep === "complete" && conversationState.lastBuildResult && (
+            <BuildCompletionCard
+              result={conversationState.lastBuildResult}
+              phases={conversationState.phases.length > 0 ? conversationState.phases : undefined}
+              onViewPreview={() => {
+                const event = new CustomEvent("switch-panel", { detail: "preview" });
+                window.dispatchEvent(event);
+              }}
+            />
+          )}
+
           {/* Follow-up questions UI */}
           <AnimatePresence>
             {followUpQuestions.length > 0 && (
@@ -787,7 +828,7 @@ const ChatPanel = forwardRef<ChatPanelHandle, { initialPrompt?: string; onVersio
           canRedo={canRedo}
           onUndo={handleUndo}
           onRedo={handleRedo}
-          onClear={orchClearChat}
+          onClear={handleClearChat}
           messageCount={messages.filter(m => m.role === "user").length}
           attachedImages={attachedImages}
         />
