@@ -1,4 +1,7 @@
 import { useState, useRef, useEffect, useCallback, forwardRef, useImperativeHandle } from "react";
+import { useSelfHealing } from "@/hooks/useSelfHealing";
+import { useProjectContextCache } from "@/hooks/useProjectContextCache";
+import { useIntentClassification } from "@/hooks/useIntentClassification";
 import { Version } from "@/components/VersionHistory";
 import { User, Sparkles, AlertTriangle, Wand2, ImagePlus, X, ArrowDown, Zap, ShieldCheck, Square } from "lucide-react";
 import VoiceInput from "@/components/VoiceInput";
@@ -62,16 +65,14 @@ const ChatPanel = forwardRef<ChatPanelHandle, { initialPrompt?: string; onVersio
   const [pendingPrompt, setPendingPrompt] = useState<string | null>(null);
   const [selectedModel, setSelectedModel] = useState<AIModelId>(DEFAULT_MODEL);
   const [selectedTheme, setSelectedTheme] = useState<string>("minimal");
-  const [previewErrors, setPreviewErrors] = useState<string[]>([]);
+  // previewErrors, healAttempts, isHealing, healingStatus provided by useSelfHealing hook below
   const [attachedImages, setAttachedImages] = useState<string[]>([]);
   const [isDragOver, setIsDragOver] = useState(false);
   const [showScrollBtn, setShowScrollBtn] = useState(false);
   
   const [buildStreamContent, setBuildStreamContent] = useState("");
   // Self-healing state
-  const [healAttempts, setHealAttempts] = useState(0);
-  const [isHealing, setIsHealing] = useState(false);
-  const [healingStatus, setHealingStatus] = useState<string>("");
+  // healAttempts, isHealing, healingStatus provided by useSelfHealing hook below
   // Build retry state
   const [buildRetryCount, setBuildRetryCount] = useState(0);
   // Follow-up questions state
@@ -106,6 +107,16 @@ const ChatPanel = forwardRef<ChatPanelHandle, { initialPrompt?: string; onVersio
   // Undo/Redo system
   const { createCheckpoint, undo, redo, canUndo, canRedo } = useUndoRedo();
 
+  // Project context cache hook
+  const { fetchProjectContext, invalidateCache: invalidateContextCache } = useProjectContextCache(currentProject?.id);
+
+  // Intent classification hook
+  const { classifyUserIntent, fastClassifyLocal } = useIntentClassification(
+    currentSandpackFiles,
+    currentPreviewHtml,
+    messages.length,
+    setPipelineStep,
+  );
 
 
   // Listen for refactor actions from CodeEditor
@@ -1699,7 +1710,7 @@ ${Object.entries(files).map(([path, code]) => `--- ${path}\n${code}`).join("\n\n
     setCurrentAgent("build");
     setPipelineStep("planning");
     sendMessage(finalText, images);
-  }, [classifyUserIntent, fastClassifyLocal]);
+  }, [classifyUserIntent, fastClassifyLocal, sendChatMessage, sendMessage]);
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === "Enter" && !e.shiftKey) {
