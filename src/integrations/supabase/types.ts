@@ -14,6 +14,80 @@ export type Database = {
   }
   public: {
     Tables: {
+      build_jobs: {
+        Row: {
+          artifact_path: string | null
+          build_config: Json
+          build_duration_ms: number | null
+          build_log: string[]
+          completed_at: string | null
+          created_at: string
+          dependencies: Json
+          error: string | null
+          file_count: number
+          id: string
+          output_files: Json
+          preview_url: string | null
+          project_id: string
+          source_files: Json
+          started_at: string | null
+          status: string
+          total_size_bytes: number
+          user_id: string
+          validation_results: Json
+        }
+        Insert: {
+          artifact_path?: string | null
+          build_config?: Json
+          build_duration_ms?: number | null
+          build_log?: string[]
+          completed_at?: string | null
+          created_at?: string
+          dependencies?: Json
+          error?: string | null
+          file_count?: number
+          id?: string
+          output_files?: Json
+          preview_url?: string | null
+          project_id: string
+          source_files?: Json
+          started_at?: string | null
+          status?: string
+          total_size_bytes?: number
+          user_id: string
+          validation_results?: Json
+        }
+        Update: {
+          artifact_path?: string | null
+          build_config?: Json
+          build_duration_ms?: number | null
+          build_log?: string[]
+          completed_at?: string | null
+          created_at?: string
+          dependencies?: Json
+          error?: string | null
+          file_count?: number
+          id?: string
+          output_files?: Json
+          preview_url?: string | null
+          project_id?: string
+          source_files?: Json
+          started_at?: string | null
+          status?: string
+          total_size_bytes?: number
+          user_id?: string
+          validation_results?: Json
+        }
+        Relationships: [
+          {
+            foreignKeyName: "build_jobs_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       deploy_history: {
         Row: {
           created_at: string

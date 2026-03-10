@@ -33,6 +33,7 @@ import {
 import { parseMultiFileOutput } from "@/contexts/VirtualFSContext";
 import { useChatAgent, type ChatAgentConfig } from "@/hooks/useChatAgent";
 import { useInstantBuild, type InstantBuildConfig } from "@/hooks/useInstantBuild";
+import { triggerBuild } from "@/lib/buildPipelineService";
 
 type Msg = { role: "user" | "assistant"; content: MsgContent; timestamp?: number };
 
@@ -868,6 +869,21 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
                 if (error) console.warn("[BuildOrch] Failed to persist sandpack state:", error);
                 else console.log("[BuildOrch] ✅ Sandpack state persisted");
               });
+
+            // Server-side build pipeline — validate, store artifacts, generate preview URL
+            triggerBuild(
+              currentProject.id,
+              result.files,
+              result.deps || {},
+              { model: selectedModel, theme: selectedTheme }
+            ).then((buildResult) => {
+              console.log(`[BuildOrch] ✅ Server build ${buildResult.build_id}: ${buildResult.status} (${buildResult.duration_ms}ms)`);
+              if (buildResult.preview_url) {
+                console.log(`[BuildOrch] 🌐 Preview URL: ${buildResult.preview_url}`);
+              }
+            }).catch((err) => {
+              console.warn("[BuildOrch] Server-side build failed (non-blocking):", err);
+            });
           }
 
           if (onVersionCreated) {
