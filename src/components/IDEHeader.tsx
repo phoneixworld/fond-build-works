@@ -1,4 +1,4 @@
-import { Zap, LogOut, ArrowLeft, ChevronDown, Command as CommandIcon, MessageCircle, Settings, Pencil, ArrowLeftRight, Lock, User, CreditCard, HelpCircle } from "lucide-react";
+import { Zap, LogOut, ArrowLeft, ChevronDown, Settings, Pencil, ArrowLeftRight, Lock, User, CreditCard, HelpCircle } from "lucide-react";
 import { forwardRef } from "react";
 import { TechStackId } from "@/lib/techStacks";
 import PresenceAvatars from "@/components/PresenceAvatars";
