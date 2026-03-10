@@ -2,11 +2,13 @@ import { useState, useEffect, useCallback, useRef, forwardRef } from "react";
 import { ScrollText, RefreshCw, Trash2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useProjects } from "@/contexts/ProjectContext";
+import { onCloudLog, clearCloudLogBuffer, type CloudLogEntry } from "@/lib/cloudLogBus";
 
 interface LogEntry {
   timestamp: string;
   level: "info" | "warn" | "error";
   message: string;
+  source?: string;
 }
 
 const LEVEL_STYLES: Record<string, string> = {
@@ -21,13 +23,27 @@ const CloudLogs = forwardRef<HTMLDivElement>((_, ref) => {
   const [autoRefresh, setAutoRefresh] = useState(true);
   const bottomRef = useRef<HTMLDivElement>(null);
 
+  // Subscribe to client-side event bus
+  useEffect(() => {
+    const unsub = onCloudLog((entry: CloudLogEntry) => {
+      setLogs(prev => {
+        const next = [entry, ...prev];
+        return next.length > 300 ? next.slice(0, 300) : next;
+      });
+    });
+    return unsub;
+  }, []);
+
+  // Clear bus buffer on project switch
+  useEffect(() => {
+    clearCloudLogBuffer();
+    setLogs([]);
+  }, [currentProject?.id]);
+
   const fetchActivity = useCallback(async () => {
     if (!currentProject) return;
 
     const pid = currentProject.id;
-    const entries: LogEntry[] = [
-      { timestamp: new Date().toISOString(), level: "info", message: `Cloud panel initialized for "${currentProject.name}"` },
-    ];
 
     // Fetch all sources in parallel
     const [dataRes, usersRes, fnRes, buildRes, auditRes, deployRes] = await Promise.all([
@@ -39,20 +55,18 @@ const CloudLogs = forwardRef<HTMLDivElement>((_, ref) => {
       supabase.from("deploy_history").select("id, to_env, status, deployed_by_email, created_at").eq("project_id", pid).order("created_at", { ascending: false }).limit(10),
     ]);
 
-    if (dataRes.error) {
-      entries.push({ timestamp: new Date().toISOString(), level: "error", message: `Failed to fetch data: ${dataRes.error.message}` });
-    }
+    const dbEntries: LogEntry[] = [];
 
     (dataRes.data || []).forEach((row: any) => {
-      entries.push({ timestamp: row.updated_at || row.created_at, level: "info", message: `Data record in "${row.collection}" (${row.id.slice(0, 8)}…) updated` });
+      dbEntries.push({ timestamp: row.updated_at || row.created_at, level: "info", message: `Data "${row.collection}" (${row.id.slice(0, 8)}…) updated`, source: "db" });
     });
 
     (usersRes.data || []).forEach((user: any) => {
-      entries.push({ timestamp: user.created_at, level: "info", message: `User "${user.email}" registered` });
+      dbEntries.push({ timestamp: user.created_at, level: "info", message: `User "${user.email}" registered`, source: "auth" });
     });
 
     (fnRes.data || []).forEach((fn: any) => {
-      entries.push({ timestamp: fn.created_at, level: "info", message: `Function "${fn.name}" created` });
+      dbEntries.push({ timestamp: fn.created_at, level: "info", message: `Function "${fn.name}" created`, source: "functions" });
     });
 
     (buildRes.data || []).forEach((build: any) => {
@@ -61,27 +75,36 @@ const CloudLogs = forwardRef<HTMLDivElement>((_, ref) => {
       const msg = build.error
         ? `Build ${build.id.slice(0, 8)}… failed: ${build.error.slice(0, 80)}`
         : `Build ${build.id.slice(0, 8)}… ${build.status}${dur}`;
-      entries.push({ timestamp: build.completed_at || build.created_at, level: lvl, message: msg });
+      dbEntries.push({ timestamp: build.completed_at || build.created_at, level: lvl, message: msg, source: "build" });
     });
 
     (auditRes.data || []).forEach((log: any) => {
-      entries.push({ timestamp: log.created_at, level: "info", message: `[${log.agent_name}] ${log.action} on ${log.entity_type}` });
+      dbEntries.push({ timestamp: log.created_at, level: "info", message: `[${log.agent_name}] ${log.action} on ${log.entity_type}`, source: "audit" });
     });
 
     (deployRes.data || []).forEach((dep: any) => {
       const lvl: LogEntry["level"] = dep.status === "failed" ? "error" : "info";
-      entries.push({ timestamp: dep.created_at, level: lvl, message: `Deploy to ${dep.to_env} ${dep.status}${dep.deployed_by_email ? ` by ${dep.deployed_by_email}` : ""}` });
+      dbEntries.push({ timestamp: dep.created_at, level: lvl, message: `Deploy to ${dep.to_env} ${dep.status}${dep.deployed_by_email ? ` by ${dep.deployed_by_email}` : ""}`, source: "deploy" });
     });
 
-    entries.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
-    setLogs(entries);
+    if (dataRes.error) {
+      dbEntries.push({ timestamp: new Date().toISOString(), level: "error", message: `Failed to fetch data: ${dataRes.error.message}`, source: "system" });
+    }
+
+    // Merge DB entries with existing client-side logs (avoid duplicates by keeping client-side)
+    setLogs(prev => {
+      const clientLogs = prev.filter(l => l.source !== "db" && l.source !== "auth" && l.source !== "functions" && l.source !== "build" && l.source !== "audit" && l.source !== "deploy");
+      const merged = [...clientLogs, ...dbEntries];
+      merged.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+      return merged.slice(0, 300);
+    });
   }, [currentProject]);
 
   useEffect(() => { fetchActivity(); }, [fetchActivity]);
 
   useEffect(() => {
     if (!autoRefresh) return;
-    const interval = setInterval(fetchActivity, 10000);
+    const interval = setInterval(fetchActivity, 15000);
     return () => clearInterval(interval);
   }, [autoRefresh, fetchActivity]);
 
@@ -97,16 +120,26 @@ const CloudLogs = forwardRef<HTMLDivElement>((_, ref) => {
       .on("postgres_changes", { event: "*", schema: "public", table: "project_data", filter: `project_id=eq.${currentProject.id}` }, (payload) => {
         const evt = payload.eventType;
         const collection = (payload.new as any)?.collection || (payload.old as any)?.collection || "unknown";
-        setLogs(prev => [{ timestamp: new Date().toISOString(), level: "info", message: `[realtime] ${evt.toUpperCase()} on "${collection}"` }, ...prev]);
+        setLogs(prev => [{ timestamp: new Date().toISOString(), level: "info", message: `[realtime] ${evt.toUpperCase()} on "${collection}"`, source: "realtime" }, ...prev]);
       })
       .on("postgres_changes", { event: "*", schema: "public", table: "build_jobs", filter: `project_id=eq.${currentProject.id}` }, (payload) => {
         const build = (payload.new as any) || {};
         const lvl: LogEntry["level"] = build.status === "failed" ? "error" : "info";
-        setLogs(prev => [{ timestamp: new Date().toISOString(), level: lvl, message: `[realtime] Build ${build.id?.slice(0, 8) || ""}… ${build.status || payload.eventType}` }, ...prev]);
+        setLogs(prev => [{ timestamp: new Date().toISOString(), level: lvl, message: `[realtime] Build ${build.id?.slice(0, 8) || ""}… ${build.status || payload.eventType}`, source: "realtime" }, ...prev]);
       })
       .subscribe();
     return () => { supabase.removeChannel(channel); };
   }, [currentProject]);
+
+  const sourceColor = (src?: string) => {
+    switch (src) {
+      case "compiler": return "text-emerald-400";
+      case "build": return "text-cyan-400";
+      case "realtime": return "text-purple-400";
+      case "deploy": return "text-orange-400";
+      default: return "text-muted-foreground/50";
+    }
+  };
 
   return (
     <div ref={ref} className="flex flex-col h-full">
@@ -135,7 +168,7 @@ const CloudLogs = forwardRef<HTMLDivElement>((_, ref) => {
           <div className="flex flex-col items-center justify-center py-16 text-center">
             <ScrollText className="w-10 h-10 text-muted-foreground/30 mb-3" />
             <p className="text-sm text-muted-foreground">No logs yet</p>
-            <p className="text-xs text-muted-foreground/70 mt-1">Activity from your app will appear here</p>
+            <p className="text-xs text-muted-foreground/70 mt-1">Build or interact with your app to see activity</p>
           </div>
         ) : (
           <div className="space-y-0.5">
@@ -147,6 +180,11 @@ const CloudLogs = forwardRef<HTMLDivElement>((_, ref) => {
                 <span className={`uppercase text-[10px] font-bold shrink-0 w-10 ${LEVEL_STYLES[log.level] || ""}`}>
                   {log.level}
                 </span>
+                {log.source && (
+                  <span className={`text-[10px] shrink-0 w-16 truncate ${sourceColor(log.source)}`}>
+                    {log.source}
+                  </span>
+                )}
                 <span className="text-foreground">{log.message}</span>
               </div>
             ))}

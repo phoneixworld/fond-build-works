@@ -22,6 +22,7 @@ import {
   createTrace, startPass, endPass,
   traceTaskStart, traceTaskEnd, finalizeTrace, printTrace,
 } from "./observability";
+import { cloudLog } from "@/lib/cloudLogBus";
 
 // ─── Public API ───────────────────────────────────────────────────────────
 
@@ -74,6 +75,7 @@ export async function compile(
     model: options.model,
   });
 
+  cloudLog.info(`Build started: intent=${ctx.buildIntent}, ${ctx.ir.entities.length} entities, ${ctx.ir.routes.length} routes`, "compiler");
   console.log(`[Compiler] Context assembled: intent=${ctx.buildIntent}, entities=${ctx.ir.entities.length}, routes=${ctx.ir.routes.length}, modules=${ctx.ir.modules.length}`);
 
   // ── Phase 2: Planning ──────────────────────────────────────────────
@@ -82,6 +84,7 @@ export async function compile(
 
   const taskGraph = planTaskGraph(ctx);
 
+  cloudLog.info(`Task graph: ${taskGraph.tasks.length} tasks across ${taskGraph.passes.length} passes`, "compiler");
   console.log(`[Compiler] Task graph: ${taskGraph.tasks.length} tasks, ${taskGraph.passes.length} passes`);
   for (let i = 0; i < taskGraph.passes.length; i++) {
     const passTaskLabels = taskGraph.passes[i].map(id =>
@@ -148,6 +151,7 @@ export async function compile(
           cacheHit: false,
         });
 
+        cloudLog.info(`Task '${task.label}' completed: ${producedFiles.length} files`, "compiler");
         console.log(`[Compiler] ✅ Task '${task.label}' done: ${producedFiles.length} files`);
       } catch (err: any) {
         task.status = "failed";
@@ -162,6 +166,7 @@ export async function compile(
           error: err.message,
         });
 
+        cloudLog.error(`Task '${task.label}' failed: ${err.message}`, "compiler");
         console.error(`[Compiler] ❌ Task '${task.label}' failed:`, err.message);
       }
     }
@@ -176,6 +181,7 @@ export async function compile(
   let verification = verifyWorkspace(workspace, taskGraph);
   callbacks.onVerification(verification);
 
+  cloudLog.info(`Verification: ${verification.ok ? "PASS" : "FAIL"} — ${verification.issues.length} issues`, "compiler");
   console.log(`[Compiler] Verification: ${verification.ok ? "PASS" : "FAIL"} — ${verification.issues.length} issues (${verification.stats.parsedOk} parsed, ${verification.stats.importsBroken} broken imports)`);
 
   // ── Phase 5: Auto-Repair ───────────────────────────────────────────
@@ -194,6 +200,7 @@ export async function compile(
     callbacks.onPhase("repairing", `Repair round ${repairRound}: ${actions.length} issues...`);
     trace.repairActions.push(...actions);
 
+    cloudLog.warn(`Repair round ${repairRound}: ${actions.length} actions`, "compiler");
     console.log(`[Compiler] Repair round ${repairRound}: ${actions.length} actions`);
 
     for (const action of actions) {
@@ -220,6 +227,7 @@ export async function compile(
         workspace.applyPatch(repairFiles);
         totalRepairActions++;
 
+        cloudLog.info(`Repaired: ${action.targetFile}`, "compiler");
         console.log(`[Compiler]   🔧 Repaired: ${action.targetFile}`);
       } catch (err: any) {
         console.warn(`[Compiler]   ⚠️ Repair failed for ${action.targetFile}:`, err.message);
@@ -254,6 +262,8 @@ export async function compile(
   } else {
     status = "failed";
   }
+
+  cloudLog.info(`Build ${status}: ${doneTasks}/${totalTasks} tasks, ${workspace.fileCount()} files`, "compiler");
 
   // Build summary
   const summary = [
