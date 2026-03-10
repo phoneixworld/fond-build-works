@@ -227,19 +227,38 @@ const IDEHeader = ({
           {primaryTabs.map((tab) => {
             const Icon = tab.icon;
             const isActive = rightPanel === tab.id;
+            const locked = isLocked?.(tab.id);
+            const lockOwner = getLockOwner?.(tab.id);
             return (
-              <button
-                key={tab.id}
-                onClick={() => setRightPanel(tab.id)}
-                className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-md text-[11px] font-medium transition-all ${
-                  isActive
-                    ? "bg-background text-foreground shadow-sm ring-1 ring-border/50"
-                    : "text-muted-foreground hover:text-foreground"
-                }`}
-              >
-                <Icon className="w-3.5 h-3.5" />
-                {tab.label}
-              </button>
+              <Tooltip key={tab.id}>
+                <TooltipTrigger asChild>
+                  <button
+                    onClick={() => setRightPanel(tab.id)}
+                    className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-md text-[11px] font-medium transition-all relative ${
+                      isActive
+                        ? "bg-background text-foreground shadow-sm ring-1 ring-border/50"
+                        : locked
+                        ? "text-muted-foreground/40 cursor-not-allowed"
+                        : "text-muted-foreground hover:text-foreground"
+                    }`}
+                  >
+                    <Icon className="w-3.5 h-3.5" />
+                    {tab.label}
+                    {locked && lockOwner && (
+                      <span
+                        className="w-2 h-2 rounded-full ring-1 ring-background absolute -top-0.5 -right-0.5"
+                        style={{ backgroundColor: lockOwner.color }}
+                      />
+                    )}
+                  </button>
+                </TooltipTrigger>
+                {locked && lockOwner && (
+                  <TooltipContent side="bottom" className="text-xs">
+                    <Lock className="w-3 h-3 inline mr-1" />
+                    {lockOwner.email.split("@")[0]} is editing
+                  </TooltipContent>
+                )}
+              </Tooltip>
             );
           })}
         </div>
