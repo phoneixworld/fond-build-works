@@ -77,11 +77,12 @@ Use the create_plan tool to return your structured plan.`;
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "google/gemini-2.5-flash-lite",
+        model: "google/gemini-2.5-flash",
         temperature: 0.15,
+        max_tokens: 16384,
         messages: [
           { role: "system", content: systemPrompt },
-          { role: "user", content: prompt },
+          { role: "user", content: prompt.length > 30000 ? prompt.slice(0, 30000) + "\n\n[TRUNCATED — focus on the key entities, roles, and pages listed above]" : prompt },
         ],
         tools: [
           {
