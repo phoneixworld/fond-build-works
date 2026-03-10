@@ -132,6 +132,7 @@ export type IssueCategory =
   | "missing_file"
   | "missing_export"
   | "broken_import"
+  | "invalid_import_syntax"
   | "missing_route"
   | "empty_stub"
   | "missing_component";
@@ -168,6 +169,7 @@ export type RepairActionType =
   | "fix_missing_file"
   | "fix_missing_export"
   | "fix_import"
+  | "fix_import_syntax"
   | "fix_syntax"
   | "remove_empty_stub";
 
