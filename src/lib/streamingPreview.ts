@@ -62,7 +62,7 @@ function parsePartialFence(text: string): StreamingParseResult {
 
   const block = text.slice(codeStart);
   const FILE_SEP = /^-{3}\s+(\/?\w[\w/.\-]*\.(?:jsx?|tsx?|css|json))\s*(?:-{0,3})?\s*$/;
-  const DEPS_SEP = /^-{3}\s+dependencies\s*$/i;
+  const DEPS_SEP = /^-{3}\s+\/?dependencies\s*$/i;
 
   const lines = block.split("\n");
   let currentFile: string | null = null;

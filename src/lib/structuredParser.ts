@@ -34,7 +34,7 @@ const FENCE_OPENERS = [
 ];
 
 const FILE_SEPARATOR = /^-{3}\s+(\/?\w[\w/.\-]*\.(?:jsx?|tsx?|css|json))\s*(?:-{0,3})?\s*$/;
-const DEPS_SEPARATOR = /^-{3}\s+dependencies\s*$/i;
+const DEPS_SEPARATOR = /^-{3}\s+\/?dependencies\s*$/i;
 const FENCE_CLOSE = /^```\s*$/;
 
 export function parseStructuredOutput(raw: string): ParseResult {
