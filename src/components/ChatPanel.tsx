@@ -158,8 +158,8 @@ const ChatPanel = forwardRef<ChatPanelHandle, { initialPrompt?: string; onVersio
       conversationState.addPhase(text, hasImages, currentProject?.ir_state, imageUrls);
       return localPhase;
     },
-    // Use async server-compiled requirements (with extracted image content) instead of sync fallback
-    conversationGetRequirements: () => conversationState.getRequirementsContextSync(),
+    // Use async server-compiled requirements (with extracted image content)
+    conversationGetRequirements: () => conversationState.getRequirementsContext(currentProject?.ir_state),
     conversationStartBuilding: () => { conversationState.startBuilding(); },
     conversationCompleteBuild: conversationState.completeBuild,
     conversationGenerateAck: conversationState.generateAcknowledgment,
