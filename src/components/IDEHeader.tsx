@@ -251,8 +251,10 @@ const IDEHeader = ({
       </div>
 
       {/* Right column — aligns with preview panel */}
-      <div className="flex items-center gap-1 flex-1 justify-end pr-1.5">
+      <div className="flex items-center gap-1 flex-1 pr-1.5">
+        {/* Preview controls left-aligned in this column */}
         {isPreview && (
+          <div className="flex items-center gap-1">
           <>
             <Tooltip>
               <TooltipTrigger asChild>
