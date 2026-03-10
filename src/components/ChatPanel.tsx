@@ -4,8 +4,8 @@ import { useProjectContextCache } from "@/hooks/useProjectContextCache";
 import { useIntentClassification } from "@/hooks/useIntentClassification";
 import { useBuildOrchestration } from "@/hooks/useBuildOrchestration";
 import { Version } from "@/components/VersionHistory";
-import { User, Sparkles, AlertTriangle, Wand2, ImagePlus, X, ArrowDown, Zap, ShieldCheck, Square } from "lucide-react";
-import { AI_MODELS, DEFAULT_MODEL, PROMPT_SUGGESTIONS, QUICK_ACTIONS, CONTEXT_SUGGESTIONS, DESIGN_THEMES, type AIModelId } from "@/lib/aiModels";
+import { User, Sparkles, Zap, ArrowDown } from "lucide-react";
+import { AI_MODELS, DEFAULT_MODEL, type AIModelId } from "@/lib/aiModels";
 import { generateSmartSuggestions } from "@/lib/smartSuggestions";
 import { useUndoRedo } from "@/hooks/useUndoRedo";
 import { motion, AnimatePresence } from "framer-motion";
@@ -13,22 +13,21 @@ import { usePreview } from "@/contexts/PreviewContext";
 import { useProjects } from "@/contexts/ProjectContext";
 import { useVirtualFS } from "@/contexts/VirtualFSContext";
 import { supabase } from "@/integrations/supabase/client";
-import { PAGE_TEMPLATES } from "@/lib/pageTemplates";
 import ChatMessage from "@/components/chat/ChatMessage";
 import BuildPipelineCard from "@/components/chat/BuildPipelineCard";
 import ClarifyingQuestions from "@/components/chat/ClarifyingQuestions";
 import ChatInput from "@/components/chat/ChatInput";
+import ChatWelcomeScreen from "@/components/chat/ChatWelcomeScreen";
+import ChatStatusBanners from "@/components/chat/ChatStatusBanners";
 import {
   type MsgContent,
   getTextContent,
   fileToDataUrl,
 } from "@/lib/codeParser";
 import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
   TooltipProvider,
 } from "@/components/ui/tooltip";
+import { ImagePlus } from "lucide-react";
 
 type Msg = { role: "user" | "assistant"; content: MsgContent; timestamp?: number };
 
@@ -99,7 +98,7 @@ const ChatPanel = forwardRef<ChatPanelHandle, { initialPrompt?: string; onVersio
     MAX_HEAL_ATTEMPTS,
   } = useSelfHealing({
     isBuildingValue: usePreview().isBuilding,
-    isLoading: false, // will be synced via ref
+    isLoading: false,
     sandpackFilesRef: { current: currentSandpackFiles } as React.RefObject<Record<string, string> | null>,
     isSendingRef: { current: false } as React.RefObject<boolean>,
     isLoadingRef: { current: false } as React.RefObject<boolean>,
@@ -476,9 +475,6 @@ const ChatPanel = forwardRef<ChatPanelHandle, { initialPrompt?: string; onVersio
     }
   };
 
-  const currentModelInfo = AI_MODELS.find((m) => m.id === selectedModel) || AI_MODELS[0];
-  const charCount = input.length;
-
   return (
     <TooltipProvider delayDuration={300}>
       <div
@@ -510,133 +506,11 @@ const ChatPanel = forwardRef<ChatPanelHandle, { initialPrompt?: string; onVersio
         {/* Messages */}
         <div ref={scrollRef} className="flex-1 overflow-y-auto px-5 py-6 space-y-8 overscroll-contain" style={{ scrollBehavior: 'smooth', WebkitOverflowScrolling: 'touch' }}>
           {messages.length === 0 && !pendingPrompt && (
-            <div className="flex flex-col items-center justify-center h-full gap-6">
-              <motion.div
-                initial={{ opacity: 0, scale: 0.9 }}
-                animate={{ opacity: 1, scale: 1 }}
-                transition={{ duration: 0.4, ease: "easeOut" }}
-                className="flex flex-col items-center gap-3"
-              >
-                <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-primary/20 via-accent/15 to-primary/10 flex items-center justify-center shadow-lg shadow-primary/5">
-                  <Sparkles className="w-7 h-7 text-primary" />
-                </div>
-                <h3 className="text-base font-semibold text-foreground">What do you want to build?</h3>
-                <p className="text-xs text-muted-foreground text-center max-w-[260px]">
-                  Pick a suggestion below, describe your app, or paste a screenshot to get started
-                </p>
-              </motion.div>
-
-              {/* Prompt suggestions */}
-              <motion.div
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.4, delay: 0.15 }}
-                className="w-full max-w-sm space-y-2"
-              >
-                <div className="grid grid-cols-2 gap-2">
-                  {PROMPT_SUGGESTIONS.map((s, i) => (
-                    <motion.button
-                      key={s.label}
-                      initial={{ opacity: 0, y: 8 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ duration: 0.3, delay: 0.2 + i * 0.05 }}
-                      onClick={() => handleSmartSend(s.prompt)}
-                      className="text-left px-3 py-3 rounded-xl border border-border bg-card hover:border-primary/40 hover:bg-card/80 hover:shadow-md hover:shadow-primary/5 transition-all group"
-                    >
-                      <span className="text-xs font-medium text-foreground group-hover:text-primary transition-colors">{s.label}</span>
-                    </motion.button>
-                  ))}
-                </div>
-
-                {/* Template selector */}
-                <div className="mt-3">
-                  <p className="text-[10px] text-muted-foreground/40 font-medium mb-1.5 text-center">Or start with a template:</p>
-                  <div className="flex flex-wrap gap-1.5 justify-center">
-                    {PAGE_TEMPLATES.slice(0, 6).map((t) => (
-                      <button
-                        key={t.id}
-                        onClick={() => setSelectedTemplate(selectedTemplate?.id === t.id ? null : t)}
-                        className={`inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[11px] font-medium border transition-all ${
-                          selectedTemplate?.id === t.id
-                            ? "border-primary bg-primary/10 text-primary"
-                            : "border-border bg-card text-muted-foreground hover:border-primary/30 hover:text-foreground"
-                        }`}
-                      >
-                        <span>{t.emoji}</span>
-                        <span>{t.name}</span>
-                      </button>
-                    ))}
-                  </div>
-                  {PAGE_TEMPLATES.length > 6 && (
-                    <details className="mt-1.5">
-                      <summary className="text-[10px] text-muted-foreground/30 cursor-pointer hover:text-muted-foreground/50 text-center">
-                        +{PAGE_TEMPLATES.length - 6} more templates
-                      </summary>
-                      <div className="flex flex-wrap gap-1.5 justify-center mt-1.5">
-                        {PAGE_TEMPLATES.slice(6).map((t) => (
-                          <button
-                            key={t.id}
-                            onClick={() => setSelectedTemplate(selectedTemplate?.id === t.id ? null : t)}
-                            className={`inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[11px] font-medium border transition-all ${
-                              selectedTemplate?.id === t.id
-                                ? "border-primary bg-primary/10 text-primary"
-                                : "border-border bg-card text-muted-foreground hover:border-primary/30 hover:text-foreground"
-                            }`}
-                          >
-                            <span>{t.emoji}</span>
-                            <span>{t.name}</span>
-                          </button>
-                        ))}
-                      </div>
-                    </details>
-                  )}
-                </div>
-              </motion.div>
-
-              {/* Capabilities showcase */}
-              <motion.div
-                initial={{ opacity: 0, y: 6 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.4 }}
-                className="w-full max-w-sm"
-              >
-                <div className="rounded-xl border border-border/50 bg-card/50 p-3">
-                  <p className="text-[10px] font-semibold text-muted-foreground/60 uppercase tracking-wider mb-2 text-center">What Phoneix Builder can do</p>
-                  <div className="grid grid-cols-2 gap-1.5">
-                    {[
-                      { icon: "🧠", label: "Multi-model AI", desc: "GPT-5, Gemini 2.5 & more" },
-                      { icon: "🎨", label: "Design themes", desc: "10+ curated styles" },
-                      { icon: "📸", label: "Image-to-code", desc: "Paste screenshot → app" },
-                      { icon: "🔧", label: "Auto-fix errors", desc: "Self-healing builds" },
-                      { icon: "⚡", label: "Live preview", desc: "Instant Sandpack render" },
-                      { icon: "🧩", label: "Smart suggestions", desc: "Context-aware actions" },
-                    ].map((cap, i) => (
-                      <div key={i} className="flex items-start gap-2 px-2 py-1.5 rounded-lg hover:bg-secondary/50 transition-colors">
-                        <span className="text-sm shrink-0">{cap.icon}</span>
-                        <div className="min-w-0">
-                          <p className="text-[11px] font-medium text-foreground leading-tight">{cap.label}</p>
-                          <p className="text-[9px] text-muted-foreground/60 leading-tight">{cap.desc}</p>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </motion.div>
-
-              {/* Keyboard hint */}
-              <motion.p
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                transition={{ delay: 0.5 }}
-                className="text-[10px] text-muted-foreground/40 flex items-center gap-1.5"
-              >
-                <kbd className="px-1.5 py-0.5 rounded bg-secondary text-muted-foreground text-[9px] font-mono">Enter</kbd>
-                to send
-                <span className="mx-1">·</span>
-                <kbd className="px-1.5 py-0.5 rounded bg-secondary text-muted-foreground text-[9px] font-mono">Shift+Enter</kbd>
-                new line
-              </motion.p>
-            </div>
+            <ChatWelcomeScreen
+              onSend={handleSmartSend}
+              selectedTemplate={selectedTemplate}
+              onSelectTemplate={setSelectedTemplate}
+            />
           )}
 
           {pendingPrompt && messages.length === 0 && (
@@ -811,8 +685,6 @@ const ChatPanel = forwardRef<ChatPanelHandle, { initialPrompt?: string; onVersio
               </motion.div>
             )}
           </AnimatePresence>
-
-          {/* Quick actions moved to above input area */}
         </div>
 
         {/* Scroll-to-bottom FAB */}
@@ -830,118 +702,21 @@ const ChatPanel = forwardRef<ChatPanelHandle, { initialPrompt?: string; onVersio
           )}
         </AnimatePresence>
 
-        {/* Self-healing status */}
-        <AnimatePresence>
-          {isHealing && (
-            <motion.div
-              initial={{ height: 0, opacity: 0 }}
-              animate={{ height: "auto", opacity: 1 }}
-              exit={{ height: 0, opacity: 0 }}
-              className="border-t border-primary/30 bg-primary/5 px-3 py-2"
-            >
-              <div className="flex items-center gap-2">
-                <ShieldCheck className="w-3.5 h-3.5 text-primary animate-pulse shrink-0" />
-                <span className="text-xs text-primary font-medium">{healingStatus}</span>
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
-
-        {/* Error banner */}
-        <AnimatePresence>
-          {previewErrors.length > 0 && !isLoading && !isHealing && (
-            <motion.div
-              initial={{ height: 0, opacity: 0 }}
-              animate={{ height: "auto", opacity: 1 }}
-              exit={{ height: 0, opacity: 0 }}
-              className="border-t border-destructive/30 bg-destructive/5 px-3 py-2"
-            >
-              <div className="flex items-center justify-between gap-2">
-                <div className="flex items-center gap-2 min-w-0">
-                  <AlertTriangle className="w-3.5 h-3.5 text-destructive shrink-0" />
-                  <span className="text-xs text-destructive truncate">
-                    {previewErrors.length} error{previewErrors.length > 1 ? "s" : ""} detected
-                    {healAttempts > 0 && healAttempts < MAX_HEAL_ATTEMPTS && (
-                      <span className="ml-1 text-muted-foreground">· auto-fixing in 5s ({healAttempts}/{MAX_HEAL_ATTEMPTS} attempts)</span>
-                    )}
-                    {healAttempts >= MAX_HEAL_ATTEMPTS && (
-                      <span className="ml-1 text-muted-foreground">· max retries reached</span>
-                    )}
-                  </span>
-                </div>
-                <div className="flex items-center gap-1.5">
-                  {healAttempts >= MAX_HEAL_ATTEMPTS && (
-                    <button
-                      onClick={() => { setHealAttempts(0); handleAutoFix(); }}
-                      className="shrink-0 flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-medium bg-primary text-primary-foreground hover:bg-primary/90 transition-colors"
-                    >
-                      <ShieldCheck className="w-3 h-3" />
-                      Retry
-                    </button>
-                  )}
-                  <button
-                    onClick={handleAutoFix}
-                    className="shrink-0 flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-medium bg-destructive text-destructive-foreground hover:bg-destructive/90 transition-colors"
-                  >
-                    <Wand2 className="w-3 h-3" />
-                    Fix now
-                  </button>
-                </div>
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
-
-        {/* Selected template chip */}
-        <AnimatePresence>
-          {selectedTemplate && (
-            <motion.div
-              initial={{ height: 0, opacity: 0 }}
-              animate={{ height: "auto", opacity: 1 }}
-              exit={{ height: 0, opacity: 0 }}
-              className="border-t border-border px-3 py-1.5"
-            >
-              <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-primary/10 border border-primary/20 text-primary text-[11px] font-medium">
-                <span>{selectedTemplate.emoji}</span>
-                <span>Template: {selectedTemplate.name}</span>
-                <button onClick={() => setSelectedTemplate(null)} className="ml-1 hover:text-primary/70 transition-colors">
-                  <X className="w-3 h-3" />
-                </button>
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
-
-        {/* Attached images preview */}
-        <AnimatePresence>
-          {attachedImages.length > 0 && (
-            <motion.div
-              initial={{ height: 0, opacity: 0 }}
-              animate={{ height: "auto", opacity: 1 }}
-              exit={{ height: 0, opacity: 0 }}
-              className="border-t border-border px-3 py-2"
-            >
-              <div className="flex gap-2 flex-wrap">
-                {attachedImages.map((img, i) => (
-                  <motion.div
-                    key={i}
-                    initial={{ opacity: 0, scale: 0.8 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    className="relative group"
-                  >
-                    <img src={img} alt="Attached" className="w-16 h-16 object-cover rounded-xl border border-border shadow-sm" />
-                    <button
-                      onClick={() => removeImage(i)}
-                      className="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full bg-destructive text-destructive-foreground flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity shadow-sm"
-                    >
-                      <X className="w-3 h-3" />
-                    </button>
-                  </motion.div>
-                ))}
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
+        {/* Status banners (healing, errors, template chip, attached images) */}
+        <ChatStatusBanners
+          isHealing={isHealing}
+          healingStatus={healingStatus}
+          previewErrors={previewErrors}
+          isLoading={isLoading}
+          healAttempts={healAttempts}
+          maxHealAttempts={MAX_HEAL_ATTEMPTS}
+          onAutoFix={handleAutoFix}
+          onResetAndFix={() => { setHealAttempts(0); handleAutoFix(); }}
+          selectedTemplate={selectedTemplate}
+          onClearTemplate={() => setSelectedTemplate(null)}
+          attachedImages={attachedImages}
+          onRemoveImage={removeImage}
+        />
 
         {/* Smart context-aware suggestions */}
         {!isLoading && followUpQuestions.length === 0 && !input && (
