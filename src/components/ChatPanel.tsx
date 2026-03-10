@@ -80,8 +80,34 @@ const ChatPanel = forwardRef<ChatPanelHandle, { initialPrompt?: string; onVersio
     currentSandpackFiles,
     currentPreviewHtml,
     messages.length,
-    (step: any) => setPipelineStep(step),
+    (step: any) => setPipelineStepProxy(step),
   );
+
+  // Use a ref to break the circular dependency between useSelfHealing and useBuildOrchestration
+  const resetHealingRef = useRef<() => void>(() => {});
+  const sendMessageRef = useRef<(text: string) => void>(() => {});
+  const setPipelineStepRef = useRef<(step: any) => void>(() => {});
+  const setPipelineStepProxy = useCallback((step: any) => setPipelineStepRef.current(step), []);
+
+  // Self-healing hook (declared first, uses sendMessage ref)
+  const {
+    previewErrors, setPreviewErrors,
+    healAttempts, setHealAttempts,
+    isHealing, healingStatus,
+    handleAutoFix,
+    resetHealing,
+    MAX_HEAL_ATTEMPTS,
+  } = useSelfHealing({
+    isBuildingValue: usePreview().isBuilding,
+    isLoading: false, // will be synced via ref
+    sandpackFilesRef: { current: currentSandpackFiles } as React.RefObject<Record<string, string> | null>,
+    isSendingRef: { current: false } as React.RefObject<boolean>,
+    isLoadingRef: { current: false } as React.RefObject<boolean>,
+    sendMessage: (text: string) => sendMessageRef.current(text),
+  });
+
+  // Keep ref in sync
+  useEffect(() => { resetHealingRef.current = resetHealing; }, [resetHealing]);
 
   // Build orchestration hook
   const buildOrch = useBuildOrchestration({
@@ -105,7 +131,7 @@ const ChatPanel = forwardRef<ChatPanelHandle, { initialPrompt?: string; onVersio
     setAttachedImages,
     setPreviewErrors: (errs: any) => setPreviewErrors(errs),
     setHealAttempts: (n: number) => setHealAttempts(n),
-    resetHealing,
+    resetHealing: () => resetHealingRef.current(),
     inputRef,
     selectedModel,
     selectedTheme,
@@ -125,9 +151,9 @@ const ChatPanel = forwardRef<ChatPanelHandle, { initialPrompt?: string; onVersio
     setBuildStreamContent, setBuildRetryCount, setPendingBuildPrompt, setIsLoading,
   } = buildOrch;
 
-  // Self-healing hook
-  const {
-    previewErrors, setPreviewErrors,
+  // Sync refs after both hooks are initialized
+  useEffect(() => { sendMessageRef.current = sendMessage; }, [sendMessage]);
+  useEffect(() => { setPipelineStepRef.current = setPipelineStep; }, [setPipelineStep]);
     healAttempts, setHealAttempts,
     isHealing, healingStatus,
     handleAutoFix,
