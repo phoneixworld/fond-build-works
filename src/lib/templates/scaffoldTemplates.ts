@@ -336,28 +336,46 @@ export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(false);
 
+  const getConfig = () => ({
+    apiBase: window.__SUPABASE_URL__ || "",
+    apiKey: window.__SUPABASE_KEY__ || "",
+    projectId: window.__PROJECT_ID__ || "",
+  });
+
+  const authFetch = useCallback(async (action, body = {}) => {
+    const { apiBase, apiKey, projectId } = getConfig();
+    const res = await fetch(\`\${apiBase}/functions/v1/project-auth\`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "Authorization": \`Bearer \${apiKey}\` },
+      body: JSON.stringify({ project_id: projectId, action, ...body }),
+    });
+    return res.json();
+  }, []);
+
   const login = useCallback(async (email, password) => {
     setLoading(true);
     try {
-      const API_BASE = window.__SUPABASE_URL__ || "";
-      const API_KEY = window.__SUPABASE_KEY__ || "";
-      const res = await fetch(\`\${API_BASE}/functions/v1/project-auth\`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", "Authorization": \`Bearer \${API_KEY}\` },
-        body: JSON.stringify({ action: "login", email, password }),
-      });
-      const json = await res.json();
-      if (json.user) setUser(json.user);
+      const json = await authFetch("login", { email, password });
+      if (json.data?.user) { setUser(json.data.user); localStorage.setItem("auth_token", json.data.token); }
+      else if (json.error) throw new Error(json.error);
       return json;
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+    } finally { setLoading(false); }
+  }, [authFetch]);
 
-  const logout = useCallback(() => setUser(null), []);
+  const signup = useCallback(async (email, password, displayName) => {
+    setLoading(true);
+    try {
+      const json = await authFetch("signup", { email, password, display_name: displayName });
+      if (json.data?.user) { setUser(json.data.user); localStorage.setItem("auth_token", json.data.token); }
+      else if (json.error) throw new Error(json.error);
+      return json;
+    } finally { setLoading(false); }
+  }, [authFetch]);
+
+  const logout = useCallback(() => { setUser(null); localStorage.removeItem("auth_token"); }, []);
 
   return (
-    <AuthContext.Provider value={{ user, loading, login, logout, isAuthenticated: !!user }}>
+    <AuthContext.Provider value={{ user, loading, login, signup, logout, isAuthenticated: !!user }}>
       {children}
     </AuthContext.Provider>
   );

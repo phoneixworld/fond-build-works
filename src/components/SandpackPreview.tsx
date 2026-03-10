@@ -1,4 +1,5 @@
 import { useMemo, Component, ReactNode, useEffect } from "react";
+import { useProjects } from "@/contexts/ProjectContext";
 import {
   SandpackProvider,
   SandpackPreview as SandpackPreviewPane,
@@ -183,10 +184,16 @@ export default function App() {
 }
 `;
 
-const INDEX_JS = `import React, { StrictMode } from "react";
+function buildIndexJs(projectId: string, supabaseUrl: string, supabaseKey: string): string {
+  return `import React, { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import App from "./App";
 import "./styles.css";
+
+// Inject project globals for generated auth/data hooks
+window.__PROJECT_ID__ = "${projectId}";
+window.__SUPABASE_URL__ = "${supabaseUrl}";
+window.__SUPABASE_KEY__ = "${supabaseKey}";
 
 // Report route changes to parent for URL bar sync
 function reportRoute() {
@@ -233,6 +240,7 @@ root.render(
   React.createElement(StrictMode, null, React.createElement(App))
 );
 `;
+}
 
 const DEFAULT_STYLES = `@tailwind base;
 @tailwind components;
@@ -327,9 +335,10 @@ const DEFAULT_INDEX_HTML = `<!DOCTYPE html>
 </body>
 </html>`;
 
-function buildSandpackFiles(files: SandpackFileSet | null): Record<string, string> {
+function buildSandpackFiles(files: SandpackFileSet | null, projectId: string, supabaseUrl: string, supabaseKey: string): Record<string, string> {
+  const indexJs = buildIndexJs(projectId, supabaseUrl, supabaseKey);
   const base: Record<string, string> = {
-    "/index.js": INDEX_JS,
+    "/index.js": indexJs,
     "/styles.css": DEFAULT_STYLES,
     "/public/index.html": DEFAULT_INDEX_HTML,
   };
@@ -351,7 +360,7 @@ function buildSandpackFiles(files: SandpackFileSet | null): Record<string, strin
   }
 
   if (base["/App.jsx"] && !base["/App.js"]) {
-    base["/index.js"] = INDEX_JS.replace('./App', './App.jsx');
+    base["/index.js"] = indexJs.replace('./App', './App.jsx');
   }
 
   return base;
@@ -381,8 +390,13 @@ interface SandpackPreviewProps {
 
 const SandpackPreview = ({ viewport, showConsole = false, initialPath }: SandpackPreviewProps) => {
   const { sandpackFiles, sandpackDeps } = usePreview();
+  const { currentProject } = useProjects();
 
-  const files = useMemo(() => buildSandpackFiles(sandpackFiles), [sandpackFiles]);
+  const projectId = currentProject?.id || "";
+  const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || "";
+  const supabaseKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY || "";
+
+  const files = useMemo(() => buildSandpackFiles(sandpackFiles, projectId, supabaseUrl, supabaseKey), [sandpackFiles, projectId, supabaseUrl, supabaseKey]);
 
   // Content-based key: remount only when file contents actually change
   const stableKey = useMemo(() => contentHash(sandpackFiles), [sandpackFiles]);
