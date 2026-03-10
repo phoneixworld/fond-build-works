@@ -885,7 +885,6 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
               console.warn("[BuildOrch] Server-side build failed (non-blocking):", err);
             });
           }
-          }
 
           if (onVersionCreated) {
             onVersionCreated({
