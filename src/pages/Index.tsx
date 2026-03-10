@@ -257,7 +257,7 @@ const IDELayout = () => {
               </>
             ) : (
               <>
-                <ResizablePanel defaultSize={50} minSize={10} className="rounded-lg border border-border overflow-hidden">
+                <ResizablePanel defaultSize={50} minSize={10} className="overflow-hidden">
                   <ErrorBoundary fallbackTitle="Chat">
                     <ChatPanel ref={chatRef} initialPrompt={initialPrompt} onVersionCreated={handleVersionCreated} />
                   </ErrorBoundary>
