@@ -484,14 +484,14 @@ const ChatPanel = forwardRef<ChatPanelHandle, { initialPrompt?: string; onVersio
     });
   }, []);
 
-  // pendingPrompt effect
+  // pendingPrompt effect — route through handleSmartSend so conversation state machine can intercept
   useEffect(() => {
     if (pendingPrompt && currentProject && !isLoadingRef.current && !isSendingRef.current && messagesRef.current.length === 0) {
       const prompt = pendingPrompt;
       setPendingPrompt(null);
-      sendMessage(prompt);
+      handleSmartSend(prompt);
     }
-  }, [pendingPrompt, currentProject, sendMessage]);
+  }, [pendingPrompt, currentProject, handleSmartSend]);
 
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
