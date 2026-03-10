@@ -234,6 +234,8 @@ const IDELayout = () => {
           onSwapLayout={() => setLayoutSwapped(prev => !prev)}
           isLocked={isLocked}
           getLockOwner={getLockOwner}
+          versions={versions}
+          onRevert={handleRevert}
         />
 
         <div className="flex-1 overflow-hidden group/resize">
