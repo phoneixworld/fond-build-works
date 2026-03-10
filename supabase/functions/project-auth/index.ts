@@ -104,7 +104,7 @@ serve(async (req) => {
             status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
           });
         }
-        return new Response(JSON.stringify({ data: { user } }), {
+        return new Response(JSON.stringify({ user }), {
           status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
