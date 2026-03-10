@@ -41,6 +41,10 @@ export function verifyWorkspace(
   const routeResults = checkRoutes(workspace);
   issues.push(...routeResults.issues);
 
+  // 7. Structural checks: undefined function calls in useEffect
+  const undefResults = checkUndefinedCalls(workspace);
+  issues.push(...undefResults.issues);
+
   // Stats
   const files = workspace.listFiles();
   const jsFiles = files.filter(f => /\.(jsx?|tsx?)$/.test(f));
