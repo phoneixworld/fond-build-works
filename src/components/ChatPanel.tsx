@@ -72,6 +72,12 @@ const ChatPanel = forwardRef<ChatPanelHandle, { initialPrompt?: string; onVersio
   // Undo/Redo system
   const { createCheckpoint, undo, redo, canUndo, canRedo } = useUndoRedo();
 
+  // Refs to break circular dependency between hooks
+  const resetHealingRef = useRef<() => void>(() => {});
+  const sendMessageRef = useRef<(text: string) => void>(() => {});
+  const setPipelineStepRef = useRef<(step: any) => void>(() => {});
+  const setPipelineStepProxy = useCallback((step: any) => setPipelineStepRef.current(step), []);
+
   // Project context cache hook
   const { fetchProjectContext, invalidateCache: invalidateContextCache } = useProjectContextCache(currentProject?.id);
 
@@ -80,14 +86,8 @@ const ChatPanel = forwardRef<ChatPanelHandle, { initialPrompt?: string; onVersio
     currentSandpackFiles,
     currentPreviewHtml,
     messages.length,
-    (step: any) => setPipelineStepProxy(step),
+    setPipelineStepProxy,
   );
-
-  // Use a ref to break the circular dependency between useSelfHealing and useBuildOrchestration
-  const resetHealingRef = useRef<() => void>(() => {});
-  const sendMessageRef = useRef<(text: string) => void>(() => {});
-  const setPipelineStepRef = useRef<(step: any) => void>(() => {});
-  const setPipelineStepProxy = useCallback((step: any) => setPipelineStepRef.current(step), []);
 
   // Self-healing hook (declared first, uses sendMessage ref)
   const {
