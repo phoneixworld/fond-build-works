@@ -192,6 +192,33 @@ RULES:
 - Use the project's design patterns`;
 }
 
+function buildFixImportSyntaxPrompt(issue: VerificationIssue, workspace: Workspace): string {
+  const fileContent = workspace.getFile(issue.file) || "";
+  const availableFiles = workspace.listFiles().filter(f => /\.(jsx?|tsx?)$/.test(f));
+
+  return `## REPAIR: Fix invalid import syntax in ${issue.file}
+
+Error: ${issue.message}
+${issue.line ? `Line: ${issue.line}` : ""}
+Suggested fix: ${issue.suggestedFix || "Fix the import syntax"}
+
+Current file content:
+\`\`\`
+${fileContent}
+\`\`\`
+
+Available files in workspace:
+${availableFiles.map(f => `- ${f}`).join("\n")}
+
+RULES:
+- Fix ONLY the invalid import syntax
+- Convert require() to ESM import if needed
+- Merge duplicate imports from the same module
+- Close any unclosed braces in destructured imports
+- Do NOT refactor anything else
+- Output the complete corrected file`;
+}
+
 // ─── Helpers ──────────────────────────────────────────────────────────────
 
 function findImporters(
