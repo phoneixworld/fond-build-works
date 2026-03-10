@@ -59,7 +59,7 @@ export const PreviewProvider = ({ children }: { children: ReactNode }) => {
   const [sandpackDeps, setSandpackDeps] = useState<Record<string, string>>({});
   const [isBuilding, setIsBuilding] = useState(false);
   const [buildStep, setBuildStep] = useState("");
-  const [previewMode, setPreviewMode] = useState<"html" | "sandpack">("html");
+  const [previewMode, setPreviewMode] = useState<"html" | "sandpack" | "esm">("html");
   const [buildMetrics, setBuildMetrics] = useState<BuildMetrics | null>(null);
   const [snapshots, setSnapshots] = useState<BuildSnapshot[]>([]);
   const [viewport, setViewport] = useState<ViewportId>("desktop");
