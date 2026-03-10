@@ -28,11 +28,11 @@ const ESMPreview = ({ viewport, initialPath }: ESMPreviewProps) => {
   const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || "";
   const supabaseKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY || "";
 
-  // Don't attempt ESM build until we have a real App file
-  const ready = hasAppEntry(sandpackFiles) && !isBuilding;
+  // Build preview whenever we have a real App file (don't gate on isBuilding —
+  // restored projects may have isBuilding stuck true while files are already valid)
+  const ready = hasAppEntry(sandpackFiles);
 
   const buildResult = useMemo(() => {
-    console.log("[ESMPreview] ready:", ready, "sandpackFiles:", sandpackFiles ? Object.keys(sandpackFiles).length : 0, "isBuilding:", isBuilding, "hasApp:", hasAppEntry(sandpackFiles));
     if (!ready || !sandpackFiles) return null;
     
     try {
