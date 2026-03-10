@@ -473,13 +473,6 @@ const PublishExportButtons = forwardRef<PublishExportHandle>((_, ref) => {
         <Globe className="w-3.5 h-3.5" />
         Publish
       </button>
-      <button
-        onClick={handleExportFn}
-        className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors"
-        title="Export as ZIP"
-      >
-        <Download className="w-3.5 h-3.5" />
-      </button>
 
       <Dialog open={showPublish} onOpenChange={setShowPublish}>
         <DialogContent className="sm:max-w-lg p-0 gap-0 overflow-hidden border-border/50 bg-card">
