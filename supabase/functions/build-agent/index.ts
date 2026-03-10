@@ -339,38 +339,94 @@ FIX CHECKLIST:
     }
     console.log(`[build-agent] 💰 maxTokens=${maxTokens} | temp=${temperature}`);
 
-    const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${LOVABLE_API_KEY}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: selectedModel,
-        messages: [
-          { role: "system", content: systemPrompt },
-          ...messages,
-        ],
-        stream: true,
-        temperature,
-        max_tokens: maxTokens,
-      }),
-    });
+    // Retry logic for transient AI gateway failures
+    let response: Response | null = null;
+    let lastError = "";
+    for (let attempt = 0; attempt < 2; attempt++) {
+      try {
+        response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${LOVABLE_API_KEY}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            model: selectedModel,
+            messages: [
+              { role: "system", content: systemPrompt },
+              ...messages,
+            ],
+            stream: true,
+            temperature,
+            max_tokens: maxTokens,
+          }),
+        });
 
-    if (!response.ok) {
-      if (response.status === 429) {
-        return new Response(JSON.stringify({ error: "Rate limit exceeded." }), {
-          status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        if (response.ok) {
+          // Verify the response has a body and correct content type
+          const contentType = response.headers.get("content-type") || "";
+          if (!response.body) {
+            console.warn(`[build-agent] Attempt ${attempt + 1}: Response OK but no body`);
+            lastError = "Empty response body from AI gateway";
+            continue;
+          }
+          
+          // If the gateway returns JSON instead of SSE (error wrapped in 200), detect and retry
+          if (contentType.includes("application/json") && !contentType.includes("text/event-stream")) {
+            const text = await response.text();
+            console.warn(`[build-agent] Attempt ${attempt + 1}: Got JSON instead of SSE:`, text.slice(0, 500));
+            try {
+              const errJson = JSON.parse(text);
+              if (errJson.error) {
+                lastError = typeof errJson.error === "string" ? errJson.error : errJson.error.message || "AI gateway error";
+                continue;
+              }
+            } catch {}
+            lastError = "Unexpected JSON response from AI gateway";
+            continue;
+          }
+
+          console.log(`[build-agent] ✅ Streaming response (attempt ${attempt + 1})`);
+          break;
+        }
+
+        if (response.status === 429) {
+          return new Response(JSON.stringify({ error: "Rate limit exceeded." }), {
+            status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+        if (response.status === 402) {
+          return new Response(JSON.stringify({ error: "Usage limit reached." }), {
+            status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+        const t = await response.text();
+        console.error(`[build-agent] Attempt ${attempt + 1} error:`, response.status, t.slice(0, 500));
+        lastError = `Status ${response.status}: ${t.slice(0, 200)}`;
+        
+        // Retry on 5xx errors
+        if (response.status >= 500 && attempt === 0) {
+          console.log("[build-agent] Retrying after 5xx...");
+          await new Promise(r => setTimeout(r, 2000));
+          continue;
+        }
+        
+        return new Response(JSON.stringify({ error: "Build agent error" }), {
+          status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
+      } catch (fetchErr) {
+        console.error(`[build-agent] Attempt ${attempt + 1} fetch error:`, fetchErr);
+        lastError = fetchErr instanceof Error ? fetchErr.message : "Fetch error";
+        if (attempt === 0) {
+          await new Promise(r => setTimeout(r, 2000));
+          continue;
+        }
       }
-      if (response.status === 402) {
-        return new Response(JSON.stringify({ error: "Usage limit reached." }), {
-          status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
-      const t = await response.text();
-      console.error("build-agent error:", response.status, t);
-      return new Response(JSON.stringify({ error: "Build agent error" }), {
+    }
+
+    if (!response || !response.ok || !response.body) {
+      console.error(`[build-agent] All attempts failed: ${lastError}`);
+      return new Response(JSON.stringify({ error: lastError || "Build agent failed after retries" }), {
         status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }

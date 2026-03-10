@@ -434,7 +434,11 @@ async function executeSingleTask(
             return;
           }
 
-          console.warn(`[BuildEngine] No code in response, retrying (attempt ${retryCount + 1})`);
+          console.warn(`[BuildEngine] No code in response (${responseText.length} chars), retrying (attempt ${retryCount + 1}). First 300 chars: ${responseText.slice(0, 300)}`);
+          // If response contains an AI error message, surface it
+          if (responseText.includes("[AI Error:")) {
+            console.error(`[BuildEngine] AI gateway error detected in response`);
+          }
           executeSingleTask(
             prompt + "\n\nCRITICAL: Your previous response did not contain code. You MUST output React code inside ```react-preview fences with --- /App.jsx markers. Output the code NOW.",
             config,
