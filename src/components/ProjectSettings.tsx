@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Settings, Copy, Check, Trash2, GitFork, Eye, EyeOff, Calendar, User, Hash, Globe, MessageCircle } from "lucide-react";
+import { Settings, Copy, Check, Trash2, GitFork, Eye, EyeOff, Calendar, User, Hash, Globe, MessageCircle, Download } from "lucide-react";
 import { useProjects } from "@/contexts/ProjectContext";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
@@ -19,9 +19,10 @@ import {
 interface ProjectSettingsProps {
   onRenameClick?: () => void;
   onClone?: () => void;
+  onExport?: () => void;
 }
 
-const ProjectSettings = ({ onRenameClick, onClone }: ProjectSettingsProps) => {
+const ProjectSettings = ({ onRenameClick, onClone, onExport }: ProjectSettingsProps) => {
   const { currentProject, deleteProject, saveProject, cloneProject } = useProjects();
   const { user } = useAuth();
   const { toast } = useToast();
@@ -198,6 +199,20 @@ const ProjectSettings = ({ onRenameClick, onClone }: ProjectSettingsProps) => {
             </div>
             <span className="text-xs font-medium px-3 py-1.5 rounded-md bg-primary text-primary-foreground opacity-0 group-hover:opacity-100 transition-opacity">
               <GitFork className="w-3.5 h-3.5 inline mr-1" /> Clone
+            </span>
+          </button>
+
+          {/* Export */}
+          <button
+            onClick={onExport}
+            className="w-full flex items-center justify-between px-4 py-3 rounded-lg hover:bg-secondary/50 transition-colors text-left group"
+          >
+            <div>
+              <p className="text-sm font-medium text-foreground">Export as ZIP</p>
+              <p className="text-xs text-muted-foreground">Download all project files as a ZIP archive.</p>
+            </div>
+            <span className="text-xs font-medium px-3 py-1.5 rounded-md bg-primary text-primary-foreground opacity-0 group-hover:opacity-100 transition-opacity">
+              <Download className="w-3.5 h-3.5 inline mr-1" /> Export
             </span>
           </button>
 

@@ -146,6 +146,7 @@ const IDELayout = () => {
         <ProjectSettingsPage
           onBack={() => setShowProjectSettings(false)}
           onRenameClick={() => setRenameOpen(true)}
+          onExport={() => publishRef.current?.handleExport()}
           versions={versions}
           onRevert={handleRevert}
           onSendMessage={(prompt) => {
