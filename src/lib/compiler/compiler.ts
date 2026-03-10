@@ -18,6 +18,7 @@ import { Workspace } from "./workspace";
 import { executeTask, type ExecutionCallbacks } from "./executor";
 import { verifyWorkspace } from "./verifier";
 import { classifyRepairActions, buildRepairSummary, MAX_REPAIR_ROUNDS } from "./repair";
+import { fixBrokenImports } from "./importFixer";
 import {
   createTrace, startPass, endPass,
   traceTaskStart, traceTaskEnd, finalizeTrace, printTrace,
