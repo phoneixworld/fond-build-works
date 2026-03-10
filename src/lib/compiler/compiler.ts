@@ -203,6 +203,16 @@ export async function compile(
     }
   }
 
+  // ── Phase 3.7: Provider Injection ──────────────────────────────────
+
+  callbacks.onPhase("injecting-providers", "Checking for missing providers...");
+
+  const providersInjected = injectMissingProviders(workspace);
+  if (providersInjected > 0) {
+    cloudLog.info(`Provider injector: added ${providersInjected} missing provider(s) to App`, "compiler");
+    console.log(`[Compiler] 💉 Provider injector: added ${providersInjected} missing provider(s)`);
+  }
+
   // ── Phase 4: Verification ──────────────────────────────────────────
 
   callbacks.onPhase("verifying", "Verifying workspace...");
