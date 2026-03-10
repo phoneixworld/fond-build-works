@@ -166,7 +166,15 @@ Use the create_plan tool to return your structured plan.`;
       throw new Error("Plan agent error");
     }
 
-    const data = await response.json();
+    const rawText = await response.text();
+    let data;
+    try {
+      data = JSON.parse(rawText);
+    } catch {
+      console.warn("[plan-agent] AI gateway response truncated, attempting repair...");
+      const repaired = repairTruncatedJson(rawText);
+      data = JSON.parse(repaired);
+    }
     const toolCall = data.choices?.[0]?.message?.tool_calls?.[0];
 
     if (toolCall?.function?.arguments) {
@@ -175,8 +183,7 @@ Use the create_plan tool to return your structured plan.`;
       try {
         plan = JSON.parse(planJson);
       } catch {
-        // Attempt JSON repair for truncated output
-        console.warn("[plan-agent] JSON truncated, attempting repair...");
+        console.warn("[plan-agent] Tool call JSON truncated, attempting repair...");
         planJson = repairTruncatedJson(planJson);
         plan = JSON.parse(planJson);
       }
