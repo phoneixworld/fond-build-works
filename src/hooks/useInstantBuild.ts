@@ -93,7 +93,7 @@ export function useInstantBuild(config: InstantBuildConfig) {
     setSandpackFiles(files);
     syncSandpackToVirtualFS(files);
     if (Object.keys(deps).length > 0) setSandpackDeps(deps);
-    setPreviewMode("sandpack");
+    setPreviewMode("esm");
 
     const fileCount = Object.keys(files).length;
     const instantMsg = `⚡ **Instant Preview** — ${fileCount} files rendered in under 1 second!\n\nYour ${templateName} is ready. I'm now polishing the content based on your prompt...`;
