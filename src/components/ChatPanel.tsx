@@ -603,6 +603,7 @@ const projectContextCacheRef = useRef<{
   projectId: string;
   schemas: any[];
   knowledge: string[];
+  irContext: string;
   fetchedAt: number;
 } | null>(null);
 const CONTEXT_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
@@ -914,17 +915,18 @@ const CONTEXT_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
   // All 4 DB queries run in parallel (Promise.allSettled) and the result is
   // cached per project for CONTEXT_CACHE_TTL_MS so subsequent messages are
   // instant — no DB round-trips at send time.
-  const fetchProjectContext = useCallback(async (projectId: string): Promise<{ schemas: any[]; knowledge: string[] }> => {
+  const fetchProjectContext = useCallback(async (projectId: string): Promise<{ schemas: any[]; knowledge: string[]; irContext: string }> => {
     const cache = projectContextCacheRef.current;
     if (cache && cache.projectId === projectId && (Date.now() - cache.fetchedAt) < CONTEXT_CACHE_TTL_MS) {
-      return { schemas: cache.schemas, knowledge: cache.knowledge };
+      return { schemas: cache.schemas, knowledge: cache.knowledge, irContext: cache.irContext };
     }
 
-    const [schemasRes, knowledgeRes, decisionsRes, governanceRes] = await Promise.allSettled([
+    const [schemasRes, knowledgeRes, decisionsRes, governanceRes, irRes] = await Promise.allSettled([
       supabase.from("project_schemas" as any).select("collection_name, schema").eq("project_id", projectId),
       supabase.from("project_knowledge" as any).select("title, content").eq("project_id", projectId).eq("is_active", true),
       supabase.from("project_decisions" as any).select("category, title, description").eq("project_id", projectId).eq("is_active", true),
       supabase.from("project_governance_rules" as any).select("category, name, description, severity").eq("project_id", projectId).eq("is_active", true),
+      supabase.from("projects").select("ir_state").eq("id", projectId).single(),
     ]);
 
     const schemas = schemasRes.status === "fulfilled" ? (schemasRes.value.data || []) : [];
@@ -945,8 +947,15 @@ const CONTEXT_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
       });
     }
 
-    projectContextCacheRef.current = { projectId, schemas, knowledge, fetchedAt: Date.now() };
-    return { schemas, knowledge };
+    // Serialize IR state if present
+    let irContext = "";
+    if (irRes.status === "fulfilled" && irRes.value.data) {
+      const { serializeIR } = await import("@/lib/irSerializer");
+      irContext = serializeIR((irRes.value.data as any).ir_state);
+    }
+
+    projectContextCacheRef.current = { projectId, schemas, knowledge, irContext, fetchedAt: Date.now() };
+    return { schemas, knowledge, irContext };
   }, []);
 
   // Prefetch context when a project is loaded — so the FIRST message has zero DB wait
@@ -1177,7 +1186,7 @@ const CONTEXT_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
 
     try {
       // ─── Context: served from in-memory cache (populated at project load) ───────
-      const { schemas, knowledge } = await fetchProjectContext(currentProject.id);
+      const { schemas, knowledge, irContext } = await fetchProjectContext(currentProject.id);
 
       // ─── Current code context: smart file prioritization ─────────────────────
       // FIX: For brand new projects (no prior messages), don't send stale sandpack files
@@ -1282,6 +1291,7 @@ const CONTEXT_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
               knowledge,
               currentCode: currentCodeSummary || undefined,
               snippetsContext: snippetsContext || undefined,
+              irContext: irContext || undefined,
               retryContext,
               onDelta: (chunk) => {
                 retryFullResponse += chunk;
@@ -1390,6 +1400,7 @@ const CONTEXT_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
               knowledge,
               currentCode: currentCodeSummary || undefined,
               snippetsContext: snippetsContext || undefined,
+              irContext: irContext || undefined,
               onDelta: (chunk) => {
                 retryFullResponse += chunk;
                 setBuildStreamContent(retryFullResponse);
@@ -1675,9 +1686,10 @@ ${Object.entries(files).map(([path, code]) => `--- ${path}\n${code}`).join("\n\n
               projectId: buildProjectId,
               techStack: currentProject.tech_stack || "react-cdn",
               schemas,
-              model: "google/gemini-3-flash-preview", // Use fastest model for polish
+              model: "google/gemini-3-flash-preview",
               designTheme: themeInfo?.prompt,
               templateContext: templateCtx || undefined,
+              irContext: irContext || undefined,
               onDelta: upsert,
               onDone: async (responseText) => {
                 // Parse and apply the polished files — but validate first
@@ -1823,6 +1835,7 @@ ${Object.entries(files).map(([path, code]) => `--- ${path}\n${code}`).join("\n\n
             knowledge,
             templateContext: templateCtx || undefined,
             snippetsContext: snippetsContext || undefined,
+            irContext: irContext || undefined,
             onDelta: upsert,
             onDone: handleOnDone,
             onError: handleOnError,

@@ -738,6 +738,7 @@ export type Database = {
           created_at: string
           html_content: string
           id: string
+          ir_state: Json
           is_published: boolean
           name: string
           published_slug: string | null
@@ -750,6 +751,7 @@ export type Database = {
           created_at?: string
           html_content?: string
           id?: string
+          ir_state?: Json
           is_published?: boolean
           name?: string
           published_slug?: string | null
@@ -762,6 +764,7 @@ export type Database = {
           created_at?: string
           html_content?: string
           id?: string
+          ir_state?: Json
           is_published?: boolean
           name?: string
           published_slug?: string | null

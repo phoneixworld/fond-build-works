@@ -4,7 +4,7 @@ import {
   ResizablePanel,
   ResizablePanelGroup,
 } from "@/components/ui/resizable";
-import { Code, Eye, Cloud, Clock, Brain, Activity, Users, Palette, FlaskConical, Puzzle, Tag, GitBranch, Globe, ListChecks, Shield, Search } from "lucide-react";
+import { Code, Eye, Cloud, Clock, Brain, Activity, Users, Palette, FlaskConical, Puzzle, Tag, GitBranch, Globe, ListChecks, Shield, Search, Layers } from "lucide-react";
 import { forwardRef } from "react";
 import { PreviewProvider } from "@/contexts/PreviewContext";
 import { VirtualFSProvider } from "@/contexts/VirtualFSContext";
@@ -27,6 +27,7 @@ import CustomDomainPanel from "@/components/CustomDomainPanel";
 import PlanningPanel from "@/components/PlanningPanel";
 import CodeQualityPanel from "@/components/CodeQualityPanel";
 import SemanticSearchPanel from "@/components/SemanticSearchPanel";
+import IREditor from "@/components/IREditor";
 import LandingPage from "@/components/LandingPage";
 import CommandPalette from "@/components/CommandPalette";
 import VersionHistory, { Version } from "@/components/VersionHistory";
@@ -57,6 +58,7 @@ const PRIMARY_TABS = [
 ];
 
 const SECONDARY_TABS = [
+  { id: "ir" as PanelId, label: "Intent", icon: Layers },
   { id: "planning" as PanelId, label: "Planner", icon: ListChecks },
   { id: "quality" as PanelId, label: "Quality", icon: Shield },
   { id: "search" as PanelId, label: "Search", icon: Search },
@@ -74,6 +76,7 @@ const SECONDARY_TABS = [
 const PANEL_COMPONENTS: Record<string, React.FC<any>> = {
   code: CodeEditor,
   cloud: CloudPanel,
+  ir: IREditor,
   quality: CodeQualityPanel,
   search: SemanticSearchPanel,
   brain: ProjectBrain,

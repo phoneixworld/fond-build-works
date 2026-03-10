@@ -181,7 +181,7 @@ serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
-    const { messages, project_id, tech_stack, schemas, model, design_theme, knowledge, template_context, current_code, snippets_context, retry_context, max_tokens: requestedMaxTokens, task_type } = await req.json();
+    const { messages, project_id, tech_stack, schemas, model, design_theme, knowledge, template_context, current_code, snippets_context, retry_context, max_tokens: requestedMaxTokens, task_type, ir_context } = await req.json();
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY is not configured");
 
@@ -192,6 +192,9 @@ serve(async (req) => {
 
     if (template_context) {
       systemPrompt += `\n\n## TEMPLATE CONTEXT\n${template_context}`;
+    }
+    if (ir_context) {
+      systemPrompt += ir_context;
     }
     if (current_code) {
       systemPrompt += `\n\n## CURRENT CODE (modify/extend — do NOT regenerate unchanged files)\n${current_code}`;

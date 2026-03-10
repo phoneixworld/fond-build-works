@@ -12,6 +12,7 @@ export interface Project {
   tech_stack: TechStackId;
   is_published: boolean;
   published_slug: string | null;
+  ir_state: Record<string, any>;
   updated_at: string;
   created_at: string;
 }
