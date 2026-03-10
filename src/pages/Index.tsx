@@ -236,7 +236,8 @@ const IDELayout = () => {
           getLockOwner={getLockOwner}
         />
 
-        <div className="flex-1 overflow-hidden">
+        <div className="flex-1 overflow-hidden group/resize">
+          <style>{`.group\\/resize:has([data-resize-handle-active]) iframe { pointer-events: none !important; }`}</style>
           <ResizablePanelGroup direction="horizontal">
             {layoutSwapped ? (
               <>
