@@ -11,8 +11,6 @@ import {
 
 const VIEWPORTS = [
   { id: "desktop" as const, label: "Desktop", icon: Monitor },
-const VIEWPORTS = [
-  { id: "desktop" as const, label: "Desktop", icon: Monitor },
   { id: "tablet" as const, label: "Tablet", icon: Tablet },
   { id: "mobile" as const, label: "Mobile", icon: Smartphone },
 ];
