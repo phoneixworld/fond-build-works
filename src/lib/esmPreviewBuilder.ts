@@ -138,16 +138,9 @@ function rewriteToRegistry(
   // Strip CSS imports (single and multi-line)
   code = code.replace(/import\s+['"][^'"]*\.css['"]\s*;?/g, "");
 
-  // 1) Rewrite: import "specifier" (side-effect)
-  code = code.replace(
-    /import\s+['"]([^'"]+)['"]\s*;?/g,
-    (_match, spec: string) => {
-      const resolved = resolveSpec(spec, filePath, fileSet);
-      return `await __import__("${resolved}");`;
-    }
-  );
+  // Order matters: most specific patterns first, side-effect last
 
-  // 2) Rewrite: import * as X from "specifier"
+  // 1) import * as X from "specifier"
   code = code.replace(
     /import\s+\*\s+as\s+(\w+)\s+from\s+['"]([^'"]+)['"]\s*;?/g,
     (_match, ns: string, spec: string) => {
@@ -156,9 +149,7 @@ function rewriteToRegistry(
     }
   );
 
-  // 3) Rewrite: import Default, { Named as Alias, ... } from "specifier"
-  //    and:     import { Named } from "specifier"
-  //    and:     import Default from "specifier"
+  // 2) import Default, { Named as Alias, ... } from "specifier"
   code = code.replace(
     /import\s+([\w$]+)\s*,\s*\{([^}]*)\}\s*from\s+['"]([^'"]+)['"]\s*;?/g,
     (_match, def: string, named: string, spec: string) => {
@@ -169,7 +160,7 @@ function rewriteToRegistry(
     }
   );
 
-  // import { Named } from "specifier"
+  // 3) import { Named } from "specifier"
   code = code.replace(
     /import\s+\{([^}]*)\}\s*from\s+['"]([^'"]+)['"]\s*;?/g,
     (_match, named: string, spec: string) => {
@@ -180,13 +171,22 @@ function rewriteToRegistry(
     }
   );
 
-  // import Default from "specifier"
+  // 4) import Default from "specifier"
   code = code.replace(
     /import\s+([\w$]+)\s+from\s+['"]([^'"]+)['"]\s*;?/g,
     (_match, def: string, spec: string) => {
       const resolved = resolveSpec(spec, filePath, fileSet);
       const tmp = `__m${uid()}`;
       return `const ${tmp} = await __import__("${resolved}");\nconst ${def} = ${tmp}.default !== undefined ? ${tmp}.default : ${tmp};`;
+    }
+  );
+
+  // 5) Side-effect: import "specifier" (LAST — so it doesn't eat other patterns)
+  code = code.replace(
+    /import\s+['"]([^'"]+)['"]\s*;?/g,
+    (_match, spec: string) => {
+      const resolved = resolveSpec(spec, filePath, fileSet);
+      return `await __import__("${resolved}");`;
     }
   );
 
