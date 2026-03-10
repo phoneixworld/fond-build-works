@@ -588,7 +588,7 @@ Deno.serve(async (req) => {
 
       // Compile build readiness
       const readiness = compileBuildReadiness(irState || {}, allReqs || [], mergedNormalized);
-      await supabase
+      const { error: readinessError } = await supabase
         .from("project_build_readiness")
         .upsert({
           project_id: projectId,
@@ -603,6 +603,9 @@ Deno.serve(async (req) => {
           recommendation: readiness.recommendation,
           updated_at: new Date().toISOString(),
         }, { onConflict: "project_id" });
+      if (readinessError) {
+        console.error("[conversation-engine] Build readiness upsert error:", JSON.stringify(readinessError));
+      }
 
       // Audit log
       await supabase
