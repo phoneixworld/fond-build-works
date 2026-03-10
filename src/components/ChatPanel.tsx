@@ -338,7 +338,23 @@ const ChatPanel = forwardRef<ChatPanelHandle, { initialPrompt?: string; onVersio
   // Project switch
   useEffect(() => {
     if (currentProject && currentProject.id !== lastProjectIdRef.current) {
+      // CRITICAL: Set lastProjectIdRef FIRST to block any in-flight build callbacks
+      // from the previous project before doing anything else
+      const previousProjectId = lastProjectIdRef.current;
       lastProjectIdRef.current = currentProject.id;
+      
+      // Abort any in-flight builds from previous project
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+        abortControllerRef.current = null;
+      }
+      isSendingRef.current = false;
+      isLoadingRef.current = false;
+      
+      // Force stop building state to prevent stale callbacks
+      setIsBuilding(false);
+      setBuildStep("");
+      
       // Use chat_history from project object as initial value
       const history = Array.isArray(currentProject.chat_history) ? currentProject.chat_history : [];
       setMessages(history);
@@ -367,11 +383,6 @@ const ChatPanel = forwardRef<ChatPanelHandle, { initialPrompt?: string; onVersio
 
       // Restore conversation state from server (durable, cross-device)
       conversationState.restoreFromServer(currentProject.id);
-      if (abortControllerRef.current) {
-        abortControllerRef.current.abort();
-        abortControllerRef.current = null;
-      }
-      isSendingRef.current = false;
 
       // Restore persisted sandpack state
       const restoreProjectId = currentProject.id;
