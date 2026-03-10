@@ -35,11 +35,13 @@ import SecurityDashboard from "./cloud/SecurityDashboard";
 import CloudEmail from "./cloud/CloudEmail";
 import AndroidExport from "./cloud/AndroidExport";
 import BuildPipeline from "./cloud/BuildPipeline";
+import CICDPipeline from "./cloud/CICDPipeline";
 
 const PREMIUM_SECTIONS = new Set(["environments"]);
 
 const CLOUD_SECTIONS = [
   { id: "overview", label: "Overview", icon: LayoutDashboard },
+  { id: "cicd", label: "CI/CD", icon: GitBranch },
   { id: "builds", label: "Build Pipeline", icon: Hammer },
   { id: "environments", label: "Environments", icon: Rocket },
   { id: "security", label: "Security", icon: ShieldAlert },
