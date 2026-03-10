@@ -478,6 +478,7 @@ ${DIRECT_TOUCH_SCRIPT}
         </div>
       )}
     </div>
+    </TooltipProvider>
   );
 };
 
