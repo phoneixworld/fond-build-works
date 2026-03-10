@@ -115,7 +115,7 @@ function getDir(filePath: string): string {
 export function buildIncrementalContext(
   task: PlanTask,
   accumulatedFiles: Record<string, string>,
-  budgetChars = 16000
+  budgetChars = 48000 // FIX 3: Increased from 16KB to 48KB — subsequent tasks MUST see prior modules
 ): string {
   const allPaths = Object.keys(accumulatedFiles);
   if (allPaths.length === 0) return "";

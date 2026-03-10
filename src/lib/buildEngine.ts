@@ -831,6 +831,8 @@ async function runPlannedBuild(
         }
       }
 
+      // FIX 3: Show task what exists in the workspace so it can import from prior modules
+      const existingFileList = Object.keys(accumulatedFiles).join("\n");
       const taskPrompt = `## TASK: ${task.title}
 ## TASK TYPE: ${taskType}
 
@@ -840,21 +842,29 @@ ${domainContext}
 ## FILES TO CREATE/MODIFY:
 ${task.filesAffected.map(f => `- ${f}`).join("\n")}
 
+## EXISTING WORKSPACE FILES (import from these — do NOT recreate):
+${existingFileList}
+
 ## IMPORTANT RULES:
 - Generate ONLY the files listed above (plus /App.jsx if routes need updating)
+- IMPORT from existing workspace files above — they are already built
 - Make sure imports reference existing component files correctly
 - If updating /App.jsx, KEEP ALL existing routes and imports — only ADD new ones
 - Output complete, working code in \`\`\`react-preview fences
 - NO descriptions, NO planning text — ONLY code
 - For frontend tasks: Import data from /data/ and hooks from /hooks/ — do NOT hardcode mock data in pages
 - If /hooks/use<Entity>.js exists, IMPORT from it. Do NOT recreate data hooks in pages.
-- If /data/<collection>.js exists, do NOT create inline mock arrays.`;
+- If /data/<collection>.js exists, do NOT create inline mock arrays.
+- Reference entities, types, and constants from prior modules — do NOT redefine them.`;
 
       try {
+        // FIX 3: Pass full accumulated code (with increased 48KB budget) so task sees prior modules
         const codeContext = buildIncrementalContext(task, accumulatedFiles);
         const { reductionPercent } = contextReductionRatio(task, accumulatedFiles);
-        if (reductionPercent > 0) console.log(`[BuildEngine] Task "${task.title}" context reduced by ${reductionPercent}%`);
-        const taskResult = await executeSingleTask(taskPrompt, config, codeContext, callbacks.onDelta, 0, 16000, taskType);
+        if (reductionPercent > 0) console.log(`[BuildEngine] Task "${task.title}" context reduced by ${reductionPercent}% (budget: 48KB)`);
+        // Scale max tokens based on task complexity — complex tasks need more output room
+        const taskMaxTokens = taskType === "frontend" ? 24000 : 16000;
+        const taskResult = await executeSingleTask(taskPrompt, config, codeContext, callbacks.onDelta, 0, taskMaxTokens, taskType);
         
         const totalSize = Object.values(taskResult.files).reduce((s, c) => s + c.length, 0);
         completeTask(taskMet, {
