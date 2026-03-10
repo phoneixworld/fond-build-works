@@ -323,6 +323,14 @@ FEATURES: Conversation list, send/receive messages, online indicators, user prof
  * Match a user prompt to the best template
  */
 export function matchTemplate(prompt: string): PageTemplate | null {
+  // Guard: Long prompts (>3000 chars) are requirement documents, not simple build requests.
+  // They match too many keywords falsely (e.g. "platform", "system", "page" all appear in specs).
+  if (prompt.length > 3000) return null;
+
+  // Guard: Detect requirement-document patterns (numbered sections, table of contents, etc.)
+  const reqDocPatterns = /\b(table of contents|functional requirement|system overview|roles and responsibilities|section \d|^\d+\.\d+\s)/im;
+  if (reqDocPatterns.test(prompt)) return null;
+
   const lower = prompt.toLowerCase();
   
   let bestMatch: PageTemplate | null = null;
@@ -334,7 +342,7 @@ export function matchTemplate(prompt: string): PageTemplate | null {
     // Check keyword matches
     for (const keyword of template.keywords) {
       if (lower.includes(keyword)) {
-        score += keyword.length > 4 ? 3 : 2; // Longer keywords score higher
+        score += keyword.length > 4 ? 3 : 2;
       }
     }
     
