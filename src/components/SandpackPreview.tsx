@@ -164,9 +164,17 @@ function sanitizeImports(code: string, filePath: string): string {
     (match, pkg) => isAllowedPkg(pkg) ? match : `undefined /* BLOCKED: ${pkg} */`
   );
 
-  // Final safety: if code is obviously broken (truncated/malformed), replace with stub
-  if (!quickSyntaxCheck(code)) {
-    console.warn(`[SandpackPreview] Broken syntax detected in ${filePath}, using safe stub`);
+  // Final safety: use Sucrase to actually parse the code — catches real syntax errors
+  // that would crash Sandpack's bundler with "Cannot assign to read only property 'message'"
+  try {
+    transform(code, {
+      transforms: ["jsx"],
+      jsxRuntime: "automatic",
+      production: true,
+    });
+  } catch {
+    // Sucrase failed — code has real syntax errors, use stub
+    console.warn(`[SandpackPreview] Syntax error in ${filePath}, using safe stub`);
     return makeSafeStub(filePath);
   }
 
