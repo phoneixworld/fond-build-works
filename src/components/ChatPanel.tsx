@@ -648,6 +648,18 @@ const ChatPanel = forwardRef<ChatPanelHandle, { initialPrompt?: string; onVersio
             />
           )}
 
+          {/* Build Completion Card */}
+          {!isLoading && pipelineStep === "complete" && conversationState.lastBuildResult && (
+            <BuildCompletionCard
+              result={conversationState.lastBuildResult}
+              phases={conversationState.phases.length > 0 ? conversationState.phases : undefined}
+              onViewPreview={() => {
+                const event = new CustomEvent("switch-panel", { detail: "preview" });
+                window.dispatchEvent(event);
+              }}
+            />
+          )}
+
           {/* Follow-up questions UI */}
           <AnimatePresence>
             {followUpQuestions.length > 0 && (
