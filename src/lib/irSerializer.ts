@@ -136,8 +136,8 @@ RULES:
 
 // ─── Auth Serialization ───────────────────────────────────────────────────
 
-function serializeAuth(auth: IRAuthConfig): string {
-  if (!auth.enabled) return "";
+function serializeAuth(auth: IRAuthConfig | undefined | null): string {
+  if (!auth || !auth.enabled) return "";
 
   let section = `## AUTHENTICATION & AUTHORIZATION (MANDATORY)
 - Provider: ${auth.provider}
