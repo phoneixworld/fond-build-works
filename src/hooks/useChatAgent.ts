@@ -2,16 +2,18 @@
  * useChatAgent — Chat-only agent flow (no code generation).
  * Extracted from useBuildOrchestration to reduce monolith complexity.
  *
- * Handles streaming chat responses, build confirmation detection,
- * and message persistence.
+ * Now uses enterprise-grade 3-layer semantic cache:
+ * L1: In-memory TF-IDF corpus (<1ms)
+ * L2: DB-backed cache via cache-proxy (5-20ms)
+ * L3: AI gateway call (200-2000ms, cached on response)
  */
 
 import { useCallback } from "react";
-import { streamChatAgent, hasBuildConfirmation, stripBuildMarker } from "@/lib/agentPipeline";
+import { hasBuildConfirmation, stripBuildMarker } from "@/lib/agentPipeline";
 import type { PipelineStep } from "@/lib/agentPipeline";
 import { supabase } from "@/integrations/supabase/client";
 import { type MsgContent, getTextContent } from "@/lib/codeParser";
-import { semanticCacheGet, semanticCacheSet } from "@/lib/semanticCache";
+import { streamThroughCacheProxy, type CacheHitResult } from "@/lib/semanticCache";
 
 type Msg = { role: "user" | "assistant"; content: MsgContent; timestamp?: number };
 
@@ -70,49 +72,56 @@ export function useChatAgent(config: ChatAgentConfig) {
       knowledge = (data || []).map((k: any) => `[${k.title}]: ${k.content}`);
     } catch {}
 
-    // ─── Semantic Cache Check ─────────────────────────────────────────
     const userText = typeof text === "string" ? text : "";
-    const cacheContext = knowledge.join("|").slice(0, 500);
-    
-    if (currentProject.id && userText.length > 5) {
-      try {
-        const cached = await semanticCacheGet(currentProject.id, userText, cacheContext);
-        if (cached.hit && cached.response) {
-          console.log(`[ChatAgent] Semantic cache ${cached.matchType} hit — saved ~${cached.tokensSaved} tokens`);
-          const displayText = stripBuildMarker(cached.response);
-          setMessages((prev) => [...prev, { role: "assistant", content: `${displayText}\n\n_⚡ Cached response_`, timestamp: Date.now() }]);
-          setIsLoading(false);
-          setBuildStep("");
-          setPipelineStep("complete");
-          setCurrentAgent(null);
-          isSendingRef.current = false;
 
-          if (hasBuildConfirmation(cached.response)) {
-            setPendingBuildPrompt(userText);
-          }
+    // Helper to finalize
+    const finalize = (responseText: string, isCached: boolean, cacheInfo?: CacheHitResult) => {
+      setIsLoading(false);
+      setBuildStep("");
+      setPipelineStep("complete");
+      setCurrentAgent(null);
+      isSendingRef.current = false;
 
-          // Persist
-          setMessages((prev) => {
-            const persistMessages = prev.map(m => ({
-              role: m.role,
-              content: typeof m.content === "string" ? m.content : getTextContent(m.content),
-            }));
-            saveProject({ chat_history: persistMessages });
-            return prev;
-          });
-          return;
-        }
-      } catch (e) {
-        console.warn("[ChatAgent] Semantic cache check failed:", e);
+      if (hasBuildConfirmation(responseText)) {
+        setPendingBuildPrompt(userText);
       }
-    }
 
-    // ─── Stream from AI ───────────────────────────────────────────────
-    await streamChatAgent({
+      const displayText = stripBuildMarker(responseText);
+      const cacheTag = isCached && cacheInfo
+        ? `\n\n_⚡ ${cacheInfo.layer} cache ${cacheInfo.matchType} hit (${(cacheInfo.similarity * 100).toFixed(0)}% match)_`
+        : "";
+
+      setMessages((prev) => {
+        const withResponse = [...prev];
+        const lastIdx = withResponse.length - 1;
+        if (lastIdx >= 0 && withResponse[lastIdx].role === "assistant") {
+          withResponse[lastIdx] = { ...withResponse[lastIdx], content: displayText + cacheTag };
+        } else {
+          withResponse.push({ role: "assistant", content: displayText + cacheTag, timestamp: Date.now() });
+        }
+
+        const persistMessages = withResponse.map(m => ({
+          role: m.role,
+          content: typeof m.content === "string" ? m.content : getTextContent(m.content),
+        }));
+        saveProject({ chat_history: persistMessages });
+        return withResponse;
+      });
+    };
+
+    // Stream through the 3-layer cache proxy
+    await streamThroughCacheProxy({
       messages: apiMessages,
       projectId: currentProject.id,
       techStack: currentProject.tech_stack || "react-cdn",
       knowledge,
+      onCacheHit: (result) => {
+        console.log(`[ChatAgent] Cache hit: ${result.layer} ${result.matchType} (${(result.similarity * 100).toFixed(1)}%)`);
+        setBuildStep(`⚡ ${result.layer} cache hit`);
+        if (result.response) {
+          finalize(result.response, true, result);
+        }
+      },
       onDelta: (chunk) => {
         fullChatResponse += chunk;
         const displayText = stripBuildMarker(fullChatResponse);
@@ -125,37 +134,10 @@ export function useChatAgent(config: ChatAgentConfig) {
         });
       },
       onDone: (finalText) => {
-        setIsLoading(false);
-        setBuildStep("");
-        setPipelineStep("complete");
-        setCurrentAgent(null);
-        isSendingRef.current = false;
-
-        if (hasBuildConfirmation(finalText)) {
-          const userText = typeof text === "string" ? text : "";
-          setPendingBuildPrompt(userText);
+        if (fullChatResponse) {
+          // Only finalize if we got streaming data (cache hits finalize in onCacheHit)
+          finalize(finalText, false);
         }
-
-        // Cache the response for future use
-        if (currentProject.id && userText.length > 5) {
-          const estimatedTokens = Math.round(finalText.length / 4);
-          semanticCacheSet(
-            currentProject.id, userText, finalText, "chat-agent", estimatedTokens, cacheContext
-          ).catch(() => {});
-        }
-
-        const displayText = stripBuildMarker(finalText);
-        setMessages((prev) => {
-          const final = prev.map((m, i) =>
-            i === prev.length - 1 && m.role === "assistant" ? { ...m, content: displayText } : m
-          );
-          const persistMessages = final.map(m => ({
-            role: m.role,
-            content: typeof m.content === "string" ? m.content : getTextContent(m.content),
-          }));
-          saveProject({ chat_history: persistMessages });
-          return final;
-        });
       },
       onError: (err) => {
         setMessages((prev) => [...prev, { role: "assistant", content: `⚠️ ${err}`, timestamp: Date.now() }]);
