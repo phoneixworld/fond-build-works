@@ -226,12 +226,14 @@ const IDEHeader = ({
                     )}
                   </button>
                 </TooltipTrigger>
-                {locked && lockOwner && (
+                {locked && lockOwner ? (
                   <TooltipContent side="bottom" className="text-xs">
                     <Lock className="w-3 h-3 inline mr-1" />
                     {lockOwner.email.split("@")[0]} is editing
                   </TooltipContent>
-                )}
+                ) : tab.iconOnly ? (
+                  <TooltipContent side="bottom" className="text-xs">{tab.label}</TooltipContent>
+                ) : null}
               </Tooltip>
             );
           })}
