@@ -167,17 +167,49 @@ function sanitizeImports(code: string, filePath: string): string {
   return code;
 }
 
-const DEFAULT_APP = `import React from "react";
+const DEFAULT_APP = `import React, { useState, useEffect } from "react";
 
 export default function App() {
+  const [dots, setDots] = useState("");
+  const [step, setStep] = useState(0);
+  const steps = [
+    "Initializing workspace",
+    "Analyzing requirements",
+    "Generating components",
+    "Assembling application"
+  ];
+
+  useEffect(() => {
+    const dotTimer = setInterval(() => setDots(d => d.length >= 3 ? "" : d + "."), 500);
+    const stepTimer = setInterval(() => setStep(s => (s + 1) % 4), 3000);
+    return () => { clearInterval(dotTimer); clearInterval(stepTimer); };
+  }, []);
+
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50">
-      <div className="text-center space-y-4">
-        <div className="w-16 h-16 mx-auto rounded-2xl bg-gradient-to-br from-indigo-500 to-pink-500 flex items-center justify-center">
-          <span className="text-2xl font-bold text-white">L</span>
+    <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", background: "linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #0f172a 100%)", fontFamily: "'Inter', system-ui, sans-serif" }}>
+      <div style={{ textAlign: "center", maxWidth: 420, padding: "0 24px" }}>
+        <div style={{ position: "relative", width: 72, height: 72, margin: "0 auto 32px" }}>
+          <div style={{ width: 72, height: 72, borderRadius: 20, background: "linear-gradient(135deg, #6366f1, #a855f7, #ec4899)", display: "flex", alignItems: "center", justifyContent: "center", boxShadow: "0 0 40px rgba(99,102,241,0.3)", animation: "pulse 2s ease-in-out infinite" }}>
+            <span style={{ fontSize: 28, fontWeight: 800, color: "#fff", letterSpacing: -1 }}>P</span>
+          </div>
+          <div style={{ position: "absolute", inset: -4, borderRadius: 24, border: "2px solid rgba(99,102,241,0.2)", animation: "spin 8s linear infinite" }} />
         </div>
-        <h1 className="text-2xl font-bold text-gray-900">Welcome to Your App</h1>
-        <p className="text-sm text-gray-500">Start building by chatting with the AI assistant</p>
+        <h1 style={{ fontSize: 22, fontWeight: 700, color: "#f1f5f9", margin: "0 0 8px", letterSpacing: "-0.02em" }}>Phoneix is building your app</h1>
+        <p style={{ fontSize: 14, color: "#64748b", margin: "0 0 32px" }}>Sit back while we craft something amazing</p>
+        <div style={{ background: "rgba(255,255,255,0.05)", borderRadius: 12, padding: "16px 20px", border: "1px solid rgba(255,255,255,0.08)" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <div style={{ width: 8, height: 8, borderRadius: "50%", background: "#6366f1", animation: "pulse 1.5s ease-in-out infinite" }} />
+            <span style={{ fontSize: 13, color: "#94a3b8", fontWeight: 500 }}>{steps[step]}{dots}</span>
+          </div>
+          <div style={{ marginTop: 12, height: 3, background: "rgba(255,255,255,0.06)", borderRadius: 2, overflow: "hidden" }}>
+            <div style={{ height: "100%", background: "linear-gradient(90deg, #6366f1, #a855f7)", borderRadius: 2, animation: "loading 2s ease-in-out infinite", width: "60%" }} />
+          </div>
+        </div>
+        <style>{\`
+          @keyframes pulse { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: 0.85; transform: scale(0.97); } }
+          @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+          @keyframes loading { 0% { width: 10%; opacity: 0.5; } 50% { width: 70%; opacity: 1; } 100% { width: 10%; opacity: 0.5; } }
+        \`}</style>
       </div>
     </div>
   );
