@@ -390,8 +390,13 @@ interface SandpackPreviewProps {
 
 const SandpackPreview = ({ viewport, showConsole = false, initialPath }: SandpackPreviewProps) => {
   const { sandpackFiles, sandpackDeps } = usePreview();
+  const { currentProject } = useProjects();
 
-  const files = useMemo(() => buildSandpackFiles(sandpackFiles), [sandpackFiles]);
+  const projectId = currentProject?.id || "";
+  const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || "";
+  const supabaseKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY || "";
+
+  const files = useMemo(() => buildSandpackFiles(sandpackFiles, projectId, supabaseUrl, supabaseKey), [sandpackFiles, projectId, supabaseUrl, supabaseKey]);
 
   // Content-based key: remount only when file contents actually change
   const stableKey = useMemo(() => contentHash(sandpackFiles), [sandpackFiles]);
