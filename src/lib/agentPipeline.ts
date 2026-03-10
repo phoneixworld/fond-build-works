@@ -232,12 +232,26 @@ async function readSSEStream(
   const decoder = new TextDecoder();
   let buf = "";
   let fullText = "";
+  let rawAccumulated = "";
   let done = false;
+  let hasReceivedSSEData = false;
+  let chunkCount = 0;
+
+  // Timeout: if no SSE data received within 60s, abort
+  const timeoutMs = 120_000;
+  const startTime = Date.now();
 
   while (!done) {
+    if (Date.now() - startTime > timeoutMs) {
+      console.warn("[readSSEStream] Timeout after 120s");
+      break;
+    }
     const { done: rd, value } = await reader.read();
     if (rd) break;
-    buf += decoder.decode(value, { stream: true });
+    const chunk = decoder.decode(value, { stream: true });
+    buf += chunk;
+    rawAccumulated += chunk;
+    chunkCount++;
 
     let idx: number;
     while ((idx = buf.indexOf("\n")) !== -1) {
@@ -250,16 +264,51 @@ async function readSSEStream(
       if (json === "[DONE]") { done = true; break; }
       try {
         const parsed = JSON.parse(json);
+        // Check for error in SSE payload
+        if (parsed.error) {
+          console.error("[readSSEStream] AI gateway error in SSE:", parsed.error);
+          const errMsg = typeof parsed.error === "string" ? parsed.error : parsed.error.message || JSON.stringify(parsed.error);
+          fullText += `\n[AI Error: ${errMsg}]`;
+          onDelta(`\n[AI Error: ${errMsg}]`);
+          done = true;
+          break;
+        }
         const content = parsed.choices?.[0]?.delta?.content;
         if (content) {
+          hasReceivedSSEData = true;
           fullText += content;
           onDelta(content);
+        }
+        // Check for finish_reason
+        const finishReason = parsed.choices?.[0]?.finish_reason;
+        if (finishReason && finishReason !== "stop") {
+          console.warn(`[readSSEStream] Model finished with reason: ${finishReason}`);
         }
       } catch {
         buf = line + "\n" + buf;
         break;
       }
     }
+  }
+
+  // If no SSE data was extracted, try parsing raw as JSON error
+  if (!hasReceivedSSEData && rawAccumulated.trim().length > 0) {
+    console.warn(`[readSSEStream] No SSE content extracted from ${chunkCount} chunks (${rawAccumulated.length} bytes). First 500 chars:`, rawAccumulated.slice(0, 500));
+    try {
+      const errorJson = JSON.parse(rawAccumulated.trim());
+      if (errorJson.error) {
+        const errMsg = typeof errorJson.error === "string" ? errorJson.error : errorJson.error.message || JSON.stringify(errorJson.error);
+        console.error("[readSSEStream] AI gateway returned JSON error:", errMsg);
+        fullText = `[AI Error: ${errMsg}]`;
+      }
+    } catch {
+      // Not JSON either — log raw response
+      console.warn("[readSSEStream] Raw non-SSE response:", rawAccumulated.slice(0, 1000));
+    }
+  }
+
+  if (fullText.length === 0) {
+    console.error(`[readSSEStream] Empty response after reading ${chunkCount} chunks`);
   }
 
   return fullText;
