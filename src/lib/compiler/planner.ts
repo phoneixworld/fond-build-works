@@ -35,25 +35,22 @@ export function planTaskGraph(ctx: BuildContext): TaskGraph {
   });
   tasks.push(infraTask);
 
-  // ── Pass 2: Auth (if needed) ──────────────────────────────────────
+  // ── Pass 2: Auth (always generated — build prompt mandates AuthContext) ──
 
-  let authTaskId: string | undefined;
-  if (ir.constraints.includes("auth_required") || ir.roles.length > 0) {
-    const authTask = createTask({
-      label: "auth",
-      type: "frontend",
-      description: `Auth system with roles: ${ir.roles.map(r => r.name).join(", ") || "user"}`,
-      produces: [
-        "/contexts/AuthContext.jsx",
-        "/pages/Auth/LoginPage.jsx",
-        "/components/ProtectedRoute.jsx",
-      ],
-      dependsOn: [infraTask.id],
-      priority: 1,
-    });
-    tasks.push(authTask);
-    authTaskId = authTask.id;
-  }
+  const authTask = createTask({
+    label: "auth",
+    type: "frontend",
+    description: `Auth system with roles: ${ir.roles.map(r => r.name).join(", ") || "user"}. Must create AuthContext, LoginPage, and ProtectedRoute.`,
+    produces: [
+      "/contexts/AuthContext.jsx",
+      "/pages/Auth/LoginPage.jsx",
+      "/components/ProtectedRoute.jsx",
+    ],
+    dependsOn: [infraTask.id],
+    priority: 1,
+  });
+  tasks.push(authTask);
+  const authTaskId = authTask.id;
 
   // ── Pass 3: Data models / backend services ────────────────────────
 
@@ -67,7 +64,7 @@ export function planTaskGraph(ctx: BuildContext): TaskGraph {
         `/hooks/use${entity.name}.jsx`,
         `/services/${entity.name.toLowerCase()}Service.js`,
       ],
-      dependsOn: authTaskId ? [infraTask.id, authTaskId] : [infraTask.id],
+      dependsOn: [infraTask.id, authTaskId],
       priority: 2,
     });
     tasks.push(modelTask);
@@ -82,7 +79,7 @@ export function planTaskGraph(ctx: BuildContext): TaskGraph {
 
     const deps = [...modelTaskIds];
     if (authTaskId && route.auth) deps.push(authTaskId);
-    if (deps.length === 0) deps.push(infraTask.id);
+    if (deps.length === 0) deps.push(infraTask.id, authTaskId);
 
     const pageTask = createTask({
       label: `page:${route.page}`,
@@ -103,7 +100,7 @@ export function planTaskGraph(ctx: BuildContext): TaskGraph {
     type: "frontend",
     description: `App.jsx with routing for: ${ir.routes.map(r => r.path).join(", ")}`,
     produces: ["/App.jsx"],
-    dependsOn: [...pageTaskIds, ...(authTaskId ? [authTaskId] : [])],
+    dependsOn: [...pageTaskIds, authTaskId],
     touches: ["/App.jsx"],
     priority: 4,
   });
