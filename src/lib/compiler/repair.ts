@@ -48,13 +48,24 @@ function issueToRepairAction(
         prompt: buildMissingFilePrompt(issue, workspace),
       };
 
-    case "broken_import":
+    case "broken_import": {
+      // Extract the missing target path from the issue message
+      const importMatch = issue.message.match(/Cannot resolve import '([^']+)'/);
+      if (importMatch) {
+        return {
+          type: "generate_missing_module",
+          targetFile: issue.file,
+          issue,
+          prompt: buildMissingFilePrompt(issue, workspace),
+        };
+      }
       return {
         type: "fix_import",
         targetFile: issue.file,
         issue,
         prompt: buildFixImportPrompt(issue, workspace),
       };
+    }
 
     case "syntax_error":
       return {
