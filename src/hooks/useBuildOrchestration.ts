@@ -114,14 +114,8 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
   const streamingControllerRef = useRef<StreamingPreviewController | null>(null);
   const lastProjectIdRef = useRef<string | null>(null);
 
-  // Keep lastProjectIdRef synced
-  useEffect(() => {
-    if (currentProject?.id) {
-      lastProjectIdRef.current = currentProject.id;
-    } else {
-      lastProjectIdRef.current = null;
-    }
-  }, [currentProject?.id]);
+  // NOTE: lastProjectIdRef is managed by ChatPanel's project-switch effect.
+  // Do NOT set it here — it would race with the restore logic.
 
   // Auto-clear safety timeout when isBuilding goes false
   useEffect(() => {
