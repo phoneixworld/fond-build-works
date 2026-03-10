@@ -154,10 +154,12 @@ const ChatPanel = forwardRef<ChatPanelHandle, { initialPrompt?: string; onVersio
         timestamp: Date.now(),
       };
       // Async server-side persist with image URLs for vision extraction
+      // NOTE: addPhase(text, hasImages, irState, imageUrls) — irState is 3rd, imageUrls is 4th
       conversationState.addPhase(text, hasImages, currentProject?.ir_state, imageUrls);
       return localPhase;
     },
-    conversationGetRequirements: conversationState.getRequirementsContextSync,
+    // Use async server-compiled requirements (with extracted image content) instead of sync fallback
+    conversationGetRequirements: () => conversationState.getRequirementsContextSync(),
     conversationStartBuilding: () => { conversationState.startBuilding(); },
     conversationCompleteBuild: conversationState.completeBuild,
     conversationGenerateAck: conversationState.generateAcknowledgment,

@@ -977,8 +977,14 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
         if (conversationMode === "gathering" || conversationMode === "ready") {
           console.log("[SmartSend] Building with accumulated requirements (server FSM approved)");
           conversationStartBuilding?.();
+          
+          // Get requirements — use sync fallback (server-compiled context was merged into phases during addPhase)
           const requirements = conversationGetRequirements?.() || "";
           const buildPrompt = requirements + "\n\n" + finalText;
+          
+          // Route model based on FULL build prompt (not just "build it")
+          console.log(`[SmartSend] Build prompt length: ${buildPrompt.length} chars`);
+          
           setCurrentAgent("build");
           setPipelineStep("planning");
           sendMessage(buildPrompt, images);
