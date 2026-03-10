@@ -93,6 +93,7 @@ function buildCodeContext(files: Record<string, string>, budgetChars = 16000): s
 function extractFilesFromOutput(text: string): Record<string, string> | null {
   const files: Record<string, string> = {};
   const separatorRegex = /^-{3}\s+(\/?\w[\w/.-]*\.(?:jsx?|tsx?|css))\s*-{0,3}\s*$/;
+  const depsSeparator = /^-{3}\s+dependencies\s*$/i;
 
   // Find code fence
   const fencePatterns = ["```react-preview", "```jsx-preview", "```react", "```jsx"];
@@ -122,9 +123,10 @@ function extractFilesFromOutput(text: string): Record<string, string> | null {
   const lines = block.split("\n");
   let currentFile: string | null = null;
   let currentLines: string[] = [];
+  let inDepsSection = false;
 
   function flush() {
-    if (currentFile) {
+    if (currentFile && !inDepsSection) {
       const code = currentLines.join("\n").trim();
       if (code.length > 0) {
         let fname = currentFile.startsWith("/") ? currentFile : `/${currentFile}`;
@@ -134,20 +136,25 @@ function extractFilesFromOutput(text: string): Record<string, string> | null {
     }
     currentFile = null;
     currentLines = [];
+    inDepsSection = false;
   }
 
   for (const line of lines) {
+    if (depsSeparator.test(line.trim())) {
+      flush();
+      inDepsSection = true;
+      continue;
+    }
     const match = line.trim().match(separatorRegex);
     if (match) {
       flush();
       currentFile = match[1];
       continue;
     }
-    if (currentFile) currentLines.push(line);
+    if (currentFile && !inDepsSection) currentLines.push(line);
   }
   flush();
 
-  // If no separators found, treat whole block as App.jsx
   if (Object.keys(files).length === 0 && block.trim().length > 20) {
     files["/App.jsx"] = block.trim();
   }
