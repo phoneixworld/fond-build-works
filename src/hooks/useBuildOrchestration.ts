@@ -2,9 +2,12 @@
  * useBuildOrchestration — Manages build engine invocation, streaming, retries, safety timeouts.
  * Extracted from ChatPanel to reduce monolith complexity.
  *
+ * Sub-hooks:
+ * - useChatAgent: chat-only agent flow (no code generation)
+ * - useInstantBuild: instant template detection, hydration, and AI polish
+ *
  * Responsibilities:
- * - sendMessage: core build agent flow (context fetch, streaming, onDone, retries, instant templates)
- * - sendChatMessage: chat-only agent (no code generation)
+ * - sendMessage: core build agent flow (context fetch, streaming, onDone, retries)
  * - handleSmartSend: intent routing (fast-classify → chat or build)
  * - clearChat: full state reset
  * - Safety timeout (300s)
@@ -12,7 +15,7 @@
  */
 
 import { useState, useRef, useEffect, useCallback } from "react";
-import { streamChatAgent, streamBuildAgent, validateReactCode, hasBuildConfirmation, stripBuildMarker, formatRetryContext, MAX_BUILD_RETRIES, type AgentIntent, type PipelineStep } from "@/lib/agentPipeline";
+import { streamBuildAgent, validateReactCode, formatRetryContext, MAX_BUILD_RETRIES, type AgentIntent, type PipelineStep } from "@/lib/agentPipeline";
 import { runBuildEngine, type EngineConfig, type EngineProgress } from "@/lib/buildEngine";
 import { matchTemplate, type PageTemplate } from "@/lib/pageTemplates";
 import { getSnippetsPromptContext } from "@/lib/componentSnippets";
@@ -28,6 +31,8 @@ import {
   postProcessHtml,
 } from "@/lib/codeParser";
 import { parseMultiFileOutput } from "@/contexts/VirtualFSContext";
+import { useChatAgent, type ChatAgentConfig } from "@/hooks/useChatAgent";
+import { useInstantBuild, type InstantBuildConfig } from "@/hooks/useInstantBuild";
 
 type Msg = { role: "user" | "assistant"; content: MsgContent; timestamp?: number };
 
@@ -125,17 +130,6 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
     }
   }, [isLoading]);
 
-  // Auto-trigger build agent when chat agent confirms a build
-  useEffect(() => {
-    if (pendingBuildPrompt && !isLoadingRef.current && !isSendingRef.current) {
-      const prompt = pendingBuildPrompt;
-      setPendingBuildPrompt(null);
-      setCurrentAgent("build");
-      setPipelineStep("planning");
-      sendMessage(prompt);
-    }
-  }, [pendingBuildPrompt]);
-
   const syncSandpackToVirtualFS = useCallback((sandpackFiles: Record<string, string>) => {
     const virtualFiles: Record<string, { path: string; content: string; language: string }> = {};
     for (const [path, content] of Object.entries(sandpackFiles)) {
@@ -161,6 +155,46 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
     return parts;
   }, []);
 
+  // ─── Shared error handler ───
+  const handleOnError = useCallback((err: string) => {
+    setMessages((prev) => [...prev, { role: "assistant" as const, content: `⚠️ ${err}`, timestamp: Date.now() }]);
+    setIsLoading(false);
+    setIsBuilding(false);
+    setBuildStep("");
+    setPipelineStep("error");
+    setCurrentAgent(null);
+    isSendingRef.current = false;
+    streamingControllerRef.current?.stop();
+    streamingControllerRef.current = null;
+  }, [setMessages, setIsBuilding, setBuildStep]);
+
+  // ─── Sub-hooks ───
+  const { sendChatMessage } = useChatAgent({
+    currentProject, saveProject, setMessages, setInput, setAttachedImages,
+    setBuildStep, setPipelineStep, setCurrentAgent, setPendingBuildPrompt,
+    setIsLoading, messagesRef, isSendingRef, isLoadingRef, buildMessageContent,
+  } as ChatAgentConfig);
+
+  const { tryInstantBuild } = useInstantBuild({
+    currentProject, saveProject, setSandpackFiles, setSandpackDeps, setPreviewMode,
+    setIsBuilding, setBuildStep, setIsLoading, setMessages, setPipelineStep,
+    setCurrentAgent, setBuildRetryCount, setBuildStreamContent,
+    messagesRef, isSendingRef, selectedModel, selectedTheme,
+    syncSandpackToVirtualFS, handleOnError,
+  } as InstantBuildConfig);
+
+  // Auto-trigger build agent when chat agent confirms a build
+  useEffect(() => {
+    if (pendingBuildPrompt && !isLoadingRef.current && !isSendingRef.current) {
+      const prompt = pendingBuildPrompt;
+      setPendingBuildPrompt(null);
+      setCurrentAgent("build");
+      setPipelineStep("planning");
+      sendMessage(prompt);
+    }
+  }, [pendingBuildPrompt]);
+
+  // ─── Core build message handler ───
   const sendMessage = useCallback(async (text: string, images: string[] = []) => {
     if (!text || !currentProject) return;
     if (isSendingRef.current || isLoadingRef.current) {
@@ -625,19 +659,6 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
         });
       };
 
-      const handleOnError = (err: string) => {
-        if (abortController.signal.aborted) return;
-        setMessages((prev) => [...prev, { role: "assistant", content: `⚠️ ${err}`, timestamp: Date.now() }]);
-        setIsLoading(false);
-        setIsBuilding(false);
-        setBuildStep("");
-        setPipelineStep("error");
-        setCurrentAgent(null);
-        isSendingRef.current = false;
-        streamingControllerRef.current?.stop();
-        streamingControllerRef.current = null;
-      };
-
       // ─── CORE: Build engine for code generation ───
       setCurrentAgent("build");
       setPipelineStep("planning");
@@ -646,188 +667,14 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
       const liveSandpackFiles = sandpackFilesRef.current;
       const isFirstBuild = !liveSandpackFiles || Object.keys(liveSandpackFiles).length === 0;
 
-      // ─── INSTANT PATH ───
+      // ─── INSTANT PATH (delegated to useInstantBuild) ───
       const isSimpleBuild = isFirstBuild && !!template;
 
       if (isSimpleBuild || isFirstBuild) {
-        const { findInstantTemplate, hydrateTemplate } = await import("@/lib/instantTemplates");
-        const templateId = template?.id || "saas-landing";
-        const templateName = template?.name || "Landing Page";
-        const instantTemplate = findInstantTemplate(templateId);
-
-        if (instantTemplate) {
-          console.log(`[BuildOrch] ⚡ INSTANT PATH: Rendering "${templateName}" in <1s`);
-          setBuildStep("⚡ Instant preview loading...");
-          setPipelineStep("bundling");
-
-          const promptDesc = userText.replace(/build|create|make|website|app|called|named|beautiful|simple/gi, "").trim();
-          const projectName = currentProject.name || "My App";
-          const { files, deps } = hydrateTemplate(instantTemplate, projectName, promptDesc || "Build applications at the speed of thought");
-
-          setSandpackFiles(files);
-          syncSandpackToVirtualFS(files);
-          if (Object.keys(deps).length > 0) setSandpackDeps(deps);
-          setPreviewMode("sandpack");
-
-          const fileCount = Object.keys(files).length;
-          const instantMsg = `⚡ **Instant Preview** — ${fileCount} files rendered in under 1 second!\n\nYour ${templateName} is ready. I'm now polishing the content based on your prompt...`;
-          setMessages((prev) => {
-            const last = prev[prev.length - 1];
-            if (last?.role === "assistant") {
-              return prev.map((m, i) => (i === prev.length - 1 ? { ...m, content: instantMsg } : m));
-            }
-            return [...prev, { role: "assistant", content: instantMsg, timestamp: Date.now() }];
-          });
-
-          const payload = { files, deps };
-          supabase
-            .from("project_data")
-            .upsert(
-              { project_id: buildProjectId, collection: "sandpack_state", data: payload as any },
-              { onConflict: "project_id,collection" }
-            )
-            .then(({ error }) => {
-              if (error) console.warn("[BuildOrch] Instant template persist failed:", error);
-            });
-
-          setBuildStep("🎨 AI is customizing your content...");
-          setPipelineStep("generating");
-
-          const polishContext = `## INSTANT TEMPLATE LOADED
-The user already sees a live preview of a ${templateName} template. Your job is to CUSTOMIZE the existing template files with the user's specific content, branding, and requirements.
-
-## USER REQUEST
-"${userText}"
-
-## CURRENT FILES (already rendered)
-${Object.entries(files).map(([path, code]) => `--- ${path}\n${code}`).join("\n\n")}
-
-## INSTRUCTIONS
-1. Keep the EXACT same file structure and component architecture
-2. Customize ALL placeholder text to match the user's specific request
-3. Adjust colors, content, and details to fit their brand/idea
-4. Output ALL files (even unchanged ones) in \`\`\`react-preview format
-5. Do NOT add new files unless necessary — focus on content customization`;
-
-          await streamBuildAgent({
-            messages: [{ role: "user" as const, content: polishContext }],
-            projectId: buildProjectId,
-            techStack: currentProject.tech_stack || "react-cdn",
-            schemas,
-            model: "google/gemini-3-flash-preview",
-            designTheme: themeInfo?.prompt,
-            templateContext: templateCtx || undefined,
-            irContext: irContext || undefined,
-            onDelta: upsert,
-            onDone: async (responseText) => {
-              const reactResult = parseReactFiles(responseText);
-              if (reactResult.files && Object.keys(reactResult.files).length > 0) {
-                let hasErrors = false;
-                try {
-                  const { transform } = await import("sucrase");
-                  for (const [fPath, fCode] of Object.entries(reactResult.files)) {
-                    if (fPath.match(/\.(jsx?|tsx?)$/)) {
-                      try {
-                        transform(fCode, { transforms: ["jsx", "imports"], filePath: fPath });
-                      } catch {
-                        hasErrors = true;
-                        break;
-                      }
-                      const importPathRegex2 = /import\s+(?:[\w{},\s*]+\s+from\s+)?["'](\.[^"']+)["']/g;
-                      let m2;
-                      while ((m2 = importPathRegex2.exec(fCode)) !== null) {
-                        const importPath = m2[1];
-                        const currentDir = fPath.substring(0, fPath.lastIndexOf("/")) || "";
-                        let resolved = importPath.startsWith("./") ? currentDir + importPath.substring(1) : importPath;
-                        if (importPath.startsWith("../")) {
-                          const parts = currentDir.split("/").filter(Boolean);
-                          let relParts = importPath.split("/");
-                          while (relParts[0] === "..") { parts.pop(); relParts.shift(); }
-                          resolved = "/" + parts.concat(relParts).join("/");
-                        }
-                        if (!resolved.startsWith("/")) resolved = "/" + resolved;
-                        const exts = ["", ".jsx", ".js", ".tsx", ".ts"];
-                        const found = exts.some(ext => reactResult.files![resolved + ext] !== undefined);
-                        const indexFound = exts.some(ext => reactResult.files![resolved + "/index" + ext] !== undefined);
-                        if (!found && !indexFound) {
-                          const segments = resolved.split("/");
-                          const compName = segments[segments.length - 1].replace(/\.\w+$/, "");
-                          const stubPath = resolved.match(/\.\w+$/) ? resolved : resolved + ".jsx";
-                          if (/^[A-Z]/.test(compName)) {
-                            reactResult.files![stubPath] = `import React from "react";
-
-export default function ${compName}({ children }) {
-  return <div className="p-4">{children || "${compName}"}</div>;
-}
-`;
-                          } else {
-                            reactResult.files![stubPath] = `export default {};
-`;
-                          }
-                          console.log("[BuildOrch] Auto-created stub for polish pass:", stubPath);
-                        }
-                      }
-                    }
-                  }
-                } catch {
-                  // Sucrase import failed, skip validation
-                }
-
-                if (hasErrors) {
-                  console.warn("[BuildOrch] Polish pass produced broken code, keeping instant template");
-                } else {
-                  setSandpackFiles(reactResult.files);
-                  syncSandpackToVirtualFS(reactResult.files);
-                  if (Object.keys(reactResult.deps).length > 0) setSandpackDeps(reactResult.deps);
-
-                  const polishedPayload = { files: reactResult.files, deps: reactResult.deps || {} };
-                  supabase
-                    .from("project_data")
-                    .upsert(
-                      { project_id: buildProjectId, collection: "sandpack_state", data: polishedPayload as any },
-                      { onConflict: "project_id,collection" }
-                    )
-                    .then(({ error }) => { if (error) console.warn("Polish persist error:", error); });
-                }
-
-                const polishedMsg = reactResult.chatText || `✅ **${templateName} customized!** Your site is ready with personalized content.`;
-                setMessages((prev) => {
-                  const last = prev[prev.length - 1];
-                  if (last?.role === "assistant") {
-                    return prev.map((m, i) => (i === prev.length - 1 ? { ...m, content: polishedMsg } : m));
-                  }
-                  return [...prev, { role: "assistant", content: polishedMsg, timestamp: Date.now() }];
-                });
-              } else {
-                setMessages((prev) => {
-                  const last = prev[prev.length - 1];
-                  const msg = `✅ **${templateName} is ready!** Your site is live with all sections.`;
-                  if (last?.role === "assistant") {
-                    return prev.map((m, i) => (i === prev.length - 1 ? { ...m, content: msg } : m));
-                  }
-                  return [...prev, { role: "assistant", content: msg, timestamp: Date.now() }];
-                });
-              }
-
-              setIsLoading(false);
-              setIsBuilding(false);
-              setBuildStep("");
-              setPipelineStep("complete");
-              setCurrentAgent(null);
-              isSendingRef.current = false;
-              setBuildRetryCount(0);
-              setTimeout(() => setBuildStreamContent(""), 3000);
-
-              const persistMessages = messagesRef.current.map(m => ({
-                role: m.role,
-                content: typeof m.content === "string" ? m.content : getTextContent(m.content),
-              }));
-              saveProject({ chat_history: persistMessages, html_content: currentProject.html_content || "" });
-            },
-            onError: handleOnError,
-          });
-          return;
-        }
+        const handled = await tryInstantBuild(
+          template, userText, schemas, irContext, templateCtx, buildProjectId, upsert,
+        );
+        if (handled) return;
       }
 
       // ─── IR-to-Domain model ───
@@ -933,10 +780,7 @@ export default function ${compName}({ children }) {
           if (progress.taskIndex !== undefined) setCurrentTaskIndex(progress.taskIndex);
 
           if (progress.phase === "planning" && progress.plan) {
-            const planSummary = `📋 **Build Plan** (${progress.plan.overallComplexity})
-${progress.plan.summary}
-
-${progress.plan.tasks.map((t: any, i: number) => `⏳ ${i + 1}. ${t.title}`).join("\n")}`;
+            const planSummary = `📋 **Build Plan** (${progress.plan.overallComplexity})\n${progress.plan.summary}\n\n${progress.plan.tasks.map((t: any, i: number) => `⏳ ${i + 1}. ${t.title}`).join("\n")}`;
             setMessages((prev) => {
               const last = prev[prev.length - 1];
               if (last?.role === "assistant") {
@@ -945,10 +789,7 @@ ${progress.plan.tasks.map((t: any, i: number) => `⏳ ${i + 1}. ${t.title}`).joi
               return [...prev, { role: "assistant", content: planSummary, timestamp: Date.now() }];
             });
           } else if (progress.phase === "executing" && progress.plan) {
-            const progressMsg = `📋 **Building** (${progress.plan.overallComplexity})
-${progress.plan.summary}
-
-${progress.plan.tasks.map((t: any, i: number) => {
+            const progressMsg = `📋 **Building** (${progress.plan.overallComplexity})\n${progress.plan.summary}\n\n${progress.plan.tasks.map((t: any, i: number) => {
               const idx = progress.taskIndex ?? 0;
               const status = i < idx ? "✅" : i === idx ? "🔨" : "⏳";
               return `${status} ${i + 1}. ${t.title}`;
@@ -1050,90 +891,7 @@ ${progress.plan.tasks.map((t: any, i: number) => {
       setBuildStep("");
       isSendingRef.current = false;
     }
-  }, [currentProject, saveProject, setPreviewHtml, setIsBuilding, setBuildStep, selectedModel, selectedTheme, onVersionCreated, setVirtualFiles, fetchProjectContext, syncSandpackToVirtualFS, buildMessageContent, currentPreviewHtml, setMessages, setInput, setAttachedImages, setPreviewErrors, setHealAttempts, setSandpackFiles, setSandpackDeps, setPreviewMode, setBuildMetrics, saveSnapshot, selectedTemplate]);
-
-  // Chat-only agent
-  const sendChatMessage = useCallback(async (text: string, images: string[] = []) => {
-    if (!text || !currentProject) return;
-    if (isSendingRef.current || isLoadingRef.current) return;
-    isSendingRef.current = true;
-
-    const content = buildMessageContent(text, images);
-    const userMsg: Msg = { role: "user", content, timestamp: Date.now() };
-    setInput("");
-    setAttachedImages([]);
-    setMessages((prev) => [...prev, userMsg]);
-    setIsLoading(true);
-    setBuildStep("Thinking...");
-
-    let fullChatResponse = "";
-    const currentMessages = messagesRef.current;
-    const apiMessages = [...currentMessages, userMsg].map(m => ({
-      role: m.role,
-      content: m.content,
-    }));
-
-    let knowledge: string[] = [];
-    try {
-      const { data } = await supabase
-        .from("project_knowledge" as any)
-        .select("title, content")
-        .eq("project_id", currentProject.id)
-        .eq("is_active", true);
-      knowledge = (data || []).map((k: any) => `[${k.title}]: ${k.content}`);
-    } catch {}
-
-    await streamChatAgent({
-      messages: apiMessages,
-      projectId: currentProject.id,
-      techStack: currentProject.tech_stack || "react-cdn",
-      knowledge,
-      onDelta: (chunk) => {
-        fullChatResponse += chunk;
-        const displayText = stripBuildMarker(fullChatResponse);
-        setMessages((prev) => {
-          const last = prev[prev.length - 1];
-          if (last?.role === "assistant") {
-            return prev.map((m, i) => (i === prev.length - 1 ? { ...m, content: displayText } : m));
-          }
-          return [...prev, { role: "assistant", content: displayText, timestamp: Date.now() }];
-        });
-      },
-      onDone: (finalText) => {
-        setIsLoading(false);
-        setBuildStep("");
-        setPipelineStep("complete");
-        setCurrentAgent(null);
-        isSendingRef.current = false;
-
-        if (hasBuildConfirmation(finalText)) {
-          const userText = typeof text === "string" ? text : "";
-          setPendingBuildPrompt(userText);
-        }
-
-        const displayText = stripBuildMarker(finalText);
-        setMessages((prev) => {
-          const final = prev.map((m, i) =>
-            i === prev.length - 1 && m.role === "assistant" ? { ...m, content: displayText } : m
-          );
-          const persistMessages = final.map(m => ({
-            role: m.role,
-            content: typeof m.content === "string" ? m.content : getTextContent(m.content),
-          }));
-          saveProject({ chat_history: persistMessages });
-          return final;
-        });
-      },
-      onError: (err) => {
-        setMessages((prev) => [...prev, { role: "assistant", content: `⚠️ ${err}`, timestamp: Date.now() }]);
-        setIsLoading(false);
-        setBuildStep("");
-        setPipelineStep(null);
-        setCurrentAgent(null);
-        isSendingRef.current = false;
-      },
-    });
-  }, [currentProject, saveProject, setBuildStep, buildMessageContent, setInput, setAttachedImages, setMessages]);
+  }, [currentProject, saveProject, setPreviewHtml, setIsBuilding, setBuildStep, selectedModel, selectedTheme, onVersionCreated, setVirtualFiles, fetchProjectContext, syncSandpackToVirtualFS, buildMessageContent, currentPreviewHtml, setMessages, setInput, setAttachedImages, setPreviewErrors, setHealAttempts, setSandpackFiles, setSandpackDeps, setPreviewMode, setBuildMetrics, saveSnapshot, selectedTemplate, tryInstantBuild, handleOnError]);
 
   // Smart routing
   const handleSmartSend = useCallback(async (text: string, images: string[] = []) => {
