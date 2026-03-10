@@ -82,6 +82,9 @@ const ChatPanel = forwardRef<ChatPanelHandle, { initialPrompt?: string; onVersio
   // Project context cache hook
   const { fetchProjectContext, invalidateCache: invalidateContextCache } = useProjectContextCache(currentProject?.id);
 
+  // Conversation state machine
+  const conversationState = useConversationState();
+
   // Intent classification hook
   const { classifyUserIntent, fastClassifyLocal } = useIntentClassification(
     currentSandpackFiles,
