@@ -53,6 +53,8 @@ interface IDEHeaderProps {
   myColor: string;
   layoutSwapped?: boolean;
   onSwapLayout?: () => void;
+  isLocked?: (panelId: PanelId) => boolean;
+  getLockOwner?: (panelId: PanelId) => { email: string; color: string } | null;
 }
 
 // GitHub SVG icon as a component compatible with LucideIcon interface
