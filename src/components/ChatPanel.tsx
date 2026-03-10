@@ -828,7 +828,7 @@ const ChatPanel = forwardRef<ChatPanelHandle, { initialPrompt?: string; onVersio
           canRedo={canRedo}
           onUndo={handleUndo}
           onRedo={handleRedo}
-          onClear={orchClearChat}
+          onClear={handleClearChat}
           messageCount={messages.filter(m => m.role === "user").length}
           attachedImages={attachedImages}
         />
