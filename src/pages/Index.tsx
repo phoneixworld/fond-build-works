@@ -275,7 +275,9 @@ const IDELayout = () => {
                 </ResizablePanel>
                 <ResizableHandle className="w-px bg-border hover:bg-primary transition-colors" />
                 <ResizablePanel defaultSize={50} minSize={30} maxSize={65}>
-                  <ChatPanel ref={chatRef} initialPrompt={initialPrompt} onVersionCreated={handleVersionCreated} />
+                  <ErrorBoundary fallbackTitle="Chat">
+                    <ChatPanel ref={chatRef} initialPrompt={initialPrompt} onVersionCreated={handleVersionCreated} />
+                  </ErrorBoundary>
                 </ResizablePanel>
               </>
             ) : (
