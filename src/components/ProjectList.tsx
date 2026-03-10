@@ -1,6 +1,7 @@
-import { Plus, FolderOpen, Trash2, Loader2 } from "lucide-react";
+import { Plus, FolderOpen, Trash2, Loader2, Users } from "lucide-react";
 import { useProjects } from "@/contexts/ProjectContext";
 import { formatDistanceToNow } from "date-fns";
+import PendingInvites from "@/components/PendingInvites";
 
 const ProjectList = () => {
   const { projects, currentProject, loading, selectProject, createProject, deleteProject } = useProjects();
@@ -27,6 +28,11 @@ const ProjectList = () => {
       </div>
 
       <div className="flex-1 overflow-y-auto p-1.5 space-y-0.5">
+        {/* Pending invites */}
+        <div className="px-1 pb-1">
+          <PendingInvites onAccepted={() => window.location.reload()} />
+        </div>
+
         {projects.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-full text-muted-foreground gap-2 p-4">
             <FolderOpen className="w-8 h-8 opacity-40" />
