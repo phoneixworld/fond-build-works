@@ -53,8 +53,8 @@ const TierGate = ({ feature, creditOperation, children, fallback, onUpgrade }: T
     const cost = getCreditCost(creditOperation);
     return fallback || (
       <div className="flex flex-col items-center justify-center p-6 rounded-lg border border-border bg-card/50 text-center gap-3">
-        <div className="w-10 h-10 rounded-full bg-amber-500/10 flex items-center justify-center">
-          <Zap className="w-5 h-5 text-amber-500" />
+        <div className="w-10 h-10 rounded-full bg-destructive/10 flex items-center justify-center">
+          <Zap className="w-5 h-5 text-destructive" />
         </div>
         <div>
           <p className="text-sm font-semibold">Insufficient Credits</p>
