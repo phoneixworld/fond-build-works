@@ -142,11 +142,23 @@ const ChatPanel = forwardRef<ChatPanelHandle, { initialPrompt?: string; onVersio
     fetchProjectContext,
     classifyUserIntent,
     fastClassifyLocal,
-    // Conversation state machine
-    conversationAnalyze: conversationState.analyzeMessage,
-    conversationAddPhase: conversationState.addPhase,
-    conversationGetRequirements: conversationState.getRequirementsContext,
-    conversationStartBuilding: conversationState.startBuilding,
+    // Conversation state machine (sync methods for backward compat)
+    conversationAnalyze: conversationState.analyzeMessageSync,
+    conversationAddPhase: (text: string, hasImages: boolean) => {
+      // Fire async server persist but return sync phase for immediate UI
+      const localPhase = {
+        id: conversationState.phases.length + 1,
+        summary: text.slice(0, 200).replace(/\n/g, " "),
+        rawText: text,
+        hasImages,
+        timestamp: Date.now(),
+      };
+      // Async server-side persist (non-blocking)
+      conversationState.addPhase(text, hasImages, currentProject?.ir_state);
+      return localPhase;
+    },
+    conversationGetRequirements: conversationState.getRequirementsContextSync,
+    conversationStartBuilding: () => { conversationState.startBuilding(); },
     conversationCompleteBuild: conversationState.completeBuild,
     conversationGenerateAck: conversationState.generateAcknowledgment,
     conversationMode: conversationState.mode,
