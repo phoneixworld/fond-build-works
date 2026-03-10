@@ -188,9 +188,11 @@ export default function App() {
   return (
     <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", background: "linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #0f172a 100%)", fontFamily: "'Inter', system-ui, sans-serif" }}>
       <div style={{ textAlign: "center", maxWidth: 420, padding: "0 24px" }}>
-        <div style={{ position: "relative", width: 72, height: 72, margin: "0 auto 32px" }}>
-          <img src="/logo.png" alt="Phoneix" style={{ width: 72, height: 72, borderRadius: 20, boxShadow: "0 0 40px rgba(99,102,241,0.3)", animation: "pulse 2s ease-in-out infinite" }} />
-          <div style={{ position: "absolute", inset: -4, borderRadius: 24, border: "2px solid rgba(99,102,241,0.2)", animation: "spin 8s linear infinite" }} />
+        <div style={{ position: "relative", width: 80, height: 80, margin: "0 auto 32px" }}>
+          <div style={{ width: 80, height: 80, borderRadius: 22, background: "linear-gradient(135deg, #4f46e5, #7c3aed)", boxShadow: "0 0 40px rgba(99,102,241,0.4)", display: "flex", alignItems: "center", justifyContent: "center", animation: "pulse 2s ease-in-out infinite" }}>
+            <span style={{ fontSize: 36, fontWeight: 800, color: "#fff", letterSpacing: "-0.03em" }}>P</span>
+          </div>
+          <div style={{ position: "absolute", inset: -5, borderRadius: 27, border: "2px solid rgba(99,102,241,0.25)", animation: "spin 8s linear infinite" }} />
         </div>
         <h1 style={{ fontSize: 22, fontWeight: 700, color: "#f1f5f9", margin: "0 0 8px", letterSpacing: "-0.02em" }}>Phoneix is building your app</h1>
         <p style={{ fontSize: 14, color: "#64748b", margin: "0 0 32px" }}>Sit back while we craft something amazing</p>
