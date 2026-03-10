@@ -90,6 +90,8 @@ const IDEHeader = ({
   myColor,
   layoutSwapped = false,
   onSwapLayout,
+  versions = [],
+  onRevert,
   isLocked,
   getLockOwner,
 }: IDEHeaderProps) => {
