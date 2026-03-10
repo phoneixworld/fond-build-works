@@ -4,6 +4,10 @@ import { usePreview } from "@/contexts/PreviewContext";
 import { motion, AnimatePresence } from "framer-motion";
 import { DIRECT_TOUCH_SCRIPT } from "@/components/DirectTouch";
 import SandpackPreview from "@/components/SandpackPreview";
+import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from "@/components/ui/tooltip";
+import {
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator, DropdownMenuLabel,
+} from "@/components/ui/dropdown-menu";
 
 const VIEWPORTS_MAP = {
   desktop: { width: "100%", maxWidth: "none" },
