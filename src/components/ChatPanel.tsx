@@ -106,6 +106,8 @@ const ChatPanel = forwardRef<ChatPanelHandle, { initialPrompt?: string; onVersio
   // Undo/Redo system
   const { createCheckpoint, undo, redo, canUndo, canRedo } = useUndoRedo();
 
+
+
   // Listen for refactor actions from CodeEditor
   useEffect(() => {
     const handler = (e: Event) => {
@@ -159,7 +161,23 @@ const ChatPanel = forwardRef<ChatPanelHandle, { initialPrompt?: string; onVersio
   }, [setVirtualFiles]);
 
 const healTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-const MAX_HEAL_ATTEMPTS = 3;
+
+// Self-healing hook
+const {
+  previewErrors, setPreviewErrors,
+  healAttempts, setHealAttempts,
+  isHealing, healingStatus,
+  handleAutoFix,
+  resetHealing,
+  MAX_HEAL_ATTEMPTS,
+} = useSelfHealing({
+  isBuildingValue: usePreview().isBuilding,
+  isLoading,
+  sandpackFilesRef,
+  isSendingRef: { current: false } as React.RefObject<boolean>, // wired below
+  isLoadingRef: { current: false } as React.RefObject<boolean>, // wired below  
+  sendMessage: (text: string) => sendMessageRef.current(text),
+});
 
 // Auto-clear safety timeout when isBuilding goes false
 const isBuildingValue = usePreview().isBuilding;
@@ -257,112 +275,10 @@ const CONTEXT_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
     }
   }, [messages.length, buildStreamContent, isLoading]);
 
-  useEffect(() => {
-    const handler = (event: MessageEvent) => {
-      if (event.data?.type === "preview-error") {
-        const errorType = event.data.errorType || "unknown";
-        const msg = event.data.message || "Unknown error";
-        const enriched = `[${errorType}] ${msg}`;
-        setPreviewErrors((prev) => {
-          if (prev.includes(enriched)) return prev;
-          return [...prev.slice(-9), enriched];
-        });
-      }
-    };
-    window.addEventListener("message", handler);
-    return () => window.removeEventListener("message", handler);
-  }, []);
+  // Preview error listening is now handled by useSelfHealing hook
+   // Self-healing is now handled by useSelfHealing hook
 
-  // ─── Self-Healing: Auto-fix runtime errors after build completes ──────────
-  // Triggers 4s after build finishes IF preview errors are detected.
-  // Guards: max 3 attempts, never during loading/healing, debounced to avoid loops.
-  const postBuildHealTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  const triggerSelfHeal = useCallback(() => {
-    if (isLoadingRef.current || isHealing || isSendingRef.current || healAttempts >= MAX_HEAL_ATTEMPTS || previewErrors.length === 0) return;
-    setIsHealing(true);
-    setHealAttempts(prev => prev + 1);
-    const attempt = healAttempts + 1;
-    setHealingStatus(`Self-healing attempt ${attempt}/${MAX_HEAL_ATTEMPTS}...`);
-    const errorSummary = previewErrors.slice(0, 5).join("\n"); // limit to 5 most recent
-    const currentFiles = sandpackFilesRef.current;
-    // Include relevant file snippets for context
-    let fileContext = "";
-    if (currentFiles) {
-      const errorFiles = new Set<string>();
-      for (const err of previewErrors) {
-        const match = err.match(/\/([\w/.-]+\.\w+)/);
-        if (match) errorFiles.add(`/${match[1]}`);
-      }
-      // Always include App.jsx
-      errorFiles.add("/App.jsx");
-      for (const filePath of errorFiles) {
-        const code = currentFiles[filePath];
-        if (code) {
-          fileContext += `\n--- ${filePath} (current) ---\n${code.slice(0, 2000)}\n`;
-        }
-      }
-    }
-    const healPrompt = `🔧 AUTO-FIX (attempt ${attempt}/${MAX_HEAL_ATTEMPTS}): The preview detected these runtime errors:\n${errorSummary}\n${fileContext ? `\nRelevant current code:${fileContext}` : ""}\n\nFix ALL these errors. Output the COMPLETE corrected files. Do not skip any file that needs changes.`;
-    setPreviewErrors([]);
-    sendMessage(healPrompt).finally(() => {
-      setIsHealing(false);
-      setHealingStatus("");
-    });
-  }, [isHealing, healAttempts, previewErrors]);
-
-  // Auto-trigger self-heal 4 seconds after build finishes if errors exist
-  useEffect(() => {
-    // Clear any pending timer
-    if (postBuildHealTimerRef.current) {
-      clearTimeout(postBuildHealTimerRef.current);
-      postBuildHealTimerRef.current = null;
-    }
-    // When build just finished (isBuilding went false) and errors are present
-    if (!isBuildingValue && !isLoading && previewErrors.length > 0 && healAttempts < MAX_HEAL_ATTEMPTS && !isHealing) {
-      postBuildHealTimerRef.current = setTimeout(() => {
-        // Re-check conditions before firing (state may have changed)
-        if (previewErrors.length > 0 && !isLoadingRef.current && !isSendingRef.current) {
-          console.log(`[SelfHeal] Auto-triggering heal: ${previewErrors.length} error(s) detected post-build`);
-          triggerSelfHeal();
-        }
-      }, 4000); // 4 second debounce — gives Sandpack time to settle
-    }
-    return () => {
-      if (postBuildHealTimerRef.current) clearTimeout(postBuildHealTimerRef.current);
-    };
-  }, [isBuildingValue, isLoading, previewErrors.length, healAttempts, isHealing]);
-
-  // Classify intent using the dedicated classifier agent
-  const classifyUserIntent = useCallback(async (prompt: string): Promise<{ intent: AgentIntent; questions?: any[] } | null> => {
-    if (prompt.length < 15 || prompt.startsWith("🔧 AUTO-FIX") || prompt.startsWith("🔧")) return null;
-    
-    const hasHistory = messagesRef.current.length > 0;
-    const hasExistingCode = !!(currentSandpackFiles && Object.keys(currentSandpackFiles).length > 0) || !!(currentPreviewHtml && currentPreviewHtml.length > 0);
-    const existingFileNames = currentSandpackFiles ? Object.keys(currentSandpackFiles) : [];
-    
-    setIsAnalyzing(true);
-    setPipelineStep("classifying");
-    try {
-      const result = await classifyIntent(prompt, hasHistory, hasExistingCode, existingFileNames);
-      setAnalysisResult(result);
-      
-      if (result.intent === "clarify" && result.questions?.length) {
-        setFollowUpQuestions(result.questions);
-        setPendingFollowUpPrompt(prompt);
-        setIsAnalyzing(false);
-        setPipelineStep(null);
-        return { intent: "clarify", questions: result.questions };
-      }
-      
-      setIsAnalyzing(false);
-      return { intent: result.intent };
-    } catch {
-      setIsAnalyzing(false);
-      setPipelineStep(null);
-      return null;
-    }
-  }, [currentSandpackFiles, currentPreviewHtml]);
+  // classifyUserIntent is now provided by useIntentClassification hook
 
   const handleFollowUpAnswer = (questionId: string, value: string) => {
     setFollowUpAnswers(prev => ({ ...prev, [questionId]: value }));
@@ -423,7 +339,7 @@ const CONTEXT_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
       setVirtualFiles({});
       // Reset all build/pipeline state
       setHealAttempts(0);
-      setIsHealing(false);
+      resetHealing();
       setBuildStreamContent("");
       setCurrentPlan(null);
       setCurrentTaskIndex(0);
@@ -437,7 +353,7 @@ const CONTEXT_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
       setPendingFollowUpPrompt("");
       setAnalysisResult(null);
       // Invalidate context cache so old schemas/knowledge don't leak
-      projectContextCacheRef.current = null;
+      invalidateContextCache();
       // Abort any in-flight request from previous project
       if (abortControllerRef.current) {
         abortControllerRef.current.abort();
@@ -482,63 +398,7 @@ const CONTEXT_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentProject?.id, setPreviewHtml]);
 
-  // ─── fetchProjectContext ──────────────────────────────────────────────────
-  // All 4 DB queries run in parallel (Promise.allSettled) and the result is
-  // cached per project for CONTEXT_CACHE_TTL_MS so subsequent messages are
-  // instant — no DB round-trips at send time.
-  const fetchProjectContext = useCallback(async (projectId: string): Promise<{ schemas: any[]; knowledge: string[]; irContext: string }> => {
-    const cache = projectContextCacheRef.current;
-    if (cache && cache.projectId === projectId && (Date.now() - cache.fetchedAt) < CONTEXT_CACHE_TTL_MS) {
-      return { schemas: cache.schemas, knowledge: cache.knowledge, irContext: cache.irContext };
-    }
-
-    const [schemasRes, knowledgeRes, decisionsRes, governanceRes, irRes] = await Promise.allSettled([
-      supabase.from("project_schemas" as any).select("collection_name, schema").eq("project_id", projectId),
-      supabase.from("project_knowledge" as any).select("title, content").eq("project_id", projectId).eq("is_active", true),
-      supabase.from("project_decisions" as any).select("category, title, description").eq("project_id", projectId).eq("is_active", true),
-      supabase.from("project_governance_rules" as any).select("category, name, description, severity").eq("project_id", projectId).eq("is_active", true),
-      supabase.from("projects").select("ir_state").eq("id", projectId).single(),
-    ]);
-
-    const schemas = schemasRes.status === "fulfilled" ? (schemasRes.value.data || []) : [];
-    const knowledge: string[] = knowledgeRes.status === "fulfilled"
-      ? (knowledgeRes.value.data || []).map((k: any) => `[${k.title}]: ${k.content}`)
-      : [];
-
-    if (decisionsRes.status === "fulfilled" && decisionsRes.value.data?.length) {
-      knowledge.push("[PROJECT DECISIONS - Follow these architectural decisions]:");
-      decisionsRes.value.data.forEach((d: any) => {
-        knowledge.push(`  [${d.category}] ${d.title}${d.description ? ': ' + d.description : ''}`);
-      });
-    }
-    if (governanceRes.status === "fulfilled" && governanceRes.value.data?.length) {
-      knowledge.push("[GOVERNANCE RULES - Enforce these standards in generated code]:");
-      governanceRes.value.data.forEach((r: any) => {
-        knowledge.push(`  [${r.severity.toUpperCase()}] ${r.name}${r.description ? ': ' + r.description : ''}`);
-      });
-    }
-
-    // Serialize IR state if present
-    let irContext = "";
-    if (irRes.status === "fulfilled" && irRes.value.data) {
-      const { serializeIR } = await import("@/lib/irSerializer");
-      irContext = serializeIR((irRes.value.data as any).ir_state);
-    }
-
-    projectContextCacheRef.current = { projectId, schemas, knowledge, irContext, fetchedAt: Date.now() };
-    return { schemas, knowledge, irContext };
-  }, []);
-
-  // Prefetch context when a project is loaded — so the FIRST message has zero DB wait
-  useEffect(() => {
-    if (currentProject?.id) {
-      // Invalidate cache on project switch
-      if (projectContextCacheRef.current?.projectId !== currentProject.id) {
-        projectContextCacheRef.current = null;
-      }
-      fetchProjectContext(currentProject.id);
-    }
-  }, [currentProject?.id, fetchProjectContext]);
+  // fetchProjectContext is now provided by useProjectContextCache hook
 
   useEffect(() => {
     const handlePaste = (e: ClipboardEvent) => {
@@ -629,7 +489,7 @@ const CONTEXT_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
     setPreviewMode("html");
     setPreviewErrors([]);
     setHealAttempts(0);
-    setIsHealing(false);
+    resetHealing();
     setCurrentAgent(null);
     setPipelineStep(null);
     setPendingBuildPrompt(null);
@@ -1790,22 +1650,7 @@ ${Object.entries(files).map(([path, code]) => `--- ${path}\n${code}`).join("\n\n
     }
   }, [pendingBuildPrompt, sendMessage]);
 
-  // ─── Client-side fast classification ───
-  // Obvious build intents skip the 1-2s classify-intent round-trip entirely
-  const fastClassifyLocal = useCallback((text: string): AgentIntent | null => {
-    const t = text.trim().toLowerCase();
-    // Clear build commands
-    if (/^(build|create|make|add|generate|design|implement|develop|set up|scaffold|wire up)\b/i.test(t)) return "build";
-    // Descriptive app prompts (e.g., "school ERP with student management")
-    if (/\b(app|website|dashboard|landing page|erp|portal|system|platform|page|form|module|component)\b/i.test(t) && t.length > 20) return "build";
-    // Modification commands
-    if (/^(change|update|fix|modify|replace|remove|delete|move|rename|resize|recolor|restyle)\b/i.test(t)) return "build";
-    // Affirmative confirmations
-    if (/^(yes|go ahead|do it|build it|sounds good|ok|sure|let's go|proceed)/i.test(t)) return "build";
-    // Clear chat intents
-    if (/^(what|how|why|can you|could you|should|is it|tell me|explain|help me understand)\b/i.test(t) && t.endsWith("?")) return "chat";
-    return null; // Ambiguous — fall through to server classification
-  }, []);
+  // fastClassifyLocal is now provided by useIntentClassification hook
 
   const handleSmartSend = useCallback(async (text: string, images: string[] = []) => {
     if (!text && images.length === 0) return;
@@ -1871,11 +1716,7 @@ ${Object.entries(files).map(([path, code]) => `--- ${path}\n${code}`).join("\n\n
     e.target.style.height = Math.min(e.target.scrollHeight, 160) + "px";
   };
 
-  const handleAutoFix = () => {
-    setHealAttempts(0);
-    const errorSummary = previewErrors.join("\n");
-    sendMessage(`The app preview has these errors, please fix them:\n${errorSummary}`);
-  };
+  // handleAutoFix is now provided by useSelfHealing hook
 
   const handleSendClick = () => {
     if (input.trim() || attachedImages.length > 0) {
