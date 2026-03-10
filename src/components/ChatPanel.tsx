@@ -297,6 +297,7 @@ const ChatPanel = forwardRef<ChatPanelHandle, { initialPrompt?: string; onVersio
     if (currentProject && currentProject.id !== lastProjectIdRef.current) {
       lastProjectIdRef.current = currentProject.id;
       const history = currentProject.chat_history ?? [];
+      console.log("[ChatPanel] Project switch:", currentProject.id, "chat_history length:", history.length, "raw:", JSON.stringify(currentProject.chat_history)?.slice(0, 200));
       setMessages(history);
       setPreviewHtml(currentProject.html_content || "");
       setSandpackFiles(null);
