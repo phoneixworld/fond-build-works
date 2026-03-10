@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { Navigate } from "react-router-dom";
-import { Mail, Lock, User, Loader2, Zap, Sparkles, Rocket, Globe } from "lucide-react";
+import { Mail, Lock, Loader2, Sparkles, Rocket, Globe } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 const Auth = () => {
