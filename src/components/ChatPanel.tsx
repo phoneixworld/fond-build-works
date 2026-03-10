@@ -62,13 +62,24 @@ const ChatPanel = forwardRef<ChatPanelHandle, { initialPrompt?: string; onVersio
   const [pendingPrompt, setPendingPrompt] = useState<string | null>(null);
   const [selectedModel, setSelectedModel] = useState<AIModelId>(DEFAULT_MODEL);
   const [selectedTheme, setSelectedTheme] = useState<string>("minimal");
+  const [previewErrors, setPreviewErrors] = useState<string[]>([]);
   const [attachedImages, setAttachedImages] = useState<string[]>([]);
   const [isDragOver, setIsDragOver] = useState(false);
   const [showScrollBtn, setShowScrollBtn] = useState(false);
   
   const [buildStreamContent, setBuildStreamContent] = useState("");
+  // Self-healing state
+  const [healAttempts, setHealAttempts] = useState(0);
+  const [isHealing, setIsHealing] = useState(false);
+  const [healingStatus, setHealingStatus] = useState<string>("");
   // Build retry state
   const [buildRetryCount, setBuildRetryCount] = useState(0);
+  // Follow-up questions state
+  const [followUpQuestions, setFollowUpQuestions] = useState<any[]>([]);
+  const [followUpAnswers, setFollowUpAnswers] = useState<Record<string, string>>({});
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [pendingFollowUpPrompt, setPendingFollowUpPrompt] = useState<string>("");
+  const [analysisResult, setAnalysisResult] = useState<any>(null);
   // Agent pipeline state
   const [currentAgent, setCurrentAgent] = useState<AgentIntent | null>(null);
   const [pipelineStep, setPipelineStep] = useState<PipelineStep | null>(null);
