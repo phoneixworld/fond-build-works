@@ -5,7 +5,8 @@ import {
   ResizablePanelGroup,
 } from "@/components/ui/resizable";
 import { Code, Eye, Cloud, Clock, Brain, Activity, Users, Palette, FlaskConical, Puzzle, Tag, GitBranch, Globe, ListChecks, Shield, Search, Layers } from "lucide-react";
-import { forwardRef } from "react";
+import { forwardRef, lazy, Suspense } from "react";
+import ErrorBoundary from "@/components/ErrorBoundary";
 import { PreviewProvider } from "@/contexts/PreviewContext";
 import { VirtualFSProvider } from "@/contexts/VirtualFSContext";
 import { ProjectProvider, useProjects } from "@/contexts/ProjectContext";
