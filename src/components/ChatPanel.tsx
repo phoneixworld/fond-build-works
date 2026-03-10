@@ -154,19 +154,6 @@ const ChatPanel = forwardRef<ChatPanelHandle, { initialPrompt?: string; onVersio
   // Sync refs after both hooks are initialized
   useEffect(() => { sendMessageRef.current = sendMessage; }, [sendMessage]);
   useEffect(() => { setPipelineStepRef.current = setPipelineStep; }, [setPipelineStep]);
-    healAttempts, setHealAttempts,
-    isHealing, healingStatus,
-    handleAutoFix,
-    resetHealing,
-    MAX_HEAL_ATTEMPTS,
-  } = useSelfHealing({
-    isBuildingValue: usePreview().isBuilding,
-    isLoading,
-    sandpackFilesRef,
-    isSendingRef,
-    isLoadingRef,
-    sendMessage: (text: string) => sendMessage(text),
-  });
 
   // Expose handle
   useImperativeHandle(ref, () => ({ clearChat: orchClearChat, sendMessage: (text: string) => sendMessage(text) }), [orchClearChat, sendMessage]);
