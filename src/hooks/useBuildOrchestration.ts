@@ -827,7 +827,10 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
           streamingControllerRef.current?.addChunk(chunk);
         },
         onFilesReady: (files, deps) => {
-          if (lastProjectIdRef.current !== buildProjectId) return;
+          if (lastProjectIdRef.current !== buildProjectId) {
+            console.warn(`[BuildOrch] ⛔ Blocked cross-project file injection: build=${buildProjectId}, current=${lastProjectIdRef.current}`);
+            return;
+          }
           setSandpackFiles(files);
           syncSandpackToVirtualFS(files);
           if (Object.keys(deps).length > 0) setSandpackDeps(deps);
