@@ -103,8 +103,6 @@ const LandingPage = ({ onStartProject, onOpenProject }: LandingPageProps) => {
   ];
 
   const hasProjects = !loading && projects.length > 0;
-
-  return (
     <div className="min-h-screen bg-background flex flex-col">
       {/* Navbar */}
       <header className="sticky top-0 z-50 flex items-center justify-between px-6 py-4 border-b border-border bg-background/80 backdrop-blur-xl">
