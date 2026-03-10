@@ -3,10 +3,10 @@ import { PresenceUser } from "@/hooks/useRealtimePresence";
 import type { PanelId } from "@/components/IDEHeader";
 
 // Panels that are always viewable (read-only) by everyone
-const ALWAYS_VIEWABLE: PanelId[] = ["preview", "history", "pulse", "brain"];
+const ALWAYS_VIEWABLE: PanelId[] = ["preview"];
 
 // Panels that can be exclusively locked
-const LOCKABLE_PANELS: PanelId[] = ["code", "cloud", "ir", "planning", "quality", "search", "brandkit", "abtesting", "plugins", "whitelabel", "github", "domains", "crew"];
+const LOCKABLE_PANELS: PanelId[] = ["code", "cloud"];
 
 export interface PanelLock {
   panelId: PanelId;
