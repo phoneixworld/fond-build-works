@@ -22,7 +22,7 @@ interface ProjectSettingsProps {
   onExport?: () => void;
 }
 
-const ProjectSettings = ({ onRenameClick, onClone }: ProjectSettingsProps) => {
+const ProjectSettings = ({ onRenameClick, onClone, onExport }: ProjectSettingsProps) => {
   const { currentProject, deleteProject, saveProject, cloneProject } = useProjects();
   const { user } = useAuth();
   const { toast } = useToast();
