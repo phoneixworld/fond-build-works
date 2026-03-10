@@ -181,6 +181,7 @@ export async function compile(
   let verification = verifyWorkspace(workspace, taskGraph);
   callbacks.onVerification(verification);
 
+  cloudLog.info(`Verification: ${verification.ok ? "PASS" : "FAIL"} — ${verification.issues.length} issues`, "compiler");
   console.log(`[Compiler] Verification: ${verification.ok ? "PASS" : "FAIL"} — ${verification.issues.length} issues (${verification.stats.parsedOk} parsed, ${verification.stats.importsBroken} broken imports)`);
 
   // ── Phase 5: Auto-Repair ───────────────────────────────────────────
