@@ -141,10 +141,10 @@ function generateComponentStub(name: string, issue: MissingModuleIssue): string 
   // Named exports (e.g. useToast from Toast component)
   for (const sym of namedExports) {
     if (sym.startsWith("use")) {
-      // Hook-like named export
-      code += `export function ${sym}() {\n  return { show: () => {}, hide: () => {} };\n}\n\n`;
+      // Hook-like named export — NEVER throw, return safe no-op
+      code += `export function ${sym}() {\n  return { show: () => {}, hide: () => {}, toast: () => {}, dismiss: () => {} };\n}\n\n`;
     } else {
-      code += `export const ${sym} = (props) => {\n  return <div {...props}>{props.children || '${sym}'}</div>;\n};\n\n`;
+      code += `export const ${sym} = ({ children, className, ...props }) => {\n  return <div className={className} {...props}>{children || '${sym}'}</div>;\n};\n\n`;
     }
   }
 
