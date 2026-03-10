@@ -217,17 +217,26 @@ export function buildESMPreview(
     }
   }
 
-  // Collect CSS
+  // Collect CSS (strip @tailwind directives since CDN handles them)
   const cssFiles: string[] = [];
-  for (const [path, code] of compiled) {
-    if (path.endsWith(".css")) {
-      cssFiles.push(code);
-    }
+  const allCssPaths = Array.from(compiled.keys()).filter(p => p.endsWith(".css"));
+  for (const path of allCssPaths) {
+    const code = compiled.get(path)!;
+    // Strip @tailwind and @import url() directives — handled by CDN/HTML
+    const cleaned = code
+      .replace(/^@tailwind\s+\w+;\s*$/gm, "")
+      .replace(/^@import\s+url\([^)]+\);\s*$/gm, "")
+      .trim();
+    if (cleaned) cssFiles.push(cleaned);
   }
-  // Also extract CSS imports that aren't files
+  // Also check non-compiled CSS entries
   for (const [path, code] of Object.entries(normalized)) {
     if (path.endsWith(".css") && !compiled.has(path)) {
-      cssFiles.push(code);
+      const cleaned = code
+        .replace(/^@tailwind\s+\w+;\s*$/gm, "")
+        .replace(/^@import\s+url\([^)]+\);\s*$/gm, "")
+        .trim();
+      if (cleaned) cssFiles.push(cleaned);
     }
   }
 
