@@ -135,6 +135,44 @@ export type Database = {
           },
         ]
       }
+      credit_usage: {
+        Row: {
+          created_at: string
+          credits_consumed: number
+          id: string
+          metadata: Json
+          operation: string
+          project_id: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          credits_consumed?: number
+          id?: string
+          metadata?: Json
+          operation: string
+          project_id?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          credits_consumed?: number
+          id?: string
+          metadata?: Json
+          operation?: string
+          project_id?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "credit_usage_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       deploy_history: {
         Row: {
           created_at: string
@@ -895,6 +933,45 @@ export type Database = {
         }
         Relationships: []
       }
+      subscription_tiers: {
+        Row: {
+          created_at: string
+          credits_per_month: number
+          features: Json
+          id: string
+          is_active: boolean
+          max_custom_domains: number
+          max_projects: number
+          max_team_members: number
+          name: string
+          price_monthly: number
+        }
+        Insert: {
+          created_at?: string
+          credits_per_month?: number
+          features?: Json
+          id: string
+          is_active?: boolean
+          max_custom_domains?: number
+          max_projects?: number
+          max_team_members?: number
+          name: string
+          price_monthly?: number
+        }
+        Update: {
+          created_at?: string
+          credits_per_month?: number
+          features?: Json
+          id?: string
+          is_active?: boolean
+          max_custom_domains?: number
+          max_projects?: number
+          max_team_members?: number
+          name?: string
+          price_monthly?: number
+        }
+        Relationships: []
+      }
       team_messages: {
         Row: {
           content: string
@@ -926,6 +1003,59 @@ export type Database = {
             columns: ["project_id"]
             isOneToOne: false
             referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      user_subscriptions: {
+        Row: {
+          created_at: string
+          credits_remaining: number
+          credits_used: number
+          current_period_end: string
+          current_period_start: string
+          id: string
+          status: string
+          stripe_customer_id: string | null
+          stripe_subscription_id: string | null
+          tier_id: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          credits_remaining?: number
+          credits_used?: number
+          current_period_end?: string
+          current_period_start?: string
+          id?: string
+          status?: string
+          stripe_customer_id?: string | null
+          stripe_subscription_id?: string | null
+          tier_id?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          credits_remaining?: number
+          credits_used?: number
+          current_period_end?: string
+          current_period_start?: string
+          id?: string
+          status?: string
+          stripe_customer_id?: string | null
+          stripe_subscription_id?: string | null
+          tier_id?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_subscriptions_tier_id_fkey"
+            columns: ["tier_id"]
+            isOneToOne: false
+            referencedRelation: "subscription_tiers"
             referencedColumns: ["id"]
           },
         ]
