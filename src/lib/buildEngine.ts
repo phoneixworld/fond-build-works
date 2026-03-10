@@ -264,6 +264,45 @@ export interface EngineResult {
   metrics?: BuildMetrics;
 }
 
+// ─── Prompt Echo Detection ─────────────────────────────────────────────────
+
+/**
+ * Detects when the AI generates code that just renders the user's prompt text
+ * as page content instead of building the actual functional app.
+ */
+function detectPromptEcho(files: Record<string, string>, userPrompt: string): boolean {
+  if (userPrompt.length < 80) return false; // Short prompts won't false-positive
+
+  // Extract significant phrases from the user's prompt (4+ words)
+  const words = userPrompt.split(/\s+/).filter(w => w.length > 2);
+  if (words.length < 10) return false;
+
+  // Check consecutive word sequences from the prompt appearing in JSX string literals
+  const codeContent = Object.values(files).join("\n");
+  
+  // Look for long verbatim substrings of the prompt in the generated code
+  // (excluding comments and import lines)
+  const codeLines = codeContent.split("\n").filter(l => 
+    !l.trim().startsWith("//") && !l.trim().startsWith("*") && !l.trim().startsWith("import")
+  ).join("\n");
+
+  let echoScore = 0;
+  const chunkSize = 8; // Check 8-word sequences
+  for (let i = 0; i <= words.length - chunkSize; i += 3) {
+    const phrase = words.slice(i, i + chunkSize).join(" ").toLowerCase();
+    if (codeLines.toLowerCase().includes(phrase)) {
+      echoScore++;
+    }
+  }
+
+  // If 3+ distinct 8-word sequences from the prompt appear verbatim in code, it's an echo
+  if (echoScore >= 3) {
+    console.warn(`[BuildEngine] ⚠️ Prompt echo detected (score: ${echoScore}) — AI is rendering requirements as content`);
+    return true;
+  }
+  return false;
+}
+
 // ─── File Parser (delegates to structured parser) ─────────────────────────
 
 function parseReactFilesFromOutput(text: string): { 
@@ -370,6 +409,22 @@ async function executeSingleTask(
               const mergedDeps = { ...parsed.deps, ...continuationResult.deps };
               resolve({ files: mergedFiles, deps: mergedDeps, chatText: parsed.chatText, modelMs: modelMs + continuationResult.modelMs, cached: false });
             }).catch(reject);
+            return;
+          }
+
+          // Prompt echo detection — reject code that just renders the requirements as content
+          if (detectPromptEcho(parsed.files, prompt) && retryCount < 2) {
+            console.warn(`[BuildEngine] Prompt echo detected — AI rendered requirements as content. Retrying...`);
+            onDelta(`\n[Detected prompt echo — regenerating actual functional UI...]\n`);
+            executeSingleTask(
+              prompt + "\n\n🚨 CRITICAL ERROR: Your previous output rendered the user's requirements/prompt text as visible page content (hero text, paragraphs, etc). This is WRONG. You must BUILD THE ACTUAL WORKING APPLICATION with functional UI components, forms, data tables, navigation — NOT display the requirements as text on the page. Generate the real app NOW.",
+              config,
+              accumulatedCode,
+              onDelta,
+              retryCount + 1,
+              maxTokens,
+              taskType
+            ).then(resolve).catch(reject);
             return;
           }
 
