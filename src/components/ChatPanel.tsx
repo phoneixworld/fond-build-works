@@ -1186,7 +1186,7 @@ const CONTEXT_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
 
     try {
       // ─── Context: served from in-memory cache (populated at project load) ───────
-      const { schemas, knowledge } = await fetchProjectContext(currentProject.id);
+      const { schemas, knowledge, irContext } = await fetchProjectContext(currentProject.id);
 
       // ─── Current code context: smart file prioritization ─────────────────────
       // FIX: For brand new projects (no prior messages), don't send stale sandpack files
