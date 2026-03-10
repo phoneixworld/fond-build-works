@@ -286,21 +286,7 @@ const CONTEXT_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
     }
   }, [messages.length, buildStreamContent, isLoading]);
 
-  useEffect(() => {
-    const handler = (event: MessageEvent) => {
-      if (event.data?.type === "preview-error") {
-        const errorType = event.data.errorType || "unknown";
-        const msg = event.data.message || "Unknown error";
-        const enriched = `[${errorType}] ${msg}`;
-        setPreviewErrors((prev) => {
-          if (prev.includes(enriched)) return prev;
-          return [...prev.slice(-9), enriched];
-        });
-      }
-    };
-    window.addEventListener("message", handler);
-    return () => window.removeEventListener("message", handler);
-  }, []);
+  // Preview error listening is now handled by useSelfHealing hook
    // Self-healing is now handled by useSelfHealing hook
 
   // Classify intent using the dedicated classifier agent
