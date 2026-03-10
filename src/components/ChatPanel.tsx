@@ -1,13 +1,12 @@
 import { useState, useRef, useEffect, useCallback, forwardRef, useImperativeHandle } from "react";
 import { Version } from "@/components/VersionHistory";
-import { Send, Bot, User, ChevronDown, Sparkles, AlertTriangle, Wand2, ImagePlus, X, Palette, ArrowDown, Clock, Zap, Trash2, ShieldCheck, MessageSquareMore, CheckCircle2, Pencil, RotateCcw, Upload, Square, Undo2, Redo2 } from "lucide-react";
+import { User, Sparkles, AlertTriangle, Wand2, ImagePlus, X, ArrowDown, Zap, ShieldCheck, Square } from "lucide-react";
 import VoiceInput from "@/components/VoiceInput";
 import { streamChat } from "@/lib/streamChat";
 import { classifyIntent, streamChatAgent, streamBuildAgent, validateReactCode, hasBuildConfirmation, stripBuildMarker, formatRetryContext, MAX_BUILD_RETRIES, type AgentIntent, type PipelineStep } from "@/lib/agentPipeline";
 import { generatePlan, type BuildPlan, type PlanTask } from "@/lib/planningAgent";
 import { executePlan } from "@/lib/taskExecutor";
 import { runBuildEngine, type EngineConfig, type EngineProgress } from "@/lib/buildEngine";
-import { validateAndFixHtml } from "@/lib/htmlValidator";
 import { matchTemplate, PAGE_TEMPLATES, type PageTemplate } from "@/lib/pageTemplates";
 import { COMPONENT_SNIPPETS, getSnippetsPromptContext } from "@/lib/componentSnippets";
 import { AI_MODELS, DEFAULT_MODEL, PROMPT_SUGGESTIONS, QUICK_ACTIONS, CONTEXT_SUGGESTIONS, DESIGN_THEMES, type AIModelId } from "@/lib/aiModels";
@@ -24,34 +23,27 @@ import { StreamingPreviewController } from "@/lib/streamingPreview";
 import ChatMessage from "@/components/chat/ChatMessage";
 import BuildPipelineCard from "@/components/chat/BuildPipelineCard";
 import ClarifyingQuestions from "@/components/chat/ClarifyingQuestions";
+import ChatWelcome from "@/components/chat/ChatWelcome";
+import ChatInput from "@/components/chat/ChatInput";
 import ReactMarkdown from "react-markdown";
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-  DropdownMenuSeparator,
-  DropdownMenuLabel,
-} from "@/components/ui/dropdown-menu";
+  type MsgContent,
+  getTextContent,
+  getImageUrls,
+  parseResponse,
+  parseReactFiles,
+  postProcessHtml,
+  sanitizeImports,
+  fileToDataUrl,
+  formatTime,
+  buildMessageContent,
+} from "@/lib/codeParser";
 import {
   Tooltip,
   TooltipContent,
   TooltipTrigger,
   TooltipProvider,
 } from "@/components/ui/tooltip";
-
-type MsgContent = string | Array<{ type: "text"; text: string } | { type: "image_url"; image_url: { url: string } }>;
-type Msg = { role: "user" | "assistant"; content: MsgContent; timestamp?: number };
-
-function getTextContent(content: MsgContent): string {
-  if (typeof content === "string") return content;
-  return content.filter((p): p is { type: "text"; text: string } => p.type === "text").map(p => p.text).join("\n");
-}
-
-function getImageUrls(content: MsgContent): string[] {
-  if (typeof content === "string") return [];
-  return content.filter((p): p is { type: "image_url"; image_url: { url: string } } => p.type === "image_url").map(p => p.image_url.url);
-}
 
 function parseResponse(text: string): [string, string | null] {
   let fenceStart = text.indexOf("```html-preview");
