@@ -1,4 +1,4 @@
-import { Loader2, CheckCircle2, Sparkles, Cpu, FileCode, Boxes } from "lucide-react";
+import { Loader2, CheckCircle2, Sparkles, Cpu, FileCode, Boxes, Globe, RefreshCw, ExternalLink, ChevronLeft, ChevronRight, Monitor, Tablet, Smartphone, MapPin, ChevronDown, Eye } from "lucide-react";
 import { useState, useRef, useMemo, useEffect, useCallback } from "react";
 import { usePreview } from "@/contexts/PreviewContext";
 import { motion, AnimatePresence } from "framer-motion";
