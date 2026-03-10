@@ -101,6 +101,106 @@ function checkSyntax(workspace: Workspace): {
   return { issues, passed, failed };
 }
 
+// ─── Import Syntax Validation ─────────────────────────────────────────────
+
+/**
+ * Validates import statement syntax beyond what the parser catches.
+ * Detects: malformed imports, mixed default+named without proper syntax,
+ * duplicate imports from same module, imports using require() in ESM context.
+ */
+function checkImportSyntax(workspace: Workspace): {
+  issues: VerificationIssue[];
+} {
+  const issues: VerificationIssue[] = [];
+
+  for (const path of workspace.listFiles()) {
+    if (!/\.(jsx?|tsx?)$/.test(path)) continue;
+    const content = workspace.getFile(path)!;
+    const lines = content.split("\n");
+
+    const seenImportSources = new Map<string, number>(); // source → first line
+
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i].trim();
+      if (!line.startsWith("import ") && !line.startsWith("import{")) continue;
+
+      const lineNum = i + 1;
+
+      // Check for require() in import context (common AI mistake)
+      if (/import\s+.*=\s*require\s*\(/.test(line)) {
+        issues.push({
+          category: "invalid_import_syntax",
+          severity: "error",
+          file: path,
+          line: lineNum,
+          message: `CJS require() mixed with import syntax: "${line.slice(0, 80)}"`,
+          suggestedFix: "Convert to ESM: import X from 'module'",
+        });
+        continue;
+      }
+
+      // Check for import without from (except side-effect imports like import './styles.css')
+      if (/import\s+\{[^}]+\}\s*;/.test(line) || /import\s+\w+\s*;/.test(line)) {
+        if (!line.includes("from") && !/'[^']*'/.test(line) && !/"[^"]*"/.test(line)) {
+          issues.push({
+            category: "invalid_import_syntax",
+            severity: "error",
+            file: path,
+            line: lineNum,
+            message: `Import missing 'from' clause: "${line.slice(0, 80)}"`,
+            suggestedFix: "Add from 'module-path' to the import statement",
+          });
+          continue;
+        }
+      }
+
+      // Check for duplicate imports from same source
+      const fromMatch = line.match(/from\s+['"]([^'"]+)['"]/);
+      if (fromMatch) {
+        const source = fromMatch[1];
+        if (seenImportSources.has(source)) {
+          issues.push({
+            category: "invalid_import_syntax",
+            severity: "warning",
+            file: path,
+            line: lineNum,
+            message: `Duplicate import from '${source}' (first at line ${seenImportSources.get(source)})`,
+            suggestedFix: `Merge imports from '${source}' into a single statement`,
+          });
+        } else {
+          seenImportSources.set(source, lineNum);
+        }
+      }
+
+      // Check for malformed destructured imports (missing closing brace)
+      if (line.includes("{") && !line.includes("}") && !lines.slice(i, Math.min(i + 5, lines.length)).join(" ").includes("}")) {
+        issues.push({
+          category: "invalid_import_syntax",
+          severity: "error",
+          file: path,
+          line: lineNum,
+          message: `Unclosed destructured import: "${line.slice(0, 80)}"`,
+          suggestedFix: "Add closing brace } to the import statement",
+        });
+      }
+
+      // Check for import from empty string
+      if (/from\s+['"]["']/.test(line)) {
+        issues.push({
+          category: "invalid_import_syntax",
+          severity: "error",
+          file: path,
+          line: lineNum,
+          message: `Import from empty module path: "${line.slice(0, 80)}"`,
+          suggestedFix: "Specify a valid module path",
+        });
+      }
+    }
+  }
+
+  return { issues };
+}
+
 // ─── Import Resolution Check ──────────────────────────────────────────────
 
 function checkImports(workspace: Workspace): {
