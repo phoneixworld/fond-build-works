@@ -184,22 +184,30 @@ const IDELayout = () => {
   }
 
   const renderPanel = () => {
-    if (rightPanel === "preview") return <PreviewPanel />;
-    if (rightPanel === "history") {
-      return <VersionHistory versions={versions} onRevert={handleRevert} onClose={() => setRightPanel("preview")} />;
-    }
-    if (rightPanel === "planning") {
-      return (
-        <PlanningPanel
-          onExecuteTask={(prompt) => {
-            chatRef.current?.sendMessage(prompt);
-            setRightPanel("preview");
-          }}
-        />
-      );
-    }
-    const Component = PANEL_COMPONENTS[rightPanel];
-    return Component ? <Component /> : <PreviewPanel />;
+    const panel = (() => {
+      if (rightPanel === "preview") return <PreviewPanel />;
+      if (rightPanel === "history") {
+        return <VersionHistory versions={versions} onRevert={handleRevert} onClose={() => setRightPanel("preview")} />;
+      }
+      if (rightPanel === "planning") {
+        return (
+          <PlanningPanel
+            onExecuteTask={(prompt) => {
+              chatRef.current?.sendMessage(prompt);
+              setRightPanel("preview");
+            }}
+          />
+        );
+      }
+      const Component = PANEL_COMPONENTS[rightPanel];
+      return Component ? <Component /> : <PreviewPanel />;
+    })();
+
+    return (
+      <ErrorBoundary fallbackTitle={rightPanel.charAt(0).toUpperCase() + rightPanel.slice(1)}>
+        {panel}
+      </ErrorBoundary>
+    );
   };
 
   const nameParts = getNameParts();
