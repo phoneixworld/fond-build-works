@@ -350,7 +350,7 @@ const CONTEXT_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
       setVirtualFiles({});
       // Reset all build/pipeline state
       setHealAttempts(0);
-      setIsHealing(false);
+      resetHealing();
       setBuildStreamContent("");
       setCurrentPlan(null);
       setCurrentTaskIndex(0);
