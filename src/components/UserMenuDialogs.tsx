@@ -9,6 +9,8 @@ import { Progress } from "@/components/ui/progress";
 import { User, Settings, CreditCard, HelpCircle, ExternalLink, Mail, Shield, Bell, Palette, MessageCircle, BookOpen, Bug, Zap } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
+import { useTier } from "@/hooks/useTier";
+import PricingPage from "@/components/PricingPage";
 
 type DialogType = "profile" | "settings" | "billing" | "help" | null;
 
