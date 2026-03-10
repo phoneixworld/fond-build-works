@@ -19,6 +19,7 @@ import {
 interface ProjectSettingsProps {
   onRenameClick?: () => void;
   onClone?: () => void;
+  onExport?: () => void;
 }
 
 const ProjectSettings = ({ onRenameClick, onClone }: ProjectSettingsProps) => {
