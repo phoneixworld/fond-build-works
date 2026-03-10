@@ -121,195 +121,159 @@ function findFile(importResolved: string, fileSet: Set<string>): string | null {
  * and imports are rewritten to use __require__() calls.
  */
 
+function resolveSpec(spec: string, filePath: string, fileSet: Set<string>): string {
+  if (spec.startsWith(".")) {
+    const found = findFile(resolveRelative(filePath, spec), fileSet);
+    return found || spec;
+  }
+  return spec;
+}
+
 function rewriteToRegistry(
   code: string,
   filePath: string,
   fileSet: Set<string>,
-  npmPackages: Set<string>
+  _npmPackages: Set<string>
 ): string {
-  // Strip CSS imports
-  code = code.replace(/^\s*import\s+['"][^'"]+\.css['"]\s*;?\s*$/gm, "");
-  
-  // Rewrite: import X from "react" → const X = await __import__("react")
-  // Rewrite: import { A, B } from "./foo" → const { A, B } = await __import__("/resolved/foo.jsx")
-  // Rewrite: import "./side-effect" → await __import__("/resolved/side-effect.js")
-  
-  // Handle all import forms
+  // Strip CSS imports (single and multi-line)
+  code = code.replace(/import\s+['"][^'"]*\.css['"]\s*;?/g, "");
+
+  // Order matters: most specific patterns first, side-effect last
+
+  // 1) import * as X from "specifier"
+  code = code.replace(
+    /import\s+\*\s+as\s+(\w+)\s+from\s+['"]([^'"]+)['"]\s*;?/g,
+    (_match, ns: string, spec: string) => {
+      const resolved = resolveSpec(spec, filePath, fileSet);
+      return `const ${ns} = await __import__("${resolved}");`;
+    }
+  );
+
+  // 2) import Default, { Named as Alias, ... } from "specifier"
+  code = code.replace(
+    /import\s+([\w$]+)\s*,\s*\{([^}]*)\}\s*from\s+['"]([^'"]+)['"]\s*;?/g,
+    (_match, def: string, named: string, spec: string) => {
+      const resolved = resolveSpec(spec, filePath, fileSet);
+      const tmp = `__m${uid()}`;
+      const namedPart = parseNamedList(named);
+      return `const ${tmp} = await __import__("${resolved}");\nconst ${def} = ${tmp}.default !== undefined ? ${tmp}.default : ${tmp};\nconst { ${namedPart} } = ${tmp};`;
+    }
+  );
+
+  // 3) import { Named } from "specifier"
+  code = code.replace(
+    /import\s+\{([^}]*)\}\s*from\s+['"]([^'"]+)['"]\s*;?/g,
+    (_match, named: string, spec: string) => {
+      const resolved = resolveSpec(spec, filePath, fileSet);
+      const tmp = `__m${uid()}`;
+      const namedPart = parseNamedList(named);
+      return `const ${tmp} = await __import__("${resolved}");\nconst { ${namedPart} } = ${tmp};`;
+    }
+  );
+
+  // 4) import Default from "specifier"
+  code = code.replace(
+    /import\s+([\w$]+)\s+from\s+['"]([^'"]+)['"]\s*;?/g,
+    (_match, def: string, spec: string) => {
+      const resolved = resolveSpec(spec, filePath, fileSet);
+      const tmp = `__m${uid()}`;
+      return `const ${tmp} = await __import__("${resolved}");\nconst ${def} = ${tmp}.default !== undefined ? ${tmp}.default : ${tmp};`;
+    }
+  );
+
+  // 5) Side-effect: import "specifier" (LAST — so it doesn't eat other patterns)
+  code = code.replace(
+    /import\s+['"]([^'"]+)['"]\s*;?/g,
+    (_match, spec: string) => {
+      const resolved = resolveSpec(spec, filePath, fileSet);
+      return `await __import__("${resolved}");`;
+    }
+  );
+
+  // 4) export { X } from "specifier"
+  code = code.replace(
+    /export\s+\{([^}]*)\}\s*from\s+['"]([^'"]+)['"]\s*;?/g,
+    (_match, names: string, spec: string) => {
+      const resolved = resolveSpec(spec, filePath, fileSet);
+      const tmp = `__m${uid()}`;
+      const lines = [`const ${tmp} = await __import__("${resolved}");`];
+      for (const n of names.split(",").map(s => s.trim()).filter(Boolean)) {
+        const [from, as] = n.split(/\s+as\s+/);
+        lines.push(`__exports__.${as || from} = ${tmp}.${from};`);
+      }
+      return lines.join("\n");
+    }
+  );
+
+  // Export rewrites — done line-by-line since they're declaration-level
   const lines = code.split("\n");
-  const rewritten: string[] = [];
+  const result: string[] = [];
+  const defaultExportNames: string[] = [];
   
-  for (const line of lines) {
-    const trimmed = line.trim();
+  for (let i = 0; i < lines.length; i++) {
+    const trimmed = lines[i].trim();
     
-    // Side-effect import: import "something"
-    const sideEffect = trimmed.match(/^import\s+['"]([^'"]+)['"]\s*;?\s*$/);
-    if (sideEffect) {
-      const spec = sideEffect[1];
-      if (spec.startsWith(".")) {
-        const resolved = findFile(resolveRelative(filePath, spec), fileSet);
-        if (resolved) {
-          rewritten.push(`await __import__("${resolved}");`);
-        }
-      } else {
-        rewritten.push(`await __import__("${spec}");`);
-      }
+    // export default function Name
+    const edf = trimmed.match(/^export\s+default\s+function\s+(\w+)/);
+    if (edf) {
+      result.push(lines[i].replace("export default function", "function"));
+      defaultExportNames.push(edf[1]);
       continue;
     }
     
-    // Standard imports: import Default, { Named } from "spec"
-    const importMatch = trimmed.match(
-      /^import\s+([\s\S]*?)\s+from\s+['"]([^'"]+)['"]\s*;?\s*$/
-    );
-    if (importMatch) {
-      const [, importClause, spec] = importMatch;
-      let resolvedSpec = spec;
-      
-      if (spec.startsWith(".")) {
-        const found = findFile(resolveRelative(filePath, spec), fileSet);
-        if (found) {
-          resolvedSpec = found;
-        } else {
-          console.warn(`[ESM] Unresolved: ${spec} from ${filePath}`);
-          rewritten.push(`// UNRESOLVED: ${line}`);
-          continue;
-        }
-      }
-      
-      // Parse the import clause
-      const parsed = parseImportClause(importClause);
-      
-      if (parsed) {
-        const tmpVar = `__m_${Math.random().toString(36).slice(2, 8)}`;
-        rewritten.push(`const ${tmpVar} = await __import__("${resolvedSpec}");`);
-        
-        const assignments: string[] = [];
-        if (parsed.default) {
-          assignments.push(`const ${parsed.default} = ${tmpVar}.default !== undefined ? ${tmpVar}.default : ${tmpVar};`);
-        }
-        if (parsed.named.length > 0) {
-          const destructured = parsed.named
-            .map(n => n.alias ? `${n.name}: ${n.alias}` : n.name)
-            .join(", ");
-          assignments.push(`const { ${destructured} } = ${tmpVar};`);
-        }
-        if (parsed.namespace) {
-          assignments.push(`const ${parsed.namespace} = ${tmpVar};`);
-        }
-        rewritten.push(...assignments);
-      } else {
-        rewritten.push(`await __import__("${resolvedSpec}");`);
-      }
+    // export default class Name  
+    const edc = trimmed.match(/^export\s+default\s+class\s+(\w+)/);
+    if (edc) {
+      result.push(lines[i].replace("export default class", "class"));
+      defaultExportNames.push(edc[1]);
       continue;
     }
     
-    // Export from: export { X } from "./foo"
-    const exportFrom = trimmed.match(
-      /^export\s+(\{[\s\S]*?\})\s+from\s+['"]([^'"]+)['"]\s*;?\s*$/
-    );
-    if (exportFrom) {
-      const [, clause, spec] = exportFrom;
-      let resolvedSpec = spec;
-      if (spec.startsWith(".")) {
-        const found = findFile(resolveRelative(filePath, spec), fileSet);
-        if (found) resolvedSpec = found;
-      }
-      const tmpVar = `__m_${Math.random().toString(36).slice(2, 8)}`;
-      rewritten.push(`const ${tmpVar} = await __import__("${resolvedSpec}");`);
-      // Re-export the names
-      const names = clause.replace(/[{}]/g, "").split(",").map(s => s.trim()).filter(Boolean);
-      for (const n of names) {
-        const parts = n.split(/\s+as\s+/);
-        const from = parts[0];
-        const as = parts[1] || parts[0];
-        rewritten.push(`__exports__.${as} = ${tmpVar}.${from};`);
-      }
-      continue;
-    }
-    
-    // export default → __exports__.default = 
-    if (trimmed.startsWith("export default function ")) {
-      const fnName = trimmed.match(/export default function\s+(\w+)/)?.[1] || "DefaultExport";
-      rewritten.push(line.replace("export default function", "function"));
-      rewritten.push(`__exports__.default = ${fnName};`);
-      continue;
-    }
-    if (trimmed.startsWith("export default class ")) {
-      const clsName = trimmed.match(/export default class\s+(\w+)/)?.[1] || "DefaultExport";
-      rewritten.push(line.replace("export default class", "class"));
-      rewritten.push(`__exports__.default = ${clsName};`);
-      continue;
-    }
+    // export default <expression>
     if (trimmed.startsWith("export default ")) {
-      rewritten.push(line.replace("export default ", "__exports__.default = "));
+      result.push(lines[i].replace("export default ", "__exports__.default = "));
       continue;
     }
     
-    // export const/let/var/function/class
-    const exportDecl = trimmed.match(/^export\s+(const|let|var|function|class)\s+(\w+)/);
-    if (exportDecl) {
-      const [, keyword, name] = exportDecl;
-      rewritten.push(line.replace(/^(\s*)export\s+/, "$1"));
-      rewritten.push(`__exports__.${name} = ${name};`);
+    // export const/let/var/function/class Name
+    const ed = trimmed.match(/^export\s+(const|let|var|function|class)\s+(\w+)/);
+    if (ed) {
+      result.push(lines[i].replace(/^(\s*)export\s+/, "$1"));
+      result.push(`__exports__.${ed[2]} = ${ed[2]};`);
       continue;
     }
     
     // export { X, Y }
-    const exportBlock = trimmed.match(/^export\s+\{([^}]+)\}\s*;?\s*$/);
-    if (exportBlock) {
-      const names = exportBlock[1].split(",").map(s => s.trim()).filter(Boolean);
-      for (const n of names) {
-        const parts = n.split(/\s+as\s+/);
-        rewritten.push(`__exports__.${parts[1] || parts[0]} = ${parts[0]};`);
+    const eb = trimmed.match(/^export\s+\{([^}]+)\}\s*;?\s*$/);
+    if (eb) {
+      for (const n of eb[1].split(",").map(s => s.trim()).filter(Boolean)) {
+        const [from, as] = n.split(/\s+as\s+/);
+        result.push(`__exports__.${as || from} = ${from};`);
       }
       continue;
     }
     
-    rewritten.push(line);
+    result.push(lines[i]);
   }
   
-  return rewritten.join("\n");
+  // Add deferred default exports
+  for (const name of defaultExportNames) {
+    result.push(`__exports__.default = ${name};`);
+  }
+  
+  return result.join("\n");
 }
 
-interface ParsedImportClause {
-  default: string | null;
-  named: Array<{ name: string; alias?: string }>;
-  namespace: string | null;
+let _uid = 0;
+function uid(): string {
+  return `_${(++_uid).toString(36)}`;
 }
 
-function parseImportClause(clause: string): ParsedImportClause | null {
-  const result: ParsedImportClause = { default: null, named: [], namespace: null };
-  let remaining = clause.trim();
-  
-  // Namespace: * as X
-  const nsMatch = remaining.match(/^\*\s+as\s+(\w+)$/);
-  if (nsMatch) {
-    result.namespace = nsMatch[1];
-    return result;
-  }
-  
-  // Default, possibly followed by named
-  // e.g., "React, { useState, useEffect }" or just "React" or just "{ useState }"
-  
-  // Check for named part first
-  const braceMatch = remaining.match(/\{([^}]*)\}/);
-  if (braceMatch) {
-    const namedStr = braceMatch[1];
-    result.named = namedStr.split(",").map(s => {
-      const parts = s.trim().split(/\s+as\s+/);
-      return parts.length === 2 
-        ? { name: parts[0].trim(), alias: parts[1].trim() }
-        : { name: parts[0].trim() };
-    }).filter(n => n.name);
-    remaining = remaining.replace(/,?\s*\{[^}]*\}/, "").trim();
-  }
-  
-  // What's left is the default import
-  if (remaining && remaining !== ",") {
-    result.default = remaining.replace(/,\s*$/, "").trim();
-  }
-  
-  if (!result.default && result.named.length === 0 && !result.namespace) return null;
-  return result;
+function parseNamedList(named: string): string {
+  return named.split(",").map(s => {
+    const parts = s.trim().split(/\s+as\s+/);
+    return parts.length === 2 ? `${parts[0].trim()}: ${parts[1].trim()}` : parts[0].trim();
+  }).filter(Boolean).join(", ");
 }
 
 // ─── Build the full HTML document ──────────────────────────────────────────
