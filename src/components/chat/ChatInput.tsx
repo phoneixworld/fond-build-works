@@ -53,10 +53,18 @@ const ChatInput = ({
   const fileInputRef = useRef<HTMLInputElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const currentModelInfo = AI_MODELS.find((m) => m.id === selectedModel) || AI_MODELS[0];
+  const MAX_CHARS = 20000;
   const charCount = input.length;
+  const isOverLimit = charCount > MAX_CHARS;
+  const showCharWarning = charCount > MAX_CHARS * 0.8;
 
   const handleInputChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-    onInputChange(e.target.value);
+    const value = e.target.value;
+    if (value.length > MAX_CHARS) {
+      onInputChange(value.slice(0, MAX_CHARS));
+    } else {
+      onInputChange(value);
+    }
     e.target.style.height = "60px";
     e.target.style.height = Math.min(e.target.scrollHeight, 160) + "px";
   };
@@ -109,7 +117,13 @@ const ChatInput = ({
           style={{ minHeight: "60px", maxHeight: "160px" }}
           disabled={isLoading}
           rows={3}
+          maxLength={MAX_CHARS}
         />
+        {showCharWarning && (
+          <span className={`text-[10px] font-mono whitespace-nowrap pb-0.5 ${isOverLimit ? 'text-destructive font-semibold' : 'text-muted-foreground'}`}>
+            {charCount.toLocaleString()}/{MAX_CHARS.toLocaleString()}
+          </span>
+        )}
         {isLoading ? (
           <Tooltip>
             <TooltipTrigger asChild>
@@ -127,7 +141,7 @@ const ChatInput = ({
             <TooltipTrigger asChild>
               <button
                 onClick={onSend}
-                disabled={!input.trim() && attachedImages.length === 0}
+                disabled={(!input.trim() && attachedImages.length === 0) || isOverLimit}
                 className="text-primary hover:text-primary/80 disabled:text-muted-foreground/30 transition-colors pb-0.5"
               >
                 <Send className="w-4 h-4" />

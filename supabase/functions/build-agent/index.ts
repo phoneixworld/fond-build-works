@@ -185,6 +185,22 @@ serve(async (req) => {
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY is not configured");
 
+    // Guard: reject excessively large payloads (>25k chars per message)
+    const MAX_MESSAGE_CHARS = 25000;
+    const oversizedMessages = messages?.filter((m: any) => 
+      typeof m.content === "string" && m.content.length > MAX_MESSAGE_CHARS
+    );
+    if (oversizedMessages?.length > 0) {
+      // Truncate oversized messages with a note
+      for (const msg of messages) {
+        if (typeof msg.content === "string" && msg.content.length > MAX_MESSAGE_CHARS) {
+          console.warn(`[build-agent] Truncating oversized message: ${msg.content.length} chars → ${MAX_MESSAGE_CHARS}`);
+          msg.content = msg.content.slice(0, MAX_MESSAGE_CHARS) + 
+            "\n\n[Note: Input was truncated from " + msg.content.length.toLocaleString() + " chars. Break large requirements into smaller steps for better results.]";
+        }
+      }
+    }
+
     const projectId = project_id || "default";
     const techStack = tech_stack || "react-cdn";
 
