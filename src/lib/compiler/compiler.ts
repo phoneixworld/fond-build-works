@@ -227,6 +227,7 @@ export async function compile(
         workspace.applyPatch(repairFiles);
         totalRepairActions++;
 
+        cloudLog.info(`Repaired: ${action.targetFile}`, "compiler");
         console.log(`[Compiler]   🔧 Repaired: ${action.targetFile}`);
       } catch (err: any) {
         console.warn(`[Compiler]   ⚠️ Repair failed for ${action.targetFile}:`, err.message);
