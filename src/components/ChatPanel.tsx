@@ -1,13 +1,12 @@
 import { useState, useRef, useEffect, useCallback, forwardRef, useImperativeHandle } from "react";
 import { Version } from "@/components/VersionHistory";
-import { Send, Bot, User, ChevronDown, Sparkles, AlertTriangle, Wand2, ImagePlus, X, Palette, ArrowDown, Clock, Zap, Trash2, ShieldCheck, MessageSquareMore, CheckCircle2, Pencil, RotateCcw, Upload, Square, Undo2, Redo2 } from "lucide-react";
+import { User, Sparkles, AlertTriangle, Wand2, ImagePlus, X, ArrowDown, Zap, ShieldCheck, Square } from "lucide-react";
 import VoiceInput from "@/components/VoiceInput";
 import { streamChat } from "@/lib/streamChat";
 import { classifyIntent, streamChatAgent, streamBuildAgent, validateReactCode, hasBuildConfirmation, stripBuildMarker, formatRetryContext, MAX_BUILD_RETRIES, type AgentIntent, type PipelineStep } from "@/lib/agentPipeline";
 import { generatePlan, type BuildPlan, type PlanTask } from "@/lib/planningAgent";
 import { executePlan } from "@/lib/taskExecutor";
 import { runBuildEngine, type EngineConfig, type EngineProgress } from "@/lib/buildEngine";
-import { validateAndFixHtml } from "@/lib/htmlValidator";
 import { matchTemplate, PAGE_TEMPLATES, type PageTemplate } from "@/lib/pageTemplates";
 import { COMPONENT_SNIPPETS, getSnippetsPromptContext } from "@/lib/componentSnippets";
 import { AI_MODELS, DEFAULT_MODEL, PROMPT_SUGGESTIONS, QUICK_ACTIONS, CONTEXT_SUGGESTIONS, DESIGN_THEMES, type AIModelId } from "@/lib/aiModels";
@@ -24,15 +23,21 @@ import { StreamingPreviewController } from "@/lib/streamingPreview";
 import ChatMessage from "@/components/chat/ChatMessage";
 import BuildPipelineCard from "@/components/chat/BuildPipelineCard";
 import ClarifyingQuestions from "@/components/chat/ClarifyingQuestions";
+import ChatWelcome from "@/components/chat/ChatWelcome";
+import ChatInput from "@/components/chat/ChatInput";
 import ReactMarkdown from "react-markdown";
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-  DropdownMenuSeparator,
-  DropdownMenuLabel,
-} from "@/components/ui/dropdown-menu";
+  type MsgContent,
+  getTextContent,
+  getImageUrls,
+  parseResponse,
+  parseReactFiles,
+  postProcessHtml,
+  sanitizeImports,
+  fileToDataUrl,
+  formatTime,
+  buildMessageContent,
+} from "@/lib/codeParser";
 import {
   Tooltip,
   TooltipContent,
@@ -40,441 +45,7 @@ import {
   TooltipProvider,
 } from "@/components/ui/tooltip";
 
-type MsgContent = string | Array<{ type: "text"; text: string } | { type: "image_url"; image_url: { url: string } }>;
 type Msg = { role: "user" | "assistant"; content: MsgContent; timestamp?: number };
-
-function getTextContent(content: MsgContent): string {
-  if (typeof content === "string") return content;
-  return content.filter((p): p is { type: "text"; text: string } => p.type === "text").map(p => p.text).join("\n");
-}
-
-function getImageUrls(content: MsgContent): string[] {
-  if (typeof content === "string") return [];
-  return content.filter((p): p is { type: "image_url"; image_url: { url: string } } => p.type === "image_url").map(p => p.image_url.url);
-}
-
-function parseResponse(text: string): [string, string | null] {
-  let fenceStart = text.indexOf("```html-preview");
-  if (fenceStart === -1) fenceStart = text.indexOf("```html");
-  if (fenceStart === -1) return [text, null];
-  const chatPart = text.slice(0, fenceStart).trim();
-  const codeStart = text.indexOf("\n", fenceStart) + 1;
-  const fenceEnd = text.indexOf("```", codeStart);
-  const htmlCode = fenceEnd === -1 ? text.slice(codeStart) : text.slice(codeStart, fenceEnd);
-  return [chatPart, htmlCode.trim()];
-}
-
-// Allowed packages in Sandpack — anything else gets stripped
-const ALLOWED_PACKAGES = new Set([
-  "react", "react-dom", "react/jsx-runtime",
-  "lucide-react", "framer-motion", "date-fns", "recharts",
-  "react-router-dom", "clsx", "tailwind-merge",
-  "react-intersection-observer", "zustand", "zod", "axios",
-  "@tanstack/react-query", "react-hook-form", "sonner",
-]);
-
-function isAllowedImport(pkg: string): boolean {
-  if (pkg.startsWith(".") || pkg.startsWith("/")) return true; // relative imports OK
-  // Check exact match or scope match (e.g. "lucide-react/icons/X")
-  const base = pkg.startsWith("@") ? pkg.split("/").slice(0, 2).join("/") : pkg.split("/")[0];
-  return ALLOWED_PACKAGES.has(base);
-}
-
-/**
- * Comprehensive import/require sanitizer.
- * Handles: single-line imports, multi-line imports, side-effect imports,
- * re-exports (export ... from), dynamic import(), and require().
- */
-function sanitizeImports(code: string): string {
-  // 1. Strip multi-line and single-line: import ... from 'pkg'
-  //    Handles: import X from 'pkg', import { A, B } from 'pkg', import type { X } from 'pkg'
-  code = code.replace(
-    /^\s*import\s+[\s\S]*?\s+from\s+['"]([^'"]+)['"]\s*;?\s*$/gm,
-    (match, pkg) => {
-      if (!isAllowedImport(pkg)) {
-        console.warn(`[Import Sanitizer] Stripped import from: ${pkg}`);
-        return `// [STRIPPED] ${pkg}`;
-      }
-      return match;
-    }
-  );
-
-  // 2. Strip side-effect imports: import 'pkg' or import "pkg"
-  code = code.replace(
-    /^\s*import\s+['"]([^'"]+)['"]\s*;?\s*$/gm,
-    (match, pkg) => {
-      if (!isAllowedImport(pkg)) {
-        console.warn(`[Import Sanitizer] Stripped side-effect import: ${pkg}`);
-        return `// [STRIPPED] ${pkg}`;
-      }
-      return match;
-    }
-  );
-
-  // 3. Strip re-exports: export { X } from 'pkg' or export * from 'pkg'
-  code = code.replace(
-    /^\s*export\s+[\s\S]*?\s+from\s+['"]([^'"]+)['"]\s*;?\s*$/gm,
-    (match, pkg) => {
-      if (!isAllowedImport(pkg)) {
-        console.warn(`[Import Sanitizer] Stripped re-export from: ${pkg}`);
-        return `// [STRIPPED] ${pkg}`;
-      }
-      return match;
-    }
-  );
-
-  // 4. Strip require() calls for unknown packages
-  code = code.replace(
-    /\brequire\s*\(\s*['"]([^'"]+)['"]\s*\)/g,
-    (match, pkg) => {
-      if (!isAllowedImport(pkg)) {
-        console.warn(`[Import Sanitizer] Stripped require: ${pkg}`);
-        return `undefined /* STRIPPED: ${pkg} */`;
-      }
-      return match;
-    }
-  );
-
-  // 5. Strip dynamic import() for unknown packages  
-  code = code.replace(
-    /\bimport\s*\(\s*['"]([^'"]+)['"]\s*\)/g,
-    (match, pkg) => {
-      if (!isAllowedImport(pkg)) {
-        console.warn(`[Import Sanitizer] Stripped dynamic import: ${pkg}`);
-        return `Promise.resolve({}) /* STRIPPED: ${pkg} */`;
-      }
-      return match;
-    }
-  );
-
-  // 6. Final pass: catch any remaining multi-line imports that span lines
-  //    Pattern: line starting with `import` ... eventually `from 'pkg'` across multiple lines
-  code = code.replace(
-    /^\s*import\s*\{[^}]*\}\s*from\s*['"]([^'"]+)['"]\s*;?\s*$/gm,
-    (match, pkg) => {
-      if (!isAllowedImport(pkg)) {
-        console.warn(`[Import Sanitizer] Stripped multi-line import: ${pkg}`);
-        return `// [STRIPPED] ${pkg}`;
-      }
-      return match;
-    }
-  );
-
-  // 7. Fix invalid JSX: <array[index].prop /> → assign to variable first
-  // Pattern: <identifier[expression].property ... />
-  // Replace with: (() => { const _C = identifier[expression].property; return <_C ... />; })()
-  code = code.replace(
-    /<(\w+)\[([^\]]+)\]\.(\w+)(\s[^>]*)?\s*\/>/g,
-    (match, arr, idx, prop, attrs) => {
-      // Replace the JSX tag with a self-invoking function that assigns to a variable
-      const cleanAttrs = (attrs || '').trim();
-      return `{(() => { const _DynComp = ${arr}[${idx}].${prop}; return <_DynComp ${cleanAttrs} />; })()}`;
-    }
-  );
-  
-  // Also fix: <array[index].property> ... </array[index].property>
-  code = code.replace(
-    /<(\w+)\[([^\]]+)\]\.(\w+)(\s[^>]*)?>([^]*?)<\/\1\[\2\]\.\3>/g,
-    (match, arr, idx, prop, attrs, children) => {
-      const cleanAttrs = (attrs || '').trim();
-      return `{(() => { const _DynComp = ${arr}[${idx}].${prop}; return <_DynComp ${cleanAttrs}>${children}</_DynComp>; })()}`;
-    }
-  );
-
-  return code;
-}
-
-/** Parse react/jsx code fences into a file map for Sandpack */
-function parseReactFiles(text: string): { chatText: string; files: Record<string, string> | null; deps: Record<string, string> } {
-  const files: Record<string, string> = {};
-  const deps: Record<string, string> = {};
-
-  // Try multiple fence formats the AI might use — order matters (most specific first)
-  const fencePatterns = [
-    "```react-preview",
-    "```jsx-preview", 
-    "```react",
-    "```jsx",
-  ];
-  
-  let fenceStart = -1;
-  let matchedPattern = "";
-  for (const pattern of fencePatterns) {
-    fenceStart = text.indexOf(pattern);
-    if (fenceStart !== -1) {
-      matchedPattern = pattern;
-      break;
-    }
-  }
-  
-  // Fallback: check if any code fence contains --- /App.jsx pattern (with or without trailing ---)
-  if (fenceStart === -1) {
-    const genericFence = text.match(/```\w*\n[\s\S]*?---\s+\/?(src\/)?App\.jsx?\s*-{0,3}/);
-    if (genericFence) {
-      fenceStart = text.indexOf(genericFence[0]);
-      matchedPattern = "generic-with-app";
-    }
-  }
-  
-  if (fenceStart === -1) {
-    return { chatText: text, files: null, deps };
-  }
-
-  const chatText = text.slice(0, fenceStart).trim();
-  const codeStart = text.indexOf("\n", fenceStart) + 1;
-  
-  // Find closing fence — must be ``` on its own line (not ```react or ```jsx etc.)
-  // Search for \n``` followed by end-of-string, newline, or whitespace (not more word chars)
-  let fenceEnd = -1;
-  let searchFrom = codeStart;
-  while (searchFrom < text.length) {
-    const candidate = text.indexOf("\n```", searchFrom);
-    if (candidate === -1) break;
-    // Check what follows the ``` — must be end of string, newline, or space (not another fence tag)
-    const afterFence = candidate + 4;
-    if (afterFence >= text.length || text[afterFence] === '\n' || text[afterFence] === '\r' || text[afterFence] === ' ') {
-      fenceEnd = candidate;
-      break;
-    }
-    searchFrom = candidate + 4;
-  }
-  
-  const block = fenceEnd === -1 ? text.slice(codeStart) : text.slice(codeStart, fenceEnd);
-  
-  if (block.trim().length === 0) {
-    return { chatText: text, files: null, deps };
-  }
-  
-  // Parse files using multiple format strategies
-  const parsedFiles = parseFileSections(block);
-  
-  if (parsedFiles.fileCount === 0) {
-    // No file separators found — treat the whole block as /App.jsx
-    // But first strip any leading separator lines that weren't caught
-    const cleaned = block.replace(/^---\s+\/?\w[\w/.-]*\.\w+\s*-{0,3}\s*\n/gm, "").trim();
-    console.log(`[parseReactFiles] Single-file mode: treating block as /App.jsx (${cleaned.length} chars)`);
-    files["/App.jsx"] = sanitizeImports(cleaned);
-    return { chatText, files, deps };
-  }
-  
-  // Copy parsed files
-  for (const [fname, code] of Object.entries(parsedFiles.files)) {
-    files[fname] = fname.match(/\.(jsx?|tsx?)$/) ? sanitizeImports(code) : code;
-  }
-  for (const [pkg, ver] of Object.entries(parsedFiles.deps)) {
-    if (ALLOWED_PACKAGES.has(pkg)) deps[pkg] = ver;
-  }
-
-  return {
-    chatText,
-    files: Object.keys(files).length > 0 ? files : null,
-    deps,
-  };
-}
-
-/** Parse file sections from a code block — simple line-by-line approach */
-function parseFileSections(block: string): { files: Record<string, string>; deps: Record<string, string>; fileCount: number } {
-  const files: Record<string, string> = {};
-  const deps: Record<string, string> = {};
-  
-  const lines = block.split("\n");
-  let currentFile: string | null = null;
-  let currentLines: string[] = [];
-  let inDeps = false;
-  let depsLines: string[] = [];
-  
-  // Regex to detect a file separator line in ANY format:
-  // "--- /App.jsx", "--- /src/App.jsx ---", "--- App.jsx ---", "---\n/App.jsx\n---"
-  const separatorRegex = /^-{3}\s+(\/?\w[\w/.-]*\.(?:jsx?|tsx?|css))\s*-{0,3}\s*$/;
-  // Also match just a bare filename line after a "---" only line
-  const bareFilenameRegex = /^\/?(\w[\w/.-]*\.(?:jsx?|tsx?|css))\s*$/;
-  const justDashes = /^-{3}\s*$/;
-  
-  function flushFile() {
-    if (currentFile) {
-      const code = currentLines.join("\n").trim();
-      if (code.length > 0) {
-        let fname = currentFile.startsWith("/") ? currentFile : `/${currentFile}`;
-        fname = fname.replace(/^\/src\//, "/");
-        files[fname] = code;
-      }
-    }
-    if (inDeps) {
-      try { Object.assign(deps, JSON.parse(depsLines.join("\n").trim())); } catch {}
-      inDeps = false;
-      depsLines = [];
-    }
-    currentFile = null;
-    currentLines = [];
-  }
-  
-  let prevWasDashes = false;
-  
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i];
-    const trimmed = line.trim();
-    
-    // Check: "--- /filename" or "--- /filename ---" on same line
-    const sepMatch = trimmed.match(separatorRegex);
-    if (sepMatch) {
-      flushFile();
-      currentFile = sepMatch[1];
-      prevWasDashes = false;
-      continue;
-    }
-    
-    // Check: "--- dependencies" or "--- dependencies ---"
-    if (/^-{3}\s+dependencies\s*-{0,3}\s*$/.test(trimmed)) {
-      flushFile();
-      inDeps = true;
-      prevWasDashes = false;
-      continue;
-    }
-    
-    // Check: just "---" line — could be frontmatter boundary
-    if (justDashes.test(trimmed)) {
-      // If we just saw "---" and this is another "---", it might be closing a frontmatter header — skip
-      if (prevWasDashes) {
-        prevWasDashes = false;
-        continue;
-      }
-      // Peek at next line for filename
-      if (i + 1 < lines.length) {
-        const nextTrimmed = lines[i + 1].trim();
-        const fnMatch = nextTrimmed.match(bareFilenameRegex);
-        if (fnMatch) {
-          flushFile();
-          currentFile = fnMatch[0].startsWith("/") ? fnMatch[0].trim() : fnMatch[0].trim();
-          i++; // skip the filename line
-          prevWasDashes = true; // so we skip the closing --- if present
-          continue;
-        }
-        if (nextTrimmed === "dependencies") {
-          flushFile();
-          inDeps = true;
-          i++; // skip "dependencies" line
-          prevWasDashes = true;
-          continue;
-        }
-      }
-      // If prev was dashes (closing frontmatter), skip this
-      if (prevWasDashes) {
-        prevWasDashes = false;
-        continue;
-      }
-      // Otherwise, treat as content
-      if (currentFile) currentLines.push(line);
-      if (inDeps) depsLines.push(line);
-      prevWasDashes = false;
-      continue;
-    }
-    
-    prevWasDashes = false;
-    
-    // Regular content line
-    if (inDeps) {
-      depsLines.push(line);
-    } else if (currentFile) {
-      currentLines.push(line);
-    }
-    // If no current file and not deps, this content is before any separator — ignore
-  }
-  
-  flushFile();
-  
-  return { files, deps, fileCount: Object.keys(files).length };
-}
-
-
-
-function postProcessHtml(html: string): string {
-  if (!html) return html;
-  
-  const validation = validateAndFixHtml(html);
-  html = validation.html;
-  
-  if (validation.issues.length > 0) {
-    console.log(`[HTML Validator] Score: ${validation.score}/100, Issues: ${validation.issues.length}`, 
-      validation.issues.map(i => `${i.fixed ? '✅' : '⚠️'} [${i.category}] ${i.message}`));
-  }
-  
-  const injections: string[] = [];
-  if (!html.includes('scroll-behavior')) {
-    injections.push('<style>html{scroll-behavior:smooth}*{-webkit-tap-highlight-color:transparent}::selection{background:rgba(99,102,241,0.2)}img{max-width:100%;height:auto}img.img-error{display:none!important}</style>');
-  }
-  if (!html.includes('__safeQuery')) {
-    injections.push(`<script>
-window.__safeQuery=function(s){try{return document.querySelector(s)}catch(e){return null}};
-document.addEventListener('DOMContentLoaded',function(){
-  document.querySelectorAll('img').forEach(function(img){
-    img.addEventListener('error',function(){this.style.display='none';this.classList.add('img-error')});
-  });
-  document.addEventListener('click',function(e){
-    var link=e.target.closest('a[href^="#"]');
-    if(!link)return;
-    var hash=link.getAttribute('href');
-    if(!hash||hash==='#')return;
-    e.preventDefault();
-    var target=document.querySelector(hash);
-    if(target){
-      target.scrollIntoView({behavior:'smooth',block:'start'});
-      history.replaceState(null,null,hash);
-    }
-    var mobileMenu=document.querySelector('[data-mobile-menu],.mobile-menu,.nav-menu.open,.menu-open');
-    if(mobileMenu){mobileMenu.classList.remove('open','active','show','menu-open');mobileMenu.style.display='none';}
-  });
-  document.querySelectorAll('a[href^="#"]').forEach(function(a){
-    var hash=a.getAttribute('href');
-    if(!hash||hash==='#')return;
-    a.style.cursor='pointer';
-  });
-});
-</script>`);
-  }
-  if (!html.includes('favicon') && !html.includes('rel="icon"')) {
-    injections.push('<link rel="icon" href="data:image/svg+xml,<svg xmlns=\'http://www.w3.org/2000/svg\' viewBox=\'0 0 32 32\'><rect width=\'32\' height=\'32\' rx=\'8\' fill=\'%236366f1\'/><text x=\'50%25\' y=\'55%25\' dominant-baseline=\'middle\' text-anchor=\'middle\' font-size=\'18\' fill=\'white\'>⚡</text></svg>" type="image/svg+xml">');
-  }
-  if (html.includes('fonts.googleapis.com') && !html.includes('preconnect')) {
-    injections.push('<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>');
-  }
-  if (!html.includes('theme-color')) {
-    injections.push('<meta name="theme-color" content="#6366f1">');
-  }
-  if (injections.length === 0) return html;
-  const headIdx = html.indexOf('<head>');
-  if (headIdx !== -1) {
-    const insertPos = headIdx + '<head>'.length;
-    return html.slice(0, insertPos) + '\n  ' + injections.join('\n  ') + html.slice(insertPos);
-  }
-  return html;
-}
-
-const TIER_COLORS: Record<string, string> = {
-  fast: "text-[hsl(var(--ide-success))]",
-  pro: "text-primary",
-  premium: "text-[hsl(var(--ide-warning))]",
-};
-
-const TIER_LABELS: Record<string, string> = {
-  fast: "Fast",
-  pro: "Pro",
-  premium: "Premium",
-};
-
-function fileToDataUrl(file: File): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(reader.result as string);
-    reader.onerror = reject;
-    reader.readAsDataURL(file);
-  });
-}
-
-function formatTime(ts?: number): string {
-  if (!ts) return "";
-  const d = new Date(ts);
-  return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
-}
 
 const MAX_IMAGE_SIZE = 4 * 1024 * 1024;
 
@@ -2814,213 +2385,34 @@ ${Object.entries(files).map(([path, code]) => `--- ${path}\n${code}`).join("\n\n
           </div>
         )}
 
-        {/* Input area */}
-        <div className="p-3 border-t border-border">
-          <div className={`flex items-end gap-2 bg-secondary/80 rounded-xl px-3 py-2.5 ring-1 transition-all ${
-            input ? "ring-primary/30" : "ring-transparent"
-          }`}>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <button
-                  onClick={() => fileInputRef.current?.click()}
-                  disabled={isLoading}
-                  className="text-muted-foreground hover:text-foreground disabled:opacity-50 transition-colors pb-0.5"
-                >
-                  <ImagePlus className="w-4 h-4" />
-                </button>
-              </TooltipTrigger>
-              <TooltipContent side="top" className="text-xs">
-                Attach image <kbd className="ml-1 px-1 py-0.5 rounded bg-muted text-[10px] font-mono">Ctrl+V</kbd>
-              </TooltipContent>
-            </Tooltip>
-            <VoiceInput
-              onTranscript={(text) => {
-                setInput(prev => prev ? prev + " " + text : text);
-                if (inputRef.current) {
-                  inputRef.current.style.height = "auto";
-                  inputRef.current.style.height = inputRef.current.scrollHeight + "px";
-                }
-              }}
-              disabled={isLoading}
-            />
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept="image/*"
-              multiple
-              onChange={handleFileSelect}
-              className="hidden"
-            />
-
-            <textarea
-              ref={inputRef}
-              value={input}
-              onChange={handleInputChange}
-              onKeyDown={handleKeyDown}
-              placeholder={attachedImages.length > 0 ? "Describe what to build from this image..." : "Describe what you want to build..."}
-              className="flex-1 bg-transparent text-sm text-foreground placeholder:text-muted-foreground/60 outline-none resize-none leading-[1.4]"
-              style={{ minHeight: "60px", maxHeight: "160px" }}
-              disabled={isLoading}
-              rows={3}
-            />
-            {isLoading ? (
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <button
-                    onClick={() => {
-                      abortControllerRef.current?.abort();
-                      abortControllerRef.current = null;
-                      setIsLoading(false);
-                      setIsBuilding(false);
-                      setBuildStep("");
-                      isSendingRef.current = false;
-                    }}
-                    className="flex items-center justify-center w-7 h-7 rounded-md bg-destructive/15 hover:bg-destructive/25 text-destructive transition-colors"
-                  >
-                    <Square className="w-3.5 h-3.5 fill-current" />
-                  </button>
-                </TooltipTrigger>
-                <TooltipContent side="top" className="text-xs">Stop generating</TooltipContent>
-              </Tooltip>
-            ) : (
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <button
-                    onClick={handleSendClick}
-                    disabled={!input.trim() && attachedImages.length === 0}
-                    className="text-primary hover:text-primary/80 disabled:text-muted-foreground/30 transition-colors pb-0.5"
-                  >
-                    <Send className="w-4 h-4" />
-                  </button>
-                </TooltipTrigger>
-                <TooltipContent side="top" className="text-xs">
-                  Send <kbd className="ml-1 px-1 py-0.5 rounded bg-muted text-[10px] font-mono">Enter</kbd>
-                </TooltipContent>
-              </Tooltip>
-            )}
-          </div>
-
-          {/* Model + Theme + Actions bar */}
-          <div className="flex items-center justify-between mt-2 px-1">
-            <div className="flex items-center gap-3">
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <button className="flex items-center gap-1.5 text-[11px] text-muted-foreground hover:text-foreground transition-colors">
-                    <Sparkles className={`w-3 h-3 ${TIER_COLORS[currentModelInfo.tier]}`} />
-                    <span>{currentModelInfo.label}</span>
-                    <ChevronDown className="w-3 h-3 opacity-50" />
-                  </button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="start" className="min-w-[240px]">
-                  <DropdownMenuLabel className="text-[10px] uppercase tracking-wider text-muted-foreground">AI Model</DropdownMenuLabel>
-                  <DropdownMenuSeparator />
-                  {AI_MODELS.map((model) => (
-                    <DropdownMenuItem
-                      key={model.id}
-                      onClick={() => setSelectedModel(model.id)}
-                      className={`flex items-center justify-between gap-3 ${selectedModel === model.id ? "text-primary font-medium" : ""}`}
-                    >
-                      <div className="flex items-center gap-2">
-                        <Sparkles className={`w-3 h-3 ${TIER_COLORS[model.tier]}`} />
-                        <div>
-                          <span className="text-xs">{model.label}</span>
-                          <span className="text-[10px] text-muted-foreground ml-1.5">{model.description}</span>
-                        </div>
-                      </div>
-                      <span className={`text-[9px] uppercase font-bold tracking-wider ${TIER_COLORS[model.tier]}`}>
-                        {TIER_LABELS[model.tier]}
-                      </span>
-                    </DropdownMenuItem>
-                  ))}
-                </DropdownMenuContent>
-              </DropdownMenu>
-
-              <div className="w-px h-3 bg-border" />
-
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <button className="flex items-center gap-1.5 px-2 py-1 rounded-md text-[11px] text-muted-foreground hover:text-foreground hover:bg-secondary/80 transition-all border border-transparent hover:border-border">
-                    <Palette className="w-3.5 h-3.5 text-accent" />
-                    <span className="font-medium">{DESIGN_THEMES.find(t => t.id === selectedTheme)?.emoji} {DESIGN_THEMES.find(t => t.id === selectedTheme)?.label}</span>
-                    <ChevronDown className="w-3 h-3 opacity-50" />
-                  </button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="start" className="min-w-[280px] p-1.5">
-                  <DropdownMenuLabel className="text-[10px] uppercase tracking-wider text-muted-foreground px-2">Design Theme</DropdownMenuLabel>
-                  <DropdownMenuSeparator />
-                  {DESIGN_THEMES.map((theme) => (
-                    <DropdownMenuItem
-                      key={theme.id}
-                      onClick={() => setSelectedTheme(theme.id)}
-                      className={`flex items-center gap-3 px-3 py-2.5 rounded-md cursor-pointer transition-colors ${selectedTheme === theme.id ? "bg-primary/10 text-primary font-medium" : "hover:bg-secondary"}`}
-                    >
-                      <span className="text-base">{theme.emoji}</span>
-                      <div className="flex flex-col">
-                        <span className="text-xs font-medium">{theme.label}</span>
-                        <span className="text-[10px] text-muted-foreground leading-tight">{theme.description}</span>
-                      </div>
-                      {selectedTheme === theme.id && (
-                        <CheckCircle2 className="w-3.5 h-3.5 text-primary ml-auto" />
-                      )}
-                    </DropdownMenuItem>
-                  ))}
-                </DropdownMenuContent>
-              </DropdownMenu>
-
-              {/* Undo/Redo */}
-              {(canUndo || canRedo) && (
-                <>
-                  <div className="w-px h-3 bg-border" />
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <button onClick={handleUndo} disabled={!canUndo || isLoading} className="text-muted-foreground/50 hover:text-foreground disabled:opacity-20 transition-colors">
-                        <Undo2 className="w-3 h-3" />
-                      </button>
-                    </TooltipTrigger>
-                    <TooltipContent side="top" className="text-xs">Undo (⌘Z)</TooltipContent>
-                  </Tooltip>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <button onClick={handleRedo} disabled={!canRedo || isLoading} className="text-muted-foreground/50 hover:text-foreground disabled:opacity-20 transition-colors">
-                        <Redo2 className="w-3 h-3" />
-                      </button>
-                    </TooltipTrigger>
-                    <TooltipContent side="top" className="text-xs">Redo (⌘⇧Z)</TooltipContent>
-                  </Tooltip>
-                </>
-              )}
-
-              {messages.length > 0 && (
-                <>
-                  <div className="w-px h-3 bg-border" />
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <button
-                        onClick={clearChat}
-                        disabled={isLoading}
-                        className="text-muted-foreground/50 hover:text-destructive disabled:opacity-30 transition-colors"
-                      >
-                        <Trash2 className="w-3 h-3" />
-                      </button>
-                    </TooltipTrigger>
-                    <TooltipContent side="top" className="text-xs">Clear conversation</TooltipContent>
-                  </Tooltip>
-                </>
-              )}
-            </div>
-
-            <div className="flex items-center gap-2">
-              {charCount > 0 && (
-                <span className={`text-[10px] transition-colors ${charCount > 2000 ? "text-destructive" : "text-muted-foreground/40"}`}>
-                  {charCount.toLocaleString()}
-                </span>
-              )}
-              <span className="text-[10px] text-muted-foreground/40">
-                {messages.filter(m => m.role === "user").length} msg{messages.filter(m => m.role === "user").length !== 1 ? "s" : ""}
-              </span>
-            </div>
-          </div>
-        </div>
+        <ChatInput
+          input={input}
+          onInputChange={setInput}
+          onSend={handleSendClick}
+          onKeyDown={handleKeyDown}
+          isLoading={isLoading}
+          onStop={() => {
+            abortControllerRef.current?.abort();
+            abortControllerRef.current = null;
+            setIsLoading(false);
+            setIsBuilding(false);
+            setBuildStep("");
+            isSendingRef.current = false;
+          }}
+          selectedModel={selectedModel}
+          onModelChange={setSelectedModel}
+          selectedTheme={selectedTheme}
+          onThemeChange={setSelectedTheme}
+          onFileSelect={handleFileSelect}
+          onVoiceTranscript={(text) => setInput(prev => prev ? prev + " " + text : text)}
+          canUndo={canUndo}
+          canRedo={canRedo}
+          onUndo={handleUndo}
+          onRedo={handleRedo}
+          onClear={clearChat}
+          messageCount={messages.filter(m => m.role === "user").length}
+          attachedImages={attachedImages}
+        />
       </div>
     </TooltipProvider>
   );
