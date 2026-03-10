@@ -251,7 +251,7 @@ const IDEHeader = ({
       </div>
 
       {/* Right column — aligns with preview panel */}
-      <div className="flex items-center gap-1 shrink-0 pr-1.5">
+      <div className="flex items-center gap-1 flex-1 pr-1.5">
         {isPreview && (
           <>
             <Tooltip>
@@ -287,7 +287,7 @@ const IDEHeader = ({
               <TooltipContent side="bottom" className="text-xs">Forward</TooltipContent>
             </Tooltip>
 
-            <div className="flex items-center gap-1.5 bg-secondary rounded-lg px-2 py-1 min-w-0 w-[320px]">
+            <div className="flex items-center gap-1.5 bg-secondary rounded-lg px-2 py-1 min-w-0 flex-1">
               <Globe className="w-3 h-3 text-muted-foreground flex-shrink-0" />
               {isEditingUrl ? (
                 <input
@@ -330,60 +330,60 @@ const IDEHeader = ({
               </TooltipTrigger>
               <TooltipContent side="bottom" className="text-xs">Refresh</TooltipContent>
             </Tooltip>
-
-            <div className="w-px h-4 bg-border mx-0.5" />
           </>
         )}
 
-        {onSwapLayout && (
+        <div className="ml-auto flex items-center gap-1">
+          {onSwapLayout && (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button onClick={onSwapLayout} className={`p-1.5 rounded-md transition-colors ${layoutSwapped ? "text-primary bg-primary/10" : "text-muted-foreground hover:text-foreground hover:bg-secondary"}`}>
+                  <ArrowLeftRight className="w-3.5 h-3.5" />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent side="bottom" className="text-xs">
+                {layoutSwapped ? "Chat on left" : "Chat on right"}
+              </TooltipContent>
+            </Tooltip>
+          )}
+
           <Tooltip>
             <TooltipTrigger asChild>
-              <button onClick={onSwapLayout} className={`p-1.5 rounded-md transition-colors ${layoutSwapped ? "text-primary bg-primary/10" : "text-muted-foreground hover:text-foreground hover:bg-secondary"}`}>
-                <ArrowLeftRight className="w-3.5 h-3.5" />
+              <button onClick={onProjectSettingsClick} className="p-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors">
+                <Settings className="w-3.5 h-3.5" />
               </button>
             </TooltipTrigger>
-            <TooltipContent side="bottom" className="text-xs">
-              {layoutSwapped ? "Chat on left" : "Chat on right"}
-            </TooltipContent>
+            <TooltipContent side="bottom" className="text-xs">Project Settings</TooltipContent>
           </Tooltip>
-        )}
 
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <button onClick={onProjectSettingsClick} className="p-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors">
-              <Settings className="w-3.5 h-3.5" />
-            </button>
-          </TooltipTrigger>
-          <TooltipContent side="bottom" className="text-xs">Project Settings</TooltipContent>
-        </Tooltip>
+          <PublishExportButtons ref={publishRef} />
 
-        <PublishExportButtons ref={publishRef} />
+          <div className="w-px h-4 bg-border mx-0.5" />
 
-        <div className="w-px h-4 bg-border mx-0.5" />
-
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <button className="flex items-center gap-1.5 p-1 rounded-lg hover:bg-secondary transition-colors group">
-              <div className="w-6 h-6 rounded-full flex items-center justify-center text-[9px] font-bold text-white ring-1 ring-border/50" style={{ backgroundColor: myColor }}>
-                {getInitials(userEmail)}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button className="flex items-center gap-1.5 p-1 rounded-lg hover:bg-secondary transition-colors group">
+                <div className="w-6 h-6 rounded-full flex items-center justify-center text-[9px] font-bold text-white ring-1 ring-border/50" style={{ backgroundColor: myColor }}>
+                  {getInitials(userEmail)}
+                </div>
+                <ChevronDown className="w-2.5 h-2.5 text-muted-foreground/40 group-hover:text-muted-foreground transition-colors" />
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-[200px]">
+              <div className="px-3 py-2">
+                <p className="text-[11px] font-medium text-foreground truncate">{userEmail}</p>
+                <p className="text-[10px] text-muted-foreground/60">Personal workspace</p>
               </div>
-              <ChevronDown className="w-2.5 h-2.5 text-muted-foreground/40 group-hover:text-muted-foreground transition-colors" />
-            </button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-[200px]">
-            <div className="px-3 py-2">
-              <p className="text-[11px] font-medium text-foreground truncate">{userEmail}</p>
-              <p className="text-[10px] text-muted-foreground/60">Personal workspace</p>
-            </div>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem onClick={onProfileClick} className="text-xs gap-2"><User className="w-3.5 h-3.5" />Profile</DropdownMenuItem>
-            <DropdownMenuItem onClick={onSettingsClick} className="text-xs gap-2"><Settings className="w-3.5 h-3.5" />Settings</DropdownMenuItem>
-            <DropdownMenuItem onClick={onBillingClick} className="text-xs gap-2"><CreditCard className="w-3.5 h-3.5" />Billing & Usage</DropdownMenuItem>
-            <DropdownMenuItem onClick={onHelpClick} className="text-xs gap-2"><HelpCircle className="w-3.5 h-3.5" />Help & Support</DropdownMenuItem>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem onClick={onSignOut} className="text-xs gap-2 text-destructive focus:text-destructive"><LogOut className="w-3.5 h-3.5" />Sign out</DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={onProfileClick} className="text-xs gap-2"><User className="w-3.5 h-3.5" />Profile</DropdownMenuItem>
+              <DropdownMenuItem onClick={onSettingsClick} className="text-xs gap-2"><Settings className="w-3.5 h-3.5" />Settings</DropdownMenuItem>
+              <DropdownMenuItem onClick={onBillingClick} className="text-xs gap-2"><CreditCard className="w-3.5 h-3.5" />Billing & Usage</DropdownMenuItem>
+              <DropdownMenuItem onClick={onHelpClick} className="text-xs gap-2"><HelpCircle className="w-3.5 h-3.5" />Help & Support</DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={onSignOut} className="text-xs gap-2 text-destructive focus:text-destructive"><LogOut className="w-3.5 h-3.5" />Sign out</DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
       </div>
     </header>
   );
