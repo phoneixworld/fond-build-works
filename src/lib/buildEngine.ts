@@ -940,7 +940,7 @@ ${existingFileList}
         if (reductionPercent > 0) console.log(`[BuildEngine] Task "${task.title}" context reduced by ${reductionPercent}% (budget: 48KB)`);
         // Scale max tokens based on task complexity — complex tasks need more output room
         const taskMaxTokens = taskType === "frontend" ? 24000 : 16000;
-        const taskResult = await executeSingleTask(taskPrompt, config, codeContext, callbacks.onDelta, 0, taskMaxTokens, taskType);
+        const taskResult = await executeSingleTask(taskPrompt, config, codeContext, callbacks.onDelta, 0, taskMaxTokens, taskType, prompt);
         
         const totalSize = Object.values(taskResult.files).reduce((s, c) => s + c.length, 0);
         completeTask(taskMet, {
