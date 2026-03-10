@@ -871,7 +871,9 @@ ${existingFileList}
 - For frontend tasks: Import data from /data/ and hooks from /hooks/ — do NOT hardcode mock data in pages
 - If /hooks/use<Entity>.js exists, IMPORT from it. Do NOT recreate data hooks in pages.
 - If /data/<collection>.js exists, do NOT create inline mock arrays.
-- Reference entities, types, and constants from prior modules — do NOT redefine them.`;
+- Reference entities, types, and constants from prior modules — do NOT redefine them.
+- CRITICAL: Build the ACTUAL functional UI — NOT a landing page or marketing page about the app
+- NEVER render the requirements text as page content — IMPLEMENT the features instead`;
 
       try {
         // FIX 3: Pass full accumulated code (with increased 48KB budget) so task sees prior modules
