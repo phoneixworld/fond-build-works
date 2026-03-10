@@ -149,6 +149,10 @@ const IDEHeader = ({
               <Pencil className="w-3.5 h-3.5" />
               Rename project
             </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => setRightPanel("settings")} className={`text-xs gap-2 ${rightPanel === "settings" ? "text-primary font-medium" : ""}`}>
+              <SlidersHorizontal className="w-3.5 h-3.5" />
+              Project Settings
+            </DropdownMenuItem>
 
             {/* Tech Stack sub-menu */}
             <DropdownMenuSub>
