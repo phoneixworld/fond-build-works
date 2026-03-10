@@ -1710,7 +1710,7 @@ ${Object.entries(files).map(([path, code]) => `--- ${path}\n${code}`).join("\n\n
     setCurrentAgent("build");
     setPipelineStep("planning");
     sendMessage(finalText, images);
-  }, [classifyUserIntent, fastClassifyLocal]);
+  }, [classifyUserIntent, fastClassifyLocal, sendChatMessage, sendMessage]);
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === "Enter" && !e.shiftKey) {
