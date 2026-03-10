@@ -118,7 +118,6 @@ const Auth = () => {
             <img src="/logo.png" alt="Phoneix World" className="w-12 h-12 rounded-xl object-cover shadow-lg shadow-primary/25" />
             <h1 className="text-xl font-bold text-foreground">Phoneix World</h1>
           </div>
-          </div>
 
           {/* Header */}
           <div className="space-y-2 lg:text-left text-center">
