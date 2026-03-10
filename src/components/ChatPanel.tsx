@@ -289,36 +289,7 @@ const CONTEXT_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
   // Preview error listening is now handled by useSelfHealing hook
    // Self-healing is now handled by useSelfHealing hook
 
-  // Classify intent using the dedicated classifier agent
-  const classifyUserIntent = useCallback(async (prompt: string): Promise<{ intent: AgentIntent; questions?: any[] } | null> => {
-    if (prompt.length < 15 || prompt.startsWith("🔧 AUTO-FIX") || prompt.startsWith("🔧")) return null;
-    
-    const hasHistory = messagesRef.current.length > 0;
-    const hasExistingCode = !!(currentSandpackFiles && Object.keys(currentSandpackFiles).length > 0) || !!(currentPreviewHtml && currentPreviewHtml.length > 0);
-    const existingFileNames = currentSandpackFiles ? Object.keys(currentSandpackFiles) : [];
-    
-    setIsAnalyzing(true);
-    setPipelineStep("classifying");
-    try {
-      const result = await classifyIntent(prompt, hasHistory, hasExistingCode, existingFileNames);
-      setAnalysisResult(result);
-      
-      if (result.intent === "clarify" && result.questions?.length) {
-        setFollowUpQuestions(result.questions);
-        setPendingFollowUpPrompt(prompt);
-        setIsAnalyzing(false);
-        setPipelineStep(null);
-        return { intent: "clarify", questions: result.questions };
-      }
-      
-      setIsAnalyzing(false);
-      return { intent: result.intent };
-    } catch {
-      setIsAnalyzing(false);
-      setPipelineStep(null);
-      return null;
-    }
-  }, [currentSandpackFiles, currentPreviewHtml]);
+  // classifyUserIntent is now provided by useIntentClassification hook
 
   const handleFollowUpAnswer = (questionId: string, value: string) => {
     setFollowUpAnswers(prev => ({ ...prev, [questionId]: value }));
