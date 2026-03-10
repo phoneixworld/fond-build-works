@@ -82,7 +82,7 @@ export interface BuildOrchestrationConfig {
 
   // Conversation state machine
   conversationAnalyze?: (text: string, hasImages: boolean) => { action: "gather" | "build" | "chat" | "continue"; reason: string };
-  conversationAddPhase?: (text: string, hasImages: boolean) => any;
+  conversationAddPhase?: (text: string, hasImages: boolean, imageUrls?: string[]) => any;
   conversationGetRequirements?: () => string;
   conversationStartBuilding?: () => void;
   conversationCompleteBuild?: (result: any) => void;
@@ -922,58 +922,85 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
   }, [currentProject, saveProject, setPreviewHtml, setIsBuilding, setBuildStep, selectedModel, selectedTheme, onVersionCreated, setVirtualFiles, fetchProjectContext, syncSandpackToVirtualFS, buildMessageContent, currentPreviewHtml, setMessages, setInput, setAttachedImages, setPreviewErrors, setHealAttempts, setSandpackFiles, setSandpackDeps, setPreviewMode, setBuildMetrics, saveSnapshot, selectedTemplate, tryInstantBuild, handleOnError]);
 
   // Smart routing with conversation state machine
+  // ── RULES ──
+  // 1. ALL messages go through conversation state machine FIRST
+  // 2. Client NEVER builds unless server FSM mode permits it
+  // 3. No legacy client heuristics (no regex build triggers, no task-list generators)
+  // 4. Images are passed to server for vision extraction
   const handleSmartSend = useCallback(async (text: string, images: string[] = []) => {
     if (!text && images.length === 0) return;
     if (isSendingRef.current || isLoadingRef.current) return;
-    const finalText = text || "Replicate this design";
+
+    const hasImages = images.length > 0;
+    // If user sends images with no text, do NOT auto-generate "Replicate this design"
+    // Instead, treat as requirements with images
+    const finalText = text || (hasImages ? "" : "");
+    if (!finalText && !hasImages) return;
 
     const isAutoFix = finalText.startsWith("🔧");
-    const isShort = finalText.length < 15;
-    const hasImages = images.length > 0;
-    const isConfirmation = /^(yes|go ahead|do it|build it|sounds good|ok|sure)/i.test(finalText.trim());
-    const hasAnswers = finalText.includes("--- Additional Requirements ---");
 
-    // ── Step 0: Conversation State Machine (runs FIRST) ──
-    if (!isAutoFix && conversationAnalyze) {
+    // ── Step 0: Auto-fix bypass (self-healing, not user intent) ──
+    if (isAutoFix) {
+      setCurrentAgent("build");
+      setPipelineStep("planning");
+      sendMessage(finalText, images);
+      return;
+    }
+
+    // ── Step 1: ALWAYS route through conversation state machine ──
+    if (conversationAnalyze) {
       const convResult = conversationAnalyze(finalText, hasImages);
-      console.log(`[ConvState] mode=${conversationMode}, action=${convResult.action}, reason=${convResult.reason}`);
+      console.log(`[SmartSend] mode=${conversationMode}, action=${convResult.action}, reason=${convResult.reason}`);
 
+      // ── GATHER: User is providing requirements ──
       if (convResult.action === "gather") {
-        // User is providing requirements — store them, acknowledge, don't build
-        const phase = conversationAddPhase?.(finalText, hasImages);
+        const phase = conversationAddPhase?.(finalText, hasImages, images);
         const ackText = conversationGenerateAck?.(phase) || "✅ Got it! Send the next phase when ready, or say **\"build it\"** to start.";
 
-        // Add user message
         const content = buildMessageContent(finalText, images);
         const userMsg: Msg = { role: "user", content, timestamp: Date.now() };
         setInput("");
         setAttachedImages([]);
         setMessages((prev) => [...prev, userMsg]);
 
-        // Add acknowledgment as assistant message
         const assistantMsg: Msg = { role: "assistant", content: ackText, timestamp: Date.now() };
         setMessages((prev) => [...prev, assistantMsg]);
 
-        // Save to project
         const updatedMessages = [...messagesRef.current, userMsg, assistantMsg];
         saveProject({ chat_history: updatedMessages.map(m => ({ role: m.role, content: m.content })) });
         return;
       }
 
-      if (convResult.action === "build" && conversationMode === "gathering") {
-        // User said "build it" after gathering phases — compile all requirements and build
-        console.log("[ConvState] Building with accumulated requirements");
-        conversationStartBuilding?.();
-        const requirements = conversationGetRequirements?.() || "";
-        const buildPrompt = requirements + "\n\n" + finalText;
-        setCurrentAgent("build");
-        setPipelineStep("planning");
-        sendMessage(buildPrompt, images);
+      // ── BUILD: Only allowed if server FSM is in gathering/ready mode ──
+      if (convResult.action === "build") {
+        // Gate: only build if we were gathering/ready (server FSM check)
+        if (conversationMode === "gathering" || conversationMode === "ready") {
+          console.log("[SmartSend] Building with accumulated requirements (server FSM approved)");
+          conversationStartBuilding?.();
+          const requirements = conversationGetRequirements?.() || "";
+          const buildPrompt = requirements + "\n\n" + finalText;
+          setCurrentAgent("build");
+          setPipelineStep("planning");
+          sendMessage(buildPrompt, images);
+          return;
+        } else {
+          // Mode is idle/complete/building — treat as a direct build (no accumulated phases)
+          console.log(`[SmartSend] Build requested but mode=${conversationMode}, proceeding as direct build`);
+        }
+      }
+
+      // ── CHAT: Route to chat agent ──
+      if (convResult.action === "chat") {
+        setCurrentAgent("chat");
+        setPipelineStep("chatting");
+        sendChatMessage(finalText, images);
         return;
       }
     }
 
-    if (!isAutoFix && !isShort && !hasImages && !isConfirmation && !hasAnswers) {
+    // ── Step 2: Intent classification (only for ambiguous messages) ──
+    // No legacy short-circuit heuristics — everything goes through classifier
+    if (finalText.length > 15) {
       const localIntent = fastClassifyLocal(finalText);
 
       if (localIntent === "chat") {
@@ -983,26 +1010,39 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
         return;
       }
 
-      if (localIntent === "build") {
-        console.log("[FastClassify] Client-side build detection, skipping server classify");
-        setCurrentAgent("build");
-        setPipelineStep("planning");
-        sendMessage(finalText, images);
-        return;
-      }
+      if (localIntent !== "build") {
+        // Server classification for ambiguous cases
+        const classification = await classifyUserIntent(finalText);
+        if (classification?.intent === "clarify") return;
 
-      const classification = await classifyUserIntent(finalText);
-      if (classification?.intent === "clarify") return;
-
-      if (classification?.intent === "chat") {
-        setCurrentAgent("chat");
-        setPipelineStep("chatting");
-        sendChatMessage(finalText, images);
-        return;
+        if (classification?.intent === "chat") {
+          setCurrentAgent("chat");
+          setPipelineStep("chatting");
+          sendChatMessage(finalText, images);
+          return;
+        }
       }
     }
 
-    // Default: route to build agent
+    // ── Step 3: Default to build (only if no gathering mode active) ──
+    // GATE: If server FSM is in "gathering" mode, DO NOT build — gather instead
+    if (conversationMode === "gathering") {
+      // Treat as additional requirements
+      const phase = conversationAddPhase?.(finalText, hasImages, images);
+      const ackText = conversationGenerateAck?.(phase) || "✅ Got it! Send the next phase when ready, or say **\"build it\"** to start.";
+
+      const content = buildMessageContent(finalText, images);
+      const userMsg: Msg = { role: "user", content, timestamp: Date.now() };
+      setInput("");
+      setAttachedImages([]);
+      setMessages((prev) => [...prev, userMsg]);
+      const assistantMsg: Msg = { role: "assistant", content: ackText, timestamp: Date.now() };
+      setMessages((prev) => [...prev, assistantMsg]);
+      const updatedMessages = [...messagesRef.current, userMsg, assistantMsg];
+      saveProject({ chat_history: updatedMessages.map(m => ({ role: m.role, content: m.content })) });
+      return;
+    }
+
     setCurrentAgent("build");
     setPipelineStep("planning");
     sendMessage(finalText, images);

@@ -595,9 +595,63 @@ Deno.serve(async (req) => {
 
     // ─── ADD_REQUIREMENT: Parse, normalize, diff, store, audit ───
     if (action === "add_requirement") {
-      const text = (message || "").trim();
+      let text = (message || "").trim();
+      const imageUrls: string[] = body.imageUrls || [];
+
+      // ── Step 1: Extract text from images via AI vision (Checklist #1: server-side, deterministic) ──
+      if ((hasImages || imageUrls.length > 0) && imageUrls.length > 0) {
+        try {
+          const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
+          if (LOVABLE_API_KEY) {
+            const visionMessages = [
+              {
+                role: "system",
+                content: `You are a requirements extraction engine. Extract ALL text, requirements, features, user stories, UI descriptions, roles, workflows, and technical specifications from the provided image(s). Output ONLY the extracted content as structured text. Preserve all details, numbers, lists, and hierarchies. If there are diagrams, describe them. Do NOT summarize — extract EVERYTHING verbatim where possible.`
+              },
+              {
+                role: "user",
+                content: [
+                  { type: "text", text: text || "Extract all requirements and specifications from these images:" },
+                  ...imageUrls.map((url: string) => ({ type: "image_url", image_url: { url } })),
+                ],
+              },
+            ];
+
+            const visionResp = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+              method: "POST",
+              headers: {
+                Authorization: `Bearer ${LOVABLE_API_KEY}`,
+                "Content-Type": "application/json",
+              },
+              body: JSON.stringify({
+                model: "google/gemini-2.5-flash",
+                messages: visionMessages,
+                max_tokens: 8000,
+              }),
+            });
+
+            if (visionResp.ok) {
+              const visionData = await visionResp.json();
+              const extractedText = visionData.choices?.[0]?.message?.content || "";
+              if (extractedText.length > 10) {
+                console.log(`[conversation-engine] Vision extracted ${extractedText.length} chars from ${imageUrls.length} image(s)`);
+                // Merge extracted text with any user-provided text
+                text = text
+                  ? `${text}\n\n--- EXTRACTED FROM IMAGES ---\n${extractedText}`
+                  : extractedText;
+              }
+            } else {
+              console.warn(`[conversation-engine] Vision API failed: ${visionResp.status}`);
+            }
+          }
+        } catch (visionErr) {
+          console.error("[conversation-engine] Vision extraction error:", visionErr);
+          // Continue with text-only parsing — non-fatal
+        }
+      }
+
       if (!text) {
-        return json({ error: "message required" }, 400);
+        return json({ error: "message required (no text and image extraction failed)" }, 400);
       }
 
       // Get current requirements for diffing
@@ -609,7 +663,7 @@ Deno.serve(async (req) => {
 
       const phaseNumber = (existingReqs?.length || 0) + 1;
 
-      // Parse & normalize
+      // Parse & normalize (now includes image-extracted text)
       const parsed = parseRequirements(text);
       const normalized = normalizeRequirement(parsed);
       const irMappings = mapToIR(normalized);

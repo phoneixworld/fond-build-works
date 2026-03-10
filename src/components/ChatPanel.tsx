@@ -144,7 +144,7 @@ const ChatPanel = forwardRef<ChatPanelHandle, { initialPrompt?: string; onVersio
     fastClassifyLocal,
     // Conversation state machine (sync methods for backward compat)
     conversationAnalyze: conversationState.analyzeMessageSync,
-    conversationAddPhase: (text: string, hasImages: boolean) => {
+    conversationAddPhase: (text: string, hasImages: boolean, imageUrls?: string[]) => {
       // Fire async server persist but return sync phase for immediate UI
       const localPhase = {
         id: conversationState.phases.length + 1,
@@ -153,8 +153,8 @@ const ChatPanel = forwardRef<ChatPanelHandle, { initialPrompt?: string; onVersio
         hasImages,
         timestamp: Date.now(),
       };
-      // Async server-side persist (non-blocking)
-      conversationState.addPhase(text, hasImages, currentProject?.ir_state);
+      // Async server-side persist with image URLs for vision extraction
+      conversationState.addPhase(text, hasImages, currentProject?.ir_state, imageUrls);
       return localPhase;
     },
     conversationGetRequirements: conversationState.getRequirementsContextSync,
