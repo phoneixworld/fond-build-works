@@ -25,15 +25,19 @@ export function verifyWorkspace(
   const importResults = checkImports(workspace);
   issues.push(...importResults.issues);
 
-  // 3. Structural checks: all produces[] exist
+  // 3. Static checks: import syntax validation
+  const importSyntaxResults = checkImportSyntax(workspace);
+  issues.push(...importSyntaxResults.issues);
+
+  // 4. Structural checks: all produces[] exist
   const producesResults = checkProducedFiles(workspace, taskGraph);
   issues.push(...producesResults.issues);
 
-  // 4. Structural checks: empty stubs
+  // 5. Structural checks: empty stubs
   const stubResults = checkEmptyStubs(workspace);
   issues.push(...stubResults.issues);
 
-  // 5. Structural checks: route existence
+  // 6. Structural checks: route existence
   const routeResults = checkRoutes(workspace);
   issues.push(...routeResults.issues);
 
