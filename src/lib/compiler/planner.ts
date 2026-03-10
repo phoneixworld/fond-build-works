@@ -100,7 +100,7 @@ export function planTaskGraph(ctx: BuildContext): TaskGraph {
     type: "frontend",
     description: `App.jsx with routing for: ${ir.routes.map(r => r.path).join(", ")}`,
     produces: ["/App.jsx"],
-    dependsOn: [...pageTaskIds, ...(authTaskId ? [authTaskId] : [])],
+    dependsOn: [...pageTaskIds, authTaskId],
     touches: ["/App.jsx"],
     priority: 4,
   });
