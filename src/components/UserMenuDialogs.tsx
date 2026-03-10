@@ -9,6 +9,8 @@ import { Progress } from "@/components/ui/progress";
 import { User, Settings, CreditCard, HelpCircle, ExternalLink, Mail, Shield, Bell, Palette, MessageCircle, BookOpen, Bug, Zap } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
+import { useTier } from "@/hooks/useTier";
+import PricingPage from "@/components/PricingPage";
 
 type DialogType = "profile" | "settings" | "billing" | "help" | null;
 
@@ -111,7 +113,7 @@ const UserMenuDialogs = ({ open, onOpenChange }: UserMenuDialogsProps) => {
 
       {/* Billing & Usage Dialog */}
       <Dialog open={open === "billing"} onOpenChange={(v) => onOpenChange(v ? "billing" : null)}>
-        <DialogContent className="sm:max-w-[460px]">
+        <DialogContent className="sm:max-w-[680px] max-h-[85vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2 text-base">
               <CreditCard className="w-4 h-4 text-primary" />
@@ -119,51 +121,7 @@ const UserMenuDialogs = ({ open, onOpenChange }: UserMenuDialogsProps) => {
             </DialogTitle>
             <DialogDescription className="text-xs">Your plan and resource usage</DialogDescription>
           </DialogHeader>
-          <div className="space-y-4 pt-2">
-            <div className="p-4 rounded-lg border border-primary/20 bg-primary/5">
-              <div className="flex items-center justify-between mb-2">
-                <div className="flex items-center gap-2">
-                  <Zap className="w-4 h-4 text-primary" />
-                  <span className="text-sm font-semibold">Pro Plan</span>
-                </div>
-                <Badge className="text-[10px]">Active</Badge>
-              </div>
-              <p className="text-[11px] text-muted-foreground">Unlimited projects · Priority builds · Custom domains</p>
-            </div>
-
-            <div className="space-y-3">
-              <div>
-                <div className="flex justify-between text-xs mb-1">
-                  <span className="text-muted-foreground">AI Credits</span>
-                  <span className="font-medium">847 / 1,000</span>
-                </div>
-                <Progress value={84.7} className="h-2" />
-              </div>
-              <div>
-                <div className="flex justify-between text-xs mb-1">
-                  <span className="text-muted-foreground">Storage</span>
-                  <span className="font-medium">2.3 GB / 10 GB</span>
-                </div>
-                <Progress value={23} className="h-2" />
-              </div>
-              <div>
-                <div className="flex justify-between text-xs mb-1">
-                  <span className="text-muted-foreground">Edge Function Invocations</span>
-                  <span className="font-medium">12.4K / 100K</span>
-                </div>
-                <Progress value={12.4} className="h-2" />
-              </div>
-            </div>
-
-            <Separator />
-            <div className="flex justify-between items-center">
-              <p className="text-xs text-muted-foreground">Next billing date: April 9, 2026</p>
-              <Button variant="outline" size="sm" className="text-xs gap-1">
-                <ExternalLink className="w-3 h-3" />
-                Manage plan
-              </Button>
-            </div>
-          </div>
+          <PricingPage onClose={() => onOpenChange(null)} />
         </DialogContent>
       </Dialog>
 
