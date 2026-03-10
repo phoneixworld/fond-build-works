@@ -739,11 +739,15 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
         ? liveSandpackFiles
         : undefined;
 
+      // Dynamic model routing — picks cheapest capable model based on complexity
+      const fileCount = safeExistingFiles ? Object.keys(safeExistingFiles).length : 0;
+      const routedModel = clientRouteModel(userText, "build", fileCount, selectedModel !== "google/gemini-2.5-pro" ? selectedModel : undefined);
+
       const engineConfig: EngineConfig = {
         projectId: buildProjectId,
         techStack: currentProject.tech_stack || "react-cdn",
         schemas: schemas.length > 0 ? schemas : undefined,
-        model: selectedModel,
+        model: routedModel,
         designTheme: themeInfo?.prompt,
         knowledge: knowledge.length > 0 ? knowledge : undefined,
         snippetsContext: snippetsContext || undefined,
