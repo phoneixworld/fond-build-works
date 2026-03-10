@@ -3,7 +3,7 @@ import { Version } from "@/components/VersionHistory";
 import { User, Sparkles, AlertTriangle, Wand2, ImagePlus, X, ArrowDown, Zap, ShieldCheck, Square } from "lucide-react";
 import VoiceInput from "@/components/VoiceInput";
 import { streamChat } from "@/lib/streamChat";
-import { streamChatAgent, streamBuildAgent, validateReactCode, hasBuildConfirmation, stripBuildMarker, formatRetryContext, MAX_BUILD_RETRIES, type AgentIntent, type PipelineStep } from "@/lib/agentPipeline";
+import { classifyIntent, streamChatAgent, streamBuildAgent, validateReactCode, hasBuildConfirmation, stripBuildMarker, formatRetryContext, MAX_BUILD_RETRIES, type AgentIntent, type PipelineStep } from "@/lib/agentPipeline";
 import { generatePlan, type BuildPlan, type PlanTask } from "@/lib/planningAgent";
 import { executePlan } from "@/lib/taskExecutor";
 import { runBuildEngine, type EngineConfig, type EngineProgress } from "@/lib/buildEngine";
@@ -12,9 +12,6 @@ import { COMPONENT_SNIPPETS, getSnippetsPromptContext } from "@/lib/componentSni
 import { AI_MODELS, DEFAULT_MODEL, PROMPT_SUGGESTIONS, QUICK_ACTIONS, CONTEXT_SUGGESTIONS, DESIGN_THEMES, type AIModelId } from "@/lib/aiModels";
 import { generateSmartSuggestions, type SmartSuggestion } from "@/lib/smartSuggestions";
 import { useUndoRedo } from "@/hooks/useUndoRedo";
-import { useProjectContextCache } from "@/hooks/useProjectContextCache";
-import { useIntentClassification } from "@/hooks/useIntentClassification";
-import { useSelfHealing } from "@/hooks/useSelfHealing";
 import DiffPreview from "@/components/DiffPreview";
 import { motion, AnimatePresence } from "framer-motion";
 import { usePreview } from "@/contexts/PreviewContext";
