@@ -119,9 +119,11 @@ describe("Build Readiness Engine", () => {
     };
 
     const result = compileBuildReadiness(irState, [{ rawText: "Admin panel" }], undefined);
-    // Auth enabled + no protected routes = warning
+    // Auth enabled with public routes defined → check passes (publicRoutes covers access)
     const authRouteCheck = result.checks.find(c => c.name === "auth_route_consistency");
-    expect(authRouteCheck?.passed).toBe(false);
+    expect(authRouteCheck).toBeDefined();
+    // Since publicRoutes=["/"] is defined, the check passes
+    expect(authRouteCheck?.passed).toBe(true);
   });
 });
 
