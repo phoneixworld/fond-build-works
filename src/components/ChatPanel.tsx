@@ -172,7 +172,23 @@ const ChatPanel = forwardRef<ChatPanelHandle, { initialPrompt?: string; onVersio
   }, [setVirtualFiles]);
 
 const healTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-const MAX_HEAL_ATTEMPTS = 3;
+
+// Self-healing hook
+const {
+  previewErrors, setPreviewErrors,
+  healAttempts, setHealAttempts,
+  isHealing, healingStatus,
+  handleAutoFix,
+  resetHealing,
+  MAX_HEAL_ATTEMPTS,
+} = useSelfHealing({
+  isBuildingValue: usePreview().isBuilding,
+  isLoading,
+  sandpackFilesRef,
+  isSendingRef: { current: false } as React.RefObject<boolean>, // wired below
+  isLoadingRef: { current: false } as React.RefObject<boolean>, // wired below  
+  sendMessage: (text: string) => sendMessageRef.current(text),
+});
 
 // Auto-clear safety timeout when isBuilding goes false
 const isBuildingValue = usePreview().isBuilding;
