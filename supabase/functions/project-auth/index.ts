@@ -83,15 +83,27 @@ serve(async (req) => {
       }
 
       case "me": {
-        if (!token) throw new Error("token required");
+        if (!token) {
+          return new Response(JSON.stringify({ error: "No token provided" }), {
+            status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
         const session = verifyToken(token);
-        if (!session || session.pid !== project_id) throw new Error("Invalid or expired token");
+        if (!session || session.pid !== project_id) {
+          return new Response(JSON.stringify({ error: "Invalid or expired token" }), {
+            status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
         const { data: user, error } = await supabase
           .from("project_users")
           .select("id, email, display_name, metadata, created_at")
           .eq("id", session.uid)
           .single();
-        if (error || !user) throw new Error("User not found");
+        if (error || !user) {
+          return new Response(JSON.stringify({ error: "User not found" }), {
+            status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
         return new Response(JSON.stringify({ data: { user } }), {
           status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
