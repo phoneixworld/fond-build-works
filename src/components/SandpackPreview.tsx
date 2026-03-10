@@ -1,4 +1,4 @@
-import { useMemo, Component, ReactNode } from "react";
+import { useMemo, Component, ReactNode, useEffect } from "react";
 import {
   SandpackProvider,
   SandpackPreview as SandpackPreviewPane,
@@ -6,6 +6,7 @@ import {
 } from "@codesandbox/sandpack-react";
 import { usePreview, SandpackFileSet } from "@/contexts/PreviewContext";
 import { AlertTriangle, RefreshCw } from "lucide-react";
+import { transform } from "sucrase";
 
 // ─── Error Boundary ───────────────────────────────────────────────────────────
 interface ErrorBoundaryState {
@@ -19,17 +20,15 @@ class SandpackErrorBoundary extends Component<
 > {
   state: ErrorBoundaryState = { hasError: false, error: null };
 
-  static getDerivedStateFromError(error: Error) {
-    // Some Sandpack errors have read-only properties; safely extract message
-    let safeError = error;
+  static getDerivedStateFromError(error: unknown) {
+    // Sandpack throws SyntaxErrors with read-only properties.
+    // Always create a fresh Error to avoid "Cannot assign to read only property 'message'"
+    let msg = "Preview encountered an error";
     try {
-      // If the error's message is read-only, wrap it in a new Error
-      const msg = error?.message || String(error) || "Preview error";
-      safeError = new Error(msg);
-    } catch {
-      safeError = new Error("Preview encountered an error");
-    }
-    return { hasError: true, error: safeError };
+      if (error instanceof Error) msg = error.message;
+      else msg = String(error);
+    } catch { /* swallow */ }
+    return { hasError: true, error: new Error(msg) };
   }
 
   componentDidCatch(error: Error) {
@@ -88,87 +87,7 @@ function isAllowedPkg(pkg: string): boolean {
   return ALLOWED_PACKAGES.has(base);
 }
 
-/**
- * Count brace/bracket/paren balance in code, skipping strings.
- */
-function countBalances(code: string): { braces: number; brackets: number; parens: number; inString: boolean } {
-  let braces = 0, brackets = 0, parens = 0;
-  let inString = false;
-  let stringChar = '';
-  for (let i = 0; i < code.length; i++) {
-    const c = code[i];
-    if (inString) {
-      if (c === stringChar && code[i - 1] !== '\\') inString = false;
-      continue;
-    }
-    if (c === '"' || c === "'" || c === '`') { inString = true; stringChar = c; continue; }
-    if (c === '{') braces++;
-    else if (c === '}') braces--;
-    else if (c === '[') brackets++;
-    else if (c === ']') brackets--;
-    else if (c === '(') parens++;
-    else if (c === ')') parens--;
-  }
-  return { braces, brackets, parens, inString };
-}
-
-/**
- * Attempt to repair truncated code by closing unclosed braces/brackets/parens.
- * Returns repaired code or null if unrecoverable.
- */
-function attemptRepair(code: string): string | null {
-  const { braces, brackets, parens, inString } = countBalances(code);
-
-  // If excess closers or way too many openers, unrecoverable
-  if (braces < -1 || brackets < -1 || parens < -1) return null;
-  if (braces > 10 || brackets > 10 || parens > 10) return null;
-
-  let repaired = code;
-
-  // Close unterminated string
-  if (inString) {
-    repaired += '"';
-  }
-
-  // Close unclosed parens, then brackets, then braces (reverse nesting order)
-  for (let i = 0; i < Math.max(0, parens); i++) repaired += ')';
-  for (let i = 0; i < Math.max(0, brackets); i++) repaired += ']';
-  for (let i = 0; i < Math.max(0, braces); i++) repaired += '}';
-
-  // Ensure there's a default export if it looks like a component file
-  if (!repaired.includes('export default') && !repaired.includes('export {')) {
-    // Find the last function/const component name
-    const fnMatch = repaired.match(/(?:function|const)\s+([A-Z]\w+)/);
-    if (fnMatch) {
-      repaired += `\nexport default ${fnMatch[1]};`;
-    }
-  }
-
-  // Verify repair worked
-  const after = countBalances(repaired);
-  if (Math.abs(after.braces) > 1 || Math.abs(after.brackets) > 1 || Math.abs(after.parens) > 1) {
-    return null; // repair failed
-  }
-
-  return repaired;
-}
-
-/**
- * Quick syntax check + repair. Returns the code (possibly repaired) or null if broken.
- */
-function quickSyntaxCheckAndRepair(code: string): string | null {
-  const { braces, brackets, parens, inString } = countBalances(code);
-  // Perfectly balanced
-  if (braces === 0 && brackets === 0 && parens === 0 && !inString) return code;
-  // Slightly unbalanced — try repair
-  if (braces >= 0 && brackets >= 0 && parens >= 0 && braces <= 8 && brackets <= 8 && parens <= 8) {
-    return attemptRepair(code);
-  }
-  // Excess closers beyond tolerance
-  if (braces < -2 || brackets < -2 || parens < -2) return null;
-  // Try repair as last resort
-  return attemptRepair(code);
-}
+// Sucrase-based syntax validation is used instead of heuristic brace counting.
 
 /**
  * Generate a safe stub component when code is broken.
@@ -218,17 +137,21 @@ function sanitizeImports(code: string, filePath: string): string {
     (match, pkg) => isAllowedPkg(pkg) ? match : `undefined /* BLOCKED: ${pkg} */`
   );
 
-  // Final safety: try to repair truncated code, fall back to stub if unrecoverable
-  const repaired = quickSyntaxCheckAndRepair(code);
-  if (repaired === null) {
-    console.warn(`[SandpackPreview] Unrecoverable syntax in ${filePath}, using safe stub`);
+  // Final safety: use Sucrase to actually parse the code — catches real syntax errors
+  // that would crash Sandpack's bundler with "Cannot assign to read only property 'message'"
+  try {
+    transform(code, {
+      transforms: ["jsx"],
+      jsxRuntime: "automatic",
+      production: true,
+    });
+  } catch {
+    // Sucrase failed — code has real syntax errors, use stub
+    console.warn(`[SandpackPreview] Syntax error in ${filePath}, using safe stub`);
     return makeSafeStub(filePath);
   }
-  if (repaired !== code) {
-    console.info(`[SandpackPreview] Auto-repaired truncated code in ${filePath}`);
-  }
 
-  return repaired;
+  return code;
 }
 
 const DEFAULT_APP = `import React from "react";
