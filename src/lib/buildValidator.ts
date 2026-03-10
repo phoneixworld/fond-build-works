@@ -182,7 +182,6 @@ export function autoCreateStubFiles(
     ];
     if (sharedUIFiles.some(f => filePath === f || filePath.endsWith(f))) {
       // Restore the real Toast/Spinner/DataTable from scaffold templates
-      const { getSharedUIComponents } = await import("@/lib/templates/scaffoldTemplates");
       const sharedUI = getSharedUIComponents();
       const matchingKey = Object.keys(sharedUI).find(k => filePath.endsWith(k.replace(/^\//, "")) || filePath === k);
       if (matchingKey && sharedUI[matchingKey]) {
