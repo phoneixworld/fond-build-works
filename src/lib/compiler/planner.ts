@@ -35,25 +35,22 @@ export function planTaskGraph(ctx: BuildContext): TaskGraph {
   });
   tasks.push(infraTask);
 
-  // ── Pass 2: Auth (if needed) ──────────────────────────────────────
+  // ── Pass 2: Auth (always generated — build prompt mandates AuthContext) ──
 
-  let authTaskId: string | undefined;
-  if (ir.constraints.includes("auth_required") || ir.roles.length > 0) {
-    const authTask = createTask({
-      label: "auth",
-      type: "frontend",
-      description: `Auth system with roles: ${ir.roles.map(r => r.name).join(", ") || "user"}`,
-      produces: [
-        "/contexts/AuthContext.jsx",
-        "/pages/Auth/LoginPage.jsx",
-        "/components/ProtectedRoute.jsx",
-      ],
-      dependsOn: [infraTask.id],
-      priority: 1,
-    });
-    tasks.push(authTask);
-    authTaskId = authTask.id;
-  }
+  const authTask = createTask({
+    label: "auth",
+    type: "frontend",
+    description: `Auth system with roles: ${ir.roles.map(r => r.name).join(", ") || "user"}. Must create AuthContext, LoginPage, and ProtectedRoute.`,
+    produces: [
+      "/contexts/AuthContext.jsx",
+      "/pages/Auth/LoginPage.jsx",
+      "/components/ProtectedRoute.jsx",
+    ],
+    dependsOn: [infraTask.id],
+    priority: 1,
+  });
+  tasks.push(authTask);
+  const authTaskId = authTask.id;
 
   // ── Pass 3: Data models / backend services ────────────────────────
 
