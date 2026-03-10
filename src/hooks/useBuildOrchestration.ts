@@ -954,7 +954,7 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
 
       // ── GATHER: User is providing requirements ──
       if (convResult.action === "gather") {
-        const phase = conversationAddPhase?.(finalText, hasImages, images);
+        const phase = conversationAddPhase?.(finalText, hasImages, images); // 3rd arg = imageUrls
         const ackText = conversationGenerateAck?.(phase) || "✅ Got it! Send the next phase when ready, or say **\"build it\"** to start.";
 
         const content = buildMessageContent(finalText, images);
