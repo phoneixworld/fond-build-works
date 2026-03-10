@@ -28,6 +28,11 @@ const ProjectList = () => {
       </div>
 
       <div className="flex-1 overflow-y-auto p-1.5 space-y-0.5">
+        {/* Pending invites */}
+        <div className="px-1 pb-1">
+          <PendingInvites onAccepted={() => window.location.reload()} />
+        </div>
+
         {projects.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-full text-muted-foreground gap-2 p-4">
             <FolderOpen className="w-8 h-8 opacity-40" />
