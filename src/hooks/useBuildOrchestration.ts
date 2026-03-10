@@ -238,14 +238,14 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
       setCurrentAgent(null);
       isSendingRef.current = false;
       setMessages((prev) => {
-        const msg = "⚠️ Build timed out after 5 minutes. The AI model may be under heavy load — please try again, or break the request into smaller steps.";
+        const msg = "⚠️ Build timed out after 8 minutes. The AI model may be under heavy load — please try again, or break the request into smaller steps.";
         const last = prev[prev.length - 1];
         if (last?.role === "assistant") {
           return prev.map((m, i) => (i === prev.length - 1 ? { ...m, content: msg } : m));
         }
         return [...prev, { role: "assistant", content: msg, timestamp: Date.now() }];
       });
-    }, 300_000);
+    }, 480_000); // 8 minutes for planned builds with multiple tasks
 
     const abortController = new AbortController();
     abortControllerRef.current = abortController;
