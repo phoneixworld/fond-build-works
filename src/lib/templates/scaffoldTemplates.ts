@@ -375,7 +375,7 @@ export function AuthProvider({ children }) {
   const logout = useCallback(() => { setUser(null); localStorage.removeItem("auth_token"); }, []);
 
   return (
-    <AuthContext.Provider value={{ user, loading, login, logout, isAuthenticated: !!user }}>
+    <AuthContext.Provider value={{ user, loading, login, signup, logout, isAuthenticated: !!user }}>
       {children}
     </AuthContext.Provider>
   );
