@@ -862,8 +862,6 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
           isSendingRef.current = false;
           setBuildRetryCount(0);
           if (result.metrics) setBuildMetrics(result.metrics);
-          streamingControllerRef.current?.stop();
-          streamingControllerRef.current = null;
           setTimeout(() => setBuildStreamContent(""), 3000);
 
           const persistMessages = messagesRef.current.map(m => ({
