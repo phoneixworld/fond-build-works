@@ -1,4 +1,5 @@
 import { useMemo, Component, ReactNode, useEffect } from "react";
+import { useProjects } from "@/contexts/ProjectContext";
 import {
   SandpackProvider,
   SandpackPreview as SandpackPreviewPane,
