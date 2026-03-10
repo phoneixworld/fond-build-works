@@ -51,43 +51,6 @@ interface IDEHeaderProps {
   getLockOwner?: (panelId: PanelId) => { email: string; color: string } | null;
 }
 
-/** Extract routes from generated React code */
-function detectRoutes(files: Record<string, string> | null): { path: string; label: string }[] {
-  if (!files) return [];
-  const routes: { path: string; label: string }[] = [];
-  const seen = new Set<string>();
-  for (const [, code] of Object.entries(files)) {
-    const routeMatches = code.matchAll(/<Route\s+[^>]*path\s*=\s*["']([^"']+)["']/g);
-    for (const match of routeMatches) {
-      const path = match[1];
-      if (!seen.has(path)) {
-        seen.add(path);
-        const label = path === "/" || path === "/*" ? "Home" : path.replace(/^\//, "").replace(/[/-]/g, " ").replace(/^\w/, c => c.toUpperCase()).replace(/:\w+/g, "⟨param⟩");
-        routes.push({ path, label });
-      }
-    }
-    for (const match of code.matchAll(/navigate\s*\(\s*["']([^"']+)["']/g)) {
-      const path = match[1];
-      if (!seen.has(path) && path.startsWith("/")) {
-        seen.add(path);
-        routes.push({ path, label: path === "/" ? "Home" : path.replace(/^\//, "").replace(/[/-]/g, " ").replace(/^\w/, c => c.toUpperCase()) });
-      }
-    }
-    for (const match of code.matchAll(/<Link\s+[^>]*to\s*=\s*["']([^"']+)["']/g)) {
-      const path = match[1];
-      if (!seen.has(path) && path.startsWith("/")) {
-        seen.add(path);
-        routes.push({ path, label: path === "/" ? "Home" : path.replace(/^\//, "").replace(/[/-]/g, " ").replace(/^\w/, c => c.toUpperCase()) });
-      }
-    }
-  }
-  routes.sort((a, b) => {
-    if (a.path === "/" || a.path === "/*") return -1;
-    if (b.path === "/" || b.path === "/*") return 1;
-    return a.path.localeCompare(b.path);
-  });
-  return routes;
-}
 
 const IDEHeader = ({
   currentProject,
