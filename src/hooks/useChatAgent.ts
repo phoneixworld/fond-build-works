@@ -11,6 +11,7 @@ import { streamChatAgent, hasBuildConfirmation, stripBuildMarker } from "@/lib/a
 import type { PipelineStep } from "@/lib/agentPipeline";
 import { supabase } from "@/integrations/supabase/client";
 import { type MsgContent, getTextContent } from "@/lib/codeParser";
+import { semanticCacheGet, semanticCacheSet } from "@/lib/semanticCache";
 
 type Msg = { role: "user" | "assistant"; content: MsgContent; timestamp?: number };
 
