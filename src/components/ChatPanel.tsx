@@ -1,4 +1,7 @@
 import { useState, useRef, useEffect, useCallback, forwardRef, useImperativeHandle } from "react";
+import { useSelfHealing } from "@/hooks/useSelfHealing";
+import { useProjectContextCache } from "@/hooks/useProjectContextCache";
+import { useIntentClassification } from "@/hooks/useIntentClassification";
 import { Version } from "@/components/VersionHistory";
 import { User, Sparkles, AlertTriangle, Wand2, ImagePlus, X, ArrowDown, Zap, ShieldCheck, Square } from "lucide-react";
 import VoiceInput from "@/components/VoiceInput";
