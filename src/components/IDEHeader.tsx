@@ -1,17 +1,12 @@
 import { Zap, LogOut, ArrowLeft, ChevronDown, Settings, Pencil, ArrowLeftRight, Lock, User, CreditCard, HelpCircle } from "lucide-react";
-import { RefObject } from "react";
 import { TechStackId } from "@/lib/techStacks";
-import PresenceAvatars from "@/components/PresenceAvatars";
 import PublishExportButtons from "@/components/PublishExportButtons";
-import { usePreview } from "@/contexts/PreviewContext";
-import DirectTouch, { DIRECT_TOUCH_SCRIPT } from "@/components/DirectTouch";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
   DropdownMenuSeparator,
-  DropdownMenuLabel,
 } from "@/components/ui/dropdown-menu";
 import {
   Tooltip,
@@ -22,12 +17,6 @@ import { LucideIcon } from "lucide-react";
 import { RefObject } from "react";
 
 export type PanelId = "code" | "preview" | "cloud" | "marketing";
-
-const VIEWPORTS = [
-  { id: "desktop" as const, label: "Desktop", icon: Monitor },
-  { id: "tablet" as const, label: "Tablet", icon: Tablet },
-  { id: "mobile" as const, label: "Mobile", icon: Smartphone },
-];
 
 interface TabDef {
   id: PanelId;
