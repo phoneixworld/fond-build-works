@@ -11,9 +11,13 @@ import {
 
 const VIEWPORTS = [
   { id: "desktop" as const, label: "Desktop", icon: Monitor },
+const VIEWPORTS = [
+  { id: "desktop" as const, label: "Desktop", icon: Monitor },
   { id: "tablet" as const, label: "Tablet", icon: Tablet },
   { id: "mobile" as const, label: "Mobile", icon: Smartphone },
 ];
+
+const VIEWPORTS_MAP = {
   desktop: { width: "100%", maxWidth: "none" },
   tablet: { width: "768px", maxWidth: "768px" },
   mobile: { width: "375px", maxWidth: "375px" },
