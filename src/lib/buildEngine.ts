@@ -774,12 +774,18 @@ async function runPlannedBuild(
 
   const sortedTasks = topologicalSort(plan.tasks);
   const executableTasks = sortedTasks.filter(t => !t.needsUserInput);
-  const parallelGroups = buildParallelGroups(executableTasks);
+  
+  // FIX 2: For complex builds (many phases), force sequential execution
+  // so each module sees the full workspace from prior modules
+  const isEnterpriseBuild = plan.tasks.length >= 6 || plan.overallComplexity === "complex";
+  const parallelGroups = isEnterpriseBuild 
+    ? executableTasks.map(t => [t]) // Sequential: one task per group
+    : buildParallelGroups(executableTasks);
   
   const metrics = startBuild(executableTasks.length);
   metrics.parallelGroups = parallelGroups.length;
   
-  console.log(`[BuildEngine] ${executableTasks.length} tasks in ${parallelGroups.length} parallel groups: ${parallelGroups.map(g => `[${g.map(t => t.title).join(", ")}]`).join(" → ")}`);
+  console.log(`[BuildEngine] ${executableTasks.length} tasks in ${parallelGroups.length} ${isEnterpriseBuild ? "sequential" : "parallel"} groups: ${parallelGroups.map(g => `[${g.map(t => t.title).join(", ")}]`).join(" → ")}`);
 
   const baseTemplate = getBaseTemplate(config.domainModel);
   let accumulatedFiles: Record<string, string> = config.existingFiles ? { ...config.existingFiles } : { ...baseTemplate };
