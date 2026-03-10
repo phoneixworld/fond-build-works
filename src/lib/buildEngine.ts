@@ -412,6 +412,22 @@ async function executeSingleTask(
             return;
           }
 
+          // Prompt echo detection — reject code that just renders the requirements as content
+          if (detectPromptEcho(parsed.files, prompt) && retryCount < 2) {
+            console.warn(`[BuildEngine] Prompt echo detected — AI rendered requirements as content. Retrying...`);
+            onDelta(`\n[Detected prompt echo — regenerating actual functional UI...]\n`);
+            executeSingleTask(
+              prompt + "\n\n🚨 CRITICAL ERROR: Your previous output rendered the user's requirements/prompt text as visible page content (hero text, paragraphs, etc). This is WRONG. You must BUILD THE ACTUAL WORKING APPLICATION with functional UI components, forms, data tables, navigation — NOT display the requirements as text on the page. Generate the real app NOW.",
+              config,
+              accumulatedCode,
+              onDelta,
+              retryCount + 1,
+              maxTokens,
+              taskType
+            ).then(resolve).catch(reject);
+            return;
+          }
+
           const validationErrors = validateAllFiles(parsed.files);
           
           if (validationErrors.length > 0 && retryCount < 2) {
