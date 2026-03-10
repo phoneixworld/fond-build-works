@@ -17,6 +17,7 @@ import { useRealtimePresence } from "@/hooks/useRealtimePresence";
 import ChatPanel from "@/components/ChatPanel";
 import CodeEditor from "@/components/CodeEditor";
 import CloudPanel from "@/components/CloudPanel";
+import BrandKitGenerator from "@/components/BrandKitGenerator";
 import PreviewPanel from "@/components/PreviewPanel";
 import LandingPage from "@/components/LandingPage";
 import CommandPalette from "@/components/CommandPalette";
