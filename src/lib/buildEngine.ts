@@ -423,6 +423,17 @@ async function executeSingleTask(
             return;
           }
 
+          // Check if the prompt is conversational/phased — if so, the AI was RIGHT
+          // to respond without code. Don't force a retry.
+          const promptLower = prompt.toLowerCase();
+          const isConversationalPrompt = /\b(phase by phase|step by step|i'll give you|ill give you|these are|here are|here is|let me explain|before you start|i'll share|ill share)\b/i.test(promptLower);
+          
+          if (isConversationalPrompt && responseText.trim().length > 20) {
+            console.log(`[BuildEngine] Prompt is conversational/phased — returning chat text without forcing code retry`);
+            resolve({ files: {}, deps: {}, chatText: responseText, modelMs, cached: false });
+            return;
+          }
+
           console.warn(`[BuildEngine] No code in response, retrying (attempt ${retryCount + 1})`);
           executeSingleTask(
             prompt + "\n\nCRITICAL: Your previous response did not contain code. You MUST output React code inside ```react-preview fences with --- /App.jsx markers. Output the code NOW.",
