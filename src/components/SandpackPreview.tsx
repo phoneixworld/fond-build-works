@@ -334,9 +334,10 @@ const DEFAULT_INDEX_HTML = `<!DOCTYPE html>
 </body>
 </html>`;
 
-function buildSandpackFiles(files: SandpackFileSet | null): Record<string, string> {
+function buildSandpackFiles(files: SandpackFileSet | null, projectId: string, supabaseUrl: string, supabaseKey: string): Record<string, string> {
+  const indexJs = buildIndexJs(projectId, supabaseUrl, supabaseKey);
   const base: Record<string, string> = {
-    "/index.js": INDEX_JS,
+    "/index.js": indexJs,
     "/styles.css": DEFAULT_STYLES,
     "/public/index.html": DEFAULT_INDEX_HTML,
   };
@@ -358,7 +359,7 @@ function buildSandpackFiles(files: SandpackFileSet | null): Record<string, strin
   }
 
   if (base["/App.jsx"] && !base["/App.js"]) {
-    base["/index.js"] = INDEX_JS.replace('./App', './App.jsx');
+    base["/index.js"] = indexJs.replace('./App', './App.jsx');
   }
 
   return base;
