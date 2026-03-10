@@ -1,6 +1,6 @@
 import { Zap, LogOut, ArrowLeft, ChevronDown, Command as CommandIcon, MessageCircle, Settings, Pencil, ArrowLeftRight, Lock, User, CreditCard, HelpCircle } from "lucide-react";
 import { forwardRef } from "react";
-import { TECH_STACKS, TechStackId } from "@/lib/techStacks";
+import { TechStackId } from "@/lib/techStacks";
 import PresenceAvatars from "@/components/PresenceAvatars";
 import PublishExportButtons from "@/components/PublishExportButtons";
 import {
@@ -9,10 +9,6 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
   DropdownMenuSeparator,
-  DropdownMenuLabel,
-  DropdownMenuSub,
-  DropdownMenuSubTrigger,
-  DropdownMenuSubContent,
 } from "@/components/ui/dropdown-menu";
 import {
   Tooltip,
