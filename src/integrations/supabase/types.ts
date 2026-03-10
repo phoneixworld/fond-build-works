@@ -88,6 +88,53 @@ export type Database = {
           },
         ]
       }
+      cache_entries: {
+        Row: {
+          cache_key: string
+          cache_type: string
+          cache_value: Json
+          created_at: string
+          expires_at: string
+          hit_count: number
+          id: string
+          project_id: string
+          prompt_hash: string | null
+          ttl_seconds: number
+        }
+        Insert: {
+          cache_key: string
+          cache_type?: string
+          cache_value?: Json
+          created_at?: string
+          expires_at?: string
+          hit_count?: number
+          id?: string
+          project_id: string
+          prompt_hash?: string | null
+          ttl_seconds?: number
+        }
+        Update: {
+          cache_key?: string
+          cache_type?: string
+          cache_value?: Json
+          created_at?: string
+          expires_at?: string
+          hit_count?: number
+          id?: string
+          project_id?: string
+          prompt_hash?: string | null
+          ttl_seconds?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cache_entries_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       deploy_history: {
         Row: {
           created_at: string
