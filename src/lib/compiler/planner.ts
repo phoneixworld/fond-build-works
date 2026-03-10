@@ -79,7 +79,7 @@ export function planTaskGraph(ctx: BuildContext): TaskGraph {
 
     const deps = [...modelTaskIds];
     if (authTaskId && route.auth) deps.push(authTaskId);
-    if (deps.length === 0) deps.push(infraTask.id);
+    if (deps.length === 0) deps.push(infraTask.id, authTaskId);
 
     const pageTask = createTask({
       label: `page:${route.page}`,
