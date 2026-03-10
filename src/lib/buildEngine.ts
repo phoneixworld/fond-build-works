@@ -625,10 +625,18 @@ export async function runBuildEngine(
   config: EngineConfig,
   callbacks: EngineCallbacks
 ): Promise<void> {
-  const isComplex = userPrompt.length > 120 || 
-    /\b(with|and|include|featuring|modules?|sections?)\b.*\b(with|and|include|featuring|modules?|sections?)\b/gi.test(userPrompt);
+  // FIX 2: Detect complex builds from accumulated requirements, not just regex
+  const promptLength = userPrompt.length;
+  const hasMultiplePhases = /Phase \d+/gi.test(userPrompt) && (userPrompt.match(/Phase \d+/gi) || []).length >= 2;
+  const hasModulePlan = /MODULE PLAN|BUILD CHECKLIST|BUILD ORDER/i.test(userPrompt);
+  const hasStructuralComplexity = /\b(with|and|include|featuring|modules?|sections?)\b.*\b(with|and|include|featuring|modules?|sections?)\b/gi.test(userPrompt);
   
+  const isComplex = promptLength > 2000 || hasMultiplePhases || hasModulePlan || hasStructuralComplexity;
   const hasExistingCode = config.existingFiles && Object.keys(config.existingFiles).length > 0;
+  
+  if (isComplex) {
+    console.log(`[BuildEngine] Complex build detected: length=${promptLength}, phases=${hasMultiplePhases}, modulePlan=${hasModulePlan}, structural=${hasStructuralComplexity}`);
+  }
   
   clearValidationCache();
   
