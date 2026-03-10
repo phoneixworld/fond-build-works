@@ -1,5 +1,6 @@
 import { useState, useMemo, useCallback, useRef, useEffect } from "react";
-import { FileCode, Copy, Check, WrapText, Search, Save, Play, SplitSquareHorizontal, X, Server, Monitor } from "lucide-react";
+import { FileCode, Copy, Check, Search, Save, Play, SplitSquareHorizontal, X, Server, Monitor } from "lucide-react";
+import Editor, { type Monaco } from "@monaco-editor/react";
 import RefactorMenu from "@/components/RefactorMenu";
 import { useVirtualFS } from "@/contexts/VirtualFSContext";
 import { usePreview } from "@/contexts/PreviewContext";
@@ -13,48 +14,6 @@ import {
 } from "@/components/ui/resizable";
 import { useToast } from "@/hooks/use-toast";
 
-function colorize(line: string, lang: string): string {
-  let escaped = line
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;");
-
-  if (lang === "html") {
-    escaped = escaped
-      .replace(/(&lt;\/?)([\w-]+)/g, '$1<span class="text-[hsl(var(--ide-chat-user))]">$2</span>')
-      .replace(/\b(class|id|href|src|rel|type|name|content|style|alt|width|height|placeholder|data-[\w-]+)=/g, '<span class="text-[hsl(var(--ide-warning))]">$1</span>=');
-  }
-
-  if (lang === "css") {
-    escaped = escaped
-      .replace(/([\w-]+)\s*:/g, '<span class="text-[hsl(var(--ide-chat-ai))]">$1</span>:');
-  }
-
-  if (lang === "python") {
-    escaped = escaped
-      .replace(/\b(def|class|import|from|return|if|elif|else|for|while|with|as|try|except|finally|raise|pass|break|continue|yield|lambda|and|or|not|in|is|None|True|False|self|async|await)\b/g, '<span class="text-accent">$1</span>')
-      .replace(/(#.*)/g, '<span class="text-muted-foreground">$1</span>')
-      .replace(/(".*?"|'.*?')/g, '<span class="text-[hsl(var(--ide-success))]">$1</span>');
-    return escaped;
-  }
-
-  if (lang === "go") {
-    escaped = escaped
-      .replace(/\b(func|package|import|return|if|else|for|range|switch|case|default|defer|go|chan|select|struct|interface|map|type|var|const|nil|true|false|make|append|len|cap|new|delete|close|panic|recover)\b/g, '<span class="text-accent">$1</span>')
-      .replace(/(\/\/.*)/g, '<span class="text-muted-foreground">$1</span>')
-      .replace(/(".*?")/g, '<span class="text-[hsl(var(--ide-success))]">$1</span>');
-    return escaped;
-  }
-
-  // JS/TS/default
-  escaped = escaped
-    .replace(/(".*?"|'.*?'|`.*?`)/g, '<span class="text-[hsl(var(--ide-success))]">$1</span>')
-    .replace(/\b(const|let|var|function|return|if|else|for|while|import|export|default|from|class|new|this|async|await|try|catch|interface|type|extends|implements|readonly|public|private|protected|static|enum|typeof|keyof|as|in|of|switch|case|break|continue|throw|yield|void|null|undefined|true|false)\b/g, '<span class="text-accent">$1</span>')
-    .replace(/(\/\/.*)/g, '<span class="text-muted-foreground">$1</span>');
-
-  return escaped;
-}
-
 const LANG_ICONS: Record<string, { color: string; label: string }> = {
   typescript: { color: "text-[hsl(var(--ide-chat-user))]", label: "TS" },
   javascript: { color: "text-[hsl(var(--ide-warning))]", label: "JS" },
@@ -67,28 +26,39 @@ const LANG_ICONS: Record<string, { color: string; label: string }> = {
   yaml: { color: "text-destructive", label: "YML" },
 };
 
+/** Map our internal language names to Monaco language IDs */
+function getMonacoLanguage(lang: string, filePath: string): string {
+  const ext = filePath.split(".").pop()?.toLowerCase() || "";
+  const map: Record<string, string> = {
+    ts: "typescript", tsx: "typescriptreact",
+    js: "javascript", jsx: "javascript",
+    html: "html", css: "css", json: "json",
+    md: "markdown", yaml: "yaml", yml: "yaml",
+    py: "python", go: "go",
+  };
+  return map[ext] || lang || "plaintext";
+}
+
 const CodeEditor = () => {
   const { files, activeFile, setActiveFile, getFile, updateFile } = useVirtualFS();
   const { previewHtml, setPreviewHtml } = usePreview();
   const { currentProject, saveProject } = useProjects();
   const { toast } = useToast();
   const [copied, setCopied] = useState(false);
-  const [wordWrap, setWordWrap] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [editing, setEditing] = useState(false);
   const [editContent, setEditContent] = useState("");
   const [dirty, setDirty] = useState(false);
   const [viewMode, setViewMode] = useState<"all" | "frontend" | "backend">("all");
-  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const editorRef = useRef<any>(null);
 
   const currentFile = getFile(activeFile);
   const code = editing ? editContent : (currentFile?.content || "// Select a file from the explorer");
   const lang = currentFile?.language || "text";
-  const lines = code.split("\n");
 
   // Determine if project has backend files
-  const hasBackend = useMemo(() => 
+  const hasBackend = useMemo(() =>
     Object.keys(files).some(p => p.startsWith("server/") || p.startsWith("api/") || p.startsWith("pages/api/")),
     [files]
   );
@@ -132,15 +102,15 @@ const CodeEditor = () => {
     setDirty(false);
   }, [currentFile]);
 
-  const handleEditChange = useCallback((e: React.ChangeEvent<HTMLTextAreaElement>) => {
-    setEditContent(e.target.value);
+  const handleEditorChange = useCallback((value: string | undefined) => {
+    setEditContent(value || "");
     setDirty(true);
   }, []);
 
   const saveEdit = useCallback(() => {
     if (!dirty || !currentFile) return;
     updateFile(activeFile, editContent);
-    
+
     // If editing index.html, update preview live
     if (activeFile === "index.html") {
       setPreviewHtml(editContent);
@@ -148,7 +118,7 @@ const CodeEditor = () => {
         saveProject({ html_content: editContent });
       }
     }
-    
+
     setDirty(false);
     toast({ title: "Saved", description: `${activeFile} updated` });
   }, [dirty, editContent, activeFile, currentFile, updateFile, setPreviewHtml, currentProject, saveProject, toast]);
@@ -206,6 +176,45 @@ const CodeEditor = () => {
   }, [searchQuery, filteredFiles]);
 
   const langInfo = LANG_ICONS[lang] || { color: "text-muted-foreground", label: lang.toUpperCase() };
+  const monacoLang = getMonacoLanguage(lang, activeFile);
+  const lineCount = code.split("\n").length;
+
+  const handleEditorMount = useCallback((editor: any, monaco: Monaco) => {
+    editorRef.current = editor;
+
+    // Configure editor theme to match IDE
+    monaco.editor.defineTheme("phoenix-dark", {
+      base: "vs-dark",
+      inherit: true,
+      rules: [
+        { token: "comment", foreground: "6b7280", fontStyle: "italic" },
+        { token: "keyword", foreground: "c084fc" },
+        { token: "string", foreground: "34d399" },
+        { token: "number", foreground: "f59e0b" },
+        { token: "type", foreground: "60a5fa" },
+      ],
+      colors: {
+        "editor.background": "#0c0c0c",
+        "editor.foreground": "#e2e8f0",
+        "editor.lineHighlightBackground": "#1e293b40",
+        "editor.selectionBackground": "#3b82f640",
+        "editorLineNumber.foreground": "#475569",
+        "editorLineNumber.activeForeground": "#94a3b8",
+        "editor.inactiveSelectionBackground": "#3b82f620",
+        "editorIndentGuide.background": "#1e293b",
+        "editorIndentGuide.activeBackground": "#334155",
+        "editorCursor.foreground": "#3b82f6",
+        "editorWhitespace.foreground": "#1e293b",
+        "editorWidget.background": "#0f172a",
+        "editorWidget.border": "#1e293b",
+        "editorSuggestWidget.background": "#0f172a",
+        "editorSuggestWidget.border": "#1e293b",
+        "editorSuggestWidget.selectedBackground": "#1e293b",
+        "minimap.background": "#0c0c0c",
+      },
+    });
+    monaco.editor.setTheme("phoenix-dark");
+  }, []);
 
   return (
     <TooltipProvider delayDuration={300}>
@@ -243,7 +252,7 @@ const CodeEditor = () => {
             </div>
           </ResizablePanel>
           <ResizableHandle className="w-px bg-border hover:bg-primary transition-colors" />
-          
+
           {/* Code panel */}
           <ResizablePanel defaultSize={75}>
             <div className="flex flex-col h-full">
@@ -331,7 +340,6 @@ const CodeEditor = () => {
                   <RefactorMenu
                     currentFile={activeFile}
                     onRefactorAction={(action, prompt) => {
-                      // Dispatch refactor prompt to chat panel
                       const event = new CustomEvent("refactor-action", { detail: { action, prompt } });
                       window.dispatchEvent(event);
                       toast({ title: "Refactor", description: `Sent "${action}" to chat editor` });
@@ -348,17 +356,6 @@ const CodeEditor = () => {
                       </button>
                     </TooltipTrigger>
                     <TooltipContent side="bottom" className="text-xs">Search files (⌘⇧F)</TooltipContent>
-                  </Tooltip>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <button
-                        onClick={() => setWordWrap(!wordWrap)}
-                        className={`p-1.5 rounded transition-colors ${wordWrap ? "text-primary bg-primary/10" : "text-muted-foreground hover:text-foreground"}`}
-                      >
-                        <WrapText className="w-3.5 h-3.5" />
-                      </button>
-                    </TooltipTrigger>
-                    <TooltipContent side="bottom" className="text-xs">Toggle word wrap</TooltipContent>
                   </Tooltip>
                   <Tooltip>
                     <TooltipTrigger asChild>
@@ -418,50 +415,63 @@ const CodeEditor = () => {
                 )}
               </div>
 
-              {/* Code area */}
-              <div className="flex-1 overflow-auto font-mono text-xs leading-6 relative">
-                {editing ? (
-                  <textarea
-                    ref={textareaRef}
-                    value={editContent}
-                    onChange={handleEditChange}
-                    spellCheck={false}
-                    className="w-full h-full bg-transparent text-foreground outline-none resize-none p-3 pl-14 leading-6 font-mono text-xs"
-                    style={{ tabSize: 2 }}
-                    onKeyDown={(e) => {
-                      // Tab support
-                      if (e.key === "Tab") {
-                        e.preventDefault();
-                        const start = e.currentTarget.selectionStart;
-                        const end = e.currentTarget.selectionEnd;
-                        const val = editContent;
-                        setEditContent(val.substring(0, start) + "  " + val.substring(end));
-                        requestAnimationFrame(() => {
-                          if (textareaRef.current) {
-                            textareaRef.current.selectionStart = textareaRef.current.selectionEnd = start + 2;
-                          }
-                        });
-                      }
-                    }}
-                  />
-                ) : (
-                  lines.map((line, i) => (
-                    <div key={i} className="flex hover:bg-[hsl(var(--ide-line-highlight))]">
-                      <span className="w-12 text-right pr-4 text-[hsl(var(--ide-gutter))] select-none shrink-0">
-                        {i + 1}
-                      </span>
-                      <pre className={`text-foreground ${wordWrap ? "whitespace-pre-wrap break-all" : ""}`}>
-                        <code dangerouslySetInnerHTML={{ __html: colorize(line, lang) }} />
-                      </pre>
+              {/* Monaco Editor */}
+              <div className="flex-1 min-h-0">
+                <Editor
+                  height="100%"
+                  language={monacoLang}
+                  value={code}
+                  onChange={editing ? handleEditorChange : undefined}
+                  onMount={handleEditorMount}
+                  theme="phoenix-dark"
+                  options={{
+                    readOnly: !editing,
+                    fontSize: 13,
+                    fontFamily: "'JetBrains Mono', 'Fira Code', 'Cascadia Code', Menlo, Monaco, 'Courier New', monospace",
+                    fontLigatures: true,
+                    lineNumbers: "on",
+                    minimap: { enabled: true, scale: 1, showSlider: "mouseover" },
+                    scrollBeyondLastLine: false,
+                    wordWrap: "on",
+                    tabSize: 2,
+                    insertSpaces: true,
+                    automaticLayout: true,
+                    bracketPairColorization: { enabled: true },
+                    guides: { bracketPairs: true, indentation: true },
+                    smoothScrolling: true,
+                    cursorBlinking: "smooth",
+                    cursorSmoothCaretAnimation: "on",
+                    renderWhitespace: "selection",
+                    padding: { top: 8, bottom: 8 },
+                    suggest: {
+                      showKeywords: true,
+                      showSnippets: true,
+                    },
+                    quickSuggestions: editing,
+                    folding: true,
+                    foldingStrategy: "indentation",
+                    showFoldingControls: "mouseover",
+                    renderLineHighlight: "all",
+                    overviewRulerLanes: 0,
+                    hideCursorInOverviewRuler: true,
+                    scrollbar: {
+                      verticalScrollbarSize: 6,
+                      horizontalScrollbarSize: 6,
+                      verticalSliderSize: 6,
+                    },
+                  }}
+                  loading={
+                    <div className="flex items-center justify-center h-full text-muted-foreground text-xs">
+                      Loading editor...
                     </div>
-                  ))
-                )}
+                  }
+                />
               </div>
 
               {/* Status bar */}
               <div className="flex items-center justify-between px-3 py-1 border-t border-border bg-[hsl(var(--ide-panel-header))] text-[10px] text-muted-foreground">
                 <div className="flex items-center gap-3">
-                  <span>{lines.length} lines</span>
+                  <span>{lineCount} lines</span>
                   <span>{Object.keys(files).length} files</span>
                   {hasBackend && (
                     <span className="flex items-center gap-1 text-accent">
@@ -473,6 +483,7 @@ const CodeEditor = () => {
                 <div className="flex items-center gap-3">
                   {dirty && <span className="text-[hsl(var(--ide-warning))]">● Modified</span>}
                   <span className={langInfo.color}>{langInfo.label}</span>
+                  <span>Monaco</span>
                 </div>
               </div>
             </div>
