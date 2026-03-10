@@ -314,27 +314,44 @@ function extractAndStripCode(text: string): CodeExtraction {
     cleaned = cleaned.replace(htmlDocPattern, "");
   }
 
+  // 2b. Catch partial HTML docs (e.g. <html>...</html> without <!DOCTYPE>)
+  const partialHtmlPattern = /<html[\s\S]*?<\/html>/gi;
+  const partialMatch = cleaned.match(partialHtmlPattern);
+  if (partialMatch) {
+    hadRawHtml = true;
+    partialMatch.forEach(block => {
+      codeBlocks.push({ language: "html", code: block.trim() });
+    });
+    cleaned = cleaned.replace(partialHtmlPattern, "");
+  }
+
   // 3. Strip orphaned HTML tags that leaked (e.g. <script>, <style>, <div id="root">)
   const leakedTagPatterns = [
     /<script[\s\S]*?<\/script>/gi,
     /<style[\s\S]*?<\/style>/gi,
     /<link\s+[^>]*>/gi,
     /<meta\s+[^>]*>/gi,
+    /<div\s+id=["']root["'][^>]*>[\s\S]*?<\/div>/gi,
   ];
   for (const pattern of leakedTagPatterns) {
     if (pattern.test(cleaned)) {
       hadRawHtml = true;
+      // Reset lastIndex after test()
+      pattern.lastIndex = 0;
       cleaned = cleaned.replace(pattern, "");
     }
   }
 
-  // 4. Strip lines that are clearly CSS/JS artifacts (e.g. "✨ font-family: ...")
+  // 4. Strip lines that are clearly CSS/JS artifacts
   cleaned = cleaned.replace(/^✨\s*[\w\-]+[:=].*$/gm, "").trim();
-  // Strip lines like "💡 { font" or "✨ <meta" etc
   cleaned = cleaned.replace(/^[✨💡]\s*[<{@].*$/gm, "").trim();
+  // Strip lines that look like JSX/HTML attributes (className=, onClick=, etc.)
+  cleaned = cleaned.replace(/^\s*(?:className|onClick|onChange|style|href|src)=["'{].*$/gm, "").trim();
+  // Strip standalone HTML-like lines
+  cleaned = cleaned.replace(/^\s*<\/?\w+[^>]*>\s*$/gm, "").trim();
 
   // 5. Clean up excessive blank lines
-  cleaned = cleaned.replace(/\n{4,}/g, "\n\n\n");
+  cleaned = cleaned.replace(/\n{3,}/g, "\n\n");
 
   return { cleanText: cleaned.trim(), codeBlocks, hadRawHtml };
 }
