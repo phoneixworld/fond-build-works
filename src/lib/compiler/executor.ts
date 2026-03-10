@@ -56,7 +56,7 @@ ${workspaceContext ? `### Current code:\n${workspaceContext}` : ""}
    - /layout/ — layout wrappers
    When importing, always use correct relative paths from the file's location. Example: from /pages/Auth/LoginPage.jsx, import Card as '../../components/ui/Card', AuthContext as '../../contexts/AuthContext'. From /pages/Dashboard.jsx, import as '../components/ui/Card'.
 4. Use the project's data API pattern: fetch(\`\${window.__SUPABASE_URL__}/functions/v1/project-api\`, { body: { project_id: window.__PROJECT_ID__, action, collection, data } })
-4. For auth, use the AuthContext pattern: import { useAuth } from '../contexts/AuthContext'
+5. For auth, use the AuthContext pattern. Import path depends on file location (e.g. from /pages/Auth/LoginPage.jsx use '../../contexts/AuthContext', from /pages/Dashboard.jsx use '../contexts/AuthContext', from /App.jsx use './contexts/AuthContext')
    - AuthContext MUST read window.__PROJECT_ID__, window.__SUPABASE_URL__, window.__SUPABASE_KEY__ for API calls
    - AuthContext MUST call project-auth edge function for signup/login/me actions
    - On app load, AuthContext checks localStorage for a saved token and calls "me" to restore the session
