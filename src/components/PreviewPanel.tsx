@@ -9,7 +9,11 @@ import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator, DropdownMenuLabel,
 } from "@/components/ui/dropdown-menu";
 
-const VIEWPORTS_MAP = {
+const VIEWPORTS = [
+  { id: "desktop" as const, label: "Desktop", icon: Monitor },
+  { id: "tablet" as const, label: "Tablet", icon: Tablet },
+  { id: "mobile" as const, label: "Mobile", icon: Smartphone },
+];
   desktop: { width: "100%", maxWidth: "none" },
   tablet: { width: "768px", maxWidth: "768px" },
   mobile: { width: "375px", maxWidth: "375px" },
