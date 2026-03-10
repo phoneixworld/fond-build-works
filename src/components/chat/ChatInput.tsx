@@ -53,10 +53,18 @@ const ChatInput = ({
   const fileInputRef = useRef<HTMLInputElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const currentModelInfo = AI_MODELS.find((m) => m.id === selectedModel) || AI_MODELS[0];
+  const MAX_CHARS = 20000;
   const charCount = input.length;
+  const isOverLimit = charCount > MAX_CHARS;
+  const showCharWarning = charCount > MAX_CHARS * 0.8;
 
   const handleInputChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-    onInputChange(e.target.value);
+    const value = e.target.value;
+    if (value.length > MAX_CHARS) {
+      onInputChange(value.slice(0, MAX_CHARS));
+    } else {
+      onInputChange(value);
+    }
     e.target.style.height = "60px";
     e.target.style.height = Math.min(e.target.scrollHeight, 160) + "px";
   };
