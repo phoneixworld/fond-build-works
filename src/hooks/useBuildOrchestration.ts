@@ -173,8 +173,6 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
     setPipelineStep("error");
     setCurrentAgent(null);
     isSendingRef.current = false;
-    streamingControllerRef.current?.stop();
-    streamingControllerRef.current = null;
   }, [setMessages, setIsBuilding, setBuildStep]);
 
   // ─── Sub-hooks ───
