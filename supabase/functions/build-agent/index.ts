@@ -216,12 +216,19 @@ FIX CHECKLIST:
 6. Output the COMPLETE fixed file — no partial snippets`;
     }
 
-    // Model routing
+    // Model routing — smart selection based on input size and task type
+    const totalInputChars = JSON.stringify(messages).length + systemPrompt.length;
+    const estimatedInputTokens = Math.ceil(totalInputChars / 4);
+    
     let selectedModel: string;
     if (model) {
       selectedModel = model;
     } else if (task_type === "schema" || task_type === "backend") {
       selectedModel = "openai/gpt-5";
+    } else if (estimatedInputTokens > 15000) {
+      // Large inputs need a high-context model to avoid truncated output
+      selectedModel = "google/gemini-2.5-pro";
+      console.log(`[build-agent] Large input (${estimatedInputTokens} est. tokens) → using gemini-2.5-pro`);
     } else {
       selectedModel = "google/gemini-3-flash-preview";
     }
@@ -231,7 +238,12 @@ FIX CHECKLIST:
     if (retry_context) temperature = 0.15;
     else if (current_code) temperature = 0.2;
 
-    const maxTokens = requestedMaxTokens || 64000;
+    // Scale max_tokens based on input complexity
+    let maxTokens = requestedMaxTokens || 64000;
+    if (estimatedInputTokens > 10000 && !requestedMaxTokens) {
+      maxTokens = 100000; // Large requirement = large output needed
+      console.log(`[build-agent] Scaled max_tokens to ${maxTokens} for large input`);
+    }
 
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
