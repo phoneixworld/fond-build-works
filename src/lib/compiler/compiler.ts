@@ -20,6 +20,7 @@ import { verifyWorkspace } from "./verifier";
 import { classifyRepairActions, buildRepairSummary, MAX_REPAIR_ROUNDS } from "./repair";
 import { fixBrokenImports } from "./importFixer";
 import { repairMissingModules } from "./missingModuleGen";
+import { injectMissingProviders } from "./providerInjector";
 import {
   createTrace, startPass, endPass,
   traceTaskStart, traceTaskEnd, finalizeTrace, printTrace,
@@ -200,6 +201,16 @@ export async function compile(
     if (extraFixes > 0) {
       console.log(`[Compiler] 🔗 Post-stub import fixer: corrected ${extraFixes} more path(s)`);
     }
+  }
+
+  // ── Phase 3.7: Provider Injection ──────────────────────────────────
+
+  callbacks.onPhase("injecting-providers", "Checking for missing providers...");
+
+  const providersInjected = injectMissingProviders(workspace);
+  if (providersInjected > 0) {
+    cloudLog.info(`Provider injector: added ${providersInjected} missing provider(s) to App`, "compiler");
+    console.log(`[Compiler] 💉 Provider injector: added ${providersInjected} missing provider(s)`);
   }
 
   // ── Phase 4: Verification ──────────────────────────────────────────
