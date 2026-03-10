@@ -220,6 +220,49 @@ function parseFencedOutput(raw: string): ParseResult {
   };
 }
 
+/**
+ * Attempt to extract and repair JSON from potentially truncated response.
+ */
+function extractAndRepairJson(raw: string): unknown | null {
+  let cleaned = raw
+    .replace(/```json\s*/gi, "")
+    .replace(/```\s*/g, "")
+    .trim();
+
+  const jsonStart = cleaned.search(/[\{\[]/);
+  if (jsonStart === -1) return null;
+
+  const startChar = cleaned[jsonStart];
+  const endChar = startChar === '[' ? ']' : '}';
+  const jsonEnd = cleaned.lastIndexOf(endChar);
+
+  if (jsonEnd <= jsonStart) return null;
+  cleaned = cleaned.substring(jsonStart, jsonEnd + 1);
+
+  try {
+    return JSON.parse(cleaned);
+  } catch {
+    // Fix trailing commas and control characters
+    cleaned = cleaned
+      .replace(/,\s*}/g, "}")
+      .replace(/,\s*]/g, "]")
+      .replace(/[\x00-\x1F\x7F]/g, "");
+
+    try {
+      return JSON.parse(cleaned);
+    } catch {
+      // Try truncated array recovery: find last complete object
+      const lastBrace = cleaned.lastIndexOf("}");
+      if (lastBrace > 0 && startChar === '[') {
+        try {
+          return JSON.parse(cleaned.substring(0, lastBrace + 1) + "]");
+        } catch { /* unrecoverable */ }
+      }
+      return null;
+    }
+  }
+}
+
 function parseJsonOutput(raw: string): ParseResult {
   // Look for JSON blocks: {"files": { "/App.jsx": "..." }}
   const jsonPatterns = [
@@ -231,28 +274,24 @@ function parseJsonOutput(raw: string): ParseResult {
     const match = raw.match(pattern);
     if (!match) continue;
 
-    try {
-      const jsonStr = match[1] || match[0];
-      const parsed = JSON.parse(jsonStr);
-      if (parsed.files && typeof parsed.files === "object") {
-        const files: Record<string, string> = {};
-        for (const [path, content] of Object.entries(parsed.files)) {
-          if (typeof content === "string") {
-            const normalizedPath = path.startsWith("/") ? path : `/${path}`;
-            files[normalizedPath] = content;
-          }
-        }
-        if (Object.keys(files).length > 0) {
-          return {
-            chatText: raw.replace(match[0], "").trim(),
-            files,
-            deps: parsed.dependencies || {},
-            parseStrategy: "json-structured",
-          };
+    const jsonStr = match[1] || match[0];
+    const parsed = extractAndRepairJson(jsonStr);
+    if (parsed && typeof parsed === "object" && (parsed as any).files) {
+      const files: Record<string, string> = {};
+      for (const [path, content] of Object.entries((parsed as any).files)) {
+        if (typeof content === "string") {
+          const normalizedPath = path.startsWith("/") ? path : `/${path}`;
+          files[normalizedPath] = content;
         }
       }
-    } catch {
-      continue;
+      if (Object.keys(files).length > 0) {
+        return {
+          chatText: raw.replace(match[0], "").trim(),
+          files,
+          deps: (parsed as any).dependencies || {},
+          parseStrategy: "json-structured",
+        };
+      }
     }
   }
 
