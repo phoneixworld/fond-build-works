@@ -175,6 +175,12 @@ export function autoCreateStubFiles(
     if (/^[A-Z]/.test(componentName)) {
       allFiles[filePath] = `import React from "react";\n\nexport default function ${componentName}({ children }) {\n  return (\n    <div className="p-4">\n      {children || <p className="text-gray-400">${componentName} loading...</p>}\n    </div>\n  );\n}\n`;
     } else {
+      // Don't overwrite shared UI components with empty stubs
+      const sharedUIFiles = ["/components/ui/Toast.jsx", "/components/ui/Toast.js", "/components/ui/Spinner.jsx", "/components/ui/DataTable.jsx"];
+      if (sharedUIFiles.some(f => filePath === f || filePath.endsWith(f))) {
+        console.log("[BuildValidator] Skipped stub for shared UI component: " + filePath);
+        continue;
+      }
       allFiles[filePath] = `// Auto-generated stub for ${componentName}\nexport default {};\n`;
     }
     console.log("[BuildValidator] Auto-created stub: " + filePath);

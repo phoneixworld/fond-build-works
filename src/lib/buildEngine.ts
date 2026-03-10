@@ -341,7 +341,8 @@ async function executeSingleTask(
   onDelta: (chunk: string) => void,
   retryCount = 0,
   maxTokens?: number,
-  taskType?: string
+  taskType?: string,
+  originalUserPrompt?: string
 ): Promise<{ files: Record<string, string>; deps: Record<string, string>; chatText: string; modelMs: number; cached: boolean }> {
   const cacheKey = getTaskCacheKey(prompt, accumulatedCode);
   const cached = getCachedTaskOutput(cacheKey);
@@ -413,7 +414,8 @@ async function executeSingleTask(
           }
 
           // Prompt echo detection — reject code that just renders the requirements as content
-          if (detectPromptEcho(parsed.files, prompt) && retryCount < 2) {
+          const echoCheckText = originalUserPrompt || prompt;
+          if (detectPromptEcho(parsed.files, echoCheckText) && retryCount < 2) {
             console.warn(`[BuildEngine] Prompt echo detected — AI rendered requirements as content. Retrying...`);
             onDelta(`\n[Detected prompt echo — regenerating actual functional UI...]\n`);
             executeSingleTask(
@@ -423,7 +425,8 @@ async function executeSingleTask(
               onDelta,
               retryCount + 1,
               maxTokens,
-              taskType
+              taskType,
+              originalUserPrompt
             ).then(resolve).catch(reject);
             return;
           }
@@ -730,7 +733,7 @@ async function runDirectBuild(
     ? buildFullCodeContext(config.existingFiles) 
     : buildFullCodeContext(getBaseTemplate(config.domainModel));
   
-  const result = await executeSingleTask(prompt, config, existingCode, callbacks.onDelta);
+  const result = await executeSingleTask(prompt, config, existingCode, callbacks.onDelta, 0, undefined, undefined, prompt);
   
   if (Object.keys(result.files).length === 0) {
     completeTask(taskMetrics, { fileCount: 0, totalFileSize: 0, modelLatencyMs: result.modelMs, validationLatencyMs: 0, mergeLatencyMs: 0, retryCount: 0, cached: result.cached, status: "failed" });
@@ -937,7 +940,7 @@ ${existingFileList}
         if (reductionPercent > 0) console.log(`[BuildEngine] Task "${task.title}" context reduced by ${reductionPercent}% (budget: 48KB)`);
         // Scale max tokens based on task complexity — complex tasks need more output room
         const taskMaxTokens = taskType === "frontend" ? 24000 : 16000;
-        const taskResult = await executeSingleTask(taskPrompt, config, codeContext, callbacks.onDelta, 0, taskMaxTokens, taskType);
+        const taskResult = await executeSingleTask(taskPrompt, config, codeContext, callbacks.onDelta, 0, taskMaxTokens, taskType, prompt);
         
         const totalSize = Object.values(taskResult.files).reduce((s, c) => s + c.length, 0);
         completeTask(taskMet, {
