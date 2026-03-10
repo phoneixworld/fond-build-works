@@ -100,6 +100,9 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
     setHealAttempts, resetHealing, inputRef,
     selectedModel, selectedTheme,
     fetchProjectContext, classifyUserIntent, fastClassifyLocal,
+    conversationAnalyze, conversationAddPhase, conversationGetRequirements,
+    conversationStartBuilding, conversationCompleteBuild, conversationGenerateAck,
+    conversationMode,
   } = config;
 
   const [buildStreamContent, setBuildStreamContent] = useState("");
