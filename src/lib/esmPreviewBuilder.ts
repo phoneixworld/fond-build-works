@@ -90,6 +90,9 @@ function rewriteImports(
   fileMap: Map<string, string>,
   blobUrls: Map<string, string>
 ): string {
+  // Strip CSS imports (they're handled via <style> injection)
+  code = code.replace(/^\s*import\s+['"][^'"]+\.css['"]\s*;?\s*$/gm, "// [CSS handled by style tag]");
+  
   // Rewrite relative imports to blob URLs
   return code.replace(
     /from\s+['"](\.[^'"]+)['"]/g,
@@ -100,18 +103,18 @@ function rewriteImports(
         return `from "${blobUrl}"`;
       }
       // Try common extensions
-      for (const ext of [".js", ".jsx", ".ts", ".tsx", "/index.js", "/index.tsx"]) {
-        const tryPath = resolved.replace(/\.\w+$/, "") + ext;
+      for (const ext of [".js", ".jsx", ".ts", ".tsx", "/index.js", "/index.jsx", "/index.tsx", "/index.ts"]) {
+        const noExt = resolved.replace(/\.\w+$/, "");
+        const tryPath = noExt + ext;
         const tryBlob = blobUrls.get(tryPath);
         if (tryBlob) return `from "${tryBlob}"`;
       }
-      // Also try without extension
-      const noExt = resolved.replace(/\.\w+$/, "");
+      // Try resolved path as-is with extensions
       for (const ext of [".js", ".jsx", ".ts", ".tsx"]) {
-        const tryBlob = blobUrls.get(noExt + ext);
+        const tryBlob = blobUrls.get(resolved + ext);
         if (tryBlob) return `from "${tryBlob}"`;
       }
-      console.warn(`[ESM] Unresolved import: ${importPath} from ${filePath}`);
+      console.warn(`[ESM] Unresolved import: ${importPath} from ${filePath} (resolved: ${resolved})`);
       return match;
     }
   );
