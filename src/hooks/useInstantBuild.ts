@@ -176,12 +176,23 @@ ${Object.entries(files).map(([path, code]) => `--- ${path}\n${code}`).join("\n\n
                     const segments = resolved.split("/");
                     const compName = segments[segments.length - 1].replace(/\.\w+$/, "");
                     const stubPath = resolved.match(/\.\w+$/) ? resolved : resolved + ".jsx";
-                    if (/^[A-Z]/.test(compName)) {
+                    // Don't overwrite shared UI components that exist in the scaffold template
+                    const sharedUIFiles = ["/components/ui/Toast.jsx", "/components/ui/Toast.js", "/components/ui/Spinner.jsx", "/components/ui/DataTable.jsx"];
+                    if (sharedUIFiles.some(f => stubPath === f || stubPath.endsWith(f))) {
+                      // Import the real component from scaffold templates instead of stubbing
+                      const { getSharedUIComponents } = await import("@/lib/templates/scaffoldTemplates");
+                      const shared = getSharedUIComponents();
+                      if (shared[stubPath]) {
+                        reactResult.files![stubPath] = shared[stubPath];
+                        console.log("[InstantBuild] Restored shared UI component:", stubPath);
+                      }
+                    } else if (/^[A-Z]/.test(compName)) {
                       reactResult.files![stubPath] = `import React from "react";\n\nexport default function ${compName}({ children }) {\n  return <div className="p-4">{children || "${compName}"}</div>;\n}\n`;
+                      console.log("[InstantBuild] Auto-created stub:", stubPath);
                     } else {
                       reactResult.files![stubPath] = `export default {};\n`;
+                      console.log("[InstantBuild] Auto-created stub:", stubPath);
                     }
-                    console.log("[InstantBuild] Auto-created stub:", stubPath);
                   }
                 }
               }
