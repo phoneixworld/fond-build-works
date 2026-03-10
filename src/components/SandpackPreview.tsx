@@ -132,35 +132,43 @@ function reportRoute() {
     window.parent.postMessage({ type: "route-change", path: location.pathname + location.search + location.hash }, "*");
   } catch(e) {}
 }
-try {
-  const origPushState = history.pushState.bind(history);
-  const origReplaceState = history.replaceState.bind(history);
-  Object.defineProperty(history, "pushState", {
-    configurable: true,
-    writable: true,
-    value: function() { origPushState.apply(history, arguments); reportRoute(); }
-  });
-  Object.defineProperty(history, "replaceState", {
-    configurable: true,
-    writable: true,
-    value: function() { origReplaceState.apply(history, arguments); reportRoute(); }
-  });
-} catch(e) { /* readonly in sandbox */ }
+
+// Safely patch history methods — Sandpack may freeze these
+(function patchHistory() {
+  try {
+    var _push = history.pushState;
+    var _replace = history.replaceState;
+    history.pushState = function pushState() {
+      var r = _push.apply(this, arguments);
+      reportRoute();
+      return r;
+    };
+    history.replaceState = function replaceState() {
+      var r = _replace.apply(this, arguments);
+      reportRoute();
+      return r;
+    };
+  } catch(e) {
+    // Sandpack readonly — fall back to polling
+    var _lastHref = location.href;
+    setInterval(function() {
+      if (location.href !== _lastHref) { _lastHref = location.href; reportRoute(); }
+    }, 300);
+  }
+})();
 window.addEventListener("popstate", reportRoute);
 
 // Listen for navigation commands from parent
 window.addEventListener("message", function(e) {
-  if (e.data?.type === "navigate" && e.data.path) {
+  if (e.data && e.data.type === "navigate" && e.data.path) {
     try { history.pushState(null, "", e.data.path); } catch(ex) {}
     window.dispatchEvent(new PopStateEvent("popstate"));
   }
 });
 
-const root = createRoot(document.getElementById("root"));
+var root = createRoot(document.getElementById("root"));
 root.render(
-  <StrictMode>
-    <App />
-  </StrictMode>
+  React.createElement(StrictMode, null, React.createElement(App))
 );
 `;
 
