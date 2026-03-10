@@ -252,9 +252,7 @@ const IDEHeader = ({
 
       {/* Right column — aligns with preview panel */}
       <div className="flex items-center gap-1 flex-1 pr-1.5">
-        {/* Preview controls left-aligned in this column */}
         {isPreview && (
-          <div className="flex items-center gap-1">
           <>
             <Tooltip>
               <TooltipTrigger asChild>
@@ -289,7 +287,7 @@ const IDEHeader = ({
               <TooltipContent side="bottom" className="text-xs">Forward</TooltipContent>
             </Tooltip>
 
-            <div className="flex items-center gap-1.5 bg-secondary rounded-lg px-2 py-1 min-w-0 w-[320px]">
+            <div className="flex items-center gap-1.5 bg-secondary rounded-lg px-2 py-1 min-w-0 flex-1">
               <Globe className="w-3 h-3 text-muted-foreground flex-shrink-0" />
               {isEditingUrl ? (
                 <input
@@ -332,12 +330,10 @@ const IDEHeader = ({
               </TooltipTrigger>
               <TooltipContent side="bottom" className="text-xs">Refresh</TooltipContent>
             </Tooltip>
-
-            <div className="w-px h-4 bg-border mx-0.5" />
           </>
         )}
 
-        {onSwapLayout && (
+        <div className="ml-auto flex items-center gap-1">
           <Tooltip>
             <TooltipTrigger asChild>
               <button onClick={onSwapLayout} className={`p-1.5 rounded-md transition-colors ${layoutSwapped ? "text-primary bg-primary/10" : "text-muted-foreground hover:text-foreground hover:bg-secondary"}`}>
