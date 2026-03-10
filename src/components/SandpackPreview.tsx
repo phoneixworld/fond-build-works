@@ -1,4 +1,4 @@
-import { useMemo, Component, ReactNode } from "react";
+import { useMemo, Component, ReactNode, useEffect } from "react";
 import {
   SandpackProvider,
   SandpackPreview as SandpackPreviewPane,
@@ -6,6 +6,7 @@ import {
 } from "@codesandbox/sandpack-react";
 import { usePreview, SandpackFileSet } from "@/contexts/PreviewContext";
 import { AlertTriangle, RefreshCw } from "lucide-react";
+import { transform } from "sucrase";
 
 // ─── Error Boundary ───────────────────────────────────────────────────────────
 interface ErrorBoundaryState {
