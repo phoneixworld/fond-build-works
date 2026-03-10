@@ -166,6 +166,7 @@ export async function compile(
           error: err.message,
         });
 
+        cloudLog.error(`Task '${task.label}' failed: ${err.message}`, "compiler");
         console.error(`[Compiler] ❌ Task '${task.label}' failed:`, err.message);
       }
     }
