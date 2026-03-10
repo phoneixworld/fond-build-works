@@ -32,6 +32,7 @@ const ESMPreview = ({ viewport, initialPath }: ESMPreviewProps) => {
   const ready = hasAppEntry(sandpackFiles) && !isBuilding;
 
   const buildResult = useMemo(() => {
+    console.log("[ESMPreview] ready:", ready, "sandpackFiles:", sandpackFiles ? Object.keys(sandpackFiles).length : 0, "isBuilding:", isBuilding, "hasApp:", hasAppEntry(sandpackFiles));
     if (!ready || !sandpackFiles) return null;
     
     try {
@@ -42,9 +43,11 @@ const ESMPreview = ({ viewport, initialPath }: ESMPreviewProps) => {
         supabaseUrl,
         supabaseKey
       );
+      console.log("[ESMPreview] Build result: fileCount=", result.fileCount, "errors=", result.errors, "htmlLength=", result.html?.length);
       setError(null);
       return result;
     } catch (e: any) {
+      console.error("[ESMPreview] Build exception:", e);
       setError(e.message);
       return null;
     }
