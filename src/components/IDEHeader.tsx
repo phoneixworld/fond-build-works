@@ -197,7 +197,7 @@ const IDEHeader = ({
         </Tooltip>
       </div>
 
-      {/* Center: Tabs + Preview toolbar */}
+      {/* Center: Tabs */}
       <div className="flex items-center gap-2 mx-auto min-w-0">
         {/* Primary tabs */}
         <div className="flex items-center gap-0.5 bg-secondary/40 rounded-lg p-0.5 shrink-0">
@@ -238,124 +238,6 @@ const IDEHeader = ({
             );
           })}
         </div>
-
-        {/* Preview toolbar — only when preview tab active */}
-        {isPreview && (
-          <>
-            <div className="w-px h-4 bg-border shrink-0" />
-
-            {/* Nav arrows + refresh */}
-            <div className="flex items-center gap-0.5 shrink-0">
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <button onClick={() => { const iframe = document.querySelector('.sp-preview-iframe') as HTMLIFrameElement; iframe?.contentWindow?.history.back(); }} className="p-1 text-muted-foreground hover:text-foreground transition-colors rounded-md hover:bg-muted/50">
-                    <ChevronLeft className="w-3.5 h-3.5" />
-                  </button>
-                </TooltipTrigger>
-                <TooltipContent side="bottom" className="text-xs">Back</TooltipContent>
-              </Tooltip>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <button onClick={() => { const iframe = document.querySelector('.sp-preview-iframe') as HTMLIFrameElement; iframe?.contentWindow?.history.forward(); }} className="p-1 text-muted-foreground hover:text-foreground transition-colors rounded-md hover:bg-muted/50">
-                    <ChevronRight className="w-3.5 h-3.5" />
-                  </button>
-                </TooltipTrigger>
-                <TooltipContent side="bottom" className="text-xs">Forward</TooltipContent>
-              </Tooltip>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <button onClick={triggerRefresh} className="p-1 text-muted-foreground hover:text-foreground transition-colors rounded-md hover:bg-muted/50">
-                    <RefreshCw className={`w-3.5 h-3.5 ${isBuilding ? "animate-spin" : ""}`} />
-                  </button>
-                </TooltipTrigger>
-                <TooltipContent side="bottom" className="text-xs">Refresh preview</TooltipContent>
-              </Tooltip>
-            </div>
-
-            {/* URL bar */}
-            <div className="flex items-center gap-1.5 bg-secondary rounded-lg px-2 py-1 min-w-0 max-w-[280px] flex-1">
-              <Globe className="w-3 h-3 text-muted-foreground flex-shrink-0" />
-              {isEditingUrl ? (
-                <input
-                  ref={urlInputRef}
-                  value={urlInput}
-                  onChange={(e) => setUrlInput(e.target.value)}
-                  onBlur={handleUrlSubmit}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") handleUrlSubmit();
-                    if (e.key === "Escape") { setIsEditingUrl(false); setUrlInput(currentPath); }
-                  }}
-                  className="flex-1 bg-transparent text-xs text-foreground outline-none min-w-0"
-                  autoFocus
-                  spellCheck={false}
-                />
-              ) : (
-                <button
-                  onClick={() => { setIsEditingUrl(true); setTimeout(() => urlInputRef.current?.select(), 0); }}
-                  className="flex-1 text-left text-xs text-muted-foreground hover:text-foreground transition-colors truncate min-w-0"
-                >
-                  <span className="text-muted-foreground/60">phoneix.world</span>
-                  <span className="text-foreground font-medium">{currentPath}</span>
-                </button>
-              )}
-
-              {previewMode === "sandpack" && hasRoutes && (
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <button className="flex items-center gap-0.5 px-1 py-0.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors flex-shrink-0">
-                      <MapPin className="w-3 h-3" />
-                      <ChevronDown className="w-2.5 h-2.5" />
-                    </button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end" className="min-w-[180px]">
-                    <DropdownMenuLabel className="text-[10px] text-muted-foreground uppercase tracking-wider">
-                      Pages ({detectedRoutes.length})
-                    </DropdownMenuLabel>
-                    <DropdownMenuSeparator />
-                    {detectedRoutes.map((route) => (
-                      <DropdownMenuItem key={route.path} onClick={() => navigateToRoute(route.path)} className={`text-xs gap-2 ${currentPath === route.path ? "bg-primary/10 text-primary font-medium" : ""}`}>
-                        <span className="font-mono text-muted-foreground text-[10px] min-w-[60px]">{route.path}</span>
-                        <span>{route.label}</span>
-                      </DropdownMenuItem>
-                    ))}
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              )}
-            </div>
-
-            {/* Viewport cycle toggle */}
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <button
-                  onClick={() => {
-                    const order = VIEWPORTS.map(v => v.id);
-                    const idx = order.indexOf(viewport);
-                    setViewport(order[(idx + 1) % order.length]);
-                  }}
-                  className="p-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-all shrink-0"
-                >
-                  {(() => {
-                    const Icon = VIEWPORTS.find(v => v.id === viewport)!.icon;
-                    return <Icon className="w-3.5 h-3.5" />;
-                  })()}
-                </button>
-              </TooltipTrigger>
-              <TooltipContent side="bottom" className="text-xs">
-                {VIEWPORTS.find(v => v.id === viewport)!.label} — click to switch
-              </TooltipContent>
-            </Tooltip>
-
-            {/* Open in new tab */}
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <button className="p-1 text-muted-foreground hover:text-foreground transition-colors rounded-md hover:bg-muted/50 shrink-0">
-                  <ExternalLink className="w-3.5 h-3.5" />
-                </button>
-              </TooltipTrigger>
-              <TooltipContent side="bottom" className="text-xs">Open in new tab</TooltipContent>
-            </Tooltip>
-          </>
-        )}
       </div>
 
       {/* Right: Actions + User menu */}

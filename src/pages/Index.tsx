@@ -33,7 +33,6 @@ import { AnimatePresence } from "framer-motion";
 import { TooltipProvider } from "@/components/ui/tooltip";
 
 const PRIMARY_TABS: { id: PanelId; label: string; icon: any; iconOnly?: boolean }[] = [
-  { id: "preview", label: "Preview", icon: Eye },
   { id: "code", label: "Code", icon: Code, iconOnly: true },
   { id: "cloud", label: "Cloud", icon: Cloud, iconOnly: true },
   { id: "marketing", label: "Brand", icon: Palette, iconOnly: true },
