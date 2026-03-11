@@ -76,8 +76,8 @@ const Auth = () => {
         <div className="relative z-10 flex flex-col justify-between p-12 w-full">
           {/* Top: Logo */}
           <div className="flex items-center gap-3">
-            <img src="/logo.png" alt="Phoneix World" className="w-10 h-10 rounded-xl object-cover shadow-lg shadow-primary/25" />
-            <span className="text-xl font-bold text-white tracking-tight">Phoneix World</span>
+            <img src="/logo.png" alt="Phoenix World" className="w-10 h-10 rounded-xl object-cover shadow-lg shadow-primary/25" />
+            <span className="text-xl font-bold text-white tracking-tight">Phoenix World</span>
           </div>
 
           {/* Center: Hero content */}
