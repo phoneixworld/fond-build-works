@@ -965,6 +965,9 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
     if (!text && images.length === 0) return;
     if (isSendingRef.current || isLoadingRef.current) return;
 
+    const smartSendProjectId = currentProject?.id;
+    const isSmartSendStale = () => !smartSendProjectId || (lastProjectIdRef.current !== null && lastProjectIdRef.current !== smartSendProjectId);
+
     const hasImages = images.length > 0;
     // If user sends images with no text, do NOT auto-generate "Replicate this design"
     // Instead, treat as requirements with images
