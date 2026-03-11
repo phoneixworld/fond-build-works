@@ -168,6 +168,8 @@ __exports__.safeURL = function safeURL(url, base) {
       }
     })();
 
+    // ── Error Bridge ──
+    function __phoenixError__(msg, extra) {
       console.error("[Phoenix Preview]", msg, extra || "");
       window.parent.postMessage({ type: "preview-error", msg: String(msg), extra: extra || null }, "*");
     }
