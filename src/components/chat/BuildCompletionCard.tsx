@@ -54,7 +54,7 @@ function RuntimeBadge({ status, summary }: { status: RuntimeStatus; summary: str
 }
 
 export default function BuildCompletionCard({ result, phases, onViewPreview }: BuildCompletionCardProps) {
-  const { filesChanged, totalFiles } = result;
+  const { filesChanged, totalFiles, chatSummary } = result;
   const runtimeStatus: RuntimeStatus = result.runtimeStatus || "pending";
   const runtimeChecks = result.runtimeChecks || [];
   const runtimeSummary = result.runtimeSummary || "Runtime checks not run yet.";
