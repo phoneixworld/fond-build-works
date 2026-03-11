@@ -876,6 +876,9 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
             console.warn(`[Compiler] ⛔ Blocked cross-project file injection`);
             return;
           }
+          // Mark task done in pipeline card
+          setCompilerTasks(prev => prev.map(t => t.label === task.label ? { ...t, status: "done" as const } : t));
+
           // Update preview with accumulated files on each task completion
           // BUT skip interim refreshes for large workspaces (>30 files) to avoid thrashing
           if (Object.keys(files).length > 0) {
@@ -884,7 +887,6 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
             const totalFileCount = Object.keys(mergedFiles).length;
             
             if (totalFileCount > 30) {
-              // Large workspace: only update internal ref, defer Sandpack refresh to onComplete
               sandpackFilesRef.current = mergedFiles;
               syncSandpackToVirtualFS(mergedFiles);
               console.log(`[Compiler] Large workspace (${totalFileCount} files) — deferring preview refresh`);
@@ -897,6 +899,7 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
         },
         onTaskError: (task, error) => {
           console.error(`[Compiler] Task '${task.label}' failed:`, error);
+          setCompilerTasks(prev => prev.map(t => t.label === task.label ? { ...t, status: "done" as const } : t));
         },
         onVerification: (result) => {
           if (result.ok) {
