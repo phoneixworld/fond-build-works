@@ -141,6 +141,34 @@ __exports__.safeURL = function safeURL(url, base) {
       return "https://placehold.co/400x300?text=" + encodeURIComponent(cleaned);
     };
 
+    // ── Safe URL Constructor (for library code in srcdoc) ──
+    // Libraries like react-router-dom call new URL(path, location.href) internally.
+    // Inside srcDoc iframes, location.href is "about:srcdoc" which cannot be used
+    // as a base URL for relative resolution. This wrapper catches that and provides
+    // a synthetic base.
+    (function() {
+      var _OrigURL = URL;
+      var _needsPatch = false;
+      try { new _OrigURL("./test", location.href); } catch(e) { _needsPatch = true; }
+      if (_needsPatch) {
+        var _syntheticBase = "https://phoenix.preview/";
+        window.URL = function PhoenixURL(url, base) {
+          if (arguments.length === 1) return new _OrigURL(url);
+          try { return new _OrigURL(url, base); }
+          catch(e) {
+            try { return new _OrigURL(url, _syntheticBase); }
+            catch(e2) { return new _OrigURL(_syntheticBase); }
+          }
+        };
+        window.URL.prototype = _OrigURL.prototype;
+        window.URL.createObjectURL = _OrigURL.createObjectURL.bind(_OrigURL);
+        window.URL.revokeObjectURL = _OrigURL.revokeObjectURL.bind(_OrigURL);
+        window.URL.canParse = _OrigURL.canParse ? _OrigURL.canParse.bind(_OrigURL) : undefined;
+        Object.setPrototypeOf(window.URL, _OrigURL);
+      }
+    })();
+
+    // ── Error Bridge ──
     function __phoenixError__(msg, extra) {
       console.error("[Phoenix Preview]", msg, extra || "");
       window.parent.postMessage({ type: "preview-error", msg: String(msg), extra: extra || null }, "*");
