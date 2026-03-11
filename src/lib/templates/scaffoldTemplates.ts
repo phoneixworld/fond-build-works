@@ -17,6 +17,7 @@
 
 import { type DomainModel } from "@/lib/domainTemplates";
 import { DESIGN_SYSTEM_CSS } from "@/lib/designSystem";
+import { getAllUIComponents, UI_ANIMATIONS_CSS } from "@/lib/templates/uiComponentTemplates";
 
 // ─── Public API ───────────────────────────────────────────────────────────
 
@@ -620,135 +621,7 @@ export default AuthProvider;
 // ─── Shared UI Components ─────────────────────────────────────────────────
 
 export function getSharedUIComponents(): Record<string, string> {
-  return {
-    "/components/ui/Card.jsx": `import React from "react";
-
-export default function Card({ children, className = "" }) {
-  return (
-    <div className={\`bg-white rounded-lg border border-gray-100 p-6 \${className}\`}>
-      {children}
-    </div>
-  );
-}
-`,
-    "/components/ui/Button.jsx": `import React from "react";
-
-export default function Button({ children, onClick, variant = "primary", className = "", ...props }) {
-  const variants = {
-    primary: "bg-blue-500 text-white hover:bg-blue-600",
-    secondary: "bg-gray-100 text-gray-700 hover:bg-gray-200",
-    danger: "bg-red-500 text-white hover:bg-red-600",
-    ghost: "text-gray-600 hover:bg-gray-100",
-  };
-  return (
-    <button
-      onClick={onClick}
-      className={\`px-4 py-2 rounded-lg text-sm font-medium transition-colors \${variants[variant] || variants.primary} \${className}\`}
-      {...props}
-    >
-      {children}
-    </button>
-  );
-}
-`,
-    "/components/ui/Modal.jsx": `import React from "react";
-import { X } from "lucide-react";
-
-export default function Modal({ isOpen, onClose, title, children }) {
-  if (!isOpen) return null;
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center">
-      <div className="fixed inset-0 bg-black/40" onClick={onClose} />
-      <div className="relative bg-white rounded-lg shadow-lg w-full max-w-lg mx-4 p-6">
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-lg font-medium text-gray-800">{title}</h2>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
-            <X className="w-5 h-5" />
-          </button>
-        </div>
-        {children}
-      </div>
-    </div>
-  );
-}
-`,
-    "/components/ui/DataTable.jsx": `import React from "react";
-
-export default function DataTable({ columns, data, onRowClick }) {
-  return (
-    <div className="overflow-x-auto border border-gray-100 rounded-lg">
-      <table className="w-full text-sm">
-        <thead>
-          <tr className="border-b border-gray-100">
-            {columns.map((col) => (
-              <th key={col.key} className="text-left px-4 py-3 text-gray-500 font-medium">{col.label}</th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          {data.map((row, i) => (
-            <tr
-              key={row.id || i}
-              onClick={() => onRowClick && onRowClick(row)}
-              className="border-b border-gray-50 hover:bg-gray-50 cursor-pointer transition-colors"
-            >
-              {columns.map((col) => (
-                <td key={col.key} className="px-4 py-3 text-gray-700">
-                  {col.render ? col.render(row[col.key], row) : row[col.key]}
-                </td>
-              ))}
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
-  );
-}
-`,
-    "/components/ui/Toast.jsx": `import React, { useState, useEffect } from "react";
-
-let toastHandler = null;
-
-export function showToast(message, type = "success") {
-  if (toastHandler) toastHandler({ message, type });
-}
-
-export default function ToastContainer() {
-  const [toast, setToast] = useState(null);
-
-  useEffect(() => {
-    toastHandler = (t) => {
-      setToast(t);
-      setTimeout(() => setToast(null), 3000);
-    };
-    return () => { toastHandler = null; };
-  }, []);
-
-  if (!toast) return null;
-
-  const colors = {
-    success: "bg-emerald-500",
-    error: "bg-red-500",
-    info: "bg-blue-500",
-  };
-
-  return (
-    <div className={\`fixed bottom-4 right-4 z-50 px-4 py-3 rounded-lg text-white text-sm shadow-lg \${colors[toast.type] || colors.success}\`}>
-      {toast.message}
-    </div>
-  );
-}
-`,
-    "/components/ui/Spinner.jsx": `import React from "react";
-
-export default function Spinner({ size = "md", className = "" }) {
-  const sizes = { sm: "w-4 h-4", md: "w-6 h-6", lg: "w-8 h-8" };
-  return (
-    <div className={\`\${sizes[size] || sizes.md} border-2 border-gray-200 border-t-blue-500 rounded-full animate-spin \${className}\`} />
-  );
-}
-`,
-  };
+  return getAllUIComponents();
 }
 
 // ─── Utility Generators ───────────────────────────────────────────────────
@@ -798,7 +671,7 @@ export function useApi(collection, projectId, sampleData) {
 }
 
 export function getGlobalStyles(): string {
-  return DESIGN_SYSTEM_CSS;
+  return DESIGN_SYSTEM_CSS + "\n" + UI_ANIMATIONS_CSS;
 }
 
 function generateAppLayout(): string {

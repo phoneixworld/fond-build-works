@@ -52,7 +52,7 @@ ${workspaceContext ? `### Current code:\n${workspaceContext}` : ""}
 1. Generate ONLY the files listed above
 2. Import from existing workspace files — do NOT recreate them
 3. **CRITICAL FILE STRUCTURE**: All files use these directories from root:
-   - /components/ui/ — shared UI (Card, Spinner, Toast, DataTable)
+   - /components/ui/ — shared UI library (Card, Button, Modal, DataTable, Toast, Spinner, Dialog, Sheet, Badge, Tabs, Select, Avatar, Input, Dropdown, Alert)
    - /components/ — reusable components (ProtectedRoute, Sidebar, etc.)
    - /contexts/ — React contexts (AuthContext, etc.)
    - /pages/ — page components (can be nested: /pages/Auth/LoginPage.jsx)
