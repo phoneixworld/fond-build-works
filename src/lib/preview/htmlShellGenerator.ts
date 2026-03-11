@@ -18,6 +18,7 @@ interface ShellConfig {
   cssContents: string[];
   entryPath: string;
   projectId: string;
+  assetMap?: Record<string, string>; // path → data URI or URL
   supabaseUrl?: string;
   supabaseKey?: string;
 }
