@@ -99,28 +99,26 @@ export function generateHtmlShell(config: ShellConfig): string {
     window.__PHOENIX_PREVIEW__ = true;
     window.__PHOENIX_METRICS__ = { bootStart: performance.now() };
 
-    // ── Safe URL Constructor ──
-    // Patch URL to handle invalid bases (about:srcdoc, blob:, etc.)
-    var _OrigURL = URL;
-    window.URL = function PhoenixURL(url, base) {
-      try {
-        return new _OrigURL(url, base);
-      } catch(e) {
-        try {
-          return new _OrigURL(url, "https://localhost");
-        } catch(e2) {
-          try {
-            return new _OrigURL("https://localhost/" + (url || ""));
-          } catch(e3) {
-            return new _OrigURL("https://localhost");
-          }
-        }
+    // ── Phoenix Asset Resolver ──
+    // Replaces new URL("./path", import.meta.url) at compile time
+    window.__phoenixResolveAsset__ = function(path) {
+      if (!path) return "";
+      if (typeof path !== "string") return String(path);
+      if (path.startsWith("http://") || path.startsWith("https://") || path.startsWith("data:") || path.startsWith("blob:")) return path;
+      // Strip leading ./ and resolve to a placeholder or inline data
+      var cleaned = path.replace(/^\\.\\//g, "");
+      return "https://placehold.co/400x300?text=" + encodeURIComponent(cleaned);
+    };
+
+    // ── Phoenix Safe URL ──
+    // Wraps remaining new URL(x, base) calls that might fail in srcdoc
+    window.__phoenixSafeURL__ = function(url, base) {
+      try { return new URL(url, base); }
+      catch(_) {
+        try { return new URL(url, "https://localhost"); }
+        catch(_2) { return new URL("https://localhost"); }
       }
     };
-    window.URL.prototype = _OrigURL.prototype;
-    Object.setPrototypeOf(window.URL, _OrigURL);
-    window.URL.createObjectURL = _OrigURL.createObjectURL;
-    window.URL.revokeObjectURL = _OrigURL.revokeObjectURL;
 
     function __phoenixError__(msg, extra) {
       console.error("[Phoenix Preview]", msg, extra || "");
