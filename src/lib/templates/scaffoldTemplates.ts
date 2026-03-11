@@ -96,8 +96,8 @@ function buildDomainScaffold(model: DomainModel): Record<string, string> {
   }
 
   const authImport = model.requiresAuth ? `import { AuthProvider } from "./contexts/AuthContext";\n` : "";
-  const authWrapOpen = model.requiresAuth ? `      <AuthProvider>\n` : "";
-  const authWrapClose = model.requiresAuth ? `      </AuthProvider>\n` : "";
+  const authWrapOpen = model.requiresAuth ? `        <AuthProvider>\n` : "";
+  const authWrapClose = model.requiresAuth ? `        </AuthProvider>\n` : "";
 
   files["/App.jsx"] = `import React from "react";
 import { HashRouter, Routes, Route, Navigate } from "react-router-dom";
@@ -106,15 +106,15 @@ ${authImport}${routeImports.join("\n")}
 
 export default function App() {
   return (
-${authWrapOpen}    <HashRouter>
-      <Routes>
+    <HashRouter>
+${authWrapOpen}      <Routes>
         <Route path="/" element={<AppLayout />}>
 ${routeElements.join("\n")}
           <Route path="*" element={<Navigate to="${indexPath}" />} />
         </Route>
       </Routes>
-    </HashRouter>
-${authWrapClose}  );
+${authWrapClose}    </HashRouter>
+  );
 }
 `;
 
