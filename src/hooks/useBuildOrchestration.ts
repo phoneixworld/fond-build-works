@@ -1077,9 +1077,13 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
               if (updatedFiles[f]) afterSnapshots[f] = updatedFiles[f];
             }
 
-            // Update Sandpack
+            // Update Sandpack files
             setSandpackFiles(updatedFiles);
             syncSandpackToVirtualFS(updatedFiles);
+            // Merge any returned dependencies into Sandpack
+            if (Object.keys(result.dependencies).length > 0) {
+              setSandpackDeps((prev: Record<string, string>) => ({ ...prev, ...result.dependencies }));
+            }
             setPreviewMode("sandpack");
 
             // FSM transition: editing → complete + audit record + post-edit readiness
