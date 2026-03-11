@@ -81,7 +81,7 @@ const KNOWN_IMPORTS: KnownImport[] = [
   },
   {
     usagePattern: /\buseMemo\b/,
-    importPattern: /import\s+(?:React|{[^}]*\buseMemo\b[^}]*})\s+from\s+['"]react['"]/,
+    importPattern: /import\s+(?:React\s*,\s*\{[^}]*\buseMemo\b[^}]*\}|React|{[^}]*\buseMemo\b[^}]*})\s+from\s+['"]react['"]/,
     importStatement: `import { useMemo } from "react";`,
   },
   // ── Utility: cn ──
