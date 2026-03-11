@@ -193,15 +193,20 @@ function checkImportSyntax(workspace: Workspace): {
       }
 
       // Check for malformed destructured imports (missing closing brace)
-      if (line.includes("{") && !line.includes("}") && !lines.slice(i, Math.min(i + 5, lines.length)).join(" ").includes("}")) {
-        issues.push({
-          category: "invalid_import_syntax",
-          severity: "error",
-          file: path,
-          line: lineNum,
-          message: `Unclosed destructured import: "${line.slice(0, 80)}"`,
-          suggestedFix: "Add closing brace } to the import statement",
-        });
+      // Look ahead up to 15 lines to allow for legitimate multi-line destructured imports
+      if (line.includes("{") && !line.includes("}")) {
+        const lookAhead = lines.slice(i, Math.min(i + 15, lines.length)).join(" ");
+        const hasClosingBrace = lookAhead.includes("}");
+        if (!hasClosingBrace) {
+          issues.push({
+            category: "invalid_import_syntax",
+            severity: "error",
+            file: path,
+            line: lineNum,
+            message: `Unclosed destructured import: "${line.slice(0, 80)}"`,
+            suggestedFix: "Add closing brace } to the import statement",
+          });
+        }
       }
 
       // Check for import from empty string
