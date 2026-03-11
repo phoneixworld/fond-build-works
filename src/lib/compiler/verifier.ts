@@ -564,7 +564,7 @@ function checkMissingCommonImports(workspace: Workspace): { issues: Verification
       if (check.usagePattern.test(content) && !check.importPattern.test(content)) {
         issues.push({
           category: "missing_import" as IssueCategory,
-          severity: "warning",
+          severity: "error",
           file: path,
           message: `'${check.name}' is used but not imported in ${path}`,
           suggestedFix: `Add import for '${check.name}'`,
