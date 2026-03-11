@@ -135,7 +135,9 @@ export type IssueCategory =
   | "invalid_import_syntax"
   | "missing_route"
   | "empty_stub"
-  | "missing_component";
+  | "missing_component"
+  | "router_hook_violation"
+  | "undefined_export";
 
 export type IssueSeverity = "error" | "warning";
 
