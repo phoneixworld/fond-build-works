@@ -914,6 +914,9 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
           setBuildStep(`🔧 Auto-repair round ${round}: fixing ${actionCount} issues...`);
         },
         onComplete: (result: BuildResult) => {
+          // Store verification result for conversation state
+          lastVerificationOkRef.current = result.verification.ok;
+
           // Set final files
           setSandpackFiles(result.workspace);
           syncSandpackToVirtualFS(result.workspace);
