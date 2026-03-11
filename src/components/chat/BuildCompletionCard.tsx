@@ -54,12 +54,14 @@ function RuntimeBadge({ status, summary }: { status: RuntimeStatus; summary: str
 }
 
 export default function BuildCompletionCard({ result, phases, onViewPreview }: BuildCompletionCardProps) {
-  const { filesChanged, totalFiles, chatSummary } = result;
+  const { filesChanged, totalFiles } = result;
   const runtimeStatus: RuntimeStatus = result.runtimeStatus || "pending";
   const runtimeChecks = result.runtimeChecks || [];
   const runtimeSummary = result.runtimeSummary || "Runtime checks not run yet.";
 
-  const isStaticPass = chatSummary?.includes("Static checks passed") || chatSummary?.includes("All checks passed") || !chatSummary?.includes("error");
+  // Authoritative flag — derived from build result, NOT from chatSummary text
+  const isStaticPass = result.verificationOk === true;
+  const isStaticFail = result.verificationOk === false;
   const failedRuntimeChecks = runtimeChecks.filter(c => !c.passed);
 
   return (
@@ -90,6 +92,12 @@ export default function BuildCompletionCard({ result, phases, onViewPreview }: B
             <span className="text-[10px] font-semibold">Static Verified</span>
           </div>
         )}
+        {isStaticFail && (
+          <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-destructive/10 text-destructive">
+            <AlertTriangle className="w-3 h-3" />
+            <span className="text-[10px] font-semibold">Static Issues Found</span>
+          </div>
+        )}
         <RuntimeBadge status={runtimeStatus} summary={runtimeSummary} />
       </div>
 
@@ -98,6 +106,11 @@ export default function BuildCompletionCard({ result, phases, onViewPreview }: B
         {isStaticPass && (
           <p className="text-[11px] text-emerald-700 font-medium">
             Static checks passed.
+          </p>
+        )}
+        {isStaticFail && (
+          <p className="text-[11px] text-destructive font-medium">
+            Static checks found issues.
           </p>
         )}
         <p className="text-[11px] text-muted-foreground">
