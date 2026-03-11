@@ -22,6 +22,7 @@ import { fixBrokenImports } from "./importFixer";
 import { repairMissingModules } from "./missingModuleGen";
 import { injectMissingProviders } from "./providerInjector";
 import { fixMissingImports, fixProviderOrdering } from "./missingImportFixer";
+import { fixExportMismatches } from "./exportMismatchFixer";
 import {
   createTrace, startPass, endPass,
   traceTaskStart, traceTaskEnd, finalizeTrace, printTrace,
@@ -233,6 +234,16 @@ export async function compile(
   if (providerOrderFixed) {
     cloudLog.info("Provider ordering fixed: ToastProvider now wraps AuthProvider", "compiler");
     console.log("[Compiler] 🔄 Fixed provider ordering: ToastProvider now wraps AuthProvider");
+  }
+
+  // ── Phase 3.95: Export Mismatch Fix ──────────────────────────────────
+
+  callbacks.onPhase("fixing-export-mismatches", "Fixing default/named export mismatches...");
+
+  const exportMismatchesFixed = fixExportMismatches(workspace);
+  if (exportMismatchesFixed > 0) {
+    cloudLog.info(`Export mismatch fixer: fixed ${exportMismatchesFixed} default/named mismatch(es)`, "compiler");
+    console.log(`[Compiler] 🔀 Export mismatch fixer: fixed ${exportMismatchesFixed} default/named mismatch(es)`);
   }
 
   // ── Phase 3.10: Ensure App.jsx exists and has valid imports ──────────

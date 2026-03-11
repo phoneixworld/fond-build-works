@@ -92,7 +92,19 @@ export function synthesizeAppJsx(workspace: Workspace): string {
   const seenComponents = new Set<string>();
   for (const route of routes) {
     if (!seenComponents.has(route.component)) {
-      imports.push(`import ${route.component} from "${route.importPath}";`);
+      // Check if target file has a default export
+      const targetFile = files.find(f => {
+        const name = f.split("/").pop()!.replace(/\.\w+$/, "");
+        return name === route.component;
+      });
+      const targetContent = targetFile ? (workspace.getFile(targetFile) || "") : "";
+      const hasDefault = /export\s+default\s/.test(targetContent);
+      
+      if (hasDefault || !targetFile) {
+        imports.push(`import ${route.component} from "${route.importPath}";`);
+      } else {
+        imports.push(`import { ${route.component} } from "${route.importPath}";`);
+      }
       seenComponents.add(route.component);
     }
   }
