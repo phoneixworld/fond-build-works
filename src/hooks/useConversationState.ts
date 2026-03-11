@@ -14,7 +14,7 @@
 
 import { useState, useCallback, useRef } from "react";
 
-export type ConversationMode = "idle" | "gathering" | "ready" | "building" | "reviewing" | "complete";
+export type ConversationMode = "idle" | "gathering" | "ready" | "building" | "editing" | "reviewing" | "complete";
 
 export interface RequirementPhase {
   id: number;
