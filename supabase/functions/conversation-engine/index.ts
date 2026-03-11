@@ -564,6 +564,9 @@ Deno.serve(async (req) => {
       } else if (hasExistingCode && EDIT_VERBS.test(lower) && EDIT_TARGETS.test(lower) && !BUILD_FULL.test(lower)) {
         recommendedAction = "edit";
         reason = "Edit intent detected (verb + target + existing code)";
+      } else if (hasExistingCode && BUG_REPORT.test(lower) && EDIT_TARGETS.test(lower) && !BUILD_FULL.test(lower)) {
+        recommendedAction = "edit";
+        reason = "Bug report detected — routing to edit (fix existing code)";
       } else if (CHAT_SIGNALS.test(lower)) {
         recommendedAction = "chat";
         reason = "User asking a question";
