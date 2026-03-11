@@ -29,6 +29,25 @@ function verifyToken(token: string): { uid: string; pid: string } | null {
   }
 }
 
+
+function normalizeUser(user: {
+  id: string;
+  email: string;
+  display_name: string | null;
+  created_at: string;
+  metadata?: Record<string, unknown> | null;
+}) {
+  const role = typeof user.metadata?.role === "string" ? user.metadata.role : "student";
+  return {
+    id: user.id,
+    email: user.email,
+    display_name: user.display_name,
+    created_at: user.created_at,
+    metadata: user.metadata ?? {},
+    role,
+  };
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
@@ -60,14 +79,14 @@ serve(async (req) => {
         const { data: user, error } = await supabase
           .from("project_users")
           .insert({ project_id, email: email.toLowerCase(), password_hash: hash, display_name: display_name || name || email.split("@")[0] })
-          .select("id, email, display_name, created_at")
+          .select("id, email, display_name, metadata, created_at")
           .single();
         if (error) {
           if (error.code === "23505") throw new Error("Email already registered");
           throw error;
         }
         const tk = generateToken(user.id, project_id);
-        return json(200, { user, token: tk, access_token: tk });
+        return json(200, { user: normalizeUser(user), token: tk, access_token: tk });
       }
 
       case "login": {
@@ -75,14 +94,14 @@ serve(async (req) => {
         const hash = await hashPassword(password);
         const { data: user, error } = await supabase
           .from("project_users")
-          .select("id, email, display_name, created_at")
+          .select("id, email, display_name, metadata, created_at")
           .eq("project_id", project_id)
           .eq("email", email.toLowerCase())
           .eq("password_hash", hash)
           .single();
         if (error || !user) throw new Error("Invalid email or password");
         const tk = generateToken(user.id, project_id);
-        return json(200, { user, token: tk, access_token: tk });
+        return json(200, { user: normalizeUser(user), token: tk, access_token: tk });
       }
 
       case "me": {
@@ -111,7 +130,7 @@ serve(async (req) => {
             message: "User not found",
           });
         }
-        return json(200, { user });
+        return json(200, { user: normalizeUser(user) });
       }
 
       default:
