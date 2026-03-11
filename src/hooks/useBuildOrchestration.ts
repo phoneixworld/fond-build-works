@@ -1256,7 +1256,7 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
     setCurrentAgent("build");
     setPipelineStep("planning");
     sendMessage(finalText, images);
-  }, [classifyUserIntent, fastClassifyLocal, sendChatMessage, sendMessage, conversationAnalyze, conversationAddPhase, conversationGetRequirements, conversationStartBuilding, conversationGenerateAck, conversationMode, buildMessageContent, setInput, setAttachedImages, setMessages, saveProject]);
+  }, [classifyUserIntent, fastClassifyLocal, sendChatMessage, sendMessage, sendEditMessage, conversationAnalyze, conversationAddPhase, conversationGetRequirements, conversationStartBuilding, conversationGenerateAck, conversationMode, buildMessageContent, setInput, setAttachedImages, setMessages, saveProject]);
 
   const clearChat = useCallback(() => {
     if (!currentProject || isLoading) return;
