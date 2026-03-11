@@ -20,6 +20,7 @@ import type {
 } from "./types";
 import { DEFAULT_ORCHESTRATOR_CONFIG } from "./types";
 import { ESMPreviewEngine } from "./esmPreviewEngine";
+import { VitePreviewEngine } from "./vitePreviewEngine";
 
 // ─── Complexity Scoring ─────────────────────────────────────────────────────
 
@@ -131,6 +132,7 @@ export class PreviewOrchestrator {
 
     // Register default engines
     this.engines.set("esm", new ESMPreviewEngine(this.config.cdnBaseUrl));
+    this.engines.set("vite", new VitePreviewEngine(this.config.cdnBaseUrl));
   }
 
   /** Register a custom engine (e.g., future Vite engine) */

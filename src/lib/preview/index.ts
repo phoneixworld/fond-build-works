@@ -21,6 +21,7 @@ export type {
 
 export { DEFAULT_ORCHESTRATOR_CONFIG } from "./types";
 export { ESMPreviewEngine } from "./esmPreviewEngine";
+export { VitePreviewEngine } from "./vitePreviewEngine";
 export { PreviewOrchestrator, getOrchestrator, resetOrchestrator, materializeSnapshot } from "./previewOrchestrator";
 export { CdnImportMapProvider, buildImportMap, scanBareImports } from "./importMapResolver";
 export { compileFile, compileWorkspace, rewriteToRegistry, resetUidCounter } from "./esmCompiler";

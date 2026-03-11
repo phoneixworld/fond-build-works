@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { DIRECT_TOUCH_SCRIPT } from "@/components/DirectTouch";
 import SandpackPreview from "@/components/SandpackPreview";
 import ESMPreview from "@/components/ESMPreview";
+import VitePreview from "@/components/VitePreview";
 
 const VIEWPORTS_MAP = {
   desktop: { width: "100%", maxWidth: "none" },
@@ -213,7 +214,22 @@ const PreviewPanel = () => {
           )}
         </AnimatePresence>
 
-        {previewMode === "esm" ? (
+        {previewMode === "vite" ? (
+          <div className="absolute inset-0" key="vite-container" style={{ display: 'flex', flexDirection: 'column' }}>
+            {isBuilding && (!sandpackFiles || Object.keys(sandpackFiles).length === 0) ? (
+              <EmptyState />
+            ) : (
+              <VitePreview
+                key={refreshKey}
+                viewport={{ width: currentViewport.width, maxWidth: currentViewport.maxWidth }}
+                initialPath={currentPath}
+                onFallback={(reason) => {
+                  console.warn("[PreviewPanel] Vite fallback triggered:", reason);
+                }}
+              />
+            )}
+          </div>
+        ) : previewMode === "esm" ? (
           <div className="absolute inset-0" key="esm-container" style={{ display: 'flex', flexDirection: 'column' }}>
             {isBuilding && (!sandpackFiles || Object.keys(sandpackFiles).length === 0) ? (
               <EmptyState />
