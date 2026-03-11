@@ -124,25 +124,32 @@ export function rewriteToRegistry(
     return resolved;
   }
 
-  // Rewrite new URL("./path", import.meta.url) → __phoenixResolveAsset__("./path")
+  // Rewrite new URL("./path", import.meta.url) → resolveAsset from Phoenix runtime
+  // This matches: new URL("./logo.png", import.meta.url)
   code = code.replace(
     /new\s+URL\(\s*(['"]([^'"]+)['"])\s*,\s*import\.meta\.url\s*\)/g,
-    (_m, _full, path: string) => `__phoenixResolveAsset__(${_full})`
+    (_m, _quoted, _path: string) => {
+      // Resolve the path relative to the current file's directory
+      const dir = filePath.split("/").slice(0, -1).join("/");
+      const resolved = _path.startsWith(".")
+        ? `${dir}/${_path.replace(/^\.\//, "")}`.replace(/\/+/g, "/")
+        : _path;
+      return `(await __import__("/__phoenix__/runtime.js")).resolveAsset("${resolved}")`;
+    }
   );
 
-  // Rewrite new URL(variable, import.meta.url) → __phoenixResolveAsset__(variable)
+  // Rewrite new URL(variable, import.meta.url) → resolveAsset(variable)
   code = code.replace(
     /new\s+URL\(\s*([^,)]+)\s*,\s*import\.meta\.url\s*\)/g,
-    (_m, expr: string) => `__phoenixResolveAsset__(${expr.trim()})`
+    (_m, expr: string) => `(await __import__("/__phoenix__/runtime.js")).resolveAsset(${expr.trim()})`
   );
 
-  // Catch remaining new URL(expr, non-http-base) patterns that could fail in srcdoc
+  // Rewrite remaining new URL(x, nonHttpBase) that would fail in srcdoc
   code = code.replace(
     /new\s+URL\(\s*([^,)]+)\s*,\s*([^)]+)\s*\)/g,
     (_m, url: string, base: string) => {
-      // Don't rewrite if base is clearly an http URL string
       if (/^['"]https?:/.test(base.trim())) return _m;
-      return `__phoenixSafeURL__(${url.trim()}, ${base.trim()})`;
+      return `(await __import__("/__phoenix__/runtime.js")).safeURL(${url.trim()}, ${base.trim()})`;
     }
   );
 
