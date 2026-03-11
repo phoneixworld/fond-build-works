@@ -85,6 +85,16 @@ const ESMPreview = ({ viewport, initialPath }: ESMPreviewProps) => {
         `complexity=${result.complexity}, ${result.buildDurationMs}ms, ` +
         `session=${result.sessionId}, errors=${result.errors.length}`
       );
+
+      // ── DEBUG: Dump compiled modules ──
+      if (result.modules) {
+        console.group("[Phoenix DEBUG] Compiled Modules");
+        for (const [path, code] of Object.entries(result.modules)) {
+          console.log(`── ${path} ──\n${(code as string).slice(0, 500)}${(code as string).length > 500 ? "\n... (truncated)" : ""}`);
+        }
+        console.groupEnd();
+      }
+
       setError(null);
       setIframeError(null);
       return result;

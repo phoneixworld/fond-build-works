@@ -37,6 +37,7 @@ export interface ESMBuildResult {
   sessionId?: string;
   complexity?: number;
   buildDurationMs?: number;
+  modules?: Record<string, string>;
 }
 
 /**
@@ -70,6 +71,7 @@ export function buildESMPreview(
     sessionId: session.id,
     complexity: session.complexityScore,
     buildDurationMs: result.metrics.buildDurationMs,
+    modules: result.modules,
   };
 }
 
