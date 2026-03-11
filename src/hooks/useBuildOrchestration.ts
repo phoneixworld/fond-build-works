@@ -1196,7 +1196,14 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
         return;
       }
 
-      if (localIntent !== "build") {
+      if (localIntent === "edit") {
+        setCurrentAgent("edit");
+        setPipelineStep("resolving");
+        sendEditMessage(finalText, images);
+        return;
+      }
+
+      if (localIntent !== "build" && localIntent !== "edit") {
         // Server classification for ambiguous cases
         const classification = await classifyUserIntent(finalText);
         if (isSmartSendStale()) {
@@ -1209,6 +1216,14 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
           setCurrentAgent("chat");
           setPipelineStep("chatting");
           sendChatMessage(finalText, images);
+          return;
+        }
+
+        // Server might also detect edit intent
+        if (classification?.intent === "edit") {
+          setCurrentAgent("edit");
+          setPipelineStep("resolving");
+          sendEditMessage(finalText, images);
           return;
         }
       }
