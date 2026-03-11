@@ -624,131 +624,220 @@ export function getSharedUIComponents(): Record<string, string> {
   return {
     "/components/ui/Card.jsx": `import React from "react";
 
-export default function Card({ children, className = "" }) {
+export default function Card({ children, title, icon: Icon, value, trend, trendUp, className = "" }) {
+  // Stat card mode
+  if (value !== undefined) {
+    return (
+      <div className={\`bg-white rounded-xl border border-[var(--color-border)] p-5 hover:shadow-md transition-all \${className}\`}>
+        <div className="flex items-center justify-between mb-3">
+          <span className="text-xs font-medium text-[var(--color-text-secondary)] uppercase tracking-wide">{title}</span>
+          {Icon && <div className="w-8 h-8 rounded-lg bg-[var(--color-primary)]/10 flex items-center justify-center"><Icon className="w-4 h-4 text-[var(--color-primary)]" /></div>}
+        </div>
+        <p className="text-2xl font-bold text-[var(--color-text)]">{value}</p>
+        {trend && <p className="text-xs mt-1"><span className={\`font-medium \${trendUp ? "text-[var(--color-success)]" : "text-[var(--color-danger)]"}\`}>{trend}</span> <span className="text-[var(--color-text-muted)]">from last month</span></p>}
+      </div>
+    );
+  }
+  // Generic card mode
   return (
-    <div className={\`bg-white rounded-lg border border-gray-100 p-6 \${className}\`}>
+    <div className={\`bg-white rounded-xl border border-[var(--color-border)] p-6 hover:shadow-md transition-all \${className}\`}>
+      {title && <h3 className="text-sm font-semibold text-[var(--color-text)] mb-4">{title}</h3>}
       {children}
     </div>
   );
 }
-`,
-    "/components/ui/Button.jsx": `import React from "react";
 
-export default function Button({ children, onClick, variant = "primary", className = "", ...props }) {
-  const variants = {
-    primary: "bg-blue-500 text-white hover:bg-blue-600",
-    secondary: "bg-gray-100 text-gray-700 hover:bg-gray-200",
-    danger: "bg-red-500 text-white hover:bg-red-600",
-    ghost: "text-gray-600 hover:bg-gray-100",
-  };
+export { Card };
+`,
+    "/components/ui/Button.jsx": \`import React from "react";
+
+const variants = {
+  primary: "bg-[var(--color-primary)] text-white hover:bg-[var(--color-primary-hover)] shadow-sm",
+  secondary: "bg-[var(--color-bg-secondary)] text-[var(--color-text)] border border-[var(--color-border)] hover:bg-[var(--color-border)]/50",
+  danger: "bg-[var(--color-danger)] text-white hover:opacity-90",
+  ghost: "text-[var(--color-text-secondary)] hover:bg-[var(--color-bg-secondary)] hover:text-[var(--color-text)]",
+  outline: "border border-[var(--color-border)] text-[var(--color-text)] hover:bg-[var(--color-bg-secondary)]",
+};
+const sizes = {
+  sm: "px-2.5 py-1.5 text-xs",
+  md: "px-4 py-2 text-sm",
+  lg: "px-5 py-2.5 text-base",
+  icon: "p-2",
+};
+
+export default function Button({ children, onClick, variant = "primary", size = "md", className = "", disabled = false, ...props }) {
   return (
     <button
       onClick={onClick}
-      className={\`px-4 py-2 rounded-lg text-sm font-medium transition-colors \${variants[variant] || variants.primary} \${className}\`}
+      disabled={disabled}
+      className={\\\`inline-flex items-center justify-center gap-2 rounded-lg font-medium transition-all focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]/20 \\\${variants[variant] || variants.primary} \\\${sizes[size] || sizes.md} \\\${disabled ? "opacity-50 cursor-not-allowed" : ""} \\\${className}\\\`}
       {...props}
     >
       {children}
     </button>
   );
 }
-`,
-    "/components/ui/Modal.jsx": `import React from "react";
+
+export { Button };
+\`,
+    "/components/ui/Modal.jsx": \`import React, { useEffect } from "react";
 import { X } from "lucide-react";
 
-export default function Modal({ isOpen, onClose, title, children }) {
+export default function Modal({ isOpen, onClose, title, children, size = "md" }) {
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleEsc = (e) => { if (e.key === "Escape") onClose(); };
+    document.addEventListener("keydown", handleEsc);
+    document.body.style.overflow = "hidden";
+    return () => { document.removeEventListener("keydown", handleEsc); document.body.style.overflow = ""; };
+  }, [isOpen, onClose]);
+
   if (!isOpen) return null;
+  const sizes = { sm: "max-w-sm", md: "max-w-lg", lg: "max-w-2xl", xl: "max-w-4xl" };
+
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center">
-      <div className="fixed inset-0 bg-black/40" onClick={onClose} />
-      <div className="relative bg-white rounded-lg shadow-lg w-full max-w-lg mx-4 p-6">
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-lg font-medium text-gray-800">{title}</h2>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
-            <X className="w-5 h-5" />
+    <div className="fixed inset-0 z-50 flex items-center justify-center" role="dialog" aria-modal="true">
+      <div className="fixed inset-0 bg-black/50 backdrop-blur-sm animate-fadeIn" onClick={onClose} />
+      <div className={\\\`relative bg-white rounded-xl shadow-2xl border border-[var(--color-border)] w-full mx-4 animate-scaleIn \\\${sizes[size] || sizes.md}\\\`}>
+        <div className="flex items-center justify-between p-6 border-b border-[var(--color-border)]">
+          <h2 className="text-lg font-semibold text-[var(--color-text)]">{title}</h2>
+          <button onClick={onClose} className="p-1 rounded-md hover:bg-[var(--color-bg-secondary)] text-[var(--color-text-muted)] transition-colors">
+            <X className="w-4 h-4" />
           </button>
         </div>
-        {children}
+        <div className="p-6">{children}</div>
       </div>
     </div>
   );
 }
-`,
-    "/components/ui/DataTable.jsx": `import React from "react";
+\`,
+    "/components/ui/DataTable.jsx": \`import React, { useState } from "react";
+import { ArrowUpDown, ChevronLeft, ChevronRight } from "lucide-react";
 
-export default function DataTable({ columns, data, onRowClick }) {
+export default function DataTable({ columns, data, onRowClick, pageSize = 10, emptyMessage = "No data found" }) {
+  const [sortKey, setSortKey] = useState(null);
+  const [sortDir, setSortDir] = useState("asc");
+  const [page, setPage] = useState(0);
+
+  const handleSort = (key) => {
+    if (sortKey === key) { setSortDir(sortDir === "asc" ? "desc" : "asc"); }
+    else { setSortKey(key); setSortDir("asc"); }
+  };
+
+  let sorted = [...(data || [])];
+  if (sortKey) {
+    sorted.sort((a, b) => {
+      const va = a[sortKey], vb = b[sortKey];
+      const cmp = typeof va === "number" ? va - vb : String(va || "").localeCompare(String(vb || ""));
+      return sortDir === "asc" ? cmp : -cmp;
+    });
+  }
+
+  const totalPages = Math.ceil(sorted.length / pageSize);
+  const paged = sorted.slice(page * pageSize, (page + 1) * pageSize);
+
   return (
-    <div className="overflow-x-auto border border-gray-100 rounded-lg">
-      <table className="w-full text-sm">
-        <thead>
-          <tr className="border-b border-gray-100">
-            {columns.map((col) => (
-              <th key={col.key} className="text-left px-4 py-3 text-gray-500 font-medium">{col.label}</th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          {data.map((row, i) => (
-            <tr
-              key={row.id || i}
-              onClick={() => onRowClick && onRowClick(row)}
-              className="border-b border-gray-50 hover:bg-gray-50 cursor-pointer transition-colors"
-            >
+    <div className="bg-white rounded-xl border border-[var(--color-border)] overflow-hidden">
+      <div className="overflow-x-auto">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="border-b border-[var(--color-border)] bg-[var(--color-bg-secondary)]">
               {columns.map((col) => (
-                <td key={col.key} className="px-4 py-3 text-gray-700">
-                  {col.render ? col.render(row[col.key], row) : row[col.key]}
-                </td>
+                <th
+                  key={col.key}
+                  onClick={() => col.sortable !== false && handleSort(col.key)}
+                  className={\\\`text-left px-5 py-3 text-xs font-medium text-[var(--color-text-secondary)] uppercase tracking-wider \\\${col.sortable !== false ? "cursor-pointer hover:text-[var(--color-text)] select-none" : ""}\\\`}
+                >
+                  <span className="flex items-center gap-1">
+                    {col.label}
+                    {col.sortable !== false && sortKey === col.key && <ArrowUpDown className="w-3 h-3" />}
+                  </span>
+                </th>
               ))}
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            {paged.length === 0 ? (
+              <tr><td colSpan={columns.length} className="px-5 py-12 text-center text-[var(--color-text-muted)]">{emptyMessage}</td></tr>
+            ) : paged.map((row, i) => (
+              <tr
+                key={row.id || i}
+                onClick={() => onRowClick && onRowClick(row)}
+                className={\\\`border-b border-[var(--color-border)] last:border-0 hover:bg-[var(--color-bg-secondary)] transition-colors \\\${onRowClick ? "cursor-pointer" : ""}\\\`}
+              >
+                {columns.map((col) => (
+                  <td key={col.key} className="px-5 py-3.5 text-[var(--color-text)]">
+                    {col.render ? col.render(row[col.key], row) : row[col.key]}
+                  </td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      {totalPages > 1 && (
+        <div className="flex items-center justify-between px-5 py-3 border-t border-[var(--color-border)] bg-[var(--color-bg-secondary)]">
+          <span className="text-xs text-[var(--color-text-muted)]">Page {page + 1} of {totalPages} ({sorted.length} items)</span>
+          <div className="flex gap-1">
+            <button onClick={() => setPage(Math.max(0, page - 1))} disabled={page === 0} className="p-1 rounded hover:bg-[var(--color-border)]/50 disabled:opacity-30"><ChevronLeft className="w-4 h-4" /></button>
+            <button onClick={() => setPage(Math.min(totalPages - 1, page + 1))} disabled={page >= totalPages - 1} className="p-1 rounded hover:bg-[var(--color-border)]/50 disabled:opacity-30"><ChevronRight className="w-4 h-4" /></button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
-`,
-    "/components/ui/Toast.jsx": `import React, { useState, useEffect } from "react";
+\`,
+    "/components/ui/Toast.jsx": \`import React, { useState, useEffect } from "react";
+import { CheckCircle, AlertCircle, Info, X } from "lucide-react";
 
 let toastHandler = null;
 
 export function showToast(message, type = "success") {
-  if (toastHandler) toastHandler({ message, type });
+  if (toastHandler) toastHandler({ message, type, id: Date.now() });
 }
 
 export default function ToastContainer() {
-  const [toast, setToast] = useState(null);
+  const [toasts, setToasts] = useState([]);
 
   useEffect(() => {
     toastHandler = (t) => {
-      setToast(t);
-      setTimeout(() => setToast(null), 3000);
+      setToasts((prev) => [...prev, t]);
+      setTimeout(() => setToasts((prev) => prev.filter((x) => x.id !== t.id)), 4000);
     };
     return () => { toastHandler = null; };
   }, []);
 
-  if (!toast) return null;
-
-  const colors = {
-    success: "bg-emerald-500",
-    error: "bg-red-500",
-    info: "bg-blue-500",
-  };
+  const icons = { success: CheckCircle, error: AlertCircle, info: Info };
+  const colors = { success: "bg-emerald-500", error: "bg-red-500", info: "bg-blue-500" };
 
   return (
-    <div className={\`fixed bottom-4 right-4 z-50 px-4 py-3 rounded-lg text-white text-sm shadow-lg \${colors[toast.type] || colors.success}\`}>
-      {toast.message}
+    <div className="fixed bottom-4 right-4 z-50 flex flex-col gap-2">
+      {toasts.map((toast) => {
+        const Icon = icons[toast.type] || icons.info;
+        return (
+          <div key={toast.id} className={\\\`flex items-center gap-3 px-4 py-3 rounded-xl text-white text-sm shadow-lg animate-slideInRight \\\${colors[toast.type] || colors.success}\\\`}>
+            <Icon className="w-4 h-4 flex-shrink-0" />
+            <span className="flex-1">{toast.message}</span>
+            <button onClick={() => setToasts((prev) => prev.filter((x) => x.id !== toast.id))} className="p-0.5 hover:bg-white/20 rounded"><X className="w-3 h-3" /></button>
+          </div>
+        );
+      })}
     </div>
   );
 }
-`,
-    "/components/ui/Spinner.jsx": `import React from "react";
+\`,
+    "/components/ui/Spinner.jsx": \`import React from "react";
 
 export default function Spinner({ size = "md", className = "" }) {
-  const sizes = { sm: "w-4 h-4", md: "w-6 h-6", lg: "w-8 h-8" };
+  const sizes = { sm: "w-4 h-4 border-2", md: "w-6 h-6 border-2", lg: "w-10 h-10 border-3" };
   return (
-    <div className={\`\${sizes[size] || sizes.md} border-2 border-gray-200 border-t-blue-500 rounded-full animate-spin \${className}\`} />
+    <div className={\\\`\\\${sizes[size] || sizes.md} border-[var(--color-border)] border-t-[var(--color-primary)] rounded-full animate-spin \\\${className}\\\`} />
   );
 }
-`,
+\`,
+    // Include all shadcn-quality components
+    ...getShadcnUIComponents(),
   };
 }
 
