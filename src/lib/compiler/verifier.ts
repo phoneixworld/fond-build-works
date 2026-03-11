@@ -377,20 +377,56 @@ function checkUndefinedCalls(workspace: Workspace): { issues: VerificationIssue[
     while ((match = effectRegex.exec(content)) !== null) {
       const effectBody = match[1];
       // Find function calls like fetchBoards(), loadData(), etc.
-      const callRegex = /\b([a-zA-Z_]\w*)\s*\(/g;
+    const callRegex = /\b([a-zA-Z_]\w*)\s*\(/g;
       let callMatch;
       while ((callMatch = callRegex.exec(effectBody)) !== null) {
         const fnName = callMatch[1];
-        // Skip common built-ins and React functions
-        const builtins = new Set([
+        // Skip JS keywords, built-ins, common methods, and React functions
+        const SKIP_NAMES = new Set([
+          // JS keywords & control flow
+          "if", "else", "for", "while", "do", "switch", "case", "return",
+          "throw", "try", "catch", "finally", "new", "typeof", "instanceof",
+          "void", "delete", "in", "of", "async", "await", "yield", "class",
+          "function", "const", "let", "var", "import", "export", "default",
+          // Built-in globals
           "console", "setTimeout", "setInterval", "clearTimeout", "clearInterval",
           "fetch", "JSON", "Array", "Object", "Promise", "parseInt", "parseFloat",
           "String", "Number", "Boolean", "Date", "Math", "Error", "RegExp",
-          "alert", "confirm", "encodeURIComponent", "decodeURIComponent",
+          "alert", "confirm", "prompt", "encodeURIComponent", "decodeURIComponent",
+          "encodeURI", "decodeURI", "atob", "btoa", "isNaN", "isFinite",
+          "Map", "Set", "WeakMap", "WeakSet", "Symbol", "Proxy", "Reflect",
+          "AbortController", "URLSearchParams", "URL", "FormData", "Headers",
+          "Request", "Response", "Blob", "File", "FileReader", "TextEncoder",
+          "TextDecoder", "crypto", "performance", "queueMicrotask",
+          "requestAnimationFrame", "cancelAnimationFrame",
+          "addEventListener", "removeEventListener", "dispatchEvent",
+          "CustomEvent", "Event",
+          // Common prototype methods (frequently called on objects/arrays)
+          "map", "filter", "reduce", "forEach", "find", "findIndex", "some",
+          "every", "includes", "indexOf", "slice", "splice", "push", "pop",
+          "shift", "unshift", "sort", "reverse", "concat", "join", "split",
+          "replace", "match", "test", "exec", "trim", "startsWith", "endsWith",
+          "keys", "values", "entries", "from", "assign", "create", "freeze",
+          "stringify", "parse", "resolve", "reject", "all", "allSettled", "race",
+          "then", "catch", "finally",
+          // DOM methods
+          "getElementById", "querySelector", "querySelectorAll",
+          "createElement", "appendChild", "removeChild", "setAttribute",
+          "getAttribute", "getItem", "setItem", "removeItem", "clear",
+          // React internals
+          "useEffect", "useState", "useCallback", "useMemo", "useRef",
+          "useContext", "useReducer", "useLayoutEffect", "useId",
+          "createContext", "createRef", "forwardRef", "memo", "lazy",
+          "createElement", "cloneElement", "createPortal",
+          "render", "unmount",
         ]);
-        if (builtins.has(fnName)) continue;
+        if (SKIP_NAMES.has(fnName)) continue;
         // Skip setState-like calls (setX pattern)
         if (/^set[A-Z]/.test(fnName)) continue;
+        // Skip common method call patterns (obj.method() — the regex captures "method")
+        // If the character before the function name is a dot, it's a method call — skip
+        const matchPos = callMatch.index;
+        if (matchPos > 0 && effectBody[matchPos - 1] === '.') continue;
 
         // Check if the function is defined/imported anywhere in the file
         const defPatterns = [
