@@ -543,8 +543,8 @@ const ChatPanel = forwardRef<ChatPanelHandle, { initialPrompt?: string; onVersio
     const userText = getTextContent(msgs[userMsgIndex].content);
     const truncated = msgs.slice(0, index);
     setMessages(truncated);
-    setTimeout(() => sendMessage(userText), 50);
-  }, [currentProject, sendMessage]);
+    setTimeout(() => handleSmartSend(userText), 50);
+  }, [currentProject, handleSmartSend]);
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === "Enter" && !e.shiftKey) {
