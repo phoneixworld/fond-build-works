@@ -381,7 +381,18 @@ export function useConversationState() {
     mode, setMode, phases, lastBuildResult, buildReadiness, agentStates, serverVersion, isRestoring,
     restoreFromServer, analyzeMessage, analyzeMessageSync, addPhase,
     getRequirementsContext, getRequirementsContextSync,
-    startBuilding, completeBuild, reset, generateAcknowledgment,
+    startBuilding, startEditing, completeEdit, completeBuild, reset, generateAcknowledgment,
     currentProjectId,
   };
+}
+
+/** Simple hash for snapshot diffing (not cryptographic) */
+function hashSnapshot(content: string): string {
+  let hash = 0;
+  for (let i = 0; i < content.length; i++) {
+    const chr = content.charCodeAt(i);
+    hash = ((hash << 5) - hash) + chr;
+    hash |= 0;
+  }
+  return `h:${hash.toString(36)}:${content.length}`;
 }

@@ -381,7 +381,7 @@ const ChatPanel = forwardRef<ChatPanelHandle, { initialPrompt?: string; onVersio
       setPendingFollowUpPrompt("");
       setAnalysisResult(null);
       invalidateContextCache();
-      conversationState.reset();
+      // Don't destructively reset server state on project switch — restore instead
 
       // Restore conversation state from server (durable, cross-device)
       conversationState.restoreFromServer(currentProject.id);

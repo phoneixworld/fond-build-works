@@ -1094,6 +1094,80 @@ Output ONLY valid JSON. No markdown, no explanation.`
       return json({ success: true });
     }
 
+    // ─── EDIT_STARTED: Transition FSM to editing, log audit ───
+    if (action === "edit_started") {
+      const targetFiles = body.targetFiles || [];
+      const instruction = body.instruction || "";
+      const beforeSnapshots = body.beforeSnapshots || {};
+
+      await transitionState(supabase, projectId, "editing", {}, userId, `Edit started: ${instruction.slice(0, 100)}`);
+
+      await logTelemetry(supabase, projectId, "edit_started", {
+        agent: "edit-engine",
+        entityType: "edit",
+        beforeState: { files: targetFiles, snapshots: beforeSnapshots },
+        afterState: null,
+        metadata: { instruction, targetFiles, fileCount: targetFiles.length },
+      }, userId);
+
+      return json({ success: true });
+    }
+
+    // ─── EDIT_COMPLETE: Log result + before/after + run post-edit readiness ───
+    if (action === "edit_complete") {
+      const targetFiles = body.targetFiles || [];
+      const instruction = body.instruction || "";
+      const beforeSnapshots = body.beforeSnapshots || {};
+      const afterSnapshots = body.afterSnapshots || {};
+      const explanation = body.explanation || "";
+
+      // Log edit audit with before/after file snapshots
+      await logTelemetry(supabase, projectId, "edit_completed", {
+        agent: "edit-engine",
+        entityType: "edit",
+        beforeState: { files: targetFiles, snapshots: beforeSnapshots },
+        afterState: { files: targetFiles, snapshots: afterSnapshots },
+        metadata: { instruction, explanation, targetFiles, fileCount: targetFiles.length },
+      }, userId);
+
+      // Run post-edit readiness validation
+      const { data: allReqs } = await supabase
+        .from("project_requirements")
+        .select("*")
+        .eq("project_id", projectId)
+        .order("phase_number", { ascending: true });
+
+      let postEditReadiness = null;
+      if (allReqs && allReqs.length > 0) {
+        let mergedNormalized: Record<string, any> = {};
+        for (const r of allReqs) {
+          mergedNormalized = mergeNormalized(mergedNormalized, r.normalized as Record<string, any>);
+        }
+        const compiledIR = mapToIR(mergedNormalized);
+        postEditReadiness = compileBuildReadiness(compiledIR, allReqs, mergedNormalized);
+
+        // Persist updated readiness
+        await supabase.from("project_build_readiness").upsert({
+          project_id: projectId,
+          is_ready: postEditReadiness.isReady,
+          score: postEditReadiness.score,
+          checks: postEditReadiness.checks,
+          missing_fields: postEditReadiness.missingFields,
+          incomplete_workflows: postEditReadiness.incompleteWorkflows,
+          unresolved_roles: postEditReadiness.unresolvedRoles,
+          underspecified_components: postEditReadiness.underspecifiedComponents,
+          missing_constraints: postEditReadiness.missingConstraints,
+          recommendation: postEditReadiness.recommendation,
+          updated_at: new Date().toISOString(),
+        }, { onConflict: "project_id" });
+      }
+
+      // Transition to complete
+      await transitionState(supabase, projectId, "complete", {}, userId, `Edit completed: ${targetFiles.length} file(s)`);
+
+      return json({ success: true, postEditReadiness });
+    }
+
     // ─── ROLLBACK: Restore to a previous version (Checklist #7) ───
     if (action === "rollback") {
       const target = targetVersion;

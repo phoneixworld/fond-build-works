@@ -970,7 +970,7 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
     }
   }, [currentProject, saveProject, setPreviewHtml, setIsBuilding, setBuildStep, selectedModel, selectedTheme, onVersionCreated, setVirtualFiles, fetchProjectContext, syncSandpackToVirtualFS, buildMessageContent, currentPreviewHtml, setMessages, setInput, setAttachedImages, setPreviewErrors, setHealAttempts, setSandpackFiles, setSandpackDeps, setPreviewMode, setBuildMetrics, saveSnapshot, selectedTemplate, tryInstantBuild, handleOnError]);
 
-  // ── Edit Mode: Surgical file editing ──────────────────────────────────────
+  // ── Edit Mode: Surgical file editing (wired through FSM) ──────────────────
   const sendEditMessage = useCallback(async (text: string, images: string[] = []) => {
     if (!currentProject) return;
 
@@ -996,6 +996,10 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
     isSendingRef.current = true;
     setBuildStreamContent("");
 
+    // Capture before-snapshots for audit
+    let resolvedTargetFiles: string[] = [];
+    const beforeSnapshots: Record<string, string> = {};
+
     try {
       await executeEdit(
         {
@@ -1009,15 +1013,23 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
         },
         {
           onResolving: (targetFiles) => {
+            resolvedTargetFiles = targetFiles;
+            // Capture before-snapshots
+            for (const f of targetFiles) {
+              if (workspace[f]) beforeSnapshots[f] = workspace[f];
+            }
             setPipelineStep("resolving");
             setBuildStep(`Editing ${targetFiles.length} file${targetFiles.length > 1 ? "s" : ""}`);
             console.log("[EditMode] Target files:", targetFiles);
+
+            // FSM transition: → editing (fire & forget)
+            conversationStartEditing?.(text, targetFiles, beforeSnapshots);
           },
           onStreaming: (chunk) => {
             setBuildStreamContent((prev) => prev + chunk);
             setPipelineStep("editing");
           },
-          onComplete: (result: EditResult) => {
+          onComplete: async (result: EditResult) => {
             console.log("[EditMode] Complete:", Object.keys(result.modifiedFiles));
 
             // Merge modified files into existing workspace
@@ -1026,18 +1038,30 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
               updatedFiles[path] = code;
             }
 
+            // Capture after-snapshots for audit
+            const afterSnapshots: Record<string, string> = {};
+            for (const f of resolvedTargetFiles) {
+              if (updatedFiles[f]) afterSnapshots[f] = updatedFiles[f];
+            }
+
             // Update Sandpack
             setSandpackFiles(updatedFiles);
             syncSandpackToVirtualFS(updatedFiles);
             setPreviewMode("sandpack");
 
-            // Add assistant message
+            // FSM transition: editing → complete + audit record + post-edit readiness
+            const postEditReadiness = await conversationCompleteEdit?.(
+              text, resolvedTargetFiles, beforeSnapshots, afterSnapshots, result.explanation
+            );
+
+            // Build assistant message with readiness info
             const fileList = result.targetFiles.map(f => f.split("/").pop()).join(", ");
-            const assistantMsg: Msg = {
-              role: "assistant",
-              content: `✅ **Edited ${result.targetFiles.length} file${result.targetFiles.length > 1 ? "s" : ""}** (${fileList})\n\n${result.explanation}`,
-              timestamp: Date.now(),
-            };
+            let editMsg = `✅ **Edited ${result.targetFiles.length} file${result.targetFiles.length > 1 ? "s" : ""}** (${fileList})\n\n${result.explanation}`;
+            if (postEditReadiness && !postEditReadiness.isReady) {
+              editMsg += `\n\n⚠️ **Post-edit readiness:** ${postEditReadiness.score}% — ${postEditReadiness.recommendation}`;
+            }
+
+            const assistantMsg: Msg = { role: "assistant", content: editMsg, timestamp: Date.now() };
             setMessages((prev) => [...prev, assistantMsg]);
 
             // Save
@@ -1045,6 +1069,17 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
             saveProject({
               chat_history: updatedMessages.map(m => ({ role: m.role, content: m.content })),
             });
+
+            // Persist sandpack state
+            supabase
+              .from("project_data")
+              .upsert(
+                { project_id: currentProject.id, collection: "sandpack_state", data: { files: updatedFiles, deps: {} } as any },
+                { onConflict: "project_id,collection" }
+              )
+              .then(({ error }) => {
+                if (error) console.warn("[EditMode] Failed to persist sandpack state:", error);
+              });
 
             // Save snapshot
             saveSnapshot(`Edit: ${text.slice(0, 40)}`);
@@ -1078,7 +1113,7 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
       setBuildStep("");
       isSendingRef.current = false;
     }
-  }, [currentProject, selectedModel, selectedTheme, sendMessage, buildMessageContent, setInput, setAttachedImages, setMessages, saveProject, setSandpackFiles, syncSandpackToVirtualFS, setPreviewMode, setIsBuilding, setBuildStep, saveSnapshot]);
+  }, [currentProject, selectedModel, selectedTheme, sendMessage, buildMessageContent, setInput, setAttachedImages, setMessages, saveProject, setSandpackFiles, syncSandpackToVirtualFS, setPreviewMode, setIsBuilding, setBuildStep, saveSnapshot, conversationStartEditing, conversationCompleteEdit]);
 
   // ── RULES ──
   // 1. ALL messages go through conversation state machine FIRST
