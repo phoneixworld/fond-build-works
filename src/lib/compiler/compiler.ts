@@ -26,6 +26,7 @@ import {
   traceTaskStart, traceTaskEnd, finalizeTrace, printTrace,
 } from "./observability";
 import { cloudLog } from "@/lib/cloudLogBus";
+import { synthesizeAppJsx } from "./appSynthesizer";
 
 // ─── Public API ───────────────────────────────────────────────────────────
 
