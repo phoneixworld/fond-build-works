@@ -130,7 +130,7 @@ serve(async (req) => {
             message: "User not found",
           });
         }
-        return json(200, { user });
+        return json(200, { user: normalizeUser(user) });
       }
 
       default:
