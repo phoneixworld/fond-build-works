@@ -53,35 +53,32 @@ const KNOWN_IMPORTS: KnownImport[] = [
   // ── React hooks ──
   {
     usagePattern: /\buseState\b/,
-    importPattern: /import\s+(?:React\s*,\s*\{[^}]*\buseState\b[^}]*\}|React|{[^}]*\buseState\b[^}]*})\s+from\s+['"]react['"]/,
-    importStatement: (filePath: string) => {
-      // Check if React is already imported — if so, skip (useState available via React.useState)
-      return `import { useState } from "react";`;
-    },
+    importPattern: /import\s+(?:React\s*,\s*\{[^}]*\buseState\b[^}]*\}|\{[^}]*\buseState\b[^}]*\})\s+from\s+['"]react['"]/,
+    importStatement: () => `import { useState } from "react";`,
   },
   {
     usagePattern: /\buseEffect\b/,
-    importPattern: /import\s+(?:React\s*,\s*\{[^}]*\buseEffect\b[^}]*\}|React|{[^}]*\buseEffect\b[^}]*})\s+from\s+['"]react['"]/,
+    importPattern: /import\s+(?:React\s*,\s*\{[^}]*\buseEffect\b[^}]*\}|\{[^}]*\buseEffect\b[^}]*\})\s+from\s+['"]react['"]/,
     importStatement: `import { useEffect } from "react";`,
   },
   {
     usagePattern: /\buseCallback\b/,
-    importPattern: /import\s+(?:React\s*,\s*\{[^}]*\buseCallback\b[^}]*\}|React|{[^}]*\buseCallback\b[^}]*})\s+from\s+['"]react['"]/,
+    importPattern: /import\s+(?:React\s*,\s*\{[^}]*\buseCallback\b[^}]*\}|\{[^}]*\buseCallback\b[^}]*\})\s+from\s+['"]react['"]/,
     importStatement: `import { useCallback } from "react";`,
   },
   {
     usagePattern: /\buseContext\b/,
-    importPattern: /import\s+(?:React\s*,\s*\{[^}]*\buseContext\b[^}]*\}|React|{[^}]*\buseContext\b[^}]*})\s+from\s+['"]react['"]/,
+    importPattern: /import\s+(?:React\s*,\s*\{[^}]*\buseContext\b[^}]*\}|\{[^}]*\buseContext\b[^}]*\})\s+from\s+['"]react['"]/,
     importStatement: `import { useContext } from "react";`,
   },
   {
     usagePattern: /\buseRef\b/,
-    importPattern: /import\s+(?:React\s*,\s*\{[^}]*\buseRef\b[^}]*\}|React|{[^}]*\buseRef\b[^}]*})\s+from\s+['"]react['"]/,
+    importPattern: /import\s+(?:React\s*,\s*\{[^}]*\buseRef\b[^}]*\}|\{[^}]*\buseRef\b[^}]*\})\s+from\s+['"]react['"]/,
     importStatement: `import { useRef } from "react";`,
   },
   {
     usagePattern: /\buseMemo\b/,
-    importPattern: /import\s+(?:React\s*,\s*\{[^}]*\buseMemo\b[^}]*\}|React|{[^}]*\buseMemo\b[^}]*})\s+from\s+['"]react['"]/,
+    importPattern: /import\s+(?:React\s*,\s*\{[^}]*\buseMemo\b[^}]*\}|\{[^}]*\buseMemo\b[^}]*\})\s+from\s+['"]react['"]/,
     importStatement: `import { useMemo } from "react";`,
   },
   // ── Utility: cn ──

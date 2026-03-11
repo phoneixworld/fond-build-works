@@ -116,23 +116,48 @@ export default LoginPage;`,
     expect(result).toContain('import { cn } from "../../lib/utils"');
   });
 
-  it("should handle import React (default only) and not re-inject hooks already available via React.*", () => {
-    // When `import React from "react"` exists, the importPattern for hooks
-    // matches `React` branch — so hooks using direct names still get injected.
-    // This is by design: `import React` doesn't give you `useState` directly.
+  it("should NOT duplicate when React default + separate hook import exist", () => {
+    // This is the exact DashboardPage.jsx scenario: React imported separately, hooks on another line
+    const ws = makeWorkspace({
+      "/pages/Dashboard/DashboardPage.jsx": `import React, { createContext, useContext } from "react";
+import { useAuth } from "../../contexts/AuthContext";
+import { Card, Spinner } from "../../components/ui/Card";
+import { Home, Settings, LogOut } from "lucide-react";
+import { NavLink } from "react-router-dom";
+import { useState, useEffect } from "react";
+
+const DashboardPage = () => {
+  const [data, setData] = useState([]);
+  useEffect(() => {}, []);
+  return <div>Dashboard</div>;
+};
+export default DashboardPage;`,
+    });
+
+    const fixed = fixMissingImports(ws);
+    const result = ws.getFile("/pages/Dashboard/DashboardPage.jsx")!;
+    // Should NOT inject anything — hooks are already on line 6
+    expect(fixed).toBe(0);
+    const hookImportCount = (result.match(/import\s*\{[^}]*useState[^}]*\}\s*from\s*["']react["']/g) || []).length;
+    expect(hookImportCount).toBe(1);
+  });
+
+  it("should inject hooks when only import React default exists (no named hooks)", () => {
     const ws = makeWorkspace({
       "/components/Widget.jsx": `import React from "react";
 const Widget = () => {
-  const [val, setVal] = React.useState(0);
+  const [val, setVal] = useState(0);
+  useEffect(() => {}, []);
   return <div>{val}</div>;
 };
 export default Widget;`,
     });
 
     const fixed = fixMissingImports(ws);
-    // React.useState doesn't match \buseState\b at word boundary after React.
-    // Actually it does: "React.useState" contains "useState" as a word.
-    // But importPattern matches "import React" so it's detected as present.
-    expect(fixed).toBe(0);
+    const result = ws.getFile("/components/Widget.jsx")!;
+    // Should inject useState and useEffect since they're used directly but not imported
+    expect(fixed).toBe(2);
+    expect(result).toContain("useState");
+    expect(result).toContain("useEffect");
   });
 });
