@@ -38,11 +38,18 @@ serve(async (req) => {
 
   try {
     const body = await req.json();
-    const { project_id, action, email, password, display_name, name, token } = body;
+    const { project_id, action, email, password, display_name, name, token, access_token } = body;
+
+    const json = (status: number, payload: Record<string, unknown>) =>
+      new Response(JSON.stringify(payload), {
+        status,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
 
     if (!project_id || !action) {
-      return new Response(JSON.stringify({ error: "project_id and action are required" }), {
-        status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      return json(400, {
+        error: "project_id and action are required",
+        message: "project_id and action are required",
       });
     }
 
@@ -60,9 +67,7 @@ serve(async (req) => {
           throw error;
         }
         const tk = generateToken(user.id, project_id);
-        return new Response(JSON.stringify({ user, token: tk }), {
-          status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
+        return json(200, { user, token: tk, access_token: tk });
       }
 
       case "login": {
@@ -77,21 +82,22 @@ serve(async (req) => {
           .single();
         if (error || !user) throw new Error("Invalid email or password");
         const tk = generateToken(user.id, project_id);
-        return new Response(JSON.stringify({ user, token: tk }), {
-          status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
+        return json(200, { user, token: tk, access_token: tk });
       }
 
       case "me": {
-        if (!token) {
-          return new Response(JSON.stringify({ error: "No token provided" }), {
-            status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        const providedToken = token || access_token;
+        if (!providedToken) {
+          return json(401, {
+            error: "No token provided",
+            message: "No token provided",
           });
         }
-        const session = verifyToken(token);
+        const session = verifyToken(providedToken);
         if (!session || session.pid !== project_id) {
-          return new Response(JSON.stringify({ error: "Invalid or expired token" }), {
-            status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
+          return json(401, {
+            error: "Invalid or expired token",
+            message: "Invalid or expired token",
           });
         }
         const { data: user, error } = await supabase
@@ -100,24 +106,26 @@ serve(async (req) => {
           .eq("id", session.uid)
           .single();
         if (error || !user) {
-          return new Response(JSON.stringify({ error: "User not found" }), {
-            status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
+          return json(401, {
+            error: "User not found",
+            message: "User not found",
           });
         }
-        return new Response(JSON.stringify({ user }), {
-          status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
+        return json(200, { user });
       }
 
       default:
-        return new Response(JSON.stringify({ error: `Unknown action: ${action}` }), {
-          status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        return json(400, {
+          error: `Unknown action: ${action}`,
+          message: `Unknown action: ${action}`,
         });
     }
   } catch (e) {
     console.error("project-auth error:", e);
-    return new Response(JSON.stringify({ error: e instanceof Error ? e.message : "Unknown error" }), {
-      status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
+    const message = e instanceof Error ? e.message : "Unknown error";
+    return new Response(JSON.stringify({ error: message, message }), {
+      status: 500,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }
 });
