@@ -541,3 +541,74 @@ function checkExportValidity(workspace: Workspace): { issues: VerificationIssue[
   }
   return { issues };
 }
+
+// ─── Missing Common Imports Check ─────────────────────────────────────────
+
+/**
+ * Detects usage of well-known identifiers without corresponding imports.
+ * E.g. using clsx() without importing clsx.
+ */
+function checkMissingCommonImports(workspace: Workspace): { issues: VerificationIssue[] } {
+  const issues: VerificationIssue[] = [];
+
+  const COMMON_IMPORTS = [
+    { name: "clsx", usagePattern: /\bclsx\s*\(/, importPattern: /import\s+(?:clsx|{[^}]*clsx[^}]*})\s+from\s+['"]clsx['"]/ },
+    { name: "React", usagePattern: /\bReact\b/, importPattern: /import\s+React/ },
+  ];
+
+  for (const path of workspace.listFiles()) {
+    if (!/\.(jsx?|tsx?)$/.test(path)) continue;
+    const content = workspace.getFile(path)!;
+
+    for (const check of COMMON_IMPORTS) {
+      if (check.usagePattern.test(content) && !check.importPattern.test(content)) {
+        issues.push({
+          category: "missing_import" as IssueCategory,
+          severity: "warning",
+          file: path,
+          message: `'${check.name}' is used but not imported in ${path}`,
+          suggestedFix: `Add import for '${check.name}'`,
+        });
+      }
+    }
+  }
+
+  return { issues };
+}
+
+// ─── Provider Ordering Check ──────────────────────────────────────────────
+
+/**
+ * Validates that ToastProvider wraps AuthProvider in App.jsx.
+ * AuthProvider uses useToast() internally, so it MUST be inside ToastProvider.
+ */
+function checkProviderOrdering(workspace: Workspace): { issues: VerificationIssue[] } {
+  const issues: VerificationIssue[] = [];
+  
+  const appPath = ["/App.jsx", "/App.tsx", "/App.js"].find(p => workspace.hasFile(p));
+  if (!appPath) return { issues };
+
+  const content = workspace.getFile(appPath)!;
+  
+  // Check if both providers exist
+  const hasAuth = /<AuthProvider[\s>]/.test(content);
+  const hasToast = /<ToastProvider[\s>]/.test(content);
+  
+  if (!hasAuth || !hasToast) return { issues };
+
+  // Check ordering: AuthProvider should NOT be the outer wrapper
+  const authPos = content.search(/<AuthProvider[\s>]/);
+  const toastPos = content.search(/<ToastProvider[\s>]/);
+
+  if (authPos < toastPos) {
+    issues.push({
+      category: "provider_ordering" as IssueCategory,
+      severity: "error",
+      file: appPath,
+      message: "AuthProvider wraps ToastProvider, but AuthProvider uses useToast() — ToastProvider must be the outer wrapper",
+      suggestedFix: "Swap provider nesting: <ToastProvider><AuthProvider>...</AuthProvider></ToastProvider>",
+    });
+  }
+
+  return { issues };
+}
