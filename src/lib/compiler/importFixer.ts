@@ -43,7 +43,7 @@ function rewriteImports(
   let fixCount = 0;
 
   // Match: import ... from './path' or import ... from "../path"
-  const importRegex = /(import\s+(?:[\w{},\s*]+\s+from\s+|))(['"])(\.\.\?\/[^'"]+)\2/g;
+  const importRegex = /(import\s+(?:[\w{},\s*]+\s+from\s+|))(['"])(\.\.?\/[^'"]+)\2/g;
 
   const fixed = content.replace(importRegex, (fullMatch, prefix, quote, importPath) => {
     // Check if this import already resolves
