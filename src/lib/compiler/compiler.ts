@@ -215,6 +215,26 @@ export async function compile(
     console.log(`[Compiler] 💉 Provider injector: added ${providersInjected} missing provider(s)`);
   }
 
+  // ── Phase 3.8: Missing Import Injection ─────────────────────────────
+
+  callbacks.onPhase("fixing-missing-imports", "Injecting missing imports...");
+
+  const missingImportsFixed = fixMissingImports(workspace);
+  if (missingImportsFixed > 0) {
+    cloudLog.info(`Missing import fixer: injected ${missingImportsFixed} missing import(s)`, "compiler");
+    console.log(`[Compiler] 📥 Missing import fixer: injected ${missingImportsFixed} missing import(s)`);
+  }
+
+  // ── Phase 3.9: Provider Ordering Fix ────────────────────────────────
+
+  callbacks.onPhase("fixing-provider-order", "Validating provider nesting order...");
+
+  const providerOrderFixed = fixProviderOrdering(workspace);
+  if (providerOrderFixed) {
+    cloudLog.info("Provider ordering fixed: ToastProvider now wraps AuthProvider", "compiler");
+    console.log("[Compiler] 🔄 Fixed provider ordering: ToastProvider now wraps AuthProvider");
+  }
+
   // ── Phase 3.8: Ensure App.jsx exists ────────────────────────────────
 
   const appEntryPoints = ["/App.jsx", "/App.tsx", "/App.js", "/App.ts"];
