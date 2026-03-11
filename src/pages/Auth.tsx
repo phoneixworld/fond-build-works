@@ -6,7 +6,7 @@ import { useToast } from "@/hooks/use-toast";
 
 const Auth = () => {
   const { user, loading, signIn, signUp } = useAuth();
-  const isSignUp = false;
+  const [isSignUp, setIsSignUp] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [displayName, setDisplayName] = useState("");
@@ -26,10 +26,30 @@ const Auth = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setSubmitting(true);
-    const { error } = await signIn(email, password);
 
+    if (isSignUp) {
+      const { error, needsEmailConfirmation } = await signUp(email, password, displayName || undefined);
+      if (error) {
+        toast({ title: "Signup failed", description: error.message, variant: "destructive" });
+      } else {
+        toast({
+          title: needsEmailConfirmation ? "Check your email" : "Account created",
+          description: needsEmailConfirmation
+            ? "We sent a verification link to your inbox."
+            : "Your account is ready. You can sign in now.",
+        });
+        if (needsEmailConfirmation) {
+          setIsSignUp(false);
+          setPassword("");
+        }
+      }
+      setSubmitting(false);
+      return;
+    }
+
+    const { error } = await signIn(email, password);
     if (error) {
-      toast({ title: "Error", description: error.message, variant: "destructive" });
+      toast({ title: "Sign in failed", description: error.message, variant: "destructive" });
     }
     setSubmitting(false);
   };
@@ -56,8 +76,8 @@ const Auth = () => {
         <div className="relative z-10 flex flex-col justify-between p-12 w-full">
           {/* Top: Logo */}
           <div className="flex items-center gap-3">
-            <img src="/logo.png" alt="Phoneix World" className="w-10 h-10 rounded-xl object-cover shadow-lg shadow-primary/25" />
-            <span className="text-xl font-bold text-white tracking-tight">Phoneix World</span>
+            <img src="/logo.png" alt="Phoenix World" className="w-10 h-10 rounded-xl object-cover shadow-lg shadow-primary/25" />
+            <span className="text-xl font-bold text-white tracking-tight">Phoenix World</span>
           </div>
 
           {/* Center: Hero content */}
@@ -114,7 +134,7 @@ const Auth = () => {
         <div className="w-full max-w-sm space-y-8">
           {/* Mobile logo (hidden on desktop where banner shows) */}
           <div className="flex flex-col items-center gap-3 lg:hidden">
-            <img src="/logo.png" alt="Phoneix World" className="w-12 h-12 rounded-xl object-cover shadow-lg shadow-primary/25" />
+            <img src="/logo.png" alt="Phoenix World" className="w-12 h-12 rounded-xl object-cover shadow-lg shadow-primary/25" />
             <h1 className="text-xl font-bold text-foreground">Phoneix World</h1>
           </div>
 
@@ -146,6 +166,19 @@ const Auth = () => {
                 />
               </div>
             </div>
+            {isSignUp && (
+              <div className="space-y-1.5">
+                <label className="text-xs font-medium text-muted-foreground">Display Name</label>
+                <input
+                  type="text"
+                  placeholder="Your name"
+                  value={displayName}
+                  onChange={(e) => setDisplayName(e.target.value)}
+                  className="w-full px-4 py-2.5 bg-secondary border border-border rounded-lg text-sm text-foreground placeholder:text-muted-foreground/40 outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary/50 transition-all"
+                />
+              </div>
+            )}
+
             <div className="space-y-1.5">
               <label className="text-xs font-medium text-muted-foreground">Password</label>
               <div className="relative">
@@ -168,9 +201,20 @@ const Auth = () => {
               className="w-full py-2.5 bg-primary text-primary-foreground rounded-lg text-sm font-semibold hover:bg-primary/90 disabled:opacity-50 transition-all flex items-center justify-center gap-2 shadow-lg shadow-primary/20"
             >
               {submitting && <Loader2 className="w-4 h-4 animate-spin" />}
-              Sign In
+              {isSignUp ? "Create Account" : "Sign In"}
             </button>
           </form>
+
+          <div className="text-center text-sm text-muted-foreground">
+            {isSignUp ? "Already have an account?" : "Don’t have an account?"}{" "}
+            <button
+              type="button"
+              onClick={() => setIsSignUp((prev) => !prev)}
+              className="text-primary hover:underline font-semibold"
+            >
+              {isSignUp ? "Sign In" : "Sign Up"}
+            </button>
+          </div>
         </div>
       </div>
     </div>
