@@ -1041,6 +1041,33 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
               updatedFiles[path] = code;
             }
 
+            // ── Post-edit deterministic repair passes ──────────────────
+            // Run the same repair pipeline as the full compiler to catch
+            // broken imports / missing modules introduced by the edit.
+            try {
+              const repairWorkspace = new Workspace(updatedFiles);
+              const { created } = repairMissingModules(repairWorkspace);
+              if (created.length > 0) {
+                console.log(`[EditMode] 🔧 Generated ${created.length} missing module(s):`, created);
+              }
+              const importsFixed = fixMissingImports(repairWorkspace);
+              if (importsFixed > 0) {
+                console.log(`[EditMode] 🔧 Fixed ${importsFixed} missing import(s)`);
+              }
+              const exportsFixed = fixExportMismatches(repairWorkspace);
+              if (exportsFixed > 0) {
+                console.log(`[EditMode] 🔧 Fixed ${exportsFixed} export mismatch(es)`);
+              }
+              // Extract repaired files back
+              const repairedFiles: Record<string, string> = {};
+              for (const f of repairWorkspace.listFiles()) {
+                repairedFiles[f] = repairWorkspace.getFile(f)!;
+              }
+              Object.assign(updatedFiles, repairedFiles);
+            } catch (repairErr) {
+              console.warn("[EditMode] Post-edit repair failed (non-blocking):", repairErr);
+            }
+
             // Capture after-snapshots for audit
             const afterSnapshots: Record<string, string> = {};
             for (const f of resolvedTargetFiles) {
