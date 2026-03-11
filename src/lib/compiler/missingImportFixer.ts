@@ -53,7 +53,7 @@ const KNOWN_IMPORTS: KnownImport[] = [
   // ── React hooks ──
   {
     usagePattern: /\buseState\b/,
-    importPattern: /import\s+(?:React|{[^}]*\buseState\b[^}]*})\s+from\s+['"]react['"]/,
+    importPattern: /import\s+(?:React\s*,\s*\{[^}]*\buseState\b[^}]*\}|React|{[^}]*\buseState\b[^}]*})\s+from\s+['"]react['"]/,
     importStatement: (filePath: string) => {
       // Check if React is already imported — if so, skip (useState available via React.useState)
       return `import { useState } from "react";`;
