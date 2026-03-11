@@ -888,7 +888,7 @@ export function useApi(collection, projectId, sampleData) {
 }
 
 export function getGlobalStyles(): string {
-  return DESIGN_SYSTEM_CSS;
+  return DESIGN_SYSTEM_CSS + "\n" + UI_ANIMATIONS_CSS;
 }
 
 function generateAppLayout(): string {

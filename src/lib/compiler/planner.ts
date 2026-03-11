@@ -24,22 +24,28 @@ export function planTaskGraph(ctx: BuildContext): TaskGraph {
   const infraTask = createTask({
     label: "infra",
     type: "infra",
-    description: `Shared UI components, design tokens, global styles.
+    description: `Shared UI component library with design tokens and global styles.
     
-UI components must be production-quality:
-- Toast.jsx: Animated toast notifications with success/error/info variants
+Pre-built components are already scaffolded in the workspace — do NOT regenerate them.
+The following components are available for import in all subsequent tasks:
+- Card.jsx: Stat card mode (<Card title icon value trend trendUp />) and generic card mode
+- Button.jsx: Variants: primary, secondary, danger, ghost, outline. Sizes: sm, md, lg, icon
+- Modal.jsx: Accessible modal with backdrop, ESC close, size variants
+- DataTable.jsx: Sortable columns, pagination, empty state, row click handler
+- Toast.jsx: Multi-toast stack with showToast(message, type) API
 - Spinner.jsx: Loading spinner with size prop
-- DataTable.jsx: Reusable table component with header, rows, sorting indicator, empty state
-- Card.jsx: Versatile card with title, icon, value, trend, and children slots
-- globals.css: Complete design token system with CSS variables for colors, spacing, typography
+- Dialog.jsx: Compound component (Dialog, DialogHeader, DialogTitle, DialogContent, DialogFooter)
+- Sheet.jsx: Slide-in panel from any edge (Sheet with side="right|left|top|bottom")
+- Badge.jsx: Status badges (default, success, warning, danger, info, outline variants)
+- Tabs.jsx: Compound tabs (Tabs, TabsList, TabsTrigger, TabsContent)
+- Select.jsx: Custom dropdown select with search
+- Avatar.jsx: User avatar with image or initials fallback
+- Input.jsx: Styled input with label, error state, and icon support
+- Dropdown.jsx: Action menu (DropdownMenu, DropdownItem, DropdownSeparator)
+- Alert.jsx: Notification banners (info, success, warning, error variants)
 
-The Card component should support stat display mode:
-<Card title="Students" icon={Users} value="1,247" trend="+12%" trendUp={true} />`,
+Only generate globals.css with design tokens. All UI components are pre-scaffolded.`,
     produces: [
-      "/components/ui/Toast.jsx",
-      "/components/ui/Spinner.jsx",
-      "/components/ui/DataTable.jsx",
-      "/components/ui/Card.jsx",
       "/styles/globals.css",
     ],
     priority: 0,
