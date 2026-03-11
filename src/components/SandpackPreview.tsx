@@ -484,6 +484,23 @@ const SandpackPreview = ({ viewport, showConsole = false, initialPath }: Sandpac
     ...sandpackDeps,
   }), [sandpackDeps]);
 
+  // If sandpackFiles is null/empty, show a friendly fallback instead of blank screen
+  if (!sandpackFiles || Object.keys(sandpackFiles).length === 0) {
+    return (
+      <div className="h-full w-full flex items-center justify-center bg-background">
+        <div className="text-center space-y-3 max-w-sm px-6">
+          <div className="w-14 h-14 mx-auto rounded-2xl bg-gradient-to-br from-primary to-accent flex items-center justify-center">
+            <span className="text-xl font-bold text-primary-foreground">L</span>
+          </div>
+          <h3 className="text-sm font-semibold text-foreground">No preview available</h3>
+          <p className="text-xs text-muted-foreground">
+            Chat with the AI to build your app and see it here.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="h-full w-full" style={{ minHeight: 0 }}>
       <SandpackErrorBoundary onRetry={() => {}}>
