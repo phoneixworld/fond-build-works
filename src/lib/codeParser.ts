@@ -220,7 +220,7 @@ export function parseFileSections(block: string): { files: Record<string, string
           prevWasDashes = true;
           continue;
         }
-        if (nextTrimmed === "dependencies") {
+        if (/^\/?dependencies$/.test(nextTrimmed)) {
           flushFile();
           inDeps = true;
           i++;
