@@ -143,7 +143,6 @@ const ChatPanel = forwardRef<ChatPanelHandle, { initialPrompt?: string; onVersio
     classifyUserIntent,
     fastClassifyLocal,
     // Conversation state machine
-    conversationAnalyze: conversationState.analyzeMessageSync,
     conversationAnalyzeAsync: async (text: string, hasImages: boolean, hasExistingCode: boolean) => {
       return conversationState.analyzeMessage(text, hasImages);
     },
@@ -189,7 +188,7 @@ const ChatPanel = forwardRef<ChatPanelHandle, { initialPrompt?: string; onVersio
   }, [orchClearChat, conversationState]);
 
   // Expose handle
-  useImperativeHandle(ref, () => ({ clearChat: handleClearChat, sendMessage: (text: string) => sendMessage(text) }), [handleClearChat, sendMessage]);
+  useImperativeHandle(ref, () => ({ clearChat: handleClearChat, sendMessage: (text: string) => handleSmartSend(text) }), [handleClearChat, handleSmartSend]);
 
   // Listen for refactor actions from CodeEditor
   useEffect(() => {
@@ -315,8 +314,8 @@ const ChatPanel = forwardRef<ChatPanelHandle, { initialPrompt?: string; onVersio
     setAnalysisResult(null);
     setCurrentAgent("build");
     setPipelineStep("planning");
-    setTimeout(() => sendMessage(enrichedPrompt), 0);
-  }, [followUpQuestions, followUpAnswers, pendingFollowUpPrompt, sendMessage, setCurrentAgent, setPipelineStep]);
+    setTimeout(() => handleSmartSend(enrichedPrompt), 0);
+  }, [followUpQuestions, followUpAnswers, pendingFollowUpPrompt, handleSmartSend, setCurrentAgent, setPipelineStep]);
 
   const skipFollowUpQuestions = useCallback(() => {
     const prompt = pendingFollowUpPrompt;
@@ -326,8 +325,8 @@ const ChatPanel = forwardRef<ChatPanelHandle, { initialPrompt?: string; onVersio
     setAnalysisResult(null);
     setCurrentAgent("build");
     setPipelineStep("planning");
-    setTimeout(() => sendMessage(prompt), 0);
-  }, [pendingFollowUpPrompt, sendMessage, setCurrentAgent, setPipelineStep]);
+    setTimeout(() => handleSmartSend(prompt), 0);
+  }, [pendingFollowUpPrompt, handleSmartSend, setCurrentAgent, setPipelineStep]);
 
   // Initial prompt
   useEffect(() => {
@@ -532,8 +531,8 @@ const ChatPanel = forwardRef<ChatPanelHandle, { initialPrompt?: string; onVersio
     setMessages(truncated);
     setEditingIndex(null);
     setEditText("");
-    setTimeout(() => sendMessage(editText.trim()), 50);
-  }, [editingIndex, editText, currentProject, sendMessage]);
+    setTimeout(() => handleSmartSend(editText.trim()), 50);
+  }, [editingIndex, editText, currentProject, handleSmartSend]);
 
   const handleRegenerate = useCallback((index: number) => {
     if (isLoadingRef.current || !currentProject) return;
@@ -544,8 +543,8 @@ const ChatPanel = forwardRef<ChatPanelHandle, { initialPrompt?: string; onVersio
     const userText = getTextContent(msgs[userMsgIndex].content);
     const truncated = msgs.slice(0, index);
     setMessages(truncated);
-    setTimeout(() => sendMessage(userText), 50);
-  }, [currentProject, sendMessage]);
+    setTimeout(() => handleSmartSend(userText), 50);
+  }, [currentProject, handleSmartSend]);
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === "Enter" && !e.shiftKey) {
@@ -741,7 +740,7 @@ const ChatPanel = forwardRef<ChatPanelHandle, { initialPrompt?: string; onVersio
                   setFollowUpAnswers({});
                   setPendingFollowUpPrompt("");
                   setAnalysisResult(null);
-                  sendMessage(enrichedPrompt);
+                  handleSmartSend(enrichedPrompt);
                 }}
                 onSkip={skipFollowUpQuestions}
               />
