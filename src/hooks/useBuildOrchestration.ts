@@ -124,6 +124,7 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
   const [totalPlanTasks, setTotalPlanTasks] = useState(0);
   const [isLoading, setIsLoading] = useState(false);
   const [selectedTemplate, setSelectedTemplate] = useState<PageTemplate | null>(null);
+  const [compilerTasks, setCompilerTasks] = useState<Array<{ id: string; label: string; status: "pending" | "in_progress" | "done" }>>([]);
 
   const messagesRef = useRef<Msg[]>([]);
   messagesRef.current = messages;
@@ -820,6 +821,9 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
         model: routedModel,
       };
 
+      // Reset compiler tasks at start
+      setCompilerTasks([{ id: "planning", label: "Planning task graph", status: "in_progress" }]);
+
       const compileCallbacks: CompileCallbacks = {
         onPhase: (phase, detail) => {
           setBuildStep(detail);
@@ -833,6 +837,24 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
           setCurrentTaskIndex(index);
           setTotalPlanTasks(total);
           setBuildStep(`🔨 Task ${index + 1}/${total}: ${task.label}`);
+
+          // Update compilerTasks for pipeline card
+          setCompilerTasks(prev => {
+            // On first task, replace planning placeholder with real tasks
+            if (prev.length <= 1 || prev[0]?.id === "planning") {
+              return Array.from({ length: total }, (_, i) => ({
+                id: `task-${i}`,
+                label: i === index ? task.label : `Task ${i + 1}`,
+                status: (i < index ? "done" : i === index ? "in_progress" : "pending") as "done" | "in_progress" | "pending",
+              }));
+            }
+            // Update existing task list
+            return prev.map((t, i) => ({
+              ...t,
+              label: i === index ? task.label : t.label,
+              status: (i < index ? "done" : i === index ? "in_progress" : t.status) as "done" | "in_progress" | "pending",
+            }));
+          });
 
           const progressMsg = `📋 **Building** (${total} tasks)\n\n${Array.from({ length: total }, (_, i) => {
             const status = i < index ? "✅" : i === index ? "🔨" : "⏳";
@@ -854,6 +876,9 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
             console.warn(`[Compiler] ⛔ Blocked cross-project file injection`);
             return;
           }
+          // Mark task done in pipeline card
+          setCompilerTasks(prev => prev.map(t => t.label === task.label ? { ...t, status: "done" as const } : t));
+
           // Update preview with accumulated files on each task completion
           // BUT skip interim refreshes for large workspaces (>30 files) to avoid thrashing
           if (Object.keys(files).length > 0) {
@@ -862,7 +887,6 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
             const totalFileCount = Object.keys(mergedFiles).length;
             
             if (totalFileCount > 30) {
-              // Large workspace: only update internal ref, defer Sandpack refresh to onComplete
               sandpackFilesRef.current = mergedFiles;
               syncSandpackToVirtualFS(mergedFiles);
               console.log(`[Compiler] Large workspace (${totalFileCount} files) — deferring preview refresh`);
@@ -875,6 +899,7 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
         },
         onTaskError: (task, error) => {
           console.error(`[Compiler] Task '${task.label}' failed:`, error);
+          setCompilerTasks(prev => prev.map(t => t.label === task.label ? { ...t, status: "done" as const } : t));
         },
         onVerification: (result) => {
           if (result.ok) {
@@ -1369,6 +1394,7 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
     setCurrentPlan(null);
     setCurrentTaskIndex(0);
     setTotalPlanTasks(0);
+    setCompilerTasks([]);
     isSendingRef.current = false;
     saveProject({ chat_history: [], html_content: "" });
   }, [currentProject, isLoading, setPreviewHtml, saveProject, setMessages, setSandpackFiles, setSandpackDeps, setPreviewMode, setPreviewErrors, setHealAttempts, resetHealing]);
@@ -1395,6 +1421,7 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
     selectedTemplate,
     setSelectedTemplate,
     buildRetryCount,
+    compilerTasks,
 
     // Refs
     isSendingRef,
