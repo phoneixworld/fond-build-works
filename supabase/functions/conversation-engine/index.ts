@@ -22,15 +22,16 @@ const corsHeaders = {
 };
 
 // ─── Conversation Mode FSM ───────────────────────────────────────────────
-type ConversationMode = "idle" | "gathering" | "ready" | "building" | "reviewing" | "complete";
+type ConversationMode = "idle" | "gathering" | "ready" | "building" | "editing" | "reviewing" | "complete";
 
 const VALID_TRANSITIONS: Record<ConversationMode, ConversationMode[]> = {
-  idle: ["gathering", "building"],
-  gathering: ["gathering", "ready", "building", "idle"],
-  ready: ["building", "gathering", "idle"],
+  idle: ["gathering", "building", "editing"],
+  gathering: ["gathering", "ready", "building", "editing", "idle"],
+  ready: ["building", "editing", "gathering", "idle"],
   building: ["reviewing", "complete", "idle"],
+  editing: ["complete", "idle", "editing", "gathering"],
   reviewing: ["complete", "building", "idle"],
-  complete: ["idle", "gathering", "building"],
+  complete: ["idle", "gathering", "building", "editing"],
 };
 
 // ─── Signal Detection ────────────────────────────────────────────────────
