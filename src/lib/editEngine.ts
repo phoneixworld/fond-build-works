@@ -36,6 +36,8 @@ export interface EditRequest {
 export interface EditResult {
   /** Files that were modified (path → new code) */
   modifiedFiles: Record<string, string>;
+  /** Dependencies returned by the AI (pkg → version) */
+  dependencies: Record<string, string>;
   /** Which files were targeted */
   targetFiles: string[];
   /** AI's explanation of what changed */
