@@ -173,6 +173,7 @@ const ChatPanel = forwardRef<ChatPanelHandle, { initialPrompt?: string; onVersio
     selectedTemplate, setSelectedTemplate, buildRetryCount,
     compilerTasks,
     isSendingRef, isLoadingRef, messagesRef, sandpackFilesRef, abortControllerRef, lastProjectIdRef,
+    lastVerificationOkRef,
     sendMessage, sendChatMessage, handleSmartSend, clearChat: orchClearChat, abortBuild,
     syncSandpackToVirtualFS,
     setCurrentAgent, setCurrentPlan, setCurrentTaskIndex, setTotalPlanTasks,
