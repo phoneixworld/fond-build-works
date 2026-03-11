@@ -398,18 +398,15 @@ function buildSandpackFiles(files: SandpackFileSet | null, projectId: string, su
     // ── AuthContext fixes: strip useNavigate, ensure exports ──
     if (sandpackPath.includes("AuthContext") && sandpackPath.endsWith(".js")) {
       // CRITICAL: AuthContext must NOT use useNavigate — it sits outside Router
-      // Remove useNavigate import
-      processed = processed.replace(
-        /,?\s*useNavigate\s*/g,
-        (match) => {
-          // If it's ", useNavigate" or "useNavigate, " inside a destructure/import
-          return "";
-        }
-      );
-      // Remove the "const navigate = useNavigate();" line
-      processed = processed.replace(/^\s*const\s+navigate\s*=\s*useNavigate\(\)\s*;?\s*$/gm, "");
-      // Replace any navigate("/...") calls with no-ops (navigation should be in consuming components)
+      // Step 1: Remove entire "const navigate = useNavigate();" lines FIRST
+      processed = processed.replace(/^\s*const\s+navigate\s*=\s*useNavigate\s*\(\s*\)\s*;?\s*$/gm, "");
+      // Step 2: Replace any navigate("/...") calls with no-ops
       processed = processed.replace(/\bnavigate\s*\(\s*['"][^'"]*['"]\s*\)/g, "/* navigate removed */");
+      // Step 3: Remove useNavigate from import statements (e.g. "import { useState, useNavigate } from ...")
+      processed = processed.replace(/,\s*useNavigate/g, "");
+      processed = processed.replace(/useNavigate\s*,\s*/g, "");
+      // Handle solo import: "import { useNavigate } from ..."
+      processed = processed.replace(/^\s*import\s*\{\s*useNavigate\s*\}\s*from\s*['"][^'"]*['"]\s*;?\s*$/gm, "");
 
       // Ensure AuthProvider is a named export
       if (/export\s+default\s+function\s+AuthProvider/.test(processed)) {
