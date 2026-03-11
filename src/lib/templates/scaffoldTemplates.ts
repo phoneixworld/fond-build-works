@@ -328,19 +328,31 @@ export default function use${entityName}(projectId) {
 }
 
 function generateAuthContext(): string {
-  return `import React, { createContext, useContext, useState, useCallback } from "react";
+  return `import React, { createContext, useContext, useState, useCallback, useEffect } from "react";
+// IMPORTANT: Do NOT import useNavigate here. AuthContext must remain router-agnostic.
+// Navigation after login/logout should be handled by consuming components, not this context.
 
 const AuthContext = createContext(null);
 
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
 
   const getConfig = () => ({
     apiBase: window.__SUPABASE_URL__ || "",
     apiKey: window.__SUPABASE_KEY__ || "",
     projectId: window.__PROJECT_ID__ || "",
   });
+
+  // Check for existing session on mount
+  useEffect(() => {
+    const token = localStorage.getItem("auth_token");
+    const savedUser = localStorage.getItem("auth_user");
+    if (token && savedUser) {
+      try { setUser(JSON.parse(savedUser)); } catch {}
+    }
+    setLoading(false);
+  }, []);
 
   const authFetch = useCallback(async (action, body = {}) => {
     const { apiBase, apiKey, projectId } = getConfig();
@@ -356,8 +368,17 @@ export function AuthProvider({ children }) {
     setLoading(true);
     try {
       const json = await authFetch("login", { email, password });
-      if (json.data?.user) { setUser(json.data.user); localStorage.setItem("auth_token", json.data.token); }
-      else if (json.error) throw new Error(json.error);
+      if (json.user) {
+        setUser(json.user);
+        localStorage.setItem("auth_token", json.token);
+        localStorage.setItem("auth_user", JSON.stringify(json.user));
+      } else if (json.data?.user) {
+        setUser(json.data.user);
+        localStorage.setItem("auth_token", json.data.token || json.token);
+        localStorage.setItem("auth_user", JSON.stringify(json.data.user));
+      } else if (json.error) {
+        throw new Error(json.error);
+      }
       return json;
     } finally { setLoading(false); }
   }, [authFetch]);
@@ -366,13 +387,26 @@ export function AuthProvider({ children }) {
     setLoading(true);
     try {
       const json = await authFetch("signup", { email, password, display_name: displayName });
-      if (json.data?.user) { setUser(json.data.user); localStorage.setItem("auth_token", json.data.token); }
-      else if (json.error) throw new Error(json.error);
+      if (json.user) {
+        setUser(json.user);
+        localStorage.setItem("auth_token", json.token);
+        localStorage.setItem("auth_user", JSON.stringify(json.user));
+      } else if (json.data?.user) {
+        setUser(json.data.user);
+        localStorage.setItem("auth_token", json.data.token || json.token);
+        localStorage.setItem("auth_user", JSON.stringify(json.data.user));
+      } else if (json.error) {
+        throw new Error(json.error);
+      }
       return json;
     } finally { setLoading(false); }
   }, [authFetch]);
 
-  const logout = useCallback(() => { setUser(null); localStorage.removeItem("auth_token"); }, []);
+  const logout = useCallback(() => {
+    setUser(null);
+    localStorage.removeItem("auth_token");
+    localStorage.removeItem("auth_user");
+  }, []);
 
   return (
     <AuthContext.Provider value={{ user, loading, login, signup, logout, isAuthenticated: !!user }}>
