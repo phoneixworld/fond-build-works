@@ -416,7 +416,84 @@ function checkUndefinedCalls(workspace: Workspace): { issues: VerificationIssue[
         }
       }
     }
+}
+
+// ─── Router Hook Violations ───────────────────────────────────────────────
+
+/**
+ * Detects useNavigate (or other Router-only hooks) inside files that are
+ * rendered OUTSIDE a Router context — specifically AuthContext, ThemeContext,
+ * and any top-level provider.
+ */
+function checkRouterHookViolations(workspace: Workspace): { issues: VerificationIssue[] } {
+  const issues: VerificationIssue[] = [];
+  const ROUTER_HOOKS = ["useNavigate", "useLocation", "useParams", "useSearchParams"];
+  // Files that typically wrap OUTSIDE the Router (or are the Router's sibling)
+  const CONTEXT_PATTERNS = [/AuthContext/, /ThemeContext/, /AppContext/, /Provider/];
+
+  for (const path of workspace.listFiles()) {
+    if (!/\.(jsx?|tsx?)$/.test(path)) continue;
+    const isContextFile = CONTEXT_PATTERNS.some(p => p.test(path));
+    if (!isContextFile) continue;
+
+    const content = workspace.getFile(path)!;
+    for (const hook of ROUTER_HOOKS) {
+      const regex = new RegExp(`\\b${hook}\\b`);
+      if (regex.test(content)) {
+        const lineNum = content.split("\n").findIndex(l => regex.test(l)) + 1;
+        issues.push({
+          category: "router_hook_violation",
+          severity: "error",
+          file: path,
+          line: lineNum,
+          message: `'${hook}' used in ${path} which is rendered outside <Router>. Remove it — navigation should be handled by consuming components.`,
+          suggestedFix: `Remove all '${hook}' usage from ${path}`,
+        });
+      }
+    }
   }
+  return { issues };
+}
+
+// ─── Export Validity Check ────────────────────────────────────────────────
+
+/**
+ * Checks "export { A, B, C }" statements and ensures each identifier
+ * is actually defined in the file. Catches AI-generated barrel exports
+ * that reference non-existent symbols.
+ */
+function checkExportValidity(workspace: Workspace): { issues: VerificationIssue[] } {
+  const issues: VerificationIssue[] = [];
+
+  for (const path of workspace.listFiles()) {
+    if (!/\.(jsx?|tsx?)$/.test(path)) continue;
+    const content = workspace.getFile(path)!;
+    const lines = content.split("\n");
+
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i].trim();
+      const match = line.match(/^export\s*\{([^}]+)\}\s*;?\s*$/);
+      if (!match) continue;
+
+      const ids = match[1].split(",").map(s => s.replace(/\s+as\s+\w+/, "").trim()).filter(Boolean);
+      for (const id of ids) {
+        // Check if this identifier is defined somewhere in the file
+        const defRegex = new RegExp(`(?:function|const|let|var|class)\\s+${id}\\b`);
+        if (!defRegex.test(content)) {
+          issues.push({
+            category: "undefined_export",
+            severity: "error",
+            file: path,
+            line: i + 1,
+            message: `Export '${id}' in "export { ... }" is not defined in ${path}`,
+            suggestedFix: `Remove '${id}' from the export statement or define it`,
+          });
+        }
+      }
+    }
+  }
+  return { issues };
+}
 
   return { issues };
 }
