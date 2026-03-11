@@ -355,18 +355,23 @@ function checkRoutes(workspace: Workspace): {
 
       if (importMatch) {
         const importPath = importMatch[1];
-        const resolved = workspace.resolveImport("/App.jsx", importPath);
-        if (resolved && workspace.hasFile(resolved)) {
+        // Skip package imports (react-router-dom, etc.) — they're always valid
+        if (!importPath.startsWith(".") && !importPath.startsWith("/")) {
           found++;
         } else {
-          missing++;
-          issues.push({
-            category: "missing_route" as const,
-            severity: "error",
-            file: "/App.jsx",
-            message: `Route '${routePath}' references component '${componentName}' imported from '${importPath}' which doesn't exist`,
-            suggestedFix: `Create ${importPath}.jsx with a ${componentName} component`,
-          });
+          const resolved = workspace.resolveImport("/App.jsx", importPath);
+          if (resolved && workspace.hasFile(resolved)) {
+            found++;
+          } else {
+            missing++;
+            issues.push({
+              category: "missing_route" as const,
+              severity: "error",
+              file: "/App.jsx",
+              message: `Route '${routePath}' references component '${componentName}' imported from '${importPath}' which doesn't exist`,
+              suggestedFix: `Create ${importPath}.jsx with a ${componentName} component`,
+            });
+          }
         }
       }
     }
