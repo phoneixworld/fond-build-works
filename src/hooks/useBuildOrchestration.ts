@@ -1019,7 +1019,13 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
         
         // Get server-compiled requirements (includes chat history fallback now)
         const requirements = await Promise.resolve(conversationGetRequirements?.() || "");
-        
+
+        // Guard: abort if project switched during async requirements fetch
+        if (isSmartSendStale()) {
+          console.warn("[SmartSend] Project switched during requirements fetch, aborting");
+          return;
+        }
+
         if (requirements && requirements.length > 50) {
           const buildPrompt = requirements + "\n\n" + finalText;
           console.log(`[SmartSend] Build prompt length: ${buildPrompt.length} chars (requirements: ${requirements.length})`);
