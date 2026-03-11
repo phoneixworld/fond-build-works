@@ -150,7 +150,7 @@ export async function executeTask(
 
   const MAX_CONTINUATION_RETRIES = 1;
 
-  const runStream = (messages: Array<{ role: string; content: string }>): Promise<{ text: string; files: Record<string, string> | null }> => {
+  const runStream = (messages: Array<{ role: "user" | "assistant"; content: string }>): Promise<{ text: string; files: Record<string, string> | null }> => {
     return new Promise((resolve, reject) => {
       let fullText = "";
       streamBuildAgent({
