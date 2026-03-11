@@ -49,6 +49,25 @@ function detectTasks(content: string, isBuilding: boolean, pipelineStep?: Pipeli
     return tasks;
   }
 
+  if (currentAgent === "edit") {
+    if (pipelineStep === "resolving") {
+      tasks.push({ id: "resolve", label: "Finding target files", status: "in_progress" });
+    } else {
+      tasks.push({ id: "resolve", label: "Target files identified", status: "done" });
+    }
+
+    if (pipelineStep === "editing" || (pipelineStep !== "resolving" && len > 0)) {
+      const hasCode = content.includes("---") && content.includes(".jsx");
+      tasks.push({ id: "edit", label: "Applying changes", status: hasCode ? "done" : "in_progress" });
+      if (hasCode) {
+        tasks.push({ id: "merge", label: "Merging into workspace", status: isBuilding ? "in_progress" : "done" });
+      }
+    }
+
+    if (!isBuilding && len > 0) return tasks.map(t => ({ ...t, status: "done" as const }));
+    return tasks;
+  }
+
   if (isBuilding && len > 0) {
     tasks.push({ id: "analyze", label: "Analyzing request", status: hasCode ? "done" : (len > 80 ? "done" : "in_progress") });
   }
