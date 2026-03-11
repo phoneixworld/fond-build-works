@@ -138,6 +138,28 @@ function generateStubComponent(
   return generateComponentStub(name, issue);
 }
 
+function generateLayoutStub(name: string, issue: MissingModuleIssue): string {
+  const namedExports = issue.symbols.filter(s => s !== name && s !== "default");
+
+  let code = `import React from 'react';\nimport { Outlet } from 'react-router-dom';\n\n`;
+
+  for (const sym of namedExports) {
+    code += `export const ${sym} = ({ children, className, ...props }) => {\n  return <div className={className} {...props}>{children || '${sym}'}</div>;\n};\n\n`;
+  }
+
+  code += `export default function ${name}({ children }) {\n`;
+  code += `  return (\n`;
+  code += `    <div className="flex h-screen">\n`;
+  code += `      <main className="flex-1 overflow-auto">\n`;
+  code += `        {children || <Outlet />}\n`;
+  code += `      </main>\n`;
+  code += `    </div>\n`;
+  code += `  );\n`;
+  code += `}\n`;
+
+  return code;
+}
+
 function generateComponentStub(name: string, issue: MissingModuleIssue): string {
   const namedExports = issue.symbols.filter(s => s !== name && s !== "default");
   
