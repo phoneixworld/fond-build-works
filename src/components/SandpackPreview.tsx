@@ -395,65 +395,12 @@ function buildSandpackFiles(files: SandpackFileSet | null, projectId: string, su
     const sandpackPath = normalized.replace(/\.(tsx?|jsx)$/, ".js");
     let processed = sandpackPath.match(/\.js$/) ? sanitizeImports(code, sandpackPath) : code;
 
-    // ── AuthContext fixes: strip useNavigate, ensure exports ──
-    if (sandpackPath.includes("AuthContext") && sandpackPath.endsWith(".js")) {
-      // CRITICAL: AuthContext must NOT use useNavigate — it sits outside Router
-      // Step 1: Remove entire "const navigate = useNavigate();" lines FIRST
-      processed = processed.replace(/^\s*const\s+navigate\s*=\s*useNavigate\s*\(\s*\)\s*;?\s*$/gm, "");
-      // Step 2: Replace any navigate("/...") calls with no-ops
-      processed = processed.replace(/\bnavigate\s*\(\s*['"][^'"]*['"]\s*\)/g, "/* navigate removed */");
-      // Step 2b: Remove "navigate" from dependency arrays like [projectId, navigate]
-      processed = processed.replace(/,\s*navigate\b/g, "");
-      processed = processed.replace(/\bnavigate\s*,\s*/g, "");
-      // Step 3: Remove useNavigate from import statements (e.g. "import { useState, useNavigate } from ...")
-      processed = processed.replace(/,\s*useNavigate/g, "");
-      processed = processed.replace(/useNavigate\s*,\s*/g, "");
-      // Handle solo import: "import { useNavigate } from ..."
-      processed = processed.replace(/^\s*import\s*\{\s*useNavigate\s*\}\s*from\s*['"][^'"]*['"]\s*;?\s*$/gm, "");
-
-      // Ensure AuthProvider and useAuth are exported — but NEVER duplicate existing exports
-      const hasNamedAuthProviderExport = /export\s+(function|const)\s+AuthProvider\b/.test(processed) || /export\s*\{[^}]*AuthProvider[^}]*\}/.test(processed);
-      const hasDefaultExport = /export\s+default\b/.test(processed);
-      const hasNamedUseAuthExport = /export\s+(function|const)\s+useAuth\b/.test(processed) || /export\s*\{[^}]*useAuth[^}]*\}/.test(processed);
-
-      // Convert "export default function AuthProvider" to named export
-      if (/export\s+default\s+function\s+AuthProvider/.test(processed)) {
-        processed = processed.replace(/export\s+default\s+function\s+AuthProvider/, "export function AuthProvider");
-        if (!/export\s+default\s/.test(processed)) {
-          processed += "\nexport default AuthProvider;\n";
-        }
-      }
-      // Add default export if missing
-      if (!hasDefaultExport && hasNamedAuthProviderExport) {
-        processed += "\nexport default AuthProvider;\n";
-      }
-      // Add named AuthProvider export if missing
-      if (!hasNamedAuthProviderExport && /(?:function|const)\s+AuthProvider\b/.test(processed)) {
-        processed = processed.replace(/^((?:function|const)\s+AuthProvider\b)/m, "export $1");
-      }
-      // Add named useAuth export if missing
-      if (!hasNamedUseAuthExport && /(?:function|const)\s+useAuth\b/.test(processed)) {
-        processed = processed.replace(/^((?:function|const)\s+useAuth\b)/m, "export $1");
-      }
-    }
-
-    // ── Safety: strip undefined identifiers from "export { A, B, C }" statements ──
-    if (sandpackPath.endsWith(".js")) {
-      processed = processed.replace(
-        /^export\s*\{([^}]+)\}\s*;?\s*$/gm,
-        (match, inner) => {
-          const ids = inner.split(",").map((s: string) => s.trim()).filter(Boolean);
-          const valid = ids.filter((id: string) => {
-            const name = id.replace(/\s+as\s+\w+/, "").trim();
-            // Check if defined in file (function, const, let, var, class, or already exported)
-            const defRegex = new RegExp(`(?:function|const|let|var|class)\\s+${name}\\b`);
-            return defRegex.test(processed);
-          });
-          if (valid.length === 0) return "// export removed — no valid identifiers";
-          return `export { ${valid.join(", ")} };`;
-        }
-      );
-    }
+    // ── Minimal safety nets (compiler handles the heavy lifting now) ──
+    // Only keep: ensure default export exists for component files
+    // The compiler's verifier + deterministic repair handles:
+    //   - useNavigate in AuthContext (router_hook_violation)
+    //   - undefined export identifiers (undefined_export)
+    //   - export deduplication
 
     // Ensure all component files have a default export — prevents "Element type is invalid"
     if (sandpackPath.endsWith(".js") && !sandpackPath.includes("styles") && !sandpackPath.includes(".css")) {

@@ -17,7 +17,7 @@ import { planTaskGraph, topologicalSort } from "./planner";
 import { Workspace } from "./workspace";
 import { executeTask, type ExecutionCallbacks } from "./executor";
 import { verifyWorkspace } from "./verifier";
-import { classifyRepairActions, buildRepairSummary, MAX_REPAIR_ROUNDS } from "./repair";
+import { classifyRepairActions, buildRepairSummary, applyDeterministicFix, MAX_REPAIR_ROUNDS } from "./repair";
 import { fixBrokenImports } from "./importFixer";
 import { repairMissingModules } from "./missingModuleGen";
 import { injectMissingProviders } from "./providerInjector";
@@ -258,7 +258,18 @@ export async function compile(
 
     for (const action of actions) {
       try {
-        // Create a micro-task for repair
+        // Handle deterministic repairs without AI
+        if (action.type === "fix_deterministic") {
+          const fixed = applyDeterministicFix(action, workspace);
+          if (fixed) {
+            totalRepairActions++;
+            cloudLog.info(`Deterministic fix: ${action.targetFile} (${action.issue.category})`, "compiler");
+            console.log(`[Compiler]   🔧 Deterministic fix: ${action.targetFile} (${action.issue.category})`);
+            continue;
+          }
+        }
+
+        // Create a micro-task for AI repair
         const repairTask: CompilerTask = {
           id: `repair-${repairRound}-${action.targetFile}`,
           label: `repair:${action.type}:${action.targetFile}`,

@@ -99,6 +99,22 @@ function issueToRepairAction(
         prompt: buildFixStubPrompt(issue, workspace),
       };
 
+    case "router_hook_violation":
+      return {
+        type: "fix_deterministic",
+        targetFile: issue.file,
+        issue,
+        prompt: "", // No AI needed — handled deterministically
+      };
+
+    case "undefined_export":
+      return {
+        type: "fix_deterministic",
+        targetFile: issue.file,
+        issue,
+        prompt: "", // No AI needed — handled deterministically
+      };
+
     default:
       return null;
   }
@@ -228,6 +244,74 @@ RULES:
 - Close any unclosed braces in destructured imports
 - Do NOT refactor anything else
 - Output the complete corrected file`;
+}
+
+// ─── Deterministic Fixes (no AI needed) ───────────────────────────────────
+
+/**
+ * Applies code fixes that can be done deterministically without calling AI.
+ * Returns true if the fix was applied successfully.
+ */
+export function applyDeterministicFix(action: RepairAction, workspace: Workspace): boolean {
+  const content = workspace.getFile(action.targetFile);
+  if (!content) return false;
+
+  let fixed = content;
+
+  switch (action.issue.category) {
+    case "router_hook_violation": {
+      // Remove useNavigate and related usage from the file
+      const ROUTER_HOOKS = ["useNavigate", "useLocation", "useParams", "useSearchParams"];
+      for (const hook of ROUTER_HOOKS) {
+        if (!new RegExp(`\\b${hook}\\b`).test(fixed)) continue;
+        
+        // Remove "const x = useHook();" lines
+        const varMatch = fixed.match(new RegExp(`const\\s+(\\w+)\\s*=\\s*${hook}\\s*\\(\\s*\\)\\s*;?`));
+        const varName = varMatch?.[1];
+        
+        fixed = fixed.replace(new RegExp(`^\\s*const\\s+\\w+\\s*=\\s*${hook}\\s*\\(\\s*\\)\\s*;?\\s*$`, "gm"), "");
+        
+        // Remove the variable from dependency arrays and calls
+        if (varName) {
+          fixed = fixed.replace(new RegExp(`\\b${varName}\\s*\\(\\s*['"][^'"]*['"]\\s*\\)`, "g"), "/* navigation removed */");
+          fixed = fixed.replace(new RegExp(`,\\s*${varName}\\b`, "g"), "");
+          fixed = fixed.replace(new RegExp(`\\b${varName}\\s*,\\s*`, "g"), "");
+        }
+        
+        // Remove from imports: "import { X, useNavigate } from ..."
+        fixed = fixed.replace(new RegExp(`,\\s*${hook}`, "g"), "");
+        fixed = fixed.replace(new RegExp(`${hook}\\s*,\\s*`, "g"), "");
+        // Solo import
+        fixed = fixed.replace(new RegExp(`^\\s*import\\s*\\{\\s*${hook}\\s*\\}\\s*from\\s*['"][^'"]*['"]\\s*;?\\s*$`, "gm"), "");
+      }
+      
+      workspace.updateFile(action.targetFile, fixed);
+      return true;
+    }
+
+    case "undefined_export": {
+      // Remove undefined identifiers from "export { A, B, C }" statements
+      fixed = fixed.replace(
+        /^export\s*\{([^}]+)\}\s*;?\s*$/gm,
+        (match, inner) => {
+          const ids = inner.split(",").map((s: string) => s.trim()).filter(Boolean);
+          const valid = ids.filter((id: string) => {
+            const name = id.replace(/\s+as\s+\w+/, "").trim();
+            const defRegex = new RegExp(`(?:function|const|let|var|class)\\s+${name}\\b`);
+            return defRegex.test(fixed);
+          });
+          if (valid.length === 0) return "// export removed — no valid identifiers";
+          return `export { ${valid.join(", ")} };`;
+        }
+      );
+      
+      workspace.updateFile(action.targetFile, fixed);
+      return true;
+    }
+
+    default:
+      return false;
+  }
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────

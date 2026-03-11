@@ -135,7 +135,9 @@ export type IssueCategory =
   | "invalid_import_syntax"
   | "missing_route"
   | "empty_stub"
-  | "missing_component";
+  | "missing_component"
+  | "router_hook_violation"
+  | "undefined_export";
 
 export type IssueSeverity = "error" | "warning";
 
@@ -172,7 +174,8 @@ export type RepairActionType =
   | "fix_import_syntax"
   | "fix_syntax"
   | "remove_empty_stub"
-  | "generate_missing_module";
+  | "generate_missing_module"
+  | "fix_deterministic";
 
 export interface RepairAction {
   type: RepairActionType;
