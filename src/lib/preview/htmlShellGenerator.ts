@@ -33,6 +33,7 @@ export function generateHtmlShell(config: ShellConfig): string {
     cssContents,
     entryPath,
     projectId,
+    assetMap = {},
     supabaseUrl = "",
     supabaseKey = "",
   } = config;
