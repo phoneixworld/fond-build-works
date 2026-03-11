@@ -13,15 +13,23 @@ const FIX_PATTERNS = /\b(fix|error|bug|broken|crash|blank|not working|issue|Synt
 const REFACTOR_PATTERNS = /\b(refactor|restructure|reorganize|clean up|simplify|optimize)\b/i;
 const EXTEND_PATTERNS = /\b(add|extend|integrate|include|implement|create new|build new)\b/i;
 
+// Patterns that strongly indicate "build me an app" — takes precedence over fix/refactor
+const NEW_APP_PATTERNS = /\b(build\s+(?:a|an|the|me|my)\s+\w|create\s+(?:a|an|the|me|my)\s+\w|School\s+ERP|CRM|e-?commerce|dashboard|management\s+system|admin\s+panel|project\s+manager|task\s+board|inventory|booking|scheduling)\b/i;
+const BUILD_TRIGGER_PATTERNS = /\b(build\s+it|generate|start\s+building|create\s+the\s+app)\b/i;
+
 export function detectBuildIntent(
   rawRequirements: string,
   hasExistingWorkspace: boolean
 ): BuildIntent {
+  // "Build it" or "build me a School ERP" is always new_app regardless of other words
+  if (!hasExistingWorkspace && (BUILD_TRIGGER_PATTERNS.test(rawRequirements) || NEW_APP_PATTERNS.test(rawRequirements))) {
+    return "new_app";
+  }
+  if (!hasExistingWorkspace) return "new_app";
   if (FIX_PATTERNS.test(rawRequirements)) return "fix";
   if (REFACTOR_PATTERNS.test(rawRequirements)) return "refactor";
-  if (hasExistingWorkspace && EXTEND_PATTERNS.test(rawRequirements)) return "extend";
-  if (hasExistingWorkspace) return "extend";
-  return "new_app";
+  if (EXTEND_PATTERNS.test(rawRequirements)) return "extend";
+  return "extend";
 }
 
 // ─── IR Extraction (deterministic, regex-based) ───────────────────────────
