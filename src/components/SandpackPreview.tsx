@@ -472,6 +472,7 @@ const SandpackPreview = ({ viewport, showConsole = false, initialPath }: Sandpac
     "tailwind-merge": "^2.2.0",
     "react-intersection-observer": "^9.10.0",
     "@tanstack/react-table": "^8.17.0",
+    "@supabase/supabase-js": "^2.38.0",
     ...sandpackDeps,
   }), [sandpackDeps]);
 
