@@ -137,7 +137,9 @@ export type IssueCategory =
   | "empty_stub"
   | "missing_component"
   | "router_hook_violation"
-  | "undefined_export";
+  | "undefined_export"
+  | "missing_import"
+  | "provider_ordering";
 
 export type IssueSeverity = "error" | "warning";
 

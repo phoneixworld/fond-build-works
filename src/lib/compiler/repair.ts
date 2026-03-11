@@ -8,6 +8,7 @@
 
 import type { VerificationResult, VerificationIssue, RepairAction, RepairActionType } from "./types";
 import type { Workspace } from "./workspace";
+import { fixMissingImports, fixProviderOrdering } from "./missingImportFixer";
 
 export const MAX_REPAIR_ROUNDS = 2;
 
@@ -113,6 +114,22 @@ function issueToRepairAction(
         targetFile: issue.file,
         issue,
         prompt: "", // No AI needed — handled deterministically
+      };
+
+    case "missing_import":
+      return {
+        type: "fix_deterministic",
+        targetFile: issue.file,
+        issue,
+        prompt: "", // No AI needed — handled by missingImportFixer
+      };
+
+    case "provider_ordering":
+      return {
+        type: "fix_deterministic",
+        targetFile: issue.file,
+        issue,
+        prompt: "", // No AI needed — handled by fixProviderOrdering
       };
 
     default:
@@ -307,6 +324,17 @@ export function applyDeterministicFix(action: RepairAction, workspace: Workspace
       
       workspace.updateFile(action.targetFile, fixed);
       return true;
+    }
+
+    case "missing_import": {
+      // Use the missing import fixer to inject the import
+      const count = fixMissingImports(workspace);
+      return count > 0;
+    }
+
+    case "provider_ordering": {
+      // Use the provider ordering fixer
+      return fixProviderOrdering(workspace);
     }
 
     default:
