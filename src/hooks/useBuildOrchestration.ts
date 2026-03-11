@@ -104,7 +104,7 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
     setHealAttempts, resetHealing, inputRef,
     selectedModel, selectedTheme,
     fetchProjectContext, classifyUserIntent, fastClassifyLocal,
-    conversationAnalyze, conversationAnalyzeAsync, conversationAddPhase, conversationGetRequirements,
+    conversationAnalyzeAsync, conversationAddPhase, conversationGetRequirements,
     conversationStartBuilding, conversationStartEditing, conversationCompleteEdit,
     conversationCompleteBuild, conversationGenerateAck,
     conversationMode,
