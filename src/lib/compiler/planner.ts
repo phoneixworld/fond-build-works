@@ -24,11 +24,22 @@ export function planTaskGraph(ctx: BuildContext): TaskGraph {
   const infraTask = createTask({
     label: "infra",
     type: "infra",
-    description: "Shared UI components, design tokens, global styles",
+    description: `Shared UI components, design tokens, global styles.
+    
+UI components must be production-quality:
+- Toast.jsx: Animated toast notifications with success/error/info variants
+- Spinner.jsx: Loading spinner with size prop
+- DataTable.jsx: Reusable table component with header, rows, sorting indicator, empty state
+- Card.jsx: Versatile card with title, icon, value, trend, and children slots
+- globals.css: Complete design token system with CSS variables for colors, spacing, typography
+
+The Card component should support stat display mode:
+<Card title="Students" icon={Users} value="1,247" trend="+12%" trendUp={true} />`,
     produces: [
       "/components/ui/Toast.jsx",
       "/components/ui/Spinner.jsx",
       "/components/ui/DataTable.jsx",
+      "/components/ui/Card.jsx",
       "/styles/globals.css",
     ],
     priority: 0,
@@ -98,24 +109,29 @@ export function planTaskGraph(ctx: BuildContext): TaskGraph {
     }
   } else if (ctx.buildIntent === "new_app") {
     // ── SEMANTIC FALLBACK: No routes extracted from regex ──────────
-    // The raw requirements describe the app in natural language.
-    // Create a single "domain pages" task that tells the AI to infer
-    // the correct pages/modules from the requirements text.
-    const domainTask = createTask({
-      label: "domain:pages",
+    // Split into layout + individual page tasks to avoid truncation.
+
+    // Task A: Layout shell (sidebar + app wrapper)
+    const layoutTask = createTask({
+      label: "domain:layout",
       type: "frontend",
-      description: `Generate ALL the main pages and components for this application based on the requirements. 
-The user asked for: "${ctx.rawRequirements.slice(0, 2000)}"
+      description: `Generate the layout shell for this application: "${ctx.rawRequirements.slice(0, 1500)}"
 
-You MUST analyze the application name and requirements to determine the correct domain-specific pages.
-For example:
-- A "School ERP" needs: Students, Teachers, Attendance, Gradebook, Fees, Timetable, Announcements
-- A "CRM" needs: Contacts, Deals, Pipeline, Activities, Reports
-- A "Project Manager" needs: Projects, Tasks, Kanban, Team, Timeline
+Create TWO files:
+1. /layout/AppLayout.jsx — Main layout wrapper with a sidebar on the left and {children} content area on the right. Must use <Outlet /> from react-router-dom for nested routing.
+2. /layout/Sidebar.jsx — Professional sidebar with:
+   - App logo/name at the top
+   - Navigation links with icons (from lucide-react) for each module
+   - Active state highlighting using useLocation() from react-router-dom
+   - User info section at the bottom with logout button
+   - Smooth hover transitions and proper spacing
 
-Generate 4-8 domain-appropriate page components with proper sidebar navigation and layout.
-Each page should have realistic sample data and full UI (tables, forms, stats cards).
-Create the layout components (AppLayout.jsx, Sidebar.jsx) with navigation for all pages.`,
+Analyze the app name to determine the correct navigation items. Examples:
+- "School ERP" → Dashboard, Students, Staff, Attendance, Gradebook, Fees, Timetable, Announcements
+- "CRM" → Dashboard, Contacts, Deals, Pipeline, Activities, Reports
+- "Project Manager" → Dashboard, Projects, Tasks, Kanban, Team, Timeline
+
+Use NavLink from react-router-dom for active state detection. Make the sidebar collapsible on mobile.`,
       produces: [
         "/layout/AppLayout.jsx",
         "/layout/Sidebar.jsx",
@@ -123,8 +139,32 @@ Create the layout components (AppLayout.jsx, Sidebar.jsx) with navigation for al
       dependsOn: [infraTask.id, authTaskId],
       priority: 3,
     });
-    tasks.push(domainTask);
-    pageTaskIds.push(domainTask.id);
+    tasks.push(layoutTask);
+
+    // Task B: Domain pages (split by concern to avoid truncation)
+    const domainPagesTask = createTask({
+      label: "domain:pages",
+      type: "frontend",
+      description: `Generate ALL the main page components for this application.
+The user asked for: "${ctx.rawRequirements.slice(0, 1500)}"
+
+IMPORTANT QUALITY RULES:
+- Create 5-8 domain-appropriate pages based on the app name/requirements
+- The DASHBOARD page MUST include: 4 stat cards with icons and trends, a data table with 5+ sample rows, and section headers
+- LIST pages MUST include: search bar, filter button, add button, data table with sample data, status badges, action buttons
+- FORM pages MUST include: proper labeled inputs, validation, submit/cancel buttons
+- Every page must use useState with realistic hardcoded sample data (real names, dates, numbers)
+- Use lucide-react for icons everywhere
+- Use color tokens: var(--color-primary), var(--color-bg), var(--color-text), var(--color-border), var(--color-success), var(--color-warning), var(--color-danger)
+- NO placeholder text like "Loading..." or "Coming soon" — every page must render complete UI
+
+Put each page in its own directory: /pages/ModuleName/ModuleName.jsx`,
+      produces: [],  // Dynamic — compiler will capture whatever files are generated
+      dependsOn: [infraTask.id, authTaskId, layoutTask.id],
+      priority: 3,
+    });
+    tasks.push(domainPagesTask);
+    pageTaskIds.push(layoutTask.id, domainPagesTask.id);
   }
 
   // ── Pass 5: App entry + routing ───────────────────────────────────

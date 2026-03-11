@@ -60,9 +60,9 @@ ${workspaceContext ? `### Current code:\n${workspaceContext}` : ""}
    - /services/ — API services
    - /styles/ — CSS files
    - /layout/ — layout wrappers
-   When importing, always use correct relative paths from the file's location. Example: from /pages/Auth/LoginPage.jsx, import Card as '../../components/ui/Card', AuthContext as '../../contexts/AuthContext'. From /pages/Dashboard.jsx, import as '../components/ui/Card'.
+   When importing, always use correct relative paths from the file's location.
 4. Use the project's data API pattern: fetch(\`\${window.__SUPABASE_URL__}/functions/v1/project-api\`, { body: { project_id: window.__PROJECT_ID__, action, collection, data } })
-5. For auth, use the AuthContext pattern. Import path depends on file location (e.g. from /pages/Auth/LoginPage.jsx use '../../contexts/AuthContext', from /pages/Dashboard.jsx use '../contexts/AuthContext', from /App.jsx use './contexts/AuthContext')
+5. For auth, use the AuthContext pattern. Import path depends on file location.
    - AuthContext MUST read window.__PROJECT_ID__, window.__SUPABASE_URL__, window.__SUPABASE_KEY__ for API calls
    - AuthContext MUST call project-auth edge function for signup/login/me actions
    - On app load, AuthContext checks localStorage for a saved token and calls "me" to restore the session
@@ -70,25 +70,34 @@ ${workspaceContext ? `### Current code:\n${workspaceContext}` : ""}
    - AuthContext must expose: { user, token, loading, login, signup, logout }
    - The login/signup functions must save the token to localStorage on success and return the result (do NOT navigate inside AuthContext)
    - The logout function must clear localStorage and set user to null (do NOT navigate inside AuthContext)
-   - **CRITICAL**: AuthContext must NOT import or call useNavigate(). Navigation must be handled by the consuming components (e.g. LoginPage calls navigate after login succeeds). AuthContext must be usable OUTSIDE a Router.
+   - **CRITICAL**: AuthContext must NOT import or call useNavigate(). Navigation must be handled by the consuming components. AuthContext must be usable OUTSIDE a Router.
    - While loading is true, show a loading spinner — never render routes until loading is false
    - Protected routes must redirect to /login when user is null (not crash or go blank)
-   - **CRITICAL ROLE SAFETY**: If you add allowedRoles checks, include "user" in the allowed list unless explicit role requirements were provided. Never block all authenticated users by default.
-5. Output complete, working code — no placeholders, no TODOs, no stubs
-6. Every component must have a default export
-7. Use Tailwind CSS with design tokens (var(--color-*)) for all styling
-8. **CRITICAL PROVIDER ORDERING in App.jsx**: The nesting order MUST be: ToastProvider (outermost) → AuthProvider → HashRouter → Routes. AuthProvider uses useToast() internally, so ToastProvider MUST wrap AuthProvider. AuthProvider MUST NOT use useNavigate(). Example:
-   <ToastProvider>
-     <AuthProvider>
-       <HashRouter>
-         <Routes>...</Routes>
-       </HashRouter>
-     </AuthProvider>
-   </ToastProvider>
-9. Protected pages must check useAuth().user and redirect to /login if null
-10. **CRITICAL**: Every file MUST import ALL identifiers it uses. If you use clsx(), you MUST have "import clsx from 'clsx'" at the top. If you use React, you MUST import it. Never assume globals exist.
-10. **CRITICAL**: Every function called in a component MUST be defined in that component, imported, or destructured from a hook/context. Never reference undefined functions like fetchBoards() without defining them first. If you need data-fetching functions, define them inside the component or a custom hook using the Data API pattern.
-11. When using useEffect, ensure ALL dependencies (functions, variables) referenced inside the effect are either defined above or listed in the dependency array. Define fetch functions with useCallback or inside the effect itself.`;
+   - **CRITICAL ROLE SAFETY**: If you add allowedRoles checks, include "user" in the allowed list unless explicit role requirements were provided.
+6. Output complete, working code — no placeholders, no TODOs, no stubs
+7. Every component must have a default export
+8. Use Tailwind CSS with design tokens (var(--color-*)) for all styling
+9. **CRITICAL PROVIDER ORDERING in App.jsx**: ToastProvider (outermost) → AuthProvider → HashRouter → Routes.
+10. Protected pages must check useAuth().user and redirect to /login if null
+11. **CRITICAL**: Every file MUST import ALL identifiers it uses.
+12. **CRITICAL**: Every function called in a component MUST be defined in that component, imported, or destructured from a hook/context.
+13. When using useEffect, ensure ALL dependencies referenced inside the effect are either defined above or listed in the dependency array.
+
+### UI QUALITY REQUIREMENTS (CRITICAL — follow these for EVERY page):
+- **NO placeholder text**: Never generate "Loading content...", "Coming soon", or "TODO". Every page must render real, functional UI.
+- **Realistic sample data**: Use useState with hardcoded arrays of 5-10 realistic rows (real names, dates, numbers). Example: \`const [students] = useState([{ id: 1, name: "Sarah Johnson", grade: "10th", gpa: 3.8 }, ...])\`
+- **Rich dashboard pages**: Dashboard pages MUST include:
+  - 4 stat cards with icons (use lucide-react), values, labels, and trend indicators (e.g., "+12% from last month")
+  - At least one data table with 5+ rows showing key entity data
+  - At least one simple chart or visual (can be a CSS bar chart if recharts is unavailable)
+- **Data tables**: Use proper \`<table>\` with thead/tbody, alternating row colors, and action buttons (Edit, Delete, View)
+- **Forms**: Include proper labels, input fields with placeholder text, validation states, and submit/cancel buttons
+- **Navigation**: Sidebar must highlight the active route, show icons (from lucide-react), and have a professional look
+- **Status badges**: Use colored badges for statuses (Active/Inactive, Paid/Pending, Present/Absent)
+- **Layout polish**: Consistent spacing (p-6), rounded corners (rounded-xl), subtle shadows (shadow-sm), proper typography hierarchy (text-2xl for titles, text-sm for labels)
+- **Empty states**: If showing "no data", use an illustration-style empty state with an icon, title, and a CTA button — never just text
+- **Color tokens**: Use CSS variables: var(--color-primary), var(--color-bg), var(--color-text), var(--color-border), var(--color-success), var(--color-warning), var(--color-danger)`;
+
 }
 
 // ─── Workspace Context Builder ────────────────────────────────────────────

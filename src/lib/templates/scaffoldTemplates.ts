@@ -184,23 +184,79 @@ export default function Sidebar() {
 // ─── Page Generators ──────────────────────────────────────────────────────
 
 function generateDashboardPage(name: string, templateName: string, entities: DomainModel["entities"]): string {
-  const statCards = entities.slice(0, 4).map(e =>
-    `        <div className="card">
-          <h3 className="text-sm font-medium text-[var(--color-text-secondary)]">${e.pluralName}</h3>
-          <p className="text-2xl font-semibold text-[var(--color-text)] mt-1">0</p>
-        </div>`
-  ).join("\n");
+  const statCards = entities.slice(0, 4).map((e, i) => {
+    const values = ["1,247", "89.5%", "₹45.2K", "32"];
+    const trends = ["+12%", "+3.2%", "+8.5%", "-2"];
+    const colors = ["var(--color-primary)", "var(--color-success)", "var(--color-warning)", "var(--color-info)"];
+    const icons = ["Users", "CheckCircle", "DollarSign", "Clock"];
+    return `        <div className="bg-white rounded-xl border border-[var(--color-border)] p-5 hover:shadow-md transition-shadow">
+          <div className="flex items-center justify-between mb-3">
+            <span className="text-xs font-medium text-[var(--color-text-secondary)] uppercase tracking-wide">${e.pluralName}</span>
+            <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: "${colors[i]}15" }}>
+              <${icons[i]} className="w-4 h-4" style={{ color: "${colors[i]}" }} />
+            </div>
+          </div>
+          <p className="text-2xl font-bold text-[var(--color-text)]">${values[i]}</p>
+          <p className="text-xs mt-1"><span className="text-[var(--color-success)] font-medium">${trends[i]}</span> <span className="text-[var(--color-text-muted)]">from last month</span></p>
+        </div>`;
+  }).join("\n");
+
+  const tableEntity = entities[0];
+  const sampleRows = tableEntity ? `
+      <div className="bg-white rounded-xl border border-[var(--color-border)] overflow-hidden">
+        <div className="px-5 py-4 border-b border-[var(--color-border)] flex items-center justify-between">
+          <h2 className="text-sm font-semibold text-[var(--color-text)]">Recent ${tableEntity.pluralName}</h2>
+          <button className="text-xs text-[var(--color-primary)] hover:underline">View All</button>
+        </div>
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="border-b border-[var(--color-border)] bg-[var(--color-bg-secondary)]">
+              <th className="text-left px-5 py-2.5 text-xs font-medium text-[var(--color-text-secondary)] uppercase">Name</th>
+              <th className="text-left px-5 py-2.5 text-xs font-medium text-[var(--color-text-secondary)] uppercase">Status</th>
+              <th className="text-left px-5 py-2.5 text-xs font-medium text-[var(--color-text-secondary)] uppercase">Date</th>
+              <th className="text-right px-5 py-2.5 text-xs font-medium text-[var(--color-text-secondary)] uppercase">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {[
+              { name: "Sarah Johnson", status: "Active", date: "2024-03-15" },
+              { name: "Michael Chen", status: "Pending", date: "2024-03-14" },
+              { name: "Emily Brown", status: "Active", date: "2024-03-13" },
+              { name: "James Wilson", status: "Inactive", date: "2024-03-12" },
+              { name: "Sophia Martinez", status: "Active", date: "2024-03-11" },
+            ].map((row, i) => (
+              <tr key={i} className="border-b border-[var(--color-border)] last:border-0 hover:bg-[var(--color-bg-secondary)] transition-colors">
+                <td className="px-5 py-3 font-medium text-[var(--color-text)]">{row.name}</td>
+                <td className="px-5 py-3">
+                  <span className={\`px-2 py-0.5 rounded-full text-xs font-medium \${row.status === "Active" ? "bg-green-100 text-green-700" : row.status === "Pending" ? "bg-yellow-100 text-yellow-700" : "bg-gray-100 text-gray-600"}\`}>{row.status}</span>
+                </td>
+                <td className="px-5 py-3 text-[var(--color-text-secondary)]">{row.date}</td>
+                <td className="px-5 py-3 text-right">
+                  <button className="text-[var(--color-primary)] hover:underline text-xs mr-3">Edit</button>
+                  <button className="text-[var(--color-danger)] hover:underline text-xs">Delete</button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>` : "";
 
   return `import React from "react";
+import { Users, CheckCircle, DollarSign, Clock } from "lucide-react";
 
 export default function ${name}() {
   return (
-    <div className="p-8">
-      <h1 className="text-2xl font-light tracking-wide text-[var(--color-text)] mb-6">${templateName} Dashboard</h1>
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+    <div className="p-6 space-y-6">
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-[var(--color-text)]">${templateName} Dashboard</h1>
+          <p className="text-sm text-[var(--color-text-muted)] mt-1">Welcome back! Here's your overview.</p>
+        </div>
+      </div>
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
 ${statCards}
       </div>
-      <p className="text-[var(--color-text-muted)]">Loading content...</p>
+${sampleRows}
     </div>
   );
 }
@@ -208,19 +264,86 @@ ${statCards}
 }
 
 function generateListPage(name: string, entity: string, title: string): string {
-  return `import React from "react";
+  return `import React, { useState } from "react";
+import { Plus, Search, Filter, MoreVertical } from "lucide-react";
+
+const SAMPLE_DATA = [
+  { id: 1, name: "Sarah Johnson", status: "Active", email: "sarah@example.com", date: "Mar 15, 2024" },
+  { id: 2, name: "Michael Chen", status: "Active", email: "michael@example.com", date: "Mar 14, 2024" },
+  { id: 3, name: "Emily Brown", status: "Pending", email: "emily@example.com", date: "Mar 13, 2024" },
+  { id: 4, name: "James Wilson", status: "Inactive", email: "james@example.com", date: "Mar 12, 2024" },
+  { id: 5, name: "Sophia Martinez", status: "Active", email: "sophia@example.com", date: "Mar 11, 2024" },
+  { id: 6, name: "David Lee", status: "Active", email: "david@example.com", date: "Mar 10, 2024" },
+];
 
 export default function ${name}() {
+  const [search, setSearch] = useState("");
+  const filtered = SAMPLE_DATA.filter(item => item.name.toLowerCase().includes(search.toLowerCase()));
+
   return (
-    <div className="p-8">
-      <div className="flex items-center justify-between mb-6">
-        <h1 className="text-2xl font-light tracking-wide text-gray-800">${title}</h1>
-        <button className="px-4 py-2 bg-blue-500 text-white rounded-lg text-sm hover:bg-blue-600 transition-colors">
+    <div className="p-6 space-y-6">
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-[var(--color-text)]">${title}</h1>
+          <p className="text-sm text-[var(--color-text-muted)] mt-1">{SAMPLE_DATA.length} total ${entity.toLowerCase()}s</p>
+        </div>
+        <button className="flex items-center gap-2 px-4 py-2 bg-[var(--color-primary)] text-white rounded-lg text-sm font-medium hover:opacity-90 transition-opacity">
+          <Plus className="w-4 h-4" />
           Add ${entity}
         </button>
       </div>
-      <div className="bg-white rounded-lg border border-gray-100 p-6">
-        <p className="text-gray-400">Loading ${title.toLowerCase()}...</p>
+
+      <div className="flex gap-3">
+        <div className="relative flex-1 max-w-sm">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--color-text-muted)]" />
+          <input
+            type="text"
+            placeholder="Search ${title.toLowerCase()}..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="w-full pl-9 pr-4 py-2 text-sm border border-[var(--color-border)] rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]/20 focus:border-[var(--color-primary)]"
+          />
+        </div>
+        <button className="flex items-center gap-2 px-3 py-2 text-sm border border-[var(--color-border)] rounded-lg hover:bg-[var(--color-bg-secondary)] transition-colors">
+          <Filter className="w-4 h-4" />
+          Filter
+        </button>
+      </div>
+
+      <div className="bg-white rounded-xl border border-[var(--color-border)] overflow-hidden">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="border-b border-[var(--color-border)] bg-[var(--color-bg-secondary)]">
+              <th className="text-left px-5 py-3 text-xs font-medium text-[var(--color-text-secondary)] uppercase">Name</th>
+              <th className="text-left px-5 py-3 text-xs font-medium text-[var(--color-text-secondary)] uppercase">Email</th>
+              <th className="text-left px-5 py-3 text-xs font-medium text-[var(--color-text-secondary)] uppercase">Status</th>
+              <th className="text-left px-5 py-3 text-xs font-medium text-[var(--color-text-secondary)] uppercase">Date</th>
+              <th className="text-right px-5 py-3 text-xs font-medium text-[var(--color-text-secondary)] uppercase"></th>
+            </tr>
+          </thead>
+          <tbody>
+            {filtered.map((row) => (
+              <tr key={row.id} className="border-b border-[var(--color-border)] last:border-0 hover:bg-[var(--color-bg-secondary)] transition-colors">
+                <td className="px-5 py-3.5 font-medium text-[var(--color-text)]">{row.name}</td>
+                <td className="px-5 py-3.5 text-[var(--color-text-secondary)]">{row.email}</td>
+                <td className="px-5 py-3.5">
+                  <span className={\`px-2 py-0.5 rounded-full text-xs font-medium \${row.status === "Active" ? "bg-green-100 text-green-700" : row.status === "Pending" ? "bg-yellow-100 text-yellow-700" : "bg-gray-100 text-gray-600"}\`}>{row.status}</span>
+                </td>
+                <td className="px-5 py-3.5 text-[var(--color-text-secondary)]">{row.date}</td>
+                <td className="px-5 py-3.5 text-right">
+                  <button className="p-1 hover:bg-[var(--color-bg-secondary)] rounded"><MoreVertical className="w-4 h-4 text-[var(--color-text-muted)]" /></button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+        {filtered.length === 0 && (
+          <div className="py-12 text-center">
+            <Search className="w-10 h-10 mx-auto text-[var(--color-text-muted)] mb-3" />
+            <p className="text-sm font-medium text-[var(--color-text)]">No results found</p>
+            <p className="text-xs text-[var(--color-text-muted)] mt-1">Try adjusting your search terms</p>
+          </div>
+        )}
       </div>
     </div>
   );
@@ -231,14 +354,47 @@ export default function ${name}() {
 function generateDetailPage(name: string, entity: string): string {
   return `import React from "react";
 import { useParams } from "react-router-dom";
+import { ArrowLeft, Edit, Trash2, Mail, Phone, Calendar } from "lucide-react";
 
 export default function ${name}() {
   const { id } = useParams();
+
   return (
-    <div className="p-8">
-      <h1 className="text-2xl font-light tracking-wide text-gray-800 mb-6">${entity} Detail</h1>
-      <div className="bg-white rounded-lg border border-gray-100 p-6">
-        <p className="text-gray-400">Loading ${entity.toLowerCase()} {id}...</p>
+    <div className="p-6 space-y-6">
+      <div className="flex items-center gap-3">
+        <button className="p-2 hover:bg-[var(--color-bg-secondary)] rounded-lg transition-colors">
+          <ArrowLeft className="w-4 h-4" />
+        </button>
+        <h1 className="text-xl font-bold text-[var(--color-text)]">${entity} Details</h1>
+      </div>
+      <div className="bg-white rounded-xl border border-[var(--color-border)] p-6">
+        <div className="flex items-start justify-between mb-6">
+          <div className="flex items-center gap-4">
+            <div className="w-14 h-14 rounded-full bg-[var(--color-primary)]/10 flex items-center justify-center text-lg font-bold text-[var(--color-primary)]">SJ</div>
+            <div>
+              <h2 className="text-lg font-semibold text-[var(--color-text)]">Sarah Johnson</h2>
+              <p className="text-sm text-[var(--color-text-muted)]">ID: #{id || "1001"}</p>
+            </div>
+          </div>
+          <div className="flex gap-2">
+            <button className="flex items-center gap-1.5 px-3 py-1.5 text-sm border border-[var(--color-border)] rounded-lg hover:bg-[var(--color-bg-secondary)]"><Edit className="w-3.5 h-3.5" /> Edit</button>
+            <button className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-[var(--color-danger)] border border-[var(--color-danger)]/30 rounded-lg hover:bg-red-50"><Trash2 className="w-3.5 h-3.5" /> Delete</button>
+          </div>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="flex items-center gap-3 p-3 rounded-lg bg-[var(--color-bg-secondary)]">
+            <Mail className="w-4 h-4 text-[var(--color-text-muted)]" />
+            <div><p className="text-xs text-[var(--color-text-muted)]">Email</p><p className="text-sm font-medium">sarah@example.com</p></div>
+          </div>
+          <div className="flex items-center gap-3 p-3 rounded-lg bg-[var(--color-bg-secondary)]">
+            <Phone className="w-4 h-4 text-[var(--color-text-muted)]" />
+            <div><p className="text-xs text-[var(--color-text-muted)]">Phone</p><p className="text-sm font-medium">+1 (555) 123-4567</p></div>
+          </div>
+          <div className="flex items-center gap-3 p-3 rounded-lg bg-[var(--color-bg-secondary)]">
+            <Calendar className="w-4 h-4 text-[var(--color-text-muted)]" />
+            <div><p className="text-xs text-[var(--color-text-muted)]">Joined</p><p className="text-sm font-medium">March 15, 2024</p></div>
+          </div>
+        </div>
       </div>
     </div>
   );
@@ -247,15 +403,46 @@ export default function ${name}() {
 }
 
 function generateFormPage(name: string, entity: string, title: string): string {
-  return `import React from "react";
+  return `import React, { useState } from "react";
+import { Save, X } from "lucide-react";
 
 export default function ${name}() {
+  const [formData, setFormData] = useState({ name: "", email: "", status: "active" });
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    console.log("Submit:", formData);
+  };
+
   return (
-    <div className="p-8">
-      <h1 className="text-2xl font-light tracking-wide text-gray-800 mb-6">${title}</h1>
-      <div className="bg-white rounded-lg border border-gray-100 p-6 max-w-2xl">
-        <p className="text-gray-400">Loading form...</p>
-      </div>
+    <div className="p-6 space-y-6">
+      <h1 className="text-2xl font-bold text-[var(--color-text)]">${title}</h1>
+      <form onSubmit={handleSubmit} className="bg-white rounded-xl border border-[var(--color-border)] p-6 max-w-2xl space-y-5">
+        <div>
+          <label className="block text-sm font-medium text-[var(--color-text)] mb-1.5">Full Name</label>
+          <input type="text" value={formData.name} onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))} placeholder="Enter full name" className="w-full px-3 py-2 text-sm border border-[var(--color-border)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]/20 focus:border-[var(--color-primary)]" />
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-[var(--color-text)] mb-1.5">Email Address</label>
+          <input type="email" value={formData.email} onChange={(e) => setFormData(prev => ({ ...prev, email: e.target.value }))} placeholder="Enter email" className="w-full px-3 py-2 text-sm border border-[var(--color-border)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]/20 focus:border-[var(--color-primary)]" />
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-[var(--color-text)] mb-1.5">Status</label>
+          <select value={formData.status} onChange={(e) => setFormData(prev => ({ ...prev, status: e.target.value }))} className="w-full px-3 py-2 text-sm border border-[var(--color-border)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]/20 focus:border-[var(--color-primary)]">
+            <option value="active">Active</option>
+            <option value="pending">Pending</option>
+            <option value="inactive">Inactive</option>
+          </select>
+        </div>
+        <div className="flex items-center gap-3 pt-2">
+          <button type="submit" className="flex items-center gap-2 px-4 py-2 bg-[var(--color-primary)] text-white rounded-lg text-sm font-medium hover:opacity-90 transition-opacity">
+            <Save className="w-4 h-4" /> Save ${entity}
+          </button>
+          <button type="button" className="flex items-center gap-2 px-4 py-2 border border-[var(--color-border)] rounded-lg text-sm hover:bg-[var(--color-bg-secondary)] transition-colors">
+            <X className="w-4 h-4" /> Cancel
+          </button>
+        </div>
+      </form>
     </div>
   );
 }
@@ -264,13 +451,18 @@ export default function ${name}() {
 
 function generateStaticPage(name: string, title: string): string {
   return `import React from "react";
+import { FileText } from "lucide-react";
 
 export default function ${name}() {
   return (
-    <div className="p-8">
-      <h1 className="text-2xl font-light tracking-wide text-gray-800 mb-6">${title}</h1>
-      <div className="bg-white rounded-lg border border-gray-100 p-6">
-        <p className="text-gray-400">Content loading...</p>
+    <div className="p-6 space-y-6">
+      <h1 className="text-2xl font-bold text-[var(--color-text)]">${title}</h1>
+      <div className="bg-white rounded-xl border border-[var(--color-border)] p-8 text-center">
+        <div className="w-12 h-12 mx-auto rounded-xl bg-[var(--color-primary)]/10 flex items-center justify-center mb-4">
+          <FileText className="w-6 h-6 text-[var(--color-primary)]" />
+        </div>
+        <h2 className="text-lg font-semibold text-[var(--color-text)] mb-2">${title}</h2>
+        <p className="text-sm text-[var(--color-text-muted)] max-w-md mx-auto">This section will display ${title.toLowerCase()} data and management tools.</p>
       </div>
     </div>
   );
