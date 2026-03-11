@@ -175,7 +175,8 @@ ${moduleDefinitions}
 
       try {
         // Polyfill import.meta.url for AsyncFunction context
-        const metaUrl = new URL(specifier, location.href).href;
+        var metaUrl;
+        try { metaUrl = new URL(specifier, location.href).href; } catch(_) { metaUrl = "https://localhost" + specifier; }
         const wrappedSource = "const import_meta_url = \\"" + metaUrl + "\\";\\n" + source.replace(/import\\.meta\\.url/g, "import_meta_url");
         const AsyncFunction = Object.getPrototypeOf(async function(){}).constructor;
         const fn = new AsyncFunction("__exports__", "__import__", wrappedSource);
