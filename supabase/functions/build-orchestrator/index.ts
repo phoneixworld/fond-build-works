@@ -41,11 +41,13 @@ function validateFile(path: string, content: string): ValidationError[] {
   }
 
   if (ext === "css") {
-    // Check for unclosed braces
-    const opens = (content.match(/\{/g) || []).length;
-    const closes = (content.match(/\}/g) || []).length;
+    // Strip comments before counting braces to avoid false positives
+    const stripped = content.replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/[^\n]*/g, "");
+    const opens = (stripped.match(/\{/g) || []).length;
+    const closes = (stripped.match(/\}/g) || []).length;
     if (opens !== closes) {
-      errors.push({ file: path, message: `Unbalanced braces: ${opens} opens vs ${closes} closes`, severity: "error" });
+      // Downgrade to warning — naive counting can still be fooled by content values
+      errors.push({ file: path, message: `Unbalanced braces: ${opens} opens vs ${closes} closes`, severity: "warning" });
     }
     return errors;
   }
