@@ -246,8 +246,14 @@ async function readSSEStream(
   let lastDataTime = Date.now(); // Track last SSE data for idle timeout
 
   while (!done) {
-    if (Date.now() - startTime > timeoutMs) {
-      console.warn("[readSSEStream] Timeout after 120s");
+    // Absolute timeout (10 min) + idle timeout (3 min since last data)
+    const now = Date.now();
+    if (now - startTime > timeoutMs) {
+      console.warn(`[readSSEStream] Absolute timeout after ${Math.round((now - startTime) / 1000)}s`);
+      break;
+    }
+    if (hasReceivedSSEData && now - lastDataTime > 180_000) {
+      console.warn(`[readSSEStream] Idle timeout — no data for 180s`);
       break;
     }
     const { done: rd, value } = await reader.read();
