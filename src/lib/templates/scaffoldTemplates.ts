@@ -469,7 +469,6 @@ export default function ${name}() {
 }
 `;
 }
-}
 
 // ─── Hook & Context Generators ────────────────────────────────────────────
 
