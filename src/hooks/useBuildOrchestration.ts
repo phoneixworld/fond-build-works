@@ -83,10 +83,13 @@ export interface BuildOrchestrationConfig {
   fastClassifyLocal: (text: string) => AgentIntent | null;
 
   // Conversation state machine
-  conversationAnalyze?: (text: string, hasImages: boolean) => { action: "gather" | "build" | "chat" | "continue"; reason: string };
+  conversationAnalyze?: (text: string, hasImages: boolean) => { action: "gather" | "build" | "edit" | "chat" | "continue"; reason: string };
+  conversationAnalyzeAsync?: (text: string, hasImages: boolean, hasExistingCode: boolean) => Promise<{ action: "gather" | "build" | "edit" | "chat" | "continue"; reason: string }>;
   conversationAddPhase?: (text: string, hasImages: boolean, imageUrls?: string[]) => any;
   conversationGetRequirements?: () => Promise<string> | string;
   conversationStartBuilding?: () => void;
+  conversationStartEditing?: (instruction: string, targetFiles: string[], beforeSnapshots: Record<string, string>) => Promise<void>;
+  conversationCompleteEdit?: (instruction: string, targetFiles: string[], beforeSnapshots: Record<string, string>, afterSnapshots: Record<string, string>, explanation: string) => Promise<any>;
   conversationCompleteBuild?: (result: any) => void;
   conversationGenerateAck?: (phase: any) => string;
   conversationMode?: string;
@@ -102,8 +105,9 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
     setHealAttempts, resetHealing, inputRef,
     selectedModel, selectedTheme,
     fetchProjectContext, classifyUserIntent, fastClassifyLocal,
-    conversationAnalyze, conversationAddPhase, conversationGetRequirements,
-    conversationStartBuilding, conversationCompleteBuild, conversationGenerateAck,
+    conversationAnalyze, conversationAnalyzeAsync, conversationAddPhase, conversationGetRequirements,
+    conversationStartBuilding, conversationStartEditing, conversationCompleteEdit,
+    conversationCompleteBuild, conversationGenerateAck,
     conversationMode,
   } = config;
 
@@ -966,7 +970,7 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
     }
   }, [currentProject, saveProject, setPreviewHtml, setIsBuilding, setBuildStep, selectedModel, selectedTheme, onVersionCreated, setVirtualFiles, fetchProjectContext, syncSandpackToVirtualFS, buildMessageContent, currentPreviewHtml, setMessages, setInput, setAttachedImages, setPreviewErrors, setHealAttempts, setSandpackFiles, setSandpackDeps, setPreviewMode, setBuildMetrics, saveSnapshot, selectedTemplate, tryInstantBuild, handleOnError]);
 
-  // ── Edit Mode: Surgical file editing ──────────────────────────────────────
+  // ── Edit Mode: Surgical file editing (wired through FSM) ──────────────────
   const sendEditMessage = useCallback(async (text: string, images: string[] = []) => {
     if (!currentProject) return;
 
@@ -992,6 +996,10 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
     isSendingRef.current = true;
     setBuildStreamContent("");
 
+    // Capture before-snapshots for audit
+    let resolvedTargetFiles: string[] = [];
+    const beforeSnapshots: Record<string, string> = {};
+
     try {
       await executeEdit(
         {
@@ -1005,15 +1013,23 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
         },
         {
           onResolving: (targetFiles) => {
+            resolvedTargetFiles = targetFiles;
+            // Capture before-snapshots
+            for (const f of targetFiles) {
+              if (workspace[f]) beforeSnapshots[f] = workspace[f];
+            }
             setPipelineStep("resolving");
             setBuildStep(`Editing ${targetFiles.length} file${targetFiles.length > 1 ? "s" : ""}`);
             console.log("[EditMode] Target files:", targetFiles);
+
+            // FSM transition: → editing (fire & forget)
+            conversationStartEditing?.(text, targetFiles, beforeSnapshots);
           },
           onStreaming: (chunk) => {
             setBuildStreamContent((prev) => prev + chunk);
             setPipelineStep("editing");
           },
-          onComplete: (result: EditResult) => {
+          onComplete: async (result: EditResult) => {
             console.log("[EditMode] Complete:", Object.keys(result.modifiedFiles));
 
             // Merge modified files into existing workspace
@@ -1022,18 +1038,30 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
               updatedFiles[path] = code;
             }
 
+            // Capture after-snapshots for audit
+            const afterSnapshots: Record<string, string> = {};
+            for (const f of resolvedTargetFiles) {
+              if (updatedFiles[f]) afterSnapshots[f] = updatedFiles[f];
+            }
+
             // Update Sandpack
             setSandpackFiles(updatedFiles);
             syncSandpackToVirtualFS(updatedFiles);
             setPreviewMode("sandpack");
 
-            // Add assistant message
+            // FSM transition: editing → complete + audit record + post-edit readiness
+            const postEditReadiness = await conversationCompleteEdit?.(
+              text, resolvedTargetFiles, beforeSnapshots, afterSnapshots, result.explanation
+            );
+
+            // Build assistant message with readiness info
             const fileList = result.targetFiles.map(f => f.split("/").pop()).join(", ");
-            const assistantMsg: Msg = {
-              role: "assistant",
-              content: `✅ **Edited ${result.targetFiles.length} file${result.targetFiles.length > 1 ? "s" : ""}** (${fileList})\n\n${result.explanation}`,
-              timestamp: Date.now(),
-            };
+            let editMsg = `✅ **Edited ${result.targetFiles.length} file${result.targetFiles.length > 1 ? "s" : ""}** (${fileList})\n\n${result.explanation}`;
+            if (postEditReadiness && !postEditReadiness.isReady) {
+              editMsg += `\n\n⚠️ **Post-edit readiness:** ${postEditReadiness.score}% — ${postEditReadiness.recommendation}`;
+            }
+
+            const assistantMsg: Msg = { role: "assistant", content: editMsg, timestamp: Date.now() };
             setMessages((prev) => [...prev, assistantMsg]);
 
             // Save
@@ -1041,6 +1069,17 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
             saveProject({
               chat_history: updatedMessages.map(m => ({ role: m.role, content: m.content })),
             });
+
+            // Persist sandpack state
+            supabase
+              .from("project_data")
+              .upsert(
+                { project_id: currentProject.id, collection: "sandpack_state", data: { files: updatedFiles, deps: {} } as any },
+                { onConflict: "project_id,collection" }
+              )
+              .then(({ error }) => {
+                if (error) console.warn("[EditMode] Failed to persist sandpack state:", error);
+              });
 
             // Save snapshot
             saveSnapshot(`Edit: ${text.slice(0, 40)}`);
@@ -1074,7 +1113,7 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
       setBuildStep("");
       isSendingRef.current = false;
     }
-  }, [currentProject, selectedModel, selectedTheme, sendMessage, buildMessageContent, setInput, setAttachedImages, setMessages, saveProject, setSandpackFiles, syncSandpackToVirtualFS, setPreviewMode, setIsBuilding, setBuildStep, saveSnapshot]);
+  }, [currentProject, selectedModel, selectedTheme, sendMessage, buildMessageContent, setInput, setAttachedImages, setMessages, saveProject, setSandpackFiles, syncSandpackToVirtualFS, setPreviewMode, setIsBuilding, setBuildStep, saveSnapshot, conversationStartEditing, conversationCompleteEdit]);
 
   // ── RULES ──
   // 1. ALL messages go through conversation state machine FIRST
@@ -1111,7 +1150,7 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
 
       // ── GATHER: User is providing requirements ──
       if (convResult.action === "gather") {
-        const phase = conversationAddPhase?.(finalText, hasImages, images); // 3rd arg = imageUrls
+        const phase = conversationAddPhase?.(finalText, hasImages, images);
         const ackText = conversationGenerateAck?.(phase) || "✅ Got it! Send the next phase when ready, or say **\"build it\"** to start.";
 
         const content = buildMessageContent(finalText, images);
@@ -1128,19 +1167,21 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
         return;
       }
 
+      // ── EDIT: Route through FSM-wired edit pipeline ──
+      if (convResult.action === "edit") {
+        setCurrentAgent("edit");
+        setPipelineStep("resolving");
+        sendEditMessage(finalText, images);
+        return;
+      }
+
       // ── BUILD: Include accumulated requirements if any phases exist ──
       if (convResult.action === "build") {
-        // Always try to include accumulated requirements when phases exist
-        const hasAccumulatedPhases = conversationMode === "gathering" || conversationMode === "ready" || conversationMode === "complete";
-        
-        // Try server-compiled requirements first
         console.log(`[SmartSend] Build requested, mode=${conversationMode}`);
         conversationStartBuilding?.();
         
-        // Get server-compiled requirements (includes chat history fallback now)
         const requirements = await Promise.resolve(conversationGetRequirements?.() || "");
 
-        // Guard: abort if project switched during async requirements fetch
         if (isSmartSendStale()) {
           console.warn("[SmartSend] Project switched during requirements fetch, aborting");
           return;
@@ -1156,7 +1197,6 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
           return;
         }
         
-        // Fallback: extract from local chat history
         const chatContext = messages
           .filter(m => typeof m.content === "string" && m.content.length > 30)
           .map(m => `**${m.role === "user" ? "User" : "Assistant"}:**\n${m.content}`)
@@ -1164,7 +1204,6 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
         
         if (chatContext.length > 100) {
           const buildPrompt = `# APPLICATION REQUIREMENTS (from conversation)\n\n${chatContext}\n\n## BUILD INSTRUCTION\nBuild the COMPLETE application based on the conversation above.\n\n${finalText}`;
-          console.log(`[SmartSend] Build from chat history fallback: ${buildPrompt.length} chars`);
           
           setCurrentAgent("build");
           setPipelineStep("planning");

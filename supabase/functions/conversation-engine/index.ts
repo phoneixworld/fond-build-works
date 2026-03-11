@@ -22,15 +22,16 @@ const corsHeaders = {
 };
 
 // ─── Conversation Mode FSM ───────────────────────────────────────────────
-type ConversationMode = "idle" | "gathering" | "ready" | "building" | "reviewing" | "complete";
+type ConversationMode = "idle" | "gathering" | "ready" | "building" | "editing" | "reviewing" | "complete";
 
 const VALID_TRANSITIONS: Record<ConversationMode, ConversationMode[]> = {
-  idle: ["gathering", "building"],
-  gathering: ["gathering", "ready", "building", "idle"],
-  ready: ["building", "gathering", "idle"],
+  idle: ["gathering", "building", "editing"],
+  gathering: ["gathering", "ready", "building", "editing", "idle"],
+  ready: ["building", "editing", "gathering", "idle"],
   building: ["reviewing", "complete", "idle"],
+  editing: ["complete", "idle", "editing", "gathering"],
   reviewing: ["complete", "building", "idle"],
-  complete: ["idle", "gathering", "building"],
+  complete: ["idle", "gathering", "building", "editing"],
 };
 
 // ─── Signal Detection ────────────────────────────────────────────────────
@@ -532,10 +533,11 @@ Deno.serve(async (req) => {
       });
     }
 
-    // ─── ANALYZE_MESSAGE: Server determines action ───
+    // ─── ANALYZE_MESSAGE: Server determines action (authoritative classifier) ───
     if (action === "analyze_message") {
       const text = (message || "").trim();
       const lower = text.toLowerCase();
+      const hasExistingCode = body.hasExistingCode || false;
 
       const { data: convState } = await supabase
         .from("project_conversation_state")
@@ -547,12 +549,20 @@ Deno.serve(async (req) => {
 
       const currentMode: ConversationMode = convState?.mode || "idle";
 
-      let recommendedAction: "gather" | "build" | "chat" | "continue" = "continue";
+      let recommendedAction: "gather" | "build" | "edit" | "chat" | "continue" = "continue";
       let reason = "";
+
+      // Edit detection — must check before build signals
+      const EDIT_VERBS = /\b(change|update|fix|modify|replace|add|remove|make|move|rename|resize|restyle|improve|tweak|adjust|refactor|sort|filter|reorder|swap|hide|show|toggle|enable|disable|increase|decrease|align|center)\b/i;
+      const EDIT_TARGETS = /\b(table|button|form|sidebar|nav|header|footer|modal|dialog|card|chart|page|column|row|field|input|label|title|heading|text|color|font|spacing|padding|margin|border|icon|image|logo|search|tab|badge|avatar|menu|dropdown)\b/i;
+      const BUILD_FULL = /\b(build|create|generate|scaffold|new app|new project|from scratch|entire|whole app|full app|complete app)\b/i;
 
       if (BUILD_SIGNALS.test(lower)) {
         recommendedAction = "build";
         reason = "User explicitly requested build";
+      } else if (hasExistingCode && EDIT_VERBS.test(lower) && EDIT_TARGETS.test(lower) && !BUILD_FULL.test(lower)) {
+        recommendedAction = "edit";
+        reason = "Edit intent detected (verb + target + existing code)";
       } else if (CHAT_SIGNALS.test(lower)) {
         recommendedAction = "chat";
         reason = "User asking a question";
@@ -580,6 +590,7 @@ Deno.serve(async (req) => {
 
       const targetMode: ConversationMode = recommendedAction === "gather" ? "gathering"
         : recommendedAction === "build" ? "building"
+        : recommendedAction === "edit" ? "editing"
         : currentMode;
       const isValidTransition = VALID_TRANSITIONS[currentMode]?.includes(targetMode) ?? true;
 
@@ -587,7 +598,7 @@ Deno.serve(async (req) => {
       await logTelemetry(supabase, projectId, "message_analyzed", {
         agent: "system",
         entityType: "message",
-        metadata: { action: recommendedAction, reason, currentMode, targetMode, isValidTransition, messageLength: text.length },
+        metadata: { action: recommendedAction, reason, currentMode, targetMode, isValidTransition, messageLength: text.length, hasExistingCode },
       }, userId);
 
       return json({ action: recommendedAction, reason, currentMode, targetMode, isValidTransition });
@@ -1081,6 +1092,80 @@ Output ONLY valid JSON. No markdown, no explanation.`
       }, userId);
 
       return json({ success: true });
+    }
+
+    // ─── EDIT_STARTED: Transition FSM to editing, log audit ───
+    if (action === "edit_started") {
+      const targetFiles = body.targetFiles || [];
+      const instruction = body.instruction || "";
+      const beforeSnapshots = body.beforeSnapshots || {};
+
+      await transitionState(supabase, projectId, "editing", {}, userId, `Edit started: ${instruction.slice(0, 100)}`);
+
+      await logTelemetry(supabase, projectId, "edit_started", {
+        agent: "edit-engine",
+        entityType: "edit",
+        beforeState: { files: targetFiles, snapshots: beforeSnapshots },
+        afterState: null,
+        metadata: { instruction, targetFiles, fileCount: targetFiles.length },
+      }, userId);
+
+      return json({ success: true });
+    }
+
+    // ─── EDIT_COMPLETE: Log result + before/after + run post-edit readiness ───
+    if (action === "edit_complete") {
+      const targetFiles = body.targetFiles || [];
+      const instruction = body.instruction || "";
+      const beforeSnapshots = body.beforeSnapshots || {};
+      const afterSnapshots = body.afterSnapshots || {};
+      const explanation = body.explanation || "";
+
+      // Log edit audit with before/after file snapshots
+      await logTelemetry(supabase, projectId, "edit_completed", {
+        agent: "edit-engine",
+        entityType: "edit",
+        beforeState: { files: targetFiles, snapshots: beforeSnapshots },
+        afterState: { files: targetFiles, snapshots: afterSnapshots },
+        metadata: { instruction, explanation, targetFiles, fileCount: targetFiles.length },
+      }, userId);
+
+      // Run post-edit readiness validation
+      const { data: allReqs } = await supabase
+        .from("project_requirements")
+        .select("*")
+        .eq("project_id", projectId)
+        .order("phase_number", { ascending: true });
+
+      let postEditReadiness = null;
+      if (allReqs && allReqs.length > 0) {
+        let mergedNormalized: Record<string, any> = {};
+        for (const r of allReqs) {
+          mergedNormalized = mergeNormalized(mergedNormalized, r.normalized as Record<string, any>);
+        }
+        const compiledIR = mapToIR(mergedNormalized);
+        postEditReadiness = compileBuildReadiness(compiledIR, allReqs, mergedNormalized);
+
+        // Persist updated readiness
+        await supabase.from("project_build_readiness").upsert({
+          project_id: projectId,
+          is_ready: postEditReadiness.isReady,
+          score: postEditReadiness.score,
+          checks: postEditReadiness.checks,
+          missing_fields: postEditReadiness.missingFields,
+          incomplete_workflows: postEditReadiness.incompleteWorkflows,
+          unresolved_roles: postEditReadiness.unresolvedRoles,
+          underspecified_components: postEditReadiness.underspecifiedComponents,
+          missing_constraints: postEditReadiness.missingConstraints,
+          recommendation: postEditReadiness.recommendation,
+          updated_at: new Date().toISOString(),
+        }, { onConflict: "project_id" });
+      }
+
+      // Transition to complete
+      await transitionState(supabase, projectId, "complete", {}, userId, `Edit completed: ${targetFiles.length} file(s)`);
+
+      return json({ success: true, postEditReadiness });
     }
 
     // ─── ROLLBACK: Restore to a previous version (Checklist #7) ───

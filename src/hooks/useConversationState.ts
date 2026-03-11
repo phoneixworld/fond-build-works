@@ -14,7 +14,7 @@
 
 import { useState, useCallback, useRef } from "react";
 
-export type ConversationMode = "idle" | "gathering" | "ready" | "building" | "reviewing" | "complete";
+export type ConversationMode = "idle" | "gathering" | "ready" | "building" | "editing" | "reviewing" | "complete";
 
 export interface RequirementPhase {
   id: number;
@@ -65,6 +65,9 @@ export interface AgentState {
 const BUILD_NOW_SIGNALS = /^(now build|go ahead|build it|start building|that's all|thats all|that's everything|thats everything|you can start|proceed|let's build|lets build|ready to build|start now|begin|execute|generate|now create|do it)\b/i;
 const PHASED_SIGNALS = /\b(phase by phase|step by step|i['']ll give you|ill give you|one at a time|let me explain|first let me|i['']ll share|ill share|i['']ll provide|ill provide|wait for my|before you start|i will share|i will give|phase\s*\d|step\s*\d|part\s*\d|section\s*\d)\b/i;
 const INFO_PROVIDING_SIGNALS = /^(these are|here are|here is|this is|below are|following are|attached are|now for|next is|the next|moving on|continuing with|for phase|for step|for part)\b/i;
+const EDIT_VERBS = /\b(change|update|fix|modify|replace|add|remove|make|move|rename|resize|restyle|improve|tweak|adjust|refactor|sort|filter|reorder|swap|hide|show|toggle|enable|disable|increase|decrease|align|center)\b/i;
+const EDIT_TARGETS = /\b(table|button|form|sidebar|nav|header|footer|modal|dialog|card|chart|page|column|row|field|input|label|title|heading|text|color|font|spacing|padding|margin|border|icon|image|logo|search|tab|badge|avatar|menu|dropdown)\b/i;
+const BUILD_FULL = /\b(build|create|generate|scaffold|new app|new project|from scratch|entire|whole app|full app|complete app)\b/i;
 
 const API_BASE = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/conversation-engine`;
 const API_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
@@ -141,7 +144,7 @@ export function useConversationState() {
 
   // ─── ANALYZE: Server-first message analysis with client fallback ──
   const analyzeMessage = useCallback(async (text: string, hasImages: boolean, _irState?: any): Promise<{
-    action: "gather" | "build" | "chat" | "continue";
+    action: "gather" | "build" | "edit" | "chat" | "continue";
     reason: string;
   }> => {
     const projectId = currentProjectId.current;
@@ -171,12 +174,15 @@ export function useConversationState() {
     }
     if (PHASED_SIGNALS.test(lower)) return { action: "gather", reason: "Phased approach" };
     if (INFO_PROVIDING_SIGNALS.test(lower)) return { action: "gather", reason: "Info providing" };
+    if (EDIT_VERBS.test(lower) && EDIT_TARGETS.test(lower) && !BUILD_FULL.test(lower)) {
+      return { action: "edit", reason: "Edit intent detected (client fallback)" };
+    }
     return { action: "continue", reason: "No signal detected" };
   }, [mode]);
 
   // ─── ANALYZE SYNC: Client-only fast path (backward compat) ────────
   const analyzeMessageSync = useCallback((text: string, hasImages: boolean): {
-    action: "gather" | "build" | "chat" | "continue";
+    action: "gather" | "build" | "edit" | "chat" | "continue";
     reason: string;
   } => {
     const trimmed = text.trim();
@@ -188,6 +194,7 @@ export function useConversationState() {
     }
     if (PHASED_SIGNALS.test(lower)) return { action: "gather", reason: "Phased approach" };
     if (INFO_PROVIDING_SIGNALS.test(lower)) return { action: "gather", reason: "Info providing" };
+    if (EDIT_VERBS.test(lower) && EDIT_TARGETS.test(lower) && !BUILD_FULL.test(lower)) return { action: "edit", reason: "Edit intent" };
     return { action: "continue", reason: "No signal" };
   }, [mode]);
 
@@ -272,6 +279,67 @@ export function useConversationState() {
     // Server transition happens in get_compiled_requirements
   }, []);
 
+  const startEditing = useCallback(async (instruction: string, targetFiles: string[], beforeSnapshots: Record<string, string>) => {
+    setMode("editing");
+    const projectId = currentProjectId.current;
+    if (projectId) {
+      try {
+        await callEngine({
+          action: "edit_started",
+          projectId,
+          instruction,
+          targetFiles,
+          beforeSnapshots: Object.fromEntries(
+            Object.entries(beforeSnapshots).map(([k, v]) => [k, hashSnapshot(v)])
+          ),
+        });
+      } catch (err) {
+        console.warn("[ConvState] edit_started failed:", err);
+      }
+    }
+  }, []);
+
+  const completeEdit = useCallback(async (
+    instruction: string,
+    targetFiles: string[],
+    beforeSnapshots: Record<string, string>,
+    afterSnapshots: Record<string, string>,
+    explanation: string
+  ) => {
+    const projectId = currentProjectId.current;
+    if (projectId) {
+      try {
+        const result = await callEngine({
+          action: "edit_complete",
+          projectId,
+          instruction,
+          targetFiles,
+          beforeSnapshots: Object.fromEntries(
+            Object.entries(beforeSnapshots).map(([k, v]) => [k, hashSnapshot(v)])
+          ),
+          afterSnapshots: Object.fromEntries(
+            Object.entries(afterSnapshots).map(([k, v]) => [k, hashSnapshot(v)])
+          ),
+          explanation,
+        });
+        if (result.postEditReadiness) {
+          syncReadiness(result.postEditReadiness);
+          if (!result.postEditReadiness.isReady) {
+            console.warn("[ConvState] Post-edit readiness check FAILED:", result.postEditReadiness.recommendation);
+          }
+        }
+        setMode("complete");
+        return result.postEditReadiness || null;
+      } catch (err) {
+        console.warn("[ConvState] edit_complete failed:", err);
+        setMode("complete");
+      }
+    } else {
+      setMode("complete");
+    }
+    return null;
+  }, [syncReadiness]);
+
   const completeBuild = useCallback(async (result: BuildResult) => {
     setLastBuildResult(result);
     setMode("complete");
@@ -320,7 +388,18 @@ export function useConversationState() {
     mode, setMode, phases, lastBuildResult, buildReadiness, agentStates, serverVersion, isRestoring,
     restoreFromServer, analyzeMessage, analyzeMessageSync, addPhase,
     getRequirementsContext, getRequirementsContextSync,
-    startBuilding, completeBuild, reset, generateAcknowledgment,
+    startBuilding, startEditing, completeEdit, completeBuild, reset, generateAcknowledgment,
     currentProjectId,
   };
+}
+
+/** Simple hash for snapshot diffing (not cryptographic) */
+function hashSnapshot(content: string): string {
+  let hash = 0;
+  for (let i = 0; i < content.length; i++) {
+    const chr = content.charCodeAt(i);
+    hash = ((hash << 5) - hash) + chr;
+    hash |= 0;
+  }
+  return `h:${hash.toString(36)}:${content.length}`;
 }

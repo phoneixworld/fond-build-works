@@ -142,8 +142,11 @@ const ChatPanel = forwardRef<ChatPanelHandle, { initialPrompt?: string; onVersio
     fetchProjectContext,
     classifyUserIntent,
     fastClassifyLocal,
-    // Conversation state machine (sync methods for backward compat)
+    // Conversation state machine
     conversationAnalyze: conversationState.analyzeMessageSync,
+    conversationAnalyzeAsync: async (text: string, hasImages: boolean, hasExistingCode: boolean) => {
+      return conversationState.analyzeMessage(text, hasImages);
+    },
     conversationAddPhase: (text: string, hasImages: boolean, imageUrls?: string[]) => {
       // Fire async server persist but return sync phase for immediate UI
       const localPhase = {
@@ -153,14 +156,13 @@ const ChatPanel = forwardRef<ChatPanelHandle, { initialPrompt?: string; onVersio
         hasImages,
         timestamp: Date.now(),
       };
-      // Async server-side persist with image URLs for vision extraction
-      // NOTE: addPhase(text, hasImages, irState, imageUrls) — irState is 3rd, imageUrls is 4th
       conversationState.addPhase(text, hasImages, currentProject?.ir_state, imageUrls);
       return localPhase;
     },
-    // Use async server-compiled requirements (with extracted image content)
     conversationGetRequirements: () => conversationState.getRequirementsContext(currentProject?.ir_state),
     conversationStartBuilding: () => { conversationState.startBuilding(); },
+    conversationStartEditing: conversationState.startEditing,
+    conversationCompleteEdit: conversationState.completeEdit,
     conversationCompleteBuild: conversationState.completeBuild,
     conversationGenerateAck: conversationState.generateAcknowledgment,
     conversationMode: conversationState.mode,
@@ -381,7 +383,7 @@ const ChatPanel = forwardRef<ChatPanelHandle, { initialPrompt?: string; onVersio
       setPendingFollowUpPrompt("");
       setAnalysisResult(null);
       invalidateContextCache();
-      conversationState.reset();
+      // Don't destructively reset server state on project switch — restore instead
 
       // Restore conversation state from server (durable, cross-device)
       conversationState.restoreFromServer(currentProject.id);
