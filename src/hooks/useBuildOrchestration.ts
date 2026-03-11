@@ -1434,6 +1434,7 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
     sandpackFilesRef,
     abortControllerRef,
     lastProjectIdRef,
+    lastVerificationOkRef,
 
     // Actions
     sendMessage,
