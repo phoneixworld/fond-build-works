@@ -54,7 +54,7 @@ export const sidebar = () => null;`,
     const pageFile = ws.getFile("/pages/DashboardPage.jsx") || "";
 
     expect(fixed).toBeGreaterThanOrEqual(1);
-    expect(pageFile).toContain("import Layout, { sidebar } from \"../components/Layout\";");
-    expect(pageFile).toContain("return <sidebar />;");
+    expect(pageFile).toContain("import Layout, { sidebar as Sidebar } from \"../components/Layout\";");
+    expect(pageFile).toContain("return <Sidebar />;");
   });
 });
