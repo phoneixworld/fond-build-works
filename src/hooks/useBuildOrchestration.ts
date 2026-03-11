@@ -821,6 +821,9 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
         model: routedModel,
       };
 
+      // Reset compiler tasks at start
+      setCompilerTasks([{ id: "planning", label: "Planning task graph", status: "in_progress" }]);
+
       const compileCallbacks: CompileCallbacks = {
         onPhase: (phase, detail) => {
           setBuildStep(detail);
@@ -834,6 +837,24 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
           setCurrentTaskIndex(index);
           setTotalPlanTasks(total);
           setBuildStep(`🔨 Task ${index + 1}/${total}: ${task.label}`);
+
+          // Update compilerTasks for pipeline card
+          setCompilerTasks(prev => {
+            // On first task, replace planning placeholder with real tasks
+            if (prev.length <= 1 || prev[0]?.id === "planning") {
+              return Array.from({ length: total }, (_, i) => ({
+                id: `task-${i}`,
+                label: i === index ? task.label : `Task ${i + 1}`,
+                status: (i < index ? "done" : i === index ? "in_progress" : "pending") as "done" | "in_progress" | "pending",
+              }));
+            }
+            // Update existing task list
+            return prev.map((t, i) => ({
+              ...t,
+              label: i === index ? task.label : t.label,
+              status: (i < index ? "done" : i === index ? "in_progress" : t.status) as "done" | "in_progress" | "pending",
+            }));
+          });
 
           const progressMsg = `📋 **Building** (${total} tasks)\n\n${Array.from({ length: total }, (_, i) => {
             const status = i < index ? "✅" : i === index ? "🔨" : "⏳";
