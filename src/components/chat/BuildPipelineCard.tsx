@@ -82,7 +82,7 @@ function detectTasks(content: string, isBuilding: boolean, pipelineStep?: Pipeli
     tasks.push({ id: "build", label: "Assembling UI & components", status: codeContent.length > 3000 ? "done" : "in_progress" });
 
     if (codeContent.length > 2000) {
-      tasks.push({ id: "validate", label: "Validating in Sandpack", status: hasClosingFence && !isBuilding ? "done" : "in_progress" });
+      tasks.push({ id: "validate", label: "Static validation in Sandpack", status: hasClosingFence && !isBuilding ? "done" : "in_progress" });
     }
 
     if (pipelineStep === "retrying") {
