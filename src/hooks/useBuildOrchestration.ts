@@ -205,6 +205,10 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
   // ─── Core build message handler ───
   const sendMessage = useCallback(async (text: string, images: string[] = []) => {
     if (!text || !currentProject) return;
+
+    const buildProjectId = currentProject.id;
+    const isStaleBuild = () => lastProjectIdRef.current !== null && lastProjectIdRef.current !== buildProjectId;
+
     if (isSendingRef.current || isLoadingRef.current) {
       console.warn("[BuildOrch] Blocked duplicate send while already sending");
       return;
