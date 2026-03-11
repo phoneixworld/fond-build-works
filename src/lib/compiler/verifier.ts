@@ -45,6 +45,14 @@ export function verifyWorkspace(
   const undefResults = checkUndefinedCalls(workspace);
   issues.push(...undefResults.issues);
 
+  // 8. Semantic check: useNavigate inside AuthContext (outside Router)
+  const routerHookResults = checkRouterHookViolations(workspace);
+  issues.push(...routerHookResults.issues);
+
+  // 9. Semantic check: export { X } where X is not defined
+  const exportResults = checkExportValidity(workspace);
+  issues.push(...exportResults.issues);
+
   // Stats
   const files = workspace.listFiles();
   const jsFiles = files.filter(f => /\.(jsx?|tsx?)$/.test(f));
