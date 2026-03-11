@@ -123,7 +123,29 @@ export class ESMPreviewEngine implements PreviewEngine {
       }
     }
 
-    // 3. Compile all source files
+    // 3. Collect asset files (images, json, svg) as data URIs
+    const assetMap: Record<string, string> = {};
+    const ASSET_EXTENSIONS = /\.(png|jpg|jpeg|gif|webp|svg|ico|json|woff2?|ttf|eot)$/i;
+    for (const [path, content] of Object.entries(normalized)) {
+      if (ASSET_EXTENSIONS.test(path)) {
+        const ext = path.split(".").pop()!.toLowerCase();
+        const mimeMap: Record<string, string> = {
+          png: "image/png", jpg: "image/jpeg", jpeg: "image/jpeg",
+          gif: "image/gif", webp: "image/webp", svg: "image/svg+xml",
+          ico: "image/x-icon", json: "application/json",
+          woff: "font/woff", woff2: "font/woff2", ttf: "font/ttf", eot: "application/vnd.ms-fontobject",
+        };
+        const mime = mimeMap[ext] || "application/octet-stream";
+        if (ext === "svg" || ext === "json") {
+          assetMap[path] = `data:${mime};charset=utf-8,${encodeURIComponent(content)}`;
+        } else {
+          // Binary files would need base64 encoding; for now use placeholder
+          assetMap[path] = `https://placehold.co/400x300?text=${encodeURIComponent(path.split("/").pop() || ext)}`;
+        }
+      }
+    }
+
+    // 4. Compile all source files
     const { modules, css, diagnostics: compileDiags } = compileWorkspace(normalized, fileSet);
     diagnostics.push(...compileDiags);
 
@@ -142,17 +164,18 @@ export class ESMPreviewEngine implements PreviewEngine {
       });
     }
 
-    // 4. Build import map
+    // 5. Build import map
     const importMap = buildImportMap(normalized, snapshot.dependencies, this.importMapProvider);
 
-    // 5. Generate HTML shell
+    // 6. Generate HTML shell with asset map
     const htmlShell = generateHtmlShell({
       importMap,
       modules,
       cssContents: css,
       entryPath: entryPath!,
       projectId: snapshot.projectId,
-      supabaseUrl: session.entryUrl ? undefined : undefined, // Injected via orchestrator
+      assetMap,
+      supabaseUrl: session.entryUrl ? undefined : undefined,
     });
 
     // 6. Build module map
