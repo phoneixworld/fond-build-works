@@ -114,6 +114,11 @@ function generateStubComponent(
     return generateContextStub(name, issue);
   }
 
+  // Layout files → generate a layout with Outlet for react-router
+  if (path.includes("/layout/") || name.toLowerCase().includes("layout")) {
+    return generateLayoutStub(name, issue);
+  }
+
   // Hook files → generate a custom hook
   if (path.includes("/hooks/") || name.startsWith("use")) {
     return generateHookStub(name, issue);
@@ -131,6 +136,28 @@ function generateStubComponent(
 
   // Default: React component
   return generateComponentStub(name, issue);
+}
+
+function generateLayoutStub(name: string, issue: MissingModuleIssue): string {
+  const namedExports = issue.symbols.filter(s => s !== name && s !== "default");
+
+  let code = `import React from 'react';\nimport { Outlet } from 'react-router-dom';\n\n`;
+
+  for (const sym of namedExports) {
+    code += `export const ${sym} = ({ children, className, ...props }) => {\n  return <div className={className} {...props}>{children || '${sym}'}</div>;\n};\n\n`;
+  }
+
+  code += `export default function ${name}({ children }) {\n`;
+  code += `  return (\n`;
+  code += `    <div className="flex h-screen">\n`;
+  code += `      <main className="flex-1 overflow-auto">\n`;
+  code += `        {children || <Outlet />}\n`;
+  code += `      </main>\n`;
+  code += `    </div>\n`;
+  code += `  );\n`;
+  code += `}\n`;
+
+  return code;
 }
 
 function generateComponentStub(name: string, issue: MissingModuleIssue): string {
