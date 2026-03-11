@@ -514,7 +514,7 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
                   setSandpackFiles(retryResult.files);
                   syncSandpackToVirtualFS(retryResult.files);
                   if (Object.keys(retryResult.deps).length > 0) setSandpackDeps(retryResult.deps);
-                  setPreviewMode("esm");
+                  setPreviewMode("sandpack");
 
                   const retryChatText = retryResult.chatText || "✅ Code generated successfully";
                   setMessages((prev) => {
