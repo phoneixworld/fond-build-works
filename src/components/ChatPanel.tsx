@@ -325,8 +325,8 @@ const ChatPanel = forwardRef<ChatPanelHandle, { initialPrompt?: string; onVersio
     setAnalysisResult(null);
     setCurrentAgent("build");
     setPipelineStep("planning");
-    setTimeout(() => sendMessage(prompt), 0);
-  }, [pendingFollowUpPrompt, sendMessage, setCurrentAgent, setPipelineStep]);
+    setTimeout(() => handleSmartSend(prompt), 0);
+  }, [pendingFollowUpPrompt, handleSmartSend, setCurrentAgent, setPipelineStep]);
 
   // Initial prompt
   useEffect(() => {
