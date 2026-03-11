@@ -79,7 +79,7 @@ const ALLOWED_PACKAGES = new Set([
   "lucide-react", "framer-motion", "date-fns", "recharts",
   "react-router-dom", "clsx", "tailwind-merge",
   "react-intersection-observer", "zustand", "zod", "axios",
-  "@tanstack/react-query", "react-hook-form", "sonner",
+  "@tanstack/react-query", "@tanstack/react-table", "react-hook-form", "sonner",
 ]);
 
 function isAllowedPkg(pkg: string): boolean {
