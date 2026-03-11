@@ -99,7 +99,29 @@ export function generateHtmlShell(config: ShellConfig): string {
     window.__PHOENIX_PREVIEW__ = true;
     window.__PHOENIX_METRICS__ = { bootStart: performance.now() };
 
-    // ── Error Bridge ──
+    // ── Safe URL Constructor ──
+    // Patch URL to handle invalid bases (about:srcdoc, blob:, etc.)
+    var _OrigURL = URL;
+    window.URL = function PhoenixURL(url, base) {
+      try {
+        return new _OrigURL(url, base);
+      } catch(e) {
+        try {
+          return new _OrigURL(url, "https://localhost");
+        } catch(e2) {
+          try {
+            return new _OrigURL("https://localhost/" + (url || ""));
+          } catch(e3) {
+            return new _OrigURL("https://localhost");
+          }
+        }
+      }
+    };
+    window.URL.prototype = _OrigURL.prototype;
+    Object.setPrototypeOf(window.URL, _OrigURL);
+    window.URL.createObjectURL = _OrigURL.createObjectURL;
+    window.URL.revokeObjectURL = _OrigURL.revokeObjectURL;
+
     function __phoenixError__(msg, extra) {
       console.error("[Phoenix Preview]", msg, extra || "");
       window.parent.postMessage({ type: "preview-error", msg: String(msg), extra: extra || null }, "*");
