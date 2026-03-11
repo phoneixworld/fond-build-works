@@ -437,6 +437,24 @@ function buildSandpackFiles(files: SandpackFileSet | null, projectId: string, su
       }
     }
 
+    // ── Safety: strip undefined identifiers from "export { A, B, C }" statements ──
+    if (sandpackPath.endsWith(".js")) {
+      processed = processed.replace(
+        /^export\s*\{([^}]+)\}\s*;?\s*$/gm,
+        (match, inner) => {
+          const ids = inner.split(",").map((s: string) => s.trim()).filter(Boolean);
+          const valid = ids.filter((id: string) => {
+            const name = id.replace(/\s+as\s+\w+/, "").trim();
+            // Check if defined in file (function, const, let, var, class, or already exported)
+            const defRegex = new RegExp(`(?:function|const|let|var|class)\\s+${name}\\b`);
+            return defRegex.test(processed);
+          });
+          if (valid.length === 0) return "// export removed — no valid identifiers";
+          return `export { ${valid.join(", ")} };`;
+        }
+      );
+    }
+
     // Ensure all component files have a default export — prevents "Element type is invalid"
     if (sandpackPath.endsWith(".js") && !sandpackPath.includes("styles") && !sandpackPath.includes(".css")) {
       if (!/export\s+default\b/.test(processed)) {
