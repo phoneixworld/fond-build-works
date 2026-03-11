@@ -92,9 +92,26 @@ export class VitePreviewEngine implements PreviewEngine {
             timestamp: Date.now(),
           });
         }
-        // Rewrite imports for SW resolution
-        compiledFiles[path.replace(/\.tsx?$/, ".js").replace(/\.jsx$/, ".js")] =
-          this.rewriteImportsForSW(compiled.code, path, fileSet);
+
+        // AST-aware import rewriting
+        const rewritten = rewriteImportsForSW(compiled.code, {
+          filePath: path,
+          fileSet,
+          resolveFile: (importPath) => this.findFileWithExtension(importPath, fileSet),
+        });
+
+        if (rewritten.unresolvedImports.length > 0) {
+          diagnostics.push({
+            severity: "warning",
+            category: "unresolved-import",
+            message: `Unresolved in ${path}: ${rewritten.unresolvedImports.join(", ")}`,
+            file: path,
+            timestamp: Date.now(),
+          });
+        }
+
+        const jsPath = path.replace(/\.tsx?$/, ".js").replace(/\.jsx$/, ".js");
+        compiledFiles[jsPath] = rewritten.code;
       } else if (path.endsWith(".css")) {
         const cleaned = code
           .replace(/^@tailwind\s+\w+;\s*$/gm, "")
@@ -114,6 +131,23 @@ export class VitePreviewEngine implements PreviewEngine {
         }
         compiledFiles[path] = code;
       }
+    }
+
+    // 3b. Detect circular dependencies and add diagnostics
+    const depGraph = buildDependencyGraph(normalized, fileSet,
+      (importPath) => this.findFileWithExtension(importPath, fileSet)
+    );
+    const cycles = detectCircularDeps(depGraph);
+    if (cycles.length > 0) {
+      for (const cycle of cycles) {
+        diagnostics.push({
+          severity: "warning",
+          category: "circular-import",
+          message: `Circular dependency: ${cycle.join(" → ")}`,
+          timestamp: Date.now(),
+        });
+      }
+      console.warn(`[Phoenix Vite] Detected ${cycles.length} circular dependency chain(s)`);
     }
 
     // 4. Build import map
