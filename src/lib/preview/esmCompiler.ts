@@ -124,10 +124,26 @@ export function rewriteToRegistry(
     return resolved;
   }
 
-  // Rewrite new URL("./path", import.meta.url) → static string
+  // Rewrite new URL("./path", import.meta.url) → __phoenixResolveAsset__("./path")
   code = code.replace(
-    /new\s+URL\(\s*['"]([^'"]+)['"]\s*,\s*import\.meta\.url\s*\)/g,
-    (_m, path: string) => `"${path}"`
+    /new\s+URL\(\s*(['"]([^'"]+)['"])\s*,\s*import\.meta\.url\s*\)/g,
+    (_m, _full, path: string) => `__phoenixResolveAsset__(${_full})`
+  );
+
+  // Rewrite new URL(variable, import.meta.url) → __phoenixResolveAsset__(variable)
+  code = code.replace(
+    /new\s+URL\(\s*([^,)]+)\s*,\s*import\.meta\.url\s*\)/g,
+    (_m, expr: string) => `__phoenixResolveAsset__(${expr.trim()})`
+  );
+
+  // Catch remaining new URL(expr, non-http-base) patterns that could fail in srcdoc
+  code = code.replace(
+    /new\s+URL\(\s*([^,)]+)\s*,\s*([^)]+)\s*\)/g,
+    (_m, url: string, base: string) => {
+      // Don't rewrite if base is clearly an http URL string
+      if (/^['"]https?:/.test(base.trim())) return _m;
+      return `__phoenixSafeURL__(${url.trim()}, ${base.trim()})`;
+    }
   );
 
   // Strip CSS imports
