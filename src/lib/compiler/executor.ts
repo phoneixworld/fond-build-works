@@ -6,6 +6,7 @@
  */
 
 import { streamBuildAgent } from "@/lib/agentPipeline";
+import { detectTruncation } from "@/lib/truncationRecovery";
 import type { BuildContext, CompilerTask, TaskGraph } from "./types";
 import type { Workspace } from "./workspace";
 
