@@ -1394,6 +1394,7 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
     setCurrentPlan(null);
     setCurrentTaskIndex(0);
     setTotalPlanTasks(0);
+    setCompilerTasks([]);
     isSendingRef.current = false;
     saveProject({ chat_history: [], html_content: "" });
   }, [currentProject, isLoading, setPreviewHtml, saveProject, setMessages, setSandpackFiles, setSandpackDeps, setPreviewMode, setPreviewErrors, setHealAttempts, resetHealing]);
