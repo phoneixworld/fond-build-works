@@ -21,6 +21,12 @@ interface ProviderRule {
 
 const PROVIDER_RULES: ProviderRule[] = [
   {
+    hookPattern: /\buseAuth\b/,
+    providerName: "AuthProvider",
+    importFrom: "./contexts/AuthContext",
+    providerPattern: /<AuthProvider[\s>]/,
+  },
+  {
     hookPattern: /\buseToast\b/,
     providerName: "ToastProvider",
     importFrom: "./components/ui/Toast",
