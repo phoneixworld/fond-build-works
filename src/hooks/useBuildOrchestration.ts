@@ -754,10 +754,12 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
       }
 
       // Guard against project switch
-      if (lastProjectIdRef.current !== buildProjectId) {
+      if (isStaleBuild()) {
         console.warn("[BuildOrch] Project switched during build setup, aborting");
         setIsLoading(false);
         setIsBuilding(false);
+        setBuildStep("");
+        isSendingRef.current = false;
         return;
       }
 
