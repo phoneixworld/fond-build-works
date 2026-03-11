@@ -411,28 +411,29 @@ function buildSandpackFiles(files: SandpackFileSet | null, projectId: string, su
       // Handle solo import: "import { useNavigate } from ..."
       processed = processed.replace(/^\s*import\s*\{\s*useNavigate\s*\}\s*from\s*['"][^'"]*['"]\s*;?\s*$/gm, "");
 
-      // Ensure AuthProvider is a named export
+      // Ensure AuthProvider and useAuth are exported — but NEVER duplicate existing exports
+      const hasNamedAuthProviderExport = /export\s+(function|const)\s+AuthProvider\b/.test(processed) || /export\s*\{[^}]*AuthProvider[^}]*\}/.test(processed);
+      const hasDefaultExport = /export\s+default\b/.test(processed);
+      const hasNamedUseAuthExport = /export\s+(function|const)\s+useAuth\b/.test(processed) || /export\s*\{[^}]*useAuth[^}]*\}/.test(processed);
+
+      // Convert "export default function AuthProvider" to named export
       if (/export\s+default\s+function\s+AuthProvider/.test(processed)) {
-        processed = processed.replace(
-          /export\s+default\s+function\s+AuthProvider/,
-          "export function AuthProvider"
-        );
+        processed = processed.replace(/export\s+default\s+function\s+AuthProvider/, "export function AuthProvider");
         if (!/export\s+default\s/.test(processed)) {
           processed += "\nexport default AuthProvider;\n";
         }
       }
-      if (/export\s+function\s+AuthProvider/.test(processed) && !/export\s+default/.test(processed)) {
+      // Add default export if missing
+      if (!hasDefaultExport && hasNamedAuthProviderExport) {
         processed += "\nexport default AuthProvider;\n";
       }
-      if (/export\s+default\s+AuthProvider/.test(processed) && !/export\s+(function|const)\s+AuthProvider/.test(processed)) {
-        processed = processed.replace(/^(const\s+AuthProvider\s*=)/m, "export $1");
+      // Add named AuthProvider export if missing
+      if (!hasNamedAuthProviderExport && /(?:function|const)\s+AuthProvider\b/.test(processed)) {
+        processed = processed.replace(/^((?:function|const)\s+AuthProvider\b)/m, "export $1");
       }
-      // Ensure useAuth is exported
-      if (/function\s+useAuth\b/.test(processed) && !/export\s+(function|const)\s+useAuth/.test(processed)) {
-        processed = processed.replace(/^(function\s+useAuth)/m, "export $1");
-      }
-      if (/const\s+useAuth\s*=/.test(processed) && !/export\s+(function|const)\s+useAuth/.test(processed)) {
-        processed = processed.replace(/^(const\s+useAuth\s*=)/m, "export $1");
+      // Add named useAuth export if missing
+      if (!hasNamedUseAuthExport && /(?:function|const)\s+useAuth\b/.test(processed)) {
+        processed = processed.replace(/^((?:function|const)\s+useAuth\b)/m, "export $1");
       }
     }
 
