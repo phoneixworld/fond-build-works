@@ -362,7 +362,7 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
           : currentPreviewHtml.slice(0, 12000) + `\n...[truncated — ${Math.round(currentPreviewHtml.length / 1000)}k chars total]`;
       }
 
-      const snippetsContext = getSnippetsPromptContext();
+      const snippetsContext = getSnippetsPromptContext(userText);
       const currentMessages = messagesRef.current;
       const apiMessages = [...currentMessages, userMsg].map(m => ({
         role: m.role,

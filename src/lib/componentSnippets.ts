@@ -1780,13 +1780,99 @@ COMPONENT_SNIPPETS.push(
 );
 
 /**
- * Get a compact snippets reference for the AI system prompt
+ * Intent-based snippet selector — picks the most relevant snippets for the user's prompt.
+ * Returns up to `limit` snippets ranked by keyword relevance.
  */
-export function getSnippetsPromptContext(): string {
-  const categories = [...new Set(COMPONENT_SNIPPETS.map(s => s.category))];
+const CATEGORY_KEYWORDS: Record<string, string[]> = {
+  hero: ["landing", "homepage", "hero", "launch", "saas", "startup", "product"],
+  features: ["features", "benefits", "capabilities", "what we offer", "services"],
+  pricing: ["pricing", "plans", "subscription", "tier", "cost", "billing"],
+  testimonials: ["testimonial", "review", "feedback", "customer", "social proof"],
+  cta: ["cta", "call to action", "signup", "register", "get started", "waitlist"],
+  footer: ["footer", "bottom", "links"],
+  contact: ["contact", "reach", "email", "support", "help"],
+  stats: ["stats", "metrics", "numbers", "kpi", "analytics"],
+  faq: ["faq", "question", "help", "support"],
+  gallery: ["gallery", "portfolio", "showcase", "images", "photos"],
+  team: ["team", "about us", "people", "staff", "members"],
+  navigation: ["nav", "header", "menu", "navbar"],
+  dashboard: ["dashboard", "admin", "panel", "overview", "erp", "crm", "management"],
+  sidebar: ["sidebar", "side menu", "drawer"],
+  blog: ["blog", "articles", "posts", "news"],
+  timeline: ["timeline", "history", "roadmap", "milestones"],
+  auth: ["login", "signup", "register", "authentication", "auth"],
+  tabs: ["tabs", "tabbed", "sections"],
+  progress: ["progress", "steps", "wizard", "onboarding"],
+  "social-proof": ["trusted by", "logo cloud", "partners", "clients"],
+  "logo-cloud": ["logo", "brands", "partners", "trusted"],
+};
+
+export function selectSnippetsForIntent(userPrompt: string, limit = 8): ComponentSnippet[] {
+  const lower = userPrompt.toLowerCase();
   
+  // Score each snippet based on category keyword matches
+  const scored = COMPONENT_SNIPPETS.map(snippet => {
+    const keywords = CATEGORY_KEYWORDS[snippet.category] || [];
+    let score = 0;
+    for (const kw of keywords) {
+      if (lower.includes(kw)) score += 2;
+    }
+    // Bonus for direct ID/name match
+    if (lower.includes(snippet.id)) score += 5;
+    if (lower.includes(snippet.name.toLowerCase())) score += 3;
+    return { snippet, score };
+  });
+
+  // If no keywords matched (e.g. "School ERP"), pick essentials for app builds
+  const hasMatches = scored.some(s => s.score > 0);
+  if (!hasMatches) {
+    // For app builds, prioritize: dashboard, sidebar, navigation, auth, tabs
+    const appCategories = ["dashboard", "sidebar", "navigation", "auth", "tabs", "stats"];
+    return COMPONENT_SNIPPETS
+      .filter(s => appCategories.includes(s.category))
+      .slice(0, limit);
+  }
+
+  return scored
+    .filter(s => s.score > 0)
+    .sort((a, b) => b.score - a.score)
+    .slice(0, limit)
+    .map(s => s.snippet);
+}
+
+/**
+ * Get a RICH snippets context for the AI — includes actual HTML structures
+ * for selected snippets, not just names. Intent-aware selection keeps token usage efficient.
+ */
+export function getSnippetsPromptContext(userPrompt?: string): string {
+  // If we have a user prompt, select relevant snippets with full HTML
+  if (userPrompt) {
+    const selected = selectSnippetsForIntent(userPrompt);
+    if (selected.length === 0) return getCompactSnippetsList();
+
+    return `Use these premium UI blueprints as structural references when building sections. 
+Adapt colors, content, and layout to match the user's domain — do NOT copy literally.
+
+${selected.map(s => `### ${s.name} (${s.category})
+\`\`\`html
+${s.structure}
+\`\`\``).join('\n\n')}
+
+### Additional available snippets (request by ID if needed):
+${getCompactSnippetsList()}`;
+  }
+
+  // Fallback: compact list only
+  return getCompactSnippetsList();
+}
+
+/**
+ * Compact list of all snippet IDs (low token cost)
+ */
+function getCompactSnippetsList(): string {
+  const categories = [...new Set(COMPONENT_SNIPPETS.map(s => s.category))];
   return categories.map(cat => {
     const snippets = COMPONENT_SNIPPETS.filter(s => s.category === cat);
-    return `### ${cat.charAt(0).toUpperCase() + cat.slice(1)} Snippets\n${snippets.map(s => `- **${s.name}** (${s.id})`).join('\n')}`;
-  }).join('\n\n');
+    return `**${cat}**: ${snippets.map(s => s.id).join(', ')}`;
+  }).join('\n');
 }
