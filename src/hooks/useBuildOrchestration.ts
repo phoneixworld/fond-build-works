@@ -36,6 +36,7 @@ import { parseMultiFileOutput } from "@/contexts/VirtualFSContext";
 import { useChatAgent, type ChatAgentConfig } from "@/hooks/useChatAgent";
 import { useInstantBuild, type InstantBuildConfig } from "@/hooks/useInstantBuild";
 import { triggerBuild } from "@/lib/buildPipelineService";
+import { executeEdit, type EditResult } from "@/lib/editEngine";
 
 type Msg = { role: "user" | "assistant"; content: MsgContent; timestamp?: number };
 
