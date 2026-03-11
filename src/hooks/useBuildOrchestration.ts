@@ -1420,6 +1420,7 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
     selectedTemplate,
     setSelectedTemplate,
     buildRetryCount,
+    compilerTasks,
 
     // Refs
     isSendingRef,
