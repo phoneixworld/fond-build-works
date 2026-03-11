@@ -500,9 +500,25 @@ ${moduleDefinitions}
       
       window.parent.postMessage({ type: "preview-ready" }, "*");
       
-      // Route change reporting
-      window.addEventListener("popstate", function() {
-        window.parent.postMessage({ type: "route-change", path: location.pathname + location.hash }, "*");
+      // Route change reporting (hash-aware)
+      function reportRoute() {
+        var hash = location.hash;
+        var path = hash && hash.startsWith("#") ? hash.slice(1) || "/" : location.pathname + location.search;
+        window.parent.postMessage({ type: "route-change", path: path }, "*");
+      }
+      window.addEventListener("popstate", reportRoute);
+      window.addEventListener("hashchange", reportRoute);
+
+      // Listen for navigation from parent
+      window.addEventListener("message", function(e) {
+        if (e.data && e.data.type === "navigate" && e.data.path) {
+          if (location.hash.startsWith("#/") || location.hash === "#") {
+            location.hash = "#" + e.data.path;
+          } else {
+            try { history.pushState(null, "", e.data.path); } catch(ex) {}
+            window.dispatchEvent(new PopStateEvent("popstate"));
+          }
+        }
       });
     } catch(e) {
       console.error("[ESM Preview]", e);

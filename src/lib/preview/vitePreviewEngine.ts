@@ -302,23 +302,30 @@ export default function App() {
       window.parent.postMessage({ type: "preview-error", msg: "Unhandled: " + (e.reason?.message || e.reason || "unknown") }, "*");
     });
 
-    // Route change reporting
+    // Route change reporting (hash-aware)
     (function() {
       var _push = history.pushState;
       var _replace = history.replaceState;
       function report() {
-        window.parent.postMessage({ type: "route-change", path: location.pathname + location.search + location.hash }, "*");
+        var hash = location.hash;
+        var path = hash && hash.startsWith("#") ? hash.slice(1) || "/" : location.pathname + location.search;
+        window.parent.postMessage({ type: "route-change", path: path }, "*");
       }
       history.pushState = function() { var r = _push.apply(this, arguments); report(); return r; };
       history.replaceState = function() { var r = _replace.apply(this, arguments); report(); return r; };
       window.addEventListener("popstate", report);
+      window.addEventListener("hashchange", report);
     })();
 
     // Listen for navigation from parent
     window.addEventListener("message", function(e) {
       if (e.data?.type === "navigate" && e.data.path) {
-        try { history.pushState(null, "", e.data.path); } catch(ex) {}
-        window.dispatchEvent(new PopStateEvent("popstate"));
+        if (location.hash.startsWith("#/") || location.hash === "#") {
+          location.hash = "#" + e.data.path;
+        } else {
+          try { history.pushState(null, "", e.data.path); } catch(ex) {}
+          window.dispatchEvent(new PopStateEvent("popstate"));
+        }
       }
     });
   </script>
