@@ -34,6 +34,8 @@ export type PipelineStep =
   | "chatting"
   | "planning"
   | "generating"
+  | "editing"
+  | "resolving"
   | "bundling"
   | "validating"
   | "retrying"
