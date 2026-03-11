@@ -531,8 +531,8 @@ const ChatPanel = forwardRef<ChatPanelHandle, { initialPrompt?: string; onVersio
     setMessages(truncated);
     setEditingIndex(null);
     setEditText("");
-    setTimeout(() => sendMessage(editText.trim()), 50);
-  }, [editingIndex, editText, currentProject, sendMessage]);
+    setTimeout(() => handleSmartSend(editText.trim()), 50);
+  }, [editingIndex, editText, currentProject, handleSmartSend]);
 
   const handleRegenerate = useCallback((index: number) => {
     if (isLoadingRef.current || !currentProject) return;
