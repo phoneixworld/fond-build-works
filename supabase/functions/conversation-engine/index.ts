@@ -554,8 +554,8 @@ Deno.serve(async (req) => {
 
       // Edit detection — must check before build signals
       const EDIT_VERBS = /\b(change|update|fix|modify|replace|add|remove|make|move|rename|resize|restyle|improve|tweak|adjust|refactor|sort|filter|reorder|swap|hide|show|toggle|enable|disable|increase|decrease|align|center)\b/i;
-      const BUG_REPORT = /\b(doesn['']?t work|does not work|not working|broken|bug|crash|error|fails?|failing|wrong|issue|problem|stuck|blank|empty|missing|disappeared)\b/i;
-      const EDIT_TARGETS = /\b(table|button|form|sidebar|nav|header|footer|modal|dialog|card|chart|page|column|row|field|input|label|title|heading|text|color|font|spacing|padding|margin|border|icon|image|logo|search|tab|badge|avatar|menu|dropdown|sign\s*up|signup|login|log\s*in|auth|register|registration|password|session)\b/i;
+      const BUG_REPORT = /\b(doesn['']?t work|does not work|not working|broken|bug|crash|error|fails?|failing|wrong|issue|problem|stuck|blank|empty|missing|disappeared|nothing shows|nothing loads|nothing happens|white screen|no content|not loading|not showing|not rendering|not displaying|can['']?t see|cannot see|shows nothing|displays nothing|page is blank|screen is blank|portal is blank|app is blank)\b/i;
+      const EDIT_TARGETS = /\b(table|button|form|sidebar|nav|header|footer|modal|dialog|card|chart|page|column|row|field|input|label|title|heading|text|color|font|spacing|padding|margin|border|icon|image|logo|search|tab|badge|avatar|menu|dropdown|sign\s*up|signup|login|log\s*in|auth|register|registration|password|session|portal|screen|app|view|dashboard|layout|content|display|render)\b/i;
       const BUILD_FULL = /\b(build|create|generate|scaffold|new app|new project|from scratch|entire|whole app|full app|complete app)\b/i;
 
       if (BUILD_SIGNALS.test(lower)) {
