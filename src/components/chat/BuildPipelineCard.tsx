@@ -131,12 +131,18 @@ const BuildPipelineCard = ({ isBuilding, streamContent, tasks: externalTasks, pi
   const allDone = doneCount === tasks.length && !isBuilding && tasks.length > 0;
   const activeTask = tasks.find(t => t.status === "in_progress");
 
+  const agentLabel = useMemo(() => {
+    if (currentAgent === "edit") return "Editing";
+    if (currentAgent === "chat") return "Responding";
+    return "Building";
+  }, [currentAgent]);
+
   const inferredTitle = useMemo(() => {
     if (buildTitle) return buildTitle;
     const titleMatch = streamContent.match(/##\s*TASK:\s*(.+?)(?:\n|$)/);
     if (titleMatch) return titleMatch[1].trim();
-    return allDone ? "Build complete" : "Building...";
-  }, [buildTitle, streamContent, allDone]);
+    return allDone ? "Build complete" : `${agentLabel}...`;
+  }, [buildTitle, streamContent, allDone, agentLabel]);
 
   const description = useMemo(() => {
     if (allDone) return `Completed in ${elapsed}s`;
