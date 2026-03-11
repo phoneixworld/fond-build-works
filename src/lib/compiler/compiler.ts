@@ -235,7 +235,7 @@ export async function compile(
     console.log("[Compiler] 🔄 Fixed provider ordering: ToastProvider now wraps AuthProvider");
   }
 
-  // ── Phase 3.10: Ensure App.jsx exists ────────────────────────────────
+  // ── Phase 3.10: Ensure App.jsx exists and has valid imports ──────────
 
   const appEntryPoints = ["/App.jsx", "/App.tsx", "/App.js", "/App.ts"];
   const hasAppEntry = appEntryPoints.some(p => workspace.hasFile(p));
@@ -246,6 +246,30 @@ export async function compile(
     workspace.addFile("/App.jsx", synthesizedApp);
     cloudLog.warn("App.jsx was missing after build — synthesized from available components", "compiler");
     console.log(`[Compiler] 🏗️ Synthesized missing App.jsx from available workspace components`);
+  } else {
+    // Validate App.jsx imports resolve to actual workspace files
+    // If too many are broken, re-synthesize to prevent "Element type is invalid" errors
+    const appPath = appEntryPoints.find(p => workspace.hasFile(p))!;
+    const appContent = workspace.getFile(appPath)!;
+    const appImports = appContent.matchAll(/import\s+\w+\s+from\s+["'](\.[^"']+)["']/g);
+    let brokenImports = 0;
+    let totalLocalImports = 0;
+    for (const m of appImports) {
+      totalLocalImports++;
+      const resolved = workspace.resolveImport(appPath, m[1]);
+      if (!resolved || !workspace.hasFile(resolved)) {
+        brokenImports++;
+        console.warn(`[Compiler] ⚠️ App.jsx import unresolved: ${m[1]}`);
+      }
+    }
+    // If more than half of local imports are broken, re-synthesize
+    if (totalLocalImports > 0 && brokenImports > 0 && brokenImports / totalLocalImports > 0.3) {
+      callbacks.onPhase("synthesizing-app", "Re-synthesizing App.jsx (too many broken imports)...");
+      const synthesizedApp = synthesizeAppJsx(workspace);
+      workspace.updateFile(appPath, synthesizedApp);
+      cloudLog.warn(`App.jsx had ${brokenImports}/${totalLocalImports} broken imports — re-synthesized`, "compiler");
+      console.log(`[Compiler] 🏗️ Re-synthesized App.jsx: ${brokenImports}/${totalLocalImports} imports were broken`);
+    }
   }
 
   // ── Phase 4: Verification ──────────────────────────────────────────
