@@ -685,7 +685,7 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
       setCurrentAgent("build");
       setPipelineStep("planning");
 
-      const buildProjectId = currentProject.id;
+      // buildProjectId already captured at top of sendMessage
       const liveSandpackFiles = sandpackFilesRef.current;
       const isFirstBuild = !liveSandpackFiles || Object.keys(liveSandpackFiles).length === 0;
 
