@@ -533,10 +533,11 @@ Deno.serve(async (req) => {
       });
     }
 
-    // ─── ANALYZE_MESSAGE: Server determines action ───
+    // ─── ANALYZE_MESSAGE: Server determines action (authoritative classifier) ───
     if (action === "analyze_message") {
       const text = (message || "").trim();
       const lower = text.toLowerCase();
+      const hasExistingCode = body.hasExistingCode || false;
 
       const { data: convState } = await supabase
         .from("project_conversation_state")
@@ -548,12 +549,20 @@ Deno.serve(async (req) => {
 
       const currentMode: ConversationMode = convState?.mode || "idle";
 
-      let recommendedAction: "gather" | "build" | "chat" | "continue" = "continue";
+      let recommendedAction: "gather" | "build" | "edit" | "chat" | "continue" = "continue";
       let reason = "";
+
+      // Edit detection — must check before build signals
+      const EDIT_VERBS = /\b(change|update|fix|modify|replace|add|remove|make|move|rename|resize|restyle|improve|tweak|adjust|refactor|sort|filter|reorder|swap|hide|show|toggle|enable|disable|increase|decrease|align|center)\b/i;
+      const EDIT_TARGETS = /\b(table|button|form|sidebar|nav|header|footer|modal|dialog|card|chart|page|column|row|field|input|label|title|heading|text|color|font|spacing|padding|margin|border|icon|image|logo|search|tab|badge|avatar|menu|dropdown)\b/i;
+      const BUILD_FULL = /\b(build|create|generate|scaffold|new app|new project|from scratch|entire|whole app|full app|complete app)\b/i;
 
       if (BUILD_SIGNALS.test(lower)) {
         recommendedAction = "build";
         reason = "User explicitly requested build";
+      } else if (hasExistingCode && EDIT_VERBS.test(lower) && EDIT_TARGETS.test(lower) && !BUILD_FULL.test(lower)) {
+        recommendedAction = "edit";
+        reason = "Edit intent detected (verb + target + existing code)";
       } else if (CHAT_SIGNALS.test(lower)) {
         recommendedAction = "chat";
         reason = "User asking a question";
@@ -581,6 +590,7 @@ Deno.serve(async (req) => {
 
       const targetMode: ConversationMode = recommendedAction === "gather" ? "gathering"
         : recommendedAction === "build" ? "building"
+        : recommendedAction === "edit" ? "editing"
         : currentMode;
       const isValidTransition = VALID_TRANSITIONS[currentMode]?.includes(targetMode) ?? true;
 
@@ -588,7 +598,7 @@ Deno.serve(async (req) => {
       await logTelemetry(supabase, projectId, "message_analyzed", {
         agent: "system",
         entityType: "message",
-        metadata: { action: recommendedAction, reason, currentMode, targetMode, isValidTransition, messageLength: text.length },
+        metadata: { action: recommendedAction, reason, currentMode, targetMode, isValidTransition, messageLength: text.length, hasExistingCode },
       }, userId);
 
       return json({ action: recommendedAction, reason, currentMode, targetMode, isValidTransition });
