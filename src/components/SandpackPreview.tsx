@@ -397,16 +397,44 @@ function buildSandpackFiles(files: SandpackFileSet | null, projectId: string, su
 
     // Ensure AuthContext has both named + default exports to prevent import mismatches
     if (sandpackPath.includes("AuthContext") && sandpackPath.endsWith(".js")) {
-      // Add default export if missing
+      // Ensure AuthProvider is a named export
+      if (/export\s+default\s+function\s+AuthProvider/.test(processed)) {
+        // "export default function AuthProvider" → make it also a named export
+        processed = processed.replace(
+          /export\s+default\s+function\s+AuthProvider/,
+          "export function AuthProvider"
+        );
+        if (!/export\s+default\s/.test(processed)) {
+          processed += "\nexport default AuthProvider;\n";
+        }
+      }
       if (/export\s+function\s+AuthProvider/.test(processed) && !/export\s+default/.test(processed)) {
         processed += "\nexport default AuthProvider;\n";
       }
-      // Add named export if only default exists
+      // Add named export if only default exists with const pattern
       if (/export\s+default\s+AuthProvider/.test(processed) && !/export\s+(function|const)\s+AuthProvider/.test(processed)) {
         processed = processed.replace(
           /^(const\s+AuthProvider\s*=)/m,
           "export $1"
         );
+      }
+      // Ensure useAuth is exported
+      if (/function\s+useAuth\b/.test(processed) && !/export\s+(function|const)\s+useAuth/.test(processed)) {
+        processed = processed.replace(/^(function\s+useAuth)/m, "export $1");
+      }
+      if (/const\s+useAuth\s*=/.test(processed) && !/export\s+(function|const)\s+useAuth/.test(processed)) {
+        processed = processed.replace(/^(const\s+useAuth\s*=)/m, "export $1");
+      }
+    }
+
+    // Ensure all component files have a default export — prevents "Element type is invalid"
+    if (sandpackPath.endsWith(".js") && !sandpackPath.includes("styles") && !sandpackPath.includes(".css")) {
+      if (!/export\s+default\b/.test(processed)) {
+        // Try to find the main component/function name and add default export
+        const mainExportMatch = processed.match(/export\s+(?:function|const)\s+([A-Z]\w+)/);
+        if (mainExportMatch) {
+          processed += `\nexport default ${mainExportMatch[1]};\n`;
+        }
       }
     }
 
