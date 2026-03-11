@@ -310,7 +310,10 @@ class AppErrorBoundary extends Component {
 // Report route changes to parent for URL bar sync
 function reportRoute() {
   try {
-    window.parent.postMessage({ type: "route-change", path: location.pathname + location.search + location.hash }, "*");
+    // For HashRouter apps, extract the meaningful path from the hash
+    var hash = location.hash;
+    var path = hash && hash.startsWith("#") ? hash.slice(1) || "/" : location.pathname + location.search;
+    window.parent.postMessage({ type: "route-change", path: path }, "*");
   } catch(e) {}
 }
 
@@ -338,12 +341,19 @@ function reportRoute() {
   }
 })();
 window.addEventListener("popstate", reportRoute);
+window.addEventListener("hashchange", reportRoute);
 
 // Listen for navigation commands from parent
 window.addEventListener("message", function(e) {
   if (e.data && e.data.type === "navigate" && e.data.path) {
-    try { history.pushState(null, "", e.data.path); } catch(ex) {}
-    window.dispatchEvent(new PopStateEvent("popstate"));
+    var targetPath = e.data.path;
+    // Support HashRouter: update hash, BrowserRouter: use pushState
+    if (location.hash.startsWith("#/") || location.hash === "#" || document.querySelector("[data-reactroot]")) {
+      location.hash = "#" + targetPath;
+    } else {
+      try { history.pushState(null, "", targetPath); } catch(ex) {}
+      window.dispatchEvent(new PopStateEvent("popstate"));
+    }
   }
 });
 
