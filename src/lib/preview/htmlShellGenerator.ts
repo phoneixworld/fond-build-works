@@ -38,8 +38,33 @@ export function generateHtmlShell(config: ShellConfig): string {
     supabaseKey = "",
   } = config;
 
+  // Phoenix runtime module — injected into the module registry
+  const phoenixRuntimeCode = `
+__exports__.resolveAsset = function resolveAsset(path) {
+  if (!path) return "";
+  if (typeof path !== "string") return String(path);
+  if (path.startsWith("http://") || path.startsWith("https://") || path.startsWith("data:") || path.startsWith("blob:")) return path;
+  var cleaned = path.replace(/^\\.\\//g, "").replace(/^\\//, "");
+  var assets = window.__PHOENIX_ASSETS__ || {};
+  if (assets[cleaned] || assets["/" + cleaned]) return assets[cleaned] || assets["/" + cleaned];
+  return "https://placehold.co/400x300?text=" + encodeURIComponent(cleaned);
+};
+__exports__.safeURL = function safeURL(url, base) {
+  try { return new URL(url, base); }
+  catch(_) {
+    try { return new URL(url, "https://localhost"); }
+    catch(_2) { return new URL("https://localhost"); }
+  }
+};
+`.trim();
+
   // Build module definitions as escaped template literals
-  const moduleDefinitions = modules
+  const allModules = [
+    { path: "/__phoenix__/runtime.js", code: phoenixRuntimeCode },
+    ...modules,
+  ];
+
+  const moduleDefinitions = allModules
     .map(m => {
       const escaped = m.code
         .replace(/\\/g, "\\\\")
