@@ -32,7 +32,7 @@ function detectEditingFiles(content: string): string[] {
   return files.slice(0, 3);
 }
 
-function detectTasks(content: string, isBuilding: boolean, pipelineStep?: PipelineStep | null, currentAgent?: "chat" | "build" | null): TaskItem[] {
+function detectTasks(content: string, isBuilding: boolean, pipelineStep?: PipelineStep | null, currentAgent?: "chat" | "build" | "edit" | null): TaskItem[] {
   const len = content.length;
   const hasCode = content.includes("```react-preview") || content.includes("```jsx") || content.includes("```html") || content.includes("```react");
   const hasClosingFence = hasCode && (() => {
