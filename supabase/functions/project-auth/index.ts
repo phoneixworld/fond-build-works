@@ -29,6 +29,25 @@ function verifyToken(token: string): { uid: string; pid: string } | null {
   }
 }
 
+
+function normalizeUser(user: {
+  id: string;
+  email: string;
+  display_name: string | null;
+  created_at: string;
+  metadata?: Record<string, unknown> | null;
+}) {
+  const role = typeof user.metadata?.role === "string" ? user.metadata.role : "student";
+  return {
+    id: user.id,
+    email: user.email,
+    display_name: user.display_name,
+    created_at: user.created_at,
+    metadata: user.metadata ?? {},
+    role,
+  };
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
