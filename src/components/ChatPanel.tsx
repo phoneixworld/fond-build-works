@@ -740,7 +740,7 @@ const ChatPanel = forwardRef<ChatPanelHandle, { initialPrompt?: string; onVersio
                   setFollowUpAnswers({});
                   setPendingFollowUpPrompt("");
                   setAnalysisResult(null);
-                  sendMessage(enrichedPrompt);
+                  handleSmartSend(enrichedPrompt);
                 }}
                 onSkip={skipFollowUpQuestions}
               />
