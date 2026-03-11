@@ -144,7 +144,7 @@ export function useConversationState() {
 
   // ─── ANALYZE: Server-first message analysis with client fallback ──
   const analyzeMessage = useCallback(async (text: string, hasImages: boolean, _irState?: any): Promise<{
-    action: "gather" | "build" | "chat" | "continue";
+    action: "gather" | "build" | "edit" | "chat" | "continue";
     reason: string;
   }> => {
     const projectId = currentProjectId.current;
@@ -174,6 +174,9 @@ export function useConversationState() {
     }
     if (PHASED_SIGNALS.test(lower)) return { action: "gather", reason: "Phased approach" };
     if (INFO_PROVIDING_SIGNALS.test(lower)) return { action: "gather", reason: "Info providing" };
+    if (EDIT_VERBS.test(lower) && EDIT_TARGETS.test(lower) && !BUILD_FULL.test(lower)) {
+      return { action: "edit", reason: "Edit intent detected (client fallback)" };
+    }
     return { action: "continue", reason: "No signal detected" };
   }, [mode]);
 
