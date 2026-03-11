@@ -72,6 +72,10 @@ export function useIntentClassification(
     } catch {
       setIsAnalyzing(false);
       setPipelineStep(null);
+      // Fallback: if classify-intent fails and we have existing code, default to edit (not rebuild)
+      if (hasExistingCode) {
+        return { intent: "edit" as AgentIntent };
+      }
       return null;
     }
   }, [sandpackFiles, previewHtml, messageCount, setPipelineStep]);

@@ -237,10 +237,13 @@ Use the classify_intent tool to return your classification.`
     });
   } catch (e) {
     console.error("classify-intent error:", e);
+    // If existing code is present, fallback to edit (not build) to prevent destructive rebuilds
+    const fallbackIntent = hasExistingCode ? "edit" : "build";
     return new Response(JSON.stringify({ 
-      intent: "build", 
-      confidence: 0.5, 
-      questions: [] 
+      intent: fallbackIntent, 
+      confidence: 0.3, 
+      questions: [],
+      analysis: { needsBackend: false, needsAuth: false, complexity: "simple" }
     }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
