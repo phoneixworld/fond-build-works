@@ -113,6 +113,36 @@ const ChatPanel = forwardRef<ChatPanelHandle, { initialPrompt?: string; onVersio
   // Keep ref in sync
   useEffect(() => { resetHealingRef.current = resetHealing; }, [resetHealing]);
 
+  // Memoize conversation callbacks to prevent cascading re-renders
+  const stableSetPreviewErrors = useCallback((errs: any) => setPreviewErrors(errs), [setPreviewErrors]);
+  const stableSetHealAttempts = useCallback((n: number) => setHealAttempts(n), [setHealAttempts]);
+  const stableResetHealing = useCallback(() => resetHealingRef.current(), []);
+
+  const conversationAnalyzeAsyncCb = useCallback(async (text: string, hasImages: boolean, _hasExistingCode: boolean) => {
+    return conversationState.analyzeMessage(text, hasImages);
+  }, [conversationState.analyzeMessage]);
+
+  const conversationAddPhaseCb = useCallback((text: string, hasImages: boolean, imageUrls?: string[]) => {
+    const localPhase = {
+      id: Date.now(), // Use timestamp for unique ID instead of phases.length (avoids stale closure)
+      summary: text.slice(0, 200).replace(/\n/g, " "),
+      rawText: text,
+      hasImages,
+      timestamp: Date.now(),
+    };
+    conversationState.addPhase(text, hasImages, currentProject?.ir_state, imageUrls);
+    return localPhase;
+  }, [conversationState.addPhase, currentProject?.ir_state]);
+
+  const conversationGetRequirementsCb = useCallback(
+    () => conversationState.getRequirementsContext(currentProject?.ir_state),
+    [conversationState.getRequirementsContext, currentProject?.ir_state]
+  );
+
+  const conversationStartBuildingCb = useCallback(() => {
+    conversationState.startBuilding();
+  }, [conversationState.startBuilding]);
+
   // Build orchestration hook
   const buildOrch = useBuildOrchestration({
     currentProject,
@@ -133,33 +163,20 @@ const ChatPanel = forwardRef<ChatPanelHandle, { initialPrompt?: string; onVersio
     setMessages,
     setInput,
     setAttachedImages,
-    setPreviewErrors: (errs: any) => setPreviewErrors(errs),
-    setHealAttempts: (n: number) => setHealAttempts(n),
-    resetHealing: () => resetHealingRef.current(),
+    setPreviewErrors: stableSetPreviewErrors,
+    setHealAttempts: stableSetHealAttempts,
+    resetHealing: stableResetHealing,
     inputRef,
     selectedModel,
     selectedTheme,
     fetchProjectContext,
     classifyUserIntent,
     fastClassifyLocal,
-    // Conversation state machine
-    conversationAnalyzeAsync: async (text: string, hasImages: boolean, hasExistingCode: boolean) => {
-      return conversationState.analyzeMessage(text, hasImages);
-    },
-    conversationAddPhase: (text: string, hasImages: boolean, imageUrls?: string[]) => {
-      // Fire async server persist but return sync phase for immediate UI
-      const localPhase = {
-        id: conversationState.phases.length + 1,
-        summary: text.slice(0, 200).replace(/\n/g, " "),
-        rawText: text,
-        hasImages,
-        timestamp: Date.now(),
-      };
-      conversationState.addPhase(text, hasImages, currentProject?.ir_state, imageUrls);
-      return localPhase;
-    },
-    conversationGetRequirements: () => conversationState.getRequirementsContext(currentProject?.ir_state),
-    conversationStartBuilding: () => { conversationState.startBuilding(); },
+    // Conversation state machine — all stable references
+    conversationAnalyzeAsync: conversationAnalyzeAsyncCb,
+    conversationAddPhase: conversationAddPhaseCb,
+    conversationGetRequirements: conversationGetRequirementsCb,
+    conversationStartBuilding: conversationStartBuildingCb,
     conversationStartEditing: conversationState.startEditing,
     conversationCompleteEdit: conversationState.completeEdit,
     conversationCompleteBuild: conversationState.completeBuild,
@@ -249,7 +266,7 @@ const ChatPanel = forwardRef<ChatPanelHandle, { initialPrompt?: string; onVersio
       });
     }
     prevPipelineStep.current = pipelineStep;
-  }, [pipelineStep, createCheckpoint, currentPreviewHtml]);
+  }, [pipelineStep, createCheckpoint]);
 
   // Keyboard shortcuts for undo/redo
   useEffect(() => {
