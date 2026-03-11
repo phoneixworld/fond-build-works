@@ -83,10 +83,13 @@ export interface BuildOrchestrationConfig {
   fastClassifyLocal: (text: string) => AgentIntent | null;
 
   // Conversation state machine
-  conversationAnalyze?: (text: string, hasImages: boolean) => { action: "gather" | "build" | "chat" | "continue"; reason: string };
+  conversationAnalyze?: (text: string, hasImages: boolean) => { action: "gather" | "build" | "edit" | "chat" | "continue"; reason: string };
+  conversationAnalyzeAsync?: (text: string, hasImages: boolean, hasExistingCode: boolean) => Promise<{ action: "gather" | "build" | "edit" | "chat" | "continue"; reason: string }>;
   conversationAddPhase?: (text: string, hasImages: boolean, imageUrls?: string[]) => any;
   conversationGetRequirements?: () => Promise<string> | string;
   conversationStartBuilding?: () => void;
+  conversationStartEditing?: (instruction: string, targetFiles: string[], beforeSnapshots: Record<string, string>) => Promise<void>;
+  conversationCompleteEdit?: (instruction: string, targetFiles: string[], beforeSnapshots: Record<string, string>, afterSnapshots: Record<string, string>, explanation: string) => Promise<any>;
   conversationCompleteBuild?: (result: any) => void;
   conversationGenerateAck?: (phase: any) => string;
   conversationMode?: string;
