@@ -1316,6 +1316,7 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
     // Actions
     sendMessage,
     sendChatMessage,
+    sendEditMessage,
     handleSmartSend,
     clearChat,
     abortBuild,
