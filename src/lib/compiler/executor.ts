@@ -80,7 +80,7 @@ ${workspaceContext ? `### Current code:\n${workspaceContext}` : ""}
      </AuthProvider>
    </ToastProvider>
 9. Protected pages must check useAuth().user and redirect to /login if null
-10. **CRITICAL**: Every file MUST import ALL identifiers it uses. If you use `clsx()`, you MUST have `import clsx from "clsx"` at the top. If you use `React`, you MUST import it. Never assume globals exist.
+10. **CRITICAL**: Every file MUST import ALL identifiers it uses. If you use clsx(), you MUST have "import clsx from 'clsx'" at the top. If you use React, you MUST import it. Never assume globals exist.
 10. **CRITICAL**: Every function called in a component MUST be defined in that component, imported, or destructured from a hook/context. Never reference undefined functions like fetchBoards() without defining them first. If you need data-fetching functions, define them inside the component or a custom hook using the Data API pattern.
 11. When using useEffect, ensure ALL dependencies (functions, variables) referenced inside the effect are either defined above or listed in the dependency array. Define fetch functions with useCallback or inside the effect itself.`;
 }
