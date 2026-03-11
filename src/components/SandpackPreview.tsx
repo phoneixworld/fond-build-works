@@ -378,7 +378,21 @@ const DEFAULT_INDEX_HTML = `<!DOCTYPE html>
 </html>`;
 
 function buildSandpackFiles(files: SandpackFileSet | null, projectId: string, supabaseUrl: string, supabaseKey: string): Record<string, string> {
-  const indexJs = buildIndexJs(projectId, supabaseUrl, supabaseKey);
+  // Determine the actual App entry extension from user files
+  let appExt = ".js";
+  if (files) {
+    for (const p of Object.keys(files)) {
+      const norm = p.startsWith("/") ? p : `/${p}`;
+      if (/^\/(?:src\/)?App\.tsx$/.test(norm)) { appExt = ".tsx"; break; }
+      if (/^\/(?:src\/)?App\.jsx$/.test(norm)) { appExt = ".jsx"; break; }
+      if (/^\/(?:src\/)?App\.ts$/.test(norm)) { appExt = ".ts"; break; }
+    }
+  }
+
+  const indexJs = buildIndexJs(projectId, supabaseUrl, supabaseKey).replace(
+    'import App from "./App"',
+    `import App from "./App${appExt === ".js" ? "" : appExt.replace(/\./, ".")}"`
+  );
   const base: Record<string, string> = {
     "/index.js": indexJs,
     "/styles.css": DEFAULT_STYLES,
@@ -390,24 +404,17 @@ function buildSandpackFiles(files: SandpackFileSet | null, projectId: string, su
     return base;
   }
 
-  // Map user files into sandpack paths — sanitize imports only, no repair
-  // Normalize ALL .jsx/.tsx/.ts extensions to .js for consistent Sandpack resolution
+  // Map user files into sandpack paths — keep original extensions so Sandpack
+  // processes TypeScript natively via its Babel preset.
   for (const [path, code] of Object.entries(files)) {
     const normalized = path.startsWith("/") ? path : `/${path}`;
-    const sandpackPath = normalized.replace(/\.(tsx?|jsx)$/, ".js");
-    let processed = sandpackPath.match(/\.js$/) ? sanitizeImports(code, sandpackPath) : code;
-
-    // ── Minimal safety nets (compiler handles the heavy lifting now) ──
-    // Only keep: ensure default export exists for component files
-    // The compiler's verifier + deterministic repair handles:
-    //   - useNavigate in AuthContext (router_hook_violation)
-    //   - undefined export identifiers (undefined_export)
-    //   - export deduplication
+    const sandpackPath = normalized;
+    const isCodeFile = /\.(jsx?|tsx?)$/.test(sandpackPath);
+    let processed = isCodeFile ? sanitizeImports(code, sandpackPath) : code;
 
     // Ensure all component files have a default export — prevents "Element type is invalid"
-    if (sandpackPath.endsWith(".js") && !sandpackPath.includes("styles") && !sandpackPath.includes(".css")) {
+    if (isCodeFile && !sandpackPath.includes("styles") && !sandpackPath.includes(".css")) {
       if (!/export\s+default\b/.test(processed)) {
-        // Try to find the main component/function name and add default export
         const mainExportMatch = processed.match(/export\s+(?:function|const)\s+([A-Z]\w+)/);
         if (mainExportMatch) {
           processed += `\nexport default ${mainExportMatch[1]};\n`;
@@ -418,7 +425,7 @@ function buildSandpackFiles(files: SandpackFileSet | null, projectId: string, su
     base[sandpackPath] = processed;
   }
 
-  if (!base["/App.js"]) {
+  if (!base["/App.tsx"] && !base["/App.jsx"] && !base["/App.js"]) {
     base["/App.js"] = DEFAULT_APP;
   }
 
