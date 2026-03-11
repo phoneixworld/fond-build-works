@@ -43,5 +43,5 @@ export { assembleBuildContext, detectBuildIntent, extractIRFromRequirements } fr
 export { planTaskGraph, topologicalSort } from "./planner";
 export { Workspace } from "./workspace";
 export { verifyWorkspace } from "./verifier";
-export { classifyRepairActions, MAX_REPAIR_ROUNDS } from "./repair";
+export { classifyRepairActions, applyDeterministicFix, MAX_REPAIR_ROUNDS } from "./repair";
 export { createTrace, printTrace } from "./observability";
