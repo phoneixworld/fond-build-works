@@ -73,6 +73,7 @@ ${workspaceContext ? `### Current code:\n${workspaceContext}` : ""}
    - **CRITICAL**: AuthContext must NOT import or call useNavigate(). Navigation must be handled by the consuming components (e.g. LoginPage calls navigate after login succeeds). AuthContext must be usable OUTSIDE a Router.
    - While loading is true, show a loading spinner — never render routes until loading is false
    - Protected routes must redirect to /login when user is null (not crash or go blank)
+   - **CRITICAL ROLE SAFETY**: If you add allowedRoles checks, include "user" in the allowed list unless explicit role requirements were provided. Never block all authenticated users by default.
 5. Output complete, working code — no placeholders, no TODOs, no stubs
 6. Every component must have a default export
 7. Use Tailwind CSS with design tokens (var(--color-*)) for all styling
