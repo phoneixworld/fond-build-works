@@ -1079,6 +1079,10 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
       if (localIntent !== "build") {
         // Server classification for ambiguous cases
         const classification = await classifyUserIntent(finalText);
+        if (isSmartSendStale()) {
+          console.warn("[SmartSend] Project switched during intent classification, aborting");
+          return;
+        }
         if (classification?.intent === "clarify") return;
 
         if (classification?.intent === "chat") {
