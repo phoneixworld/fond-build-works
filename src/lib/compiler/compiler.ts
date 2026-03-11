@@ -10,7 +10,7 @@
 
 import type {
   BuildContext, BuildResult, BuildStatus,
-  CompilerTask, TaskGraph, VerificationResult,
+  CompilerTask, TaskGraph, VerificationResult, RuntimeVerification,
 } from "./types";
 import { assembleBuildContext } from "./context";
 import { planTaskGraph, topologicalSort } from "./planner";
