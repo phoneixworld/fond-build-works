@@ -45,7 +45,8 @@ export function validateAllFiles(files: Record<string, string>): { file: string;
     for (const m of constMatch) definedComponents.add(m[1]);
   }
   
-  for (const [filePath, code] of Object.entries(files)) {
+  for (const [filePath, origCode] of Object.entries(files)) {
+    let code = origCode;
     if (isFileValidated(filePath, code)) continue;
 
     if (filePath.match(/\.(jsx?|tsx?)$/)) {
@@ -71,11 +72,17 @@ export function validateAllFiles(files: Record<string, string>): { file: string;
       
       const undefinedRefs = findUndefinedJSXReferences(code, filePath, files, definedComponents, availablePackages);
       if (undefinedRefs.length > 0) {
-        errors.push({ 
-          file: filePath, 
-          error: `${undefinedRefs.join(", ")} ${undefinedRefs.length === 1 ? "is" : "are"} not defined. Either import ${undefinedRefs.length === 1 ? "it" : "them"} or remove ${undefinedRefs.length === 1 ? "it" : "them"}. Available packages: ${[...availablePackages].join(", ")}. Do NOT use react-hot-toast, sonner, or any toast library — implement a simple inline toast component instead.`
-        });
-        continue;
+        // Try to auto-inject imports for components that exist in the workspace
+        const stillUndefined = autoInjectMissingImports(undefinedRefs, filePath, files);
+        if (stillUndefined.length > 0) {
+          errors.push({ 
+            file: filePath, 
+            error: `${stillUndefined.join(", ")} ${stillUndefined.length === 1 ? "is" : "are"} not defined. Either import ${stillUndefined.length === 1 ? "it" : "them"} or remove ${stillUndefined.length === 1 ? "it" : "them"}. Available packages: ${[...availablePackages].join(", ")}. Do NOT use react-hot-toast, sonner, or any toast library — implement a simple inline toast component instead.`
+          });
+          continue;
+        }
+        // Re-read updated code after injection
+        code = files[filePath];
       }
       
       markFileValidated(filePath, code);
@@ -214,7 +221,101 @@ export function autoCreateStubFiles(
   return unresolvable;
 }
 
+// ─── Auto-Inject Missing Imports ──────────────────────────────────────────
+
+/**
+ * For each undefined JSX reference, try to find it in the workspace files
+ * and inject the import statement. Returns refs that couldn't be resolved.
+ */
+function autoInjectMissingImports(
+  undefinedRefs: string[],
+  filePath: string,
+  allFiles: Record<string, string>
+): string[] {
+  const stillMissing: string[] = [];
+
+  for (const ref of undefinedRefs) {
+    // Search workspace for a file that exports this component
+    const candidatePaths = [
+      `/components/ui/${ref}.jsx`, `/components/ui/${ref}.js`,
+      `/components/ui/${ref}.tsx`, `/components/ui/${ref}.ts`,
+      `/components/${ref}.jsx`, `/components/${ref}.js`,
+      `/components/${ref}.tsx`, `/components/${ref}.ts`,
+      `/pages/${ref}.jsx`, `/pages/${ref}.js`,
+    ];
+
+    let foundPath: string | null = null;
+    for (const cp of candidatePaths) {
+      if (allFiles[cp]) { foundPath = cp; break; }
+    }
+
+    // Also search by scanning all files for `export default function RefName`
+    if (!foundPath) {
+      for (const [fp, code] of Object.entries(allFiles)) {
+        if (fp === filePath) continue;
+        if (code.includes(`export default function ${ref}`) || 
+            code.includes(`export function ${ref}`) ||
+            code.includes(`export default ${ref}`)) {
+          foundPath = fp;
+          break;
+        }
+      }
+    }
+
+    if (!foundPath) {
+      // Try creating from scaffold templates
+      const sharedUI = getSharedUIComponents();
+      const scaffoldKey = Object.keys(sharedUI).find(k => k.includes(`/${ref}.`));
+      if (scaffoldKey && sharedUI[scaffoldKey]) {
+        const targetPath = scaffoldKey.startsWith("/") ? scaffoldKey : `/${scaffoldKey}`;
+        allFiles[targetPath] = sharedUI[scaffoldKey];
+        foundPath = targetPath;
+        console.log(`[BuildValidator] Auto-created ${ref} from scaffold template: ${targetPath}`);
+      }
+    }
+
+    if (foundPath) {
+      // Calculate relative import path
+      const importPath = makeRelativeImport(filePath, foundPath);
+      const importStatement = `import ${ref} from "${importPath}";\n`;
+      
+      // Inject at top of file (after existing imports)
+      const code = allFiles[filePath];
+      const lastImportIdx = code.lastIndexOf("\nimport ");
+      if (lastImportIdx >= 0) {
+        const lineEnd = code.indexOf("\n", lastImportIdx + 1);
+        allFiles[filePath] = code.slice(0, lineEnd + 1) + importStatement + code.slice(lineEnd + 1);
+      } else {
+        allFiles[filePath] = importStatement + code;
+      }
+      console.log(`[BuildValidator] Auto-injected import for ${ref} in ${filePath} → ${importPath}`);
+    } else {
+      stillMissing.push(ref);
+    }
+  }
+
+  return stillMissing;
+}
+
+function makeRelativeImport(fromFile: string, toFile: string): string {
+  const fromParts = fromFile.split("/").slice(0, -1);
+  const toParts = toFile.replace(/\.\w+$/, "").split("/");
+  
+  // Find common prefix
+  let common = 0;
+  while (common < fromParts.length && common < toParts.length && fromParts[common] === toParts[common]) {
+    common++;
+  }
+  
+  const ups = fromParts.length - common;
+  const rest = toParts.slice(common);
+  
+  if (ups === 0) return "./" + rest.join("/");
+  return "../".repeat(ups) + rest.join("/");
+}
+
 // ─── Undefined JSX Reference Detection ────────────────────────────────────
+
 
 /**
  * Find JSX component references (PascalCase) that are neither imported nor defined in the file.
