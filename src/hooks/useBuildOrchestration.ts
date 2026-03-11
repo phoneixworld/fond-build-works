@@ -1203,7 +1203,7 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
         return;
       }
 
-      if (localIntent !== "build" && localIntent !== "edit") {
+      if (localIntent !== "build") {
         // Server classification for ambiguous cases
         const classification = await classifyUserIntent(finalText);
         if (isSmartSendStale()) {
