@@ -66,7 +66,7 @@ const KNOWN_IMPORTS: KnownImport[] = [
   },
   {
     usagePattern: /\buseCallback\b/,
-    importPattern: /import\s+(?:React|{[^}]*\buseCallback\b[^}]*})\s+from\s+['"]react['"]/,
+    importPattern: /import\s+(?:React\s*,\s*\{[^}]*\buseCallback\b[^}]*\}|React|{[^}]*\buseCallback\b[^}]*})\s+from\s+['"]react['"]/,
     importStatement: `import { useCallback } from "react";`,
   },
   {
