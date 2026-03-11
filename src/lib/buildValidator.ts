@@ -45,7 +45,8 @@ export function validateAllFiles(files: Record<string, string>): { file: string;
     for (const m of constMatch) definedComponents.add(m[1]);
   }
   
-  for (const [filePath, code] of Object.entries(files)) {
+  for (const [filePath, origCode] of Object.entries(files)) {
+    let code = origCode;
     if (isFileValidated(filePath, code)) continue;
 
     if (filePath.match(/\.(jsx?|tsx?)$/)) {
