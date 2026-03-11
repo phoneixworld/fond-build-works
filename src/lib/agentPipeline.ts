@@ -239,13 +239,21 @@ async function readSSEStream(
   let hasReceivedSSEData = false;
   let chunkCount = 0;
 
-  // Timeout: if no SSE data received within 60s, abort
-  const timeoutMs = 120_000;
+  // Timeout: must be longer than the build safety timeout (480s)
+  // Complex multi-task builds can take 3-5 minutes with sequential AI calls
+  const timeoutMs = 600_000; // 10 minutes
   const startTime = Date.now();
+  let lastDataTime = Date.now(); // Track last SSE data for idle timeout
 
   while (!done) {
-    if (Date.now() - startTime > timeoutMs) {
-      console.warn("[readSSEStream] Timeout after 120s");
+    // Absolute timeout (10 min) + idle timeout (3 min since last data)
+    const now = Date.now();
+    if (now - startTime > timeoutMs) {
+      console.warn(`[readSSEStream] Absolute timeout after ${Math.round((now - startTime) / 1000)}s`);
+      break;
+    }
+    if (hasReceivedSSEData && now - lastDataTime > 180_000) {
+      console.warn(`[readSSEStream] Idle timeout — no data for 180s`);
       break;
     }
     const { done: rd, value } = await reader.read();
@@ -278,6 +286,7 @@ async function readSSEStream(
         const content = parsed.choices?.[0]?.delta?.content;
         if (content) {
           hasReceivedSSEData = true;
+          lastDataTime = Date.now();
           fullText += content;
           onDelta(content);
         }

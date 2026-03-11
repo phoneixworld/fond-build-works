@@ -13,15 +13,23 @@ const FIX_PATTERNS = /\b(fix|error|bug|broken|crash|blank|not working|issue|Synt
 const REFACTOR_PATTERNS = /\b(refactor|restructure|reorganize|clean up|simplify|optimize)\b/i;
 const EXTEND_PATTERNS = /\b(add|extend|integrate|include|implement|create new|build new)\b/i;
 
+// Patterns that strongly indicate "build me an app" — takes precedence over fix/refactor
+const NEW_APP_PATTERNS = /\b(build\s+(?:a|an|the|me|my)\s+\w|create\s+(?:a|an|the|me|my)\s+\w|School\s+ERP|CRM|e-?commerce|dashboard|management\s+system|admin\s+panel|project\s+manager|task\s+board|inventory|booking|scheduling)\b/i;
+const BUILD_TRIGGER_PATTERNS = /\b(build\s+it|generate|start\s+building|create\s+the\s+app)\b/i;
+
 export function detectBuildIntent(
   rawRequirements: string,
   hasExistingWorkspace: boolean
 ): BuildIntent {
+  // "Build it" or "build me a School ERP" is always new_app regardless of other words
+  if (!hasExistingWorkspace && (BUILD_TRIGGER_PATTERNS.test(rawRequirements) || NEW_APP_PATTERNS.test(rawRequirements))) {
+    return "new_app";
+  }
+  if (!hasExistingWorkspace) return "new_app";
   if (FIX_PATTERNS.test(rawRequirements)) return "fix";
   if (REFACTOR_PATTERNS.test(rawRequirements)) return "refactor";
-  if (hasExistingWorkspace && EXTEND_PATTERNS.test(rawRequirements)) return "extend";
-  if (hasExistingWorkspace) return "extend";
-  return "new_app";
+  if (EXTEND_PATTERNS.test(rawRequirements)) return "extend";
+  return "extend";
 }
 
 // ─── IR Extraction (deterministic, regex-based) ───────────────────────────
@@ -65,6 +73,79 @@ function extractEntities(raw: string): IREntity[] {
 
     entities.push({ name, fields });
   }
+
+  // ── Semantic entity extraction from natural language ──
+  // If regex found nothing, try to infer entities from domain keywords
+  if (entities.length === 0) {
+    const domainEntityPatterns: Array<{ pattern: RegExp; name: string; fields: Array<{name: string; type: string; required: boolean}> }> = [
+      { pattern: /\b(student|pupil|learner)s?\b/i, name: "Student", fields: [
+        { name: "name", type: "string", required: true }, { name: "email", type: "string", required: true },
+        { name: "grade", type: "string", required: false }, { name: "status", type: "string", required: false },
+      ]},
+      { pattern: /\b(teacher|instructor|staff|faculty)\b/i, name: "Teacher", fields: [
+        { name: "name", type: "string", required: true }, { name: "email", type: "string", required: true },
+        { name: "subject", type: "string", required: false }, { name: "department", type: "string", required: false },
+      ]},
+      { pattern: /\b(parent|guardian)\b/i, name: "Parent", fields: [
+        { name: "name", type: "string", required: true }, { name: "email", type: "string", required: true },
+        { name: "phone", type: "string", required: false },
+      ]},
+      { pattern: /\b(class|course|subject)\b/i, name: "Class", fields: [
+        { name: "name", type: "string", required: true }, { name: "teacher", type: "string", required: false },
+        { name: "schedule", type: "string", required: false },
+      ]},
+      { pattern: /\b(attendance)\b/i, name: "Attendance", fields: [
+        { name: "student_id", type: "string", required: true }, { name: "date", type: "date", required: true },
+        { name: "status", type: "string", required: true },
+      ]},
+      { pattern: /\b(grade|mark|score|assessment)\b/i, name: "Grade", fields: [
+        { name: "student_id", type: "string", required: true }, { name: "subject", type: "string", required: true },
+        { name: "score", type: "number", required: true },
+      ]},
+      { pattern: /\b(fee|payment|billing|invoice)\b/i, name: "Fee", fields: [
+        { name: "student_id", type: "string", required: true }, { name: "amount", type: "number", required: true },
+        { name: "status", type: "string", required: true }, { name: "due_date", type: "date", required: false },
+      ]},
+      { pattern: /\b(contact|lead|customer|client)\b/i, name: "Contact", fields: [
+        { name: "name", type: "string", required: true }, { name: "email", type: "string", required: true },
+        { name: "company", type: "string", required: false }, { name: "status", type: "string", required: false },
+      ]},
+      { pattern: /\b(deal|opportunity|pipeline)\b/i, name: "Deal", fields: [
+        { name: "title", type: "string", required: true }, { name: "value", type: "number", required: true },
+        { name: "stage", type: "string", required: true }, { name: "contact_id", type: "string", required: false },
+      ]},
+      { pattern: /\b(task|ticket|issue)\b/i, name: "Task", fields: [
+        { name: "title", type: "string", required: true }, { name: "description", type: "string", required: false },
+        { name: "status", type: "string", required: true }, { name: "assignee", type: "string", required: false },
+        { name: "priority", type: "string", required: false },
+      ]},
+      { pattern: /\b(project)\b/i, name: "Project", fields: [
+        { name: "name", type: "string", required: true }, { name: "description", type: "string", required: false },
+        { name: "status", type: "string", required: true }, { name: "deadline", type: "date", required: false },
+      ]},
+      { pattern: /\b(product|item|inventory)\b/i, name: "Product", fields: [
+        { name: "name", type: "string", required: true }, { name: "price", type: "number", required: true },
+        { name: "quantity", type: "number", required: true }, { name: "category", type: "string", required: false },
+      ]},
+      { pattern: /\b(order|purchase)\b/i, name: "Order", fields: [
+        { name: "customer", type: "string", required: true }, { name: "total", type: "number", required: true },
+        { name: "status", type: "string", required: true }, { name: "date", type: "date", required: true },
+      ]},
+      { pattern: /\b(employee|worker|team\s*member)\b/i, name: "Employee", fields: [
+        { name: "name", type: "string", required: true }, { name: "email", type: "string", required: true },
+        { name: "role", type: "string", required: false }, { name: "department", type: "string", required: false },
+      ]},
+    ];
+
+    const seenNames = new Set<string>();
+    for (const ep of domainEntityPatterns) {
+      if (ep.pattern.test(raw) && !seenNames.has(ep.name)) {
+        entities.push({ name: ep.name, fields: ep.fields });
+        seenNames.add(ep.name);
+      }
+    }
+  }
+
   return entities;
 }
 
@@ -98,6 +179,46 @@ function extractRoutes(raw: string): IRRoute[] {
       auth: !path.includes("login") && !path.includes("signup"),
     });
   }
+
+  // ── Semantic route inference from natural language ──
+  // If regex found no explicit routes, infer from module/page keywords
+  if (routes.length === 0) {
+    const routePatterns: Array<{ pattern: RegExp; path: string; page: string }> = [
+      { pattern: /\b(dashboard|overview|home)\b/i, path: "/", page: "DashboardPage" },
+      { pattern: /\bstudent/i, path: "/students", page: "StudentsPage" },
+      { pattern: /\b(teacher|staff|faculty)\b/i, path: "/teachers", page: "TeachersPage" },
+      { pattern: /\b(parent|guardian)\b/i, path: "/parents", page: "ParentsPage" },
+      { pattern: /\battendance\b/i, path: "/attendance", page: "AttendancePage" },
+      { pattern: /\b(grade|gradebook|marks|assessment)\b/i, path: "/grades", page: "GradesPage" },
+      { pattern: /\b(fee|payment|billing)\b/i, path: "/fees", page: "FeesPage" },
+      { pattern: /\b(timetable|schedule|calendar)\b/i, path: "/timetable", page: "TimetablePage" },
+      { pattern: /\b(announcement|notice|notification)\b/i, path: "/announcements", page: "AnnouncementsPage" },
+      { pattern: /\b(contact|lead|customer)\b/i, path: "/contacts", page: "ContactsPage" },
+      { pattern: /\b(deal|opportunity|pipeline)\b/i, path: "/deals", page: "DealsPage" },
+      { pattern: /\b(task|ticket|issue)\b/i, path: "/tasks", page: "TasksPage" },
+      { pattern: /\b(project)\b/i, path: "/projects", page: "ProjectsPage" },
+      { pattern: /\b(product|inventory|catalog)\b/i, path: "/products", page: "ProductsPage" },
+      { pattern: /\b(order|purchase)\b/i, path: "/orders", page: "OrdersPage" },
+      { pattern: /\b(employee|team|hr)\b/i, path: "/employees", page: "EmployeesPage" },
+      { pattern: /\breport/i, path: "/reports", page: "ReportsPage" },
+      { pattern: /\bsetting/i, path: "/settings", page: "SettingsPage" },
+    ];
+
+    // Always add dashboard for new apps
+    const hasDashboardKeyword = /\b(dashboard|overview|home)\b/i.test(raw);
+    if (!hasDashboardKeyword) {
+      routes.push({ path: "/", page: "DashboardPage", auth: true });
+    }
+
+    const seenPages = new Set<string>();
+    for (const rp of routePatterns) {
+      if (rp.pattern.test(raw) && !seenPages.has(rp.page)) {
+        routes.push({ path: rp.path, page: rp.page, auth: !rp.path.includes("login") });
+        seenPages.add(rp.page);
+      }
+    }
+  }
+
   return routes;
 }
 
