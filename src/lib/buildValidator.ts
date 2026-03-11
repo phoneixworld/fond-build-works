@@ -71,11 +71,17 @@ export function validateAllFiles(files: Record<string, string>): { file: string;
       
       const undefinedRefs = findUndefinedJSXReferences(code, filePath, files, definedComponents, availablePackages);
       if (undefinedRefs.length > 0) {
-        errors.push({ 
-          file: filePath, 
-          error: `${undefinedRefs.join(", ")} ${undefinedRefs.length === 1 ? "is" : "are"} not defined. Either import ${undefinedRefs.length === 1 ? "it" : "them"} or remove ${undefinedRefs.length === 1 ? "it" : "them"}. Available packages: ${[...availablePackages].join(", ")}. Do NOT use react-hot-toast, sonner, or any toast library — implement a simple inline toast component instead.`
-        });
-        continue;
+        // Try to auto-inject imports for components that exist in the workspace
+        const stillUndefined = autoInjectMissingImports(undefinedRefs, filePath, files);
+        if (stillUndefined.length > 0) {
+          errors.push({ 
+            file: filePath, 
+            error: `${stillUndefined.join(", ")} ${stillUndefined.length === 1 ? "is" : "are"} not defined. Either import ${stillUndefined.length === 1 ? "it" : "them"} or remove ${stillUndefined.length === 1 ? "it" : "them"}. Available packages: ${[...availablePackages].join(", ")}. Do NOT use react-hot-toast, sonner, or any toast library — implement a simple inline toast component instead.`
+          });
+          continue;
+        }
+        // Re-read updated code after injection
+        code = files[filePath];
       }
       
       markFileValidated(filePath, code);
