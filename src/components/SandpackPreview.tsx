@@ -503,8 +503,9 @@ const SandpackPreview = ({ viewport, showConsole = false, initialPath }: Sandpac
 
   const files = useMemo(() => buildSandpackFiles(sandpackFiles, projectId, supabaseUrl, supabaseKey), [sandpackFiles, projectId, supabaseUrl, supabaseKey]);
 
-  // Content-based key: remount only when file contents actually change
-  const stableKey = useMemo(() => contentHash(sandpackFiles), [sandpackFiles]);
+  // Project-stable key: only remount when project changes, not on every file update
+  // This prevents thrashing during large multi-task builds
+  const stableKey = useMemo(() => `sp-${projectId || "default"}`, [projectId]);
 
   const dependencies = useMemo(() => ({
     "react": "^18.2.0",
@@ -555,8 +556,8 @@ const SandpackPreview = ({ viewport, showConsole = false, initialPath }: Sandpac
               "https://cdn.tailwindcss.com",
             ],
             recompileMode: "delayed",
-            recompileDelay: 800,
-            bundlerTimeOut: 120000,
+            recompileDelay: 1200,
+            bundlerTimeOut: 240000,
           }}
         >
           <div className="h-full flex flex-col" style={viewport ? { width: viewport.width, maxWidth: viewport.maxWidth, height: '100%' } : { height: '100%' }}>

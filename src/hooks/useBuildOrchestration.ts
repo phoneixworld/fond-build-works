@@ -847,12 +847,22 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
             return;
           }
           // Update preview with accumulated files on each task completion
+          // BUT skip interim refreshes for large workspaces (>30 files) to avoid thrashing
           if (Object.keys(files).length > 0) {
             const currentFiles = sandpackFilesRef.current || {};
             const mergedFiles = { ...currentFiles, ...files };
-            setSandpackFiles(mergedFiles);
-            syncSandpackToVirtualFS(mergedFiles);
-            setPreviewMode("sandpack");
+            const totalFileCount = Object.keys(mergedFiles).length;
+            
+            if (totalFileCount > 30) {
+              // Large workspace: only update internal ref, defer Sandpack refresh to onComplete
+              sandpackFilesRef.current = mergedFiles;
+              syncSandpackToVirtualFS(mergedFiles);
+              console.log(`[Compiler] Large workspace (${totalFileCount} files) — deferring preview refresh`);
+            } else {
+              setSandpackFiles(mergedFiles);
+              syncSandpackToVirtualFS(mergedFiles);
+              setPreviewMode("sandpack");
+            }
           }
         },
         onTaskError: (task, error) => {
