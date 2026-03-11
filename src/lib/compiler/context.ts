@@ -73,6 +73,79 @@ function extractEntities(raw: string): IREntity[] {
 
     entities.push({ name, fields });
   }
+
+  // ── Semantic entity extraction from natural language ──
+  // If regex found nothing, try to infer entities from domain keywords
+  if (entities.length === 0) {
+    const domainEntityPatterns: Array<{ pattern: RegExp; name: string; fields: Array<{name: string; type: string; required: boolean}> }> = [
+      { pattern: /\b(student|pupil|learner)s?\b/i, name: "Student", fields: [
+        { name: "name", type: "string", required: true }, { name: "email", type: "string", required: true },
+        { name: "grade", type: "string", required: false }, { name: "status", type: "string", required: false },
+      ]},
+      { pattern: /\b(teacher|instructor|staff|faculty)\b/i, name: "Teacher", fields: [
+        { name: "name", type: "string", required: true }, { name: "email", type: "string", required: true },
+        { name: "subject", type: "string", required: false }, { name: "department", type: "string", required: false },
+      ]},
+      { pattern: /\b(parent|guardian)\b/i, name: "Parent", fields: [
+        { name: "name", type: "string", required: true }, { name: "email", type: "string", required: true },
+        { name: "phone", type: "string", required: false },
+      ]},
+      { pattern: /\b(class|course|subject)\b/i, name: "Class", fields: [
+        { name: "name", type: "string", required: true }, { name: "teacher", type: "string", required: false },
+        { name: "schedule", type: "string", required: false },
+      ]},
+      { pattern: /\b(attendance)\b/i, name: "Attendance", fields: [
+        { name: "student_id", type: "string", required: true }, { name: "date", type: "date", required: true },
+        { name: "status", type: "string", required: true },
+      ]},
+      { pattern: /\b(grade|mark|score|assessment)\b/i, name: "Grade", fields: [
+        { name: "student_id", type: "string", required: true }, { name: "subject", type: "string", required: true },
+        { name: "score", type: "number", required: true },
+      ]},
+      { pattern: /\b(fee|payment|billing|invoice)\b/i, name: "Fee", fields: [
+        { name: "student_id", type: "string", required: true }, { name: "amount", type: "number", required: true },
+        { name: "status", type: "string", required: true }, { name: "due_date", type: "date", required: false },
+      ]},
+      { pattern: /\b(contact|lead|customer|client)\b/i, name: "Contact", fields: [
+        { name: "name", type: "string", required: true }, { name: "email", type: "string", required: true },
+        { name: "company", type: "string", required: false }, { name: "status", type: "string", required: false },
+      ]},
+      { pattern: /\b(deal|opportunity|pipeline)\b/i, name: "Deal", fields: [
+        { name: "title", type: "string", required: true }, { name: "value", type: "number", required: true },
+        { name: "stage", type: "string", required: true }, { name: "contact_id", type: "string", required: false },
+      ]},
+      { pattern: /\b(task|ticket|issue)\b/i, name: "Task", fields: [
+        { name: "title", type: "string", required: true }, { name: "description", type: "string", required: false },
+        { name: "status", type: "string", required: true }, { name: "assignee", type: "string", required: false },
+        { name: "priority", type: "string", required: false },
+      ]},
+      { pattern: /\b(project)\b/i, name: "Project", fields: [
+        { name: "name", type: "string", required: true }, { name: "description", type: "string", required: false },
+        { name: "status", type: "string", required: true }, { name: "deadline", type: "date", required: false },
+      ]},
+      { pattern: /\b(product|item|inventory)\b/i, name: "Product", fields: [
+        { name: "name", type: "string", required: true }, { name: "price", type: "number", required: true },
+        { name: "quantity", type: "number", required: true }, { name: "category", type: "string", required: false },
+      ]},
+      { pattern: /\b(order|purchase)\b/i, name: "Order", fields: [
+        { name: "customer", type: "string", required: true }, { name: "total", type: "number", required: true },
+        { name: "status", type: "string", required: true }, { name: "date", type: "date", required: true },
+      ]},
+      { pattern: /\b(employee|worker|team\s*member)\b/i, name: "Employee", fields: [
+        { name: "name", type: "string", required: true }, { name: "email", type: "string", required: true },
+        { name: "role", type: "string", required: false }, { name: "department", type: "string", required: false },
+      ]},
+    ];
+
+    const seenNames = new Set<string>();
+    for (const ep of domainEntityPatterns) {
+      if (ep.pattern.test(raw) && !seenNames.has(ep.name)) {
+        entities.push({ name: ep.name, fields: ep.fields });
+        seenNames.add(ep.name);
+      }
+    }
+  }
+
   return entities;
 }
 
