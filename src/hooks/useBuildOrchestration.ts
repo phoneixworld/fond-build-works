@@ -37,6 +37,10 @@ import { useChatAgent, type ChatAgentConfig } from "@/hooks/useChatAgent";
 import { useInstantBuild, type InstantBuildConfig } from "@/hooks/useInstantBuild";
 import { triggerBuild } from "@/lib/buildPipelineService";
 import { executeEdit, type EditResult } from "@/lib/editEngine";
+import { Workspace } from "@/lib/compiler/workspace";
+import { repairMissingModules } from "@/lib/compiler/missingModuleGen";
+import { fixMissingImports } from "@/lib/compiler/missingImportFixer";
+import { fixExportMismatches } from "@/lib/compiler/exportMismatchFixer";
 
 type Msg = { role: "user" | "assistant"; content: MsgContent; timestamp?: number };
 
