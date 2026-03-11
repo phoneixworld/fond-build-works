@@ -53,6 +53,7 @@ export function planTaskGraph(ctx: BuildContext): TaskGraph {
   const authTaskId = authTask.id;
 
   // ── Pass 3: Data models / backend services ────────────────────────
+  // (only if IR extraction found explicit entities)
 
   const modelTaskIds: string[] = [];
   for (const entity of ir.entities) {
@@ -74,31 +75,68 @@ export function planTaskGraph(ctx: BuildContext): TaskGraph {
   // ── Pass 4: Pages / UI ────────────────────────────────────────────
 
   const pageTaskIds: string[] = [];
-  for (const route of ir.routes) {
-    if (route.page === "LoginPage" && authTaskId) continue; // Already handled
 
-    const deps = [...modelTaskIds];
-    if (authTaskId && route.auth) deps.push(authTaskId);
-    if (deps.length === 0) deps.push(infraTask.id, authTaskId);
+  if (ir.routes.length > 0) {
+    // Structured routes from IR extraction
+    for (const route of ir.routes) {
+      if (route.page === "LoginPage" && authTaskId) continue;
 
-    const pageTask = createTask({
-      label: `page:${route.page}`,
+      const deps = [...modelTaskIds];
+      if (authTaskId && route.auth) deps.push(authTaskId);
+      if (deps.length === 0) deps.push(infraTask.id, authTaskId);
+
+      const pageTask = createTask({
+        label: `page:${route.page}`,
+        type: "frontend",
+        description: `Page component for ${route.path}: ${route.page}`,
+        produces: [`/pages/${route.page}.jsx`],
+        dependsOn: deps,
+        priority: 3,
+      });
+      tasks.push(pageTask);
+      pageTaskIds.push(pageTask.id);
+    }
+  } else if (ctx.buildIntent === "new_app") {
+    // ── SEMANTIC FALLBACK: No routes extracted from regex ──────────
+    // The raw requirements describe the app in natural language.
+    // Create a single "domain pages" task that tells the AI to infer
+    // the correct pages/modules from the requirements text.
+    const domainTask = createTask({
+      label: "domain:pages",
       type: "frontend",
-      description: `Page component for ${route.path}: ${route.page}`,
-      produces: [`/pages/${route.page}.jsx`],
-      dependsOn: deps,
+      description: `Generate ALL the main pages and components for this application based on the requirements. 
+The user asked for: "${ctx.rawRequirements.slice(0, 2000)}"
+
+You MUST analyze the application name and requirements to determine the correct domain-specific pages.
+For example:
+- A "School ERP" needs: Students, Teachers, Attendance, Gradebook, Fees, Timetable, Announcements
+- A "CRM" needs: Contacts, Deals, Pipeline, Activities, Reports
+- A "Project Manager" needs: Projects, Tasks, Kanban, Team, Timeline
+
+Generate 4-8 domain-appropriate page components with proper sidebar navigation and layout.
+Each page should have realistic sample data and full UI (tables, forms, stats cards).
+Create the layout components (AppLayout.jsx, Sidebar.jsx) with navigation for all pages.`,
+      produces: [
+        "/layout/AppLayout.jsx",
+        "/layout/Sidebar.jsx",
+      ],
+      dependsOn: [infraTask.id, authTaskId],
       priority: 3,
     });
-    tasks.push(pageTask);
-    pageTaskIds.push(pageTask.id);
+    tasks.push(domainTask);
+    pageTaskIds.push(domainTask.id);
   }
 
   // ── Pass 5: App entry + routing ───────────────────────────────────
 
+  const routesList = ir.routes.length > 0
+    ? ir.routes.map(r => r.path).join(", ")
+    : "(infer from generated pages)";
+
   const appTask = createTask({
     label: "app:routing",
     type: "frontend",
-    description: `App.jsx with routing for: ${ir.routes.map(r => r.path).join(", ")}`,
+    description: `App.jsx with routing for: ${routesList}. Import ALL page components generated in previous tasks. If routes are not listed above, scan the workspace for /pages/**/*.jsx files and create routes for each.`,
     produces: ["/App.jsx"],
     dependsOn: [...pageTaskIds, authTaskId],
     touches: ["/App.jsx"],
