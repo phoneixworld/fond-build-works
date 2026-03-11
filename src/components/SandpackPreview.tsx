@@ -503,8 +503,9 @@ const SandpackPreview = ({ viewport, showConsole = false, initialPath }: Sandpac
 
   const files = useMemo(() => buildSandpackFiles(sandpackFiles, projectId, supabaseUrl, supabaseKey), [sandpackFiles, projectId, supabaseUrl, supabaseKey]);
 
-  // Content-based key: remount only when file contents actually change
-  const stableKey = useMemo(() => contentHash(sandpackFiles), [sandpackFiles]);
+  // Project-stable key: only remount when project changes, not on every file update
+  // This prevents thrashing during large multi-task builds
+  const stableKey = useMemo(() => `sp-${projectId || "default"}`, [projectId]);
 
   const dependencies = useMemo(() => ({
     "react": "^18.2.0",
