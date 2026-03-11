@@ -205,6 +205,10 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
   // ─── Core build message handler ───
   const sendMessage = useCallback(async (text: string, images: string[] = []) => {
     if (!text || !currentProject) return;
+
+    const buildProjectId = currentProject.id;
+    const isStaleBuild = () => lastProjectIdRef.current !== null && lastProjectIdRef.current !== buildProjectId;
+
     if (isSendingRef.current || isLoadingRef.current) {
       console.warn("[BuildOrch] Blocked duplicate send while already sending");
       return;
@@ -302,6 +306,16 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
 
     try {
       const { schemas, knowledge, irContext } = await fetchProjectContext(currentProject.id);
+
+      // Guard: abort if project switched during async fetch
+      if (isStaleBuild()) {
+        console.warn("[BuildOrch] Project switched during context fetch, aborting");
+        setIsLoading(false);
+        setIsBuilding(false);
+        setBuildStep("");
+        isSendingRef.current = false;
+        return;
+      }
 
       const isFirstMessage = messagesRef.current.filter(m => m.role === "user").length <= 1;
       const hasPersistedHistory = (currentProject.chat_history ?? []).length > 0;
@@ -671,7 +685,7 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
       setCurrentAgent("build");
       setPipelineStep("planning");
 
-      const buildProjectId = currentProject.id;
+      // buildProjectId already captured at top of sendMessage
       const liveSandpackFiles = sandpackFilesRef.current;
       const isFirstBuild = !liveSandpackFiles || Object.keys(liveSandpackFiles).length === 0;
 
@@ -740,10 +754,12 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
       }
 
       // Guard against project switch
-      if (lastProjectIdRef.current !== buildProjectId) {
+      if (isStaleBuild()) {
         console.warn("[BuildOrch] Project switched during build setup, aborting");
         setIsLoading(false);
         setIsBuilding(false);
+        setBuildStep("");
+        isSendingRef.current = false;
         return;
       }
 
@@ -949,6 +965,9 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
     if (!text && images.length === 0) return;
     if (isSendingRef.current || isLoadingRef.current) return;
 
+    const smartSendProjectId = currentProject?.id;
+    const isSmartSendStale = () => !smartSendProjectId || (lastProjectIdRef.current !== null && lastProjectIdRef.current !== smartSendProjectId);
+
     const hasImages = images.length > 0;
     // If user sends images with no text, do NOT auto-generate "Replicate this design"
     // Instead, treat as requirements with images
@@ -1000,7 +1019,13 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
         
         // Get server-compiled requirements (includes chat history fallback now)
         const requirements = await Promise.resolve(conversationGetRequirements?.() || "");
-        
+
+        // Guard: abort if project switched during async requirements fetch
+        if (isSmartSendStale()) {
+          console.warn("[SmartSend] Project switched during requirements fetch, aborting");
+          return;
+        }
+
         if (requirements && requirements.length > 50) {
           const buildPrompt = requirements + "\n\n" + finalText;
           console.log(`[SmartSend] Build prompt length: ${buildPrompt.length} chars (requirements: ${requirements.length})`);
@@ -1054,6 +1079,10 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
       if (localIntent !== "build") {
         // Server classification for ambiguous cases
         const classification = await classifyUserIntent(finalText);
+        if (isSmartSendStale()) {
+          console.warn("[SmartSend] Project switched during intent classification, aborting");
+          return;
+        }
         if (classification?.intent === "clarify") return;
 
         if (classification?.intent === "chat") {
