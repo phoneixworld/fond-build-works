@@ -266,7 +266,7 @@ const ChatPanel = forwardRef<ChatPanelHandle, { initialPrompt?: string; onVersio
       });
     }
     prevPipelineStep.current = pipelineStep;
-  }, [pipelineStep, createCheckpoint, currentPreviewHtml]);
+  }, [pipelineStep, createCheckpoint]);
 
   // Keyboard shortcuts for undo/redo
   useEffect(() => {
