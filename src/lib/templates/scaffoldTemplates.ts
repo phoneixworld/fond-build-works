@@ -17,7 +17,7 @@
 
 import { type DomainModel } from "@/lib/domainTemplates";
 import { DESIGN_SYSTEM_CSS } from "@/lib/designSystem";
-import { getShadcnUIComponents, UI_ANIMATIONS_CSS } from "@/lib/templates/uiComponentTemplates";
+import { getAllUIComponents, UI_ANIMATIONS_CSS } from "@/lib/templates/uiComponentTemplates";
 
 // ─── Public API ───────────────────────────────────────────────────────────
 
