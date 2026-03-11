@@ -52,6 +52,7 @@ export interface BuildResult {
   totalFiles: number;
   chatSummary: string;
   timestamp: number;
+  verificationOk?: boolean;
 }
 
 export interface AgentState {
