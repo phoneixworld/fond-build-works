@@ -8,7 +8,6 @@ import { AlertTriangle, RefreshCw } from "lucide-react";
 function hasAppEntry(files: Record<string, string> | null): boolean {
   if (!files) return false;
   const keys = Object.keys(files);
-  // Check for explicit App entry
   const hasExplicitApp = keys.some(p => {
     const normalized = p.replace(/^\/+/, '/');
     return /\/?(?:src\/)?App\.(tsx?|jsx?)$/.test(normalized) || 
@@ -16,9 +15,8 @@ function hasAppEntry(files: Record<string, string> | null): boolean {
            normalized === '/App.js' || normalized === '/App.ts';
   });
   if (hasExplicitApp) return true;
-  // Fallback: if we have JSX/TSX files, auto-generate an App entry
   const jsxFiles = keys.filter(p => /\.(jsx?|tsx?)$/.test(p));
-  return jsxFiles.length >= 2; // At least 2 component files = worth rendering
+  return jsxFiles.length >= 2;
 }
 
 interface ESMPreviewProps {
@@ -31,18 +29,33 @@ const ESMPreview = ({ viewport, initialPath }: ESMPreviewProps) => {
   const { sandpackFiles, sandpackDeps, isBuilding } = usePreview();
   const { currentProject } = useProjects();
   const [error, setError] = useState<string | null>(null);
+  const [iframeError, setIframeError] = useState<string | null>(null);
   const prevHtmlRef = useRef<string | null>(null);
 
   const projectId = currentProject?.id || "";
   const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || "";
   const supabaseKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY || "";
 
-  // Build preview whenever we have a real App file
   const ready = hasAppEntry(sandpackFiles);
   
   if (sandpackFiles && Object.keys(sandpackFiles).length > 0 && !ready) {
     console.warn("[ESMPreview] Files present but no App entry found. File keys:", Object.keys(sandpackFiles));
   }
+
+  // Listen for errors from inside the iframe
+  useEffect(() => {
+    const handler = (e: MessageEvent) => {
+      if (e.data?.type === "esm-preview-error") {
+        console.error("[ESMPreview] Iframe error:", e.data.message);
+        setIframeError(e.data.message);
+      }
+      if (e.data?.type === "preview-ready") {
+        setIframeError(null);
+      }
+    };
+    window.addEventListener("message", handler);
+    return () => window.removeEventListener("message", handler);
+  }, []);
 
   const buildResult = useMemo(() => {
     if (!ready || !sandpackFiles) return null;
@@ -57,6 +70,7 @@ const ESMPreview = ({ viewport, initialPath }: ESMPreviewProps) => {
       );
       console.log("[ESMPreview] Build result: fileCount=", result.fileCount, "errors=", result.errors, "htmlLength=", result.html?.length);
       setError(null);
+      setIframeError(null);
       return result;
     } catch (e: any) {
       console.error("[ESMPreview] Build exception:", e);
@@ -65,7 +79,6 @@ const ESMPreview = ({ viewport, initialPath }: ESMPreviewProps) => {
     }
   }, [ready, sandpackFiles, sandpackDeps, projectId, supabaseUrl, supabaseKey]);
 
-  // Cleanup old blob URLs
   useEffect(() => {
     return () => {
       if (prevHtmlRef.current) {
@@ -107,18 +120,24 @@ const ESMPreview = ({ viewport, initialPath }: ESMPreviewProps) => {
   }
 
   if (!buildResult?.html) {
-    return null; // Let the loading overlay or EmptyState handle this
+    return null;
   }
 
   return (
     <div
-      className="h-full w-full"
+      className="h-full w-full flex flex-col"
       style={viewport ? { width: viewport.width, maxWidth: viewport.maxWidth } : undefined}
     >
+      {iframeError && (
+        <div className="px-3 py-2 bg-destructive/10 border-b border-destructive/20 text-xs text-destructive flex items-center gap-2">
+          <AlertTriangle className="w-3.5 h-3.5 flex-shrink-0" />
+          <span className="truncate">{iframeError}</span>
+        </div>
+      )}
       <iframe
         ref={iframeRef}
         srcDoc={buildResult.html}
-        className="w-full h-full border-0 bg-white"
+        className="w-full flex-1 border-0 bg-white"
         title="ESM Preview"
         sandbox="allow-scripts allow-same-origin allow-popups allow-forms allow-modals"
         style={viewport && viewport.width !== "100%" ? { borderRadius: 8 } : undefined}
