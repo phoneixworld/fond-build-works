@@ -156,9 +156,17 @@ fetch(\`\${apiBase}/functions/v1/project-auth\`, {
 \`\`\`
 
 ### Backend Rules:
-- ANY app with persistent data MUST use Data API — NEVER mock arrays or localStorage
-- Dashboard pages → fetch real data with skeleton loading
+- ANY app with persistent data SHOULD use Data API when available
+- Dashboard pages → fetch real data with skeleton loading, but ALWAYS provide inline SAMPLE_DATA as fallback
 - EVERY list page → Data API with loading/error/empty states
+- CRITICAL: Data hooks MUST gracefully handle API failures by falling back to sample data instead of showing error messages. Pattern:
+\`\`\`
+const SAMPLE_DATA = [/* realistic sample items */];
+// In fetch catch block or when API_BASE is empty:
+setData(SAMPLE_DATA);
+setError(null); // Don't show errors for missing API — show sample data instead
+\`\`\`
+- When window.__SUPABASE_URL__ is empty or fetch fails, display the UI with sample data — NEVER show "Error loading" messages
 
 ${schemas && schemas.length > 0 ? `## DATA MODELS\n${schemas.map((s: any) => {
   const fields = s.schema?.fields || [];
