@@ -378,7 +378,21 @@ const DEFAULT_INDEX_HTML = `<!DOCTYPE html>
 </html>`;
 
 function buildSandpackFiles(files: SandpackFileSet | null, projectId: string, supabaseUrl: string, supabaseKey: string): Record<string, string> {
-  const indexJs = buildIndexJs(projectId, supabaseUrl, supabaseKey);
+  // Determine the actual App entry extension from user files
+  let appExt = ".js";
+  if (files) {
+    for (const p of Object.keys(files)) {
+      const norm = p.startsWith("/") ? p : `/${p}`;
+      if (/^\/(?:src\/)?App\.tsx$/.test(norm)) { appExt = ".tsx"; break; }
+      if (/^\/(?:src\/)?App\.jsx$/.test(norm)) { appExt = ".jsx"; break; }
+      if (/^\/(?:src\/)?App\.ts$/.test(norm)) { appExt = ".ts"; break; }
+    }
+  }
+
+  const indexJs = buildIndexJs(projectId, supabaseUrl, supabaseKey).replace(
+    'import App from "./App"',
+    `import App from "./App${appExt === ".js" ? "" : appExt.replace(/\./, ".")}"`
+  );
   const base: Record<string, string> = {
     "/index.js": indexJs,
     "/styles.css": DEFAULT_STYLES,
