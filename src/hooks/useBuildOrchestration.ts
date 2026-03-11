@@ -857,7 +857,7 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
           // Set final files
           setSandpackFiles(result.workspace);
           syncSandpackToVirtualFS(result.workspace);
-          setPreviewMode("esm");
+          setPreviewMode("sandpack");
 
           // Build completion message
           const statusEmoji = result.status === "success" ? "✅" : result.status === "partial" ? "⚠️" : "❌";
