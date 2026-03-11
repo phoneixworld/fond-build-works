@@ -550,8 +550,8 @@ body {
 // Appended to build-agent system prompt to enforce token usage.
 
 export const DESIGN_SYSTEM_PROMPT = `## PHONEIX DESIGN SYSTEM (MANDATORY)
-The app includes a design system via /styles/globals.css with CSS custom properties.
-You MUST use these tokens instead of hardcoded values:
+The app includes a PREMIUM design system via /styles/globals.css with CSS custom properties AND pre-built component classes.
+You MUST use these tokens and classes to produce visually stunning, production-grade UIs.
 
 ### Colors — use Tailwind arbitrary values:
 - Primary: bg-[var(--color-primary)], text-[var(--color-primary)], border-[var(--color-primary)]
@@ -560,18 +560,30 @@ You MUST use these tokens instead of hardcoded values:
 - Text: text-[var(--color-text)], text-[var(--color-text-secondary)], text-[var(--color-text-muted)]
 - Borders: border-[var(--color-border)], border-[var(--color-border-light)]
 - Status: text-[var(--color-success)], text-[var(--color-warning)], text-[var(--color-danger)]
-- Badges: Use .badge-primary, .badge-success, .badge-warning, .badge-danger classes
 
-### Components — use the provided utility classes:
-- Cards: className="card" (includes hover effect)
-- Buttons: className="btn btn-primary", "btn btn-secondary", "btn btn-danger"
-- Inputs: className="input"
-- Tables: className="table" with th/td
-- Surfaces: className="surface", "surface-elevated", "surface-secondary"
-
-### Spacing — use Tailwind's default scale (p-4, gap-6, mb-8, etc.)
-### Radius — use rounded-lg (default), rounded-xl (cards), rounded-full (avatars/badges)
-### Shadows — use shadow-sm, shadow-md, shadow-lg via Tailwind OR var(--shadow-*)
+### Pre-Built Component Classes (USE THESE — they are beautiful):
+- **Cards**: className="card" (hover glow), "card-glass" (glassmorphism), "card-featured" (highlighted)
+- **Buttons**: className="btn btn-primary", "btn btn-secondary", "btn btn-danger"
+- **Badges**: className="badge badge-primary", "badge-success", "badge-warning", "badge-danger"
+- **Inputs**: className="input"
+- **Tables**: className="table" with th/td (alternating rows + hover)
+- **Stat Cards**: className="stat-card" with "stat-value", "stat-label", "stat-trend stat-trend-up"
+- **Modals**: className="modal-overlay" → "modal" with "modal-header", "modal-body", "modal-actions"
+- **Toasts**: className="toast toast-success", "toast-error", "toast-warning", "toast-info"
+- **Tabs**: className="tab-list" with "tab" / "tab tab-active"
+- **Toggle**: className="toggle" / "toggle toggle-active"
+- **Avatar**: className="avatar avatar-md", "avatar-sm", "avatar-lg", "avatar-xl"
+- **Avatar Groups**: className="avatar-group" wrapping avatars
+- **Progress**: className="progress" → "progress-bar" (set width %)
+- **Spinner**: className="spinner" / "spinner-lg"
+- **Skeleton**: className="skeleton" (shimmer loading)
+- **Empty States**: "empty-state" → "empty-state-icon", "empty-state-title", "empty-state-text"
+- **Dividers**: className="divider" or "divider-gradient"
+- **Gradient Text**: className="text-gradient"
+- **Surfaces**: className="surface", "surface-elevated", "surface-secondary"
+- **Stagger Animation**: className="stagger" on parent — children animate in sequence
+- **Animations**: "animate-fade-in", "animate-slide-in", "animate-scale-in", "animate-bounce-in"
+- **Tooltip**: className="tooltip-wrapper" → "tooltip"
 
 ### Sidebar must use:
 - bg-[var(--color-sidebar)] for background
@@ -579,9 +591,21 @@ You MUST use these tokens instead of hardcoded values:
 - text-[var(--color-sidebar-text-active)] with bg-[var(--color-sidebar-active)] for active
 - border-[var(--color-sidebar-border)] for dividers
 
+### UI POLISH RULES (make it beautiful):
+1. **Stat cards** on dashboards: use "stat-card" class with trend indicators
+2. **Loading states**: use "skeleton" class for shimmer, "spinner" for inline
+3. **Empty states**: ALWAYS use "empty-state" pattern with icon + title + CTA button
+4. **Modals**: use "modal-overlay" + "modal" classes for dialogs
+5. **Lists**: add "stagger" class to parent for entrance animations
+6. **Tables**: add hover states, status badges in cells, action buttons
+7. **Toasts**: use "toast" classes for feedback on create/update/delete
+8. **Tabs**: use "tab-list" + "tab" for multi-section pages
+9. **Avatars**: use "avatar" classes in user lists, comments, team views
+10. **Glass cards**: use "card-glass" for hero overlays or premium sections
+
 ### NEVER use these raw colors directly:
 - ❌ bg-gray-50, bg-gray-900, text-gray-400, text-gray-800, border-gray-200
-- ❌ bg-blue-500, bg-red-500, bg-green-500, bg-yellow-500
+- ❌ bg-blue-500, bg-red-500, bg-green-500, bg-yellow-500, bg-white, text-black
 - ✅ Use the semantic token equivalents above instead
 
 ### Typography:
