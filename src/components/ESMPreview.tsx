@@ -1,4 +1,4 @@
-import { useRef, useEffect, useMemo, useState } from "react";
+import { useRef, useEffect, useMemo, useState, useCallback } from "react";
 import { usePreview } from "@/contexts/PreviewContext";
 import { useProjects } from "@/contexts/ProjectContext";
 import { buildESMPreview, revokeBlobUrls } from "@/lib/preview";
@@ -33,6 +33,7 @@ const ESMPreview = ({ viewport, initialPath }: ESMPreviewProps) => {
   const [iframeError, setIframeError] = useState<string | null>(null);
   const [diagnostics, setDiagnostics] = useState<PreviewDiagnostic[]>([]);
   const [bootMetrics, setBootMetrics] = useState<{ bootDurationMs?: number; moduleCount?: number } | null>(null);
+  const [retryNonce, setRetryNonce] = useState(0);
   const prevHtmlRef = useRef<string | null>(null);
 
   const projectId = currentProject?.id || "";
@@ -67,12 +68,11 @@ const ESMPreview = ({ viewport, initialPath }: ESMPreviewProps) => {
     return () => window.removeEventListener("message", handler);
   }, []);
 
-  const buildResult = useMemo(() => {
-    if (!ready || !sandpackFiles) return null;
+  // ── Pure computation: build the preview HTML (NO state mutations) ──
+  const buildOutput = useMemo<{ result: ReturnType<typeof buildESMPreview>; error: null } | { result: null; error: string }>(() => {
+    if (!ready || !sandpackFiles) return { result: null, error: null } as any;
 
     try {
-      setDiagnostics([]);
-      setBootMetrics(null);
       const result = buildESMPreview(
         sandpackFiles,
         sandpackDeps,
@@ -95,16 +95,26 @@ const ESMPreview = ({ viewport, initialPath }: ESMPreviewProps) => {
         console.groupEnd();
       }
 
-      setError(null);
-      setIframeError(null);
-      return result;
+      return { result, error: null };
     } catch (e: any) {
       console.error("[Phoenix Preview] Build exception:", e);
-      setError(e.message);
-      return null;
+      return { result: null, error: e.message };
     }
-  }, [ready, sandpackFiles, sandpackDeps, projectId, supabaseUrl, supabaseKey]);
+  }, [ready, sandpackFiles, sandpackDeps, projectId, supabaseUrl, supabaseKey, retryNonce]);
 
+  // ── Side effects: sync build output to state (runs AFTER render) ──
+  useEffect(() => {
+    if (buildOutput.error) {
+      setError(buildOutput.error);
+    } else if (buildOutput.result) {
+      setError(null);
+      setIframeError(null);
+      setDiagnostics([]);
+      setBootMetrics(null);
+    }
+  }, [buildOutput]);
+
+  // Cleanup blob URLs on unmount
   useEffect(() => {
     return () => {
       if (prevHtmlRef.current) {
@@ -113,14 +123,21 @@ const ESMPreview = ({ viewport, initialPath }: ESMPreviewProps) => {
     };
   }, []);
 
+  // Track previous HTML for blob cleanup
   useEffect(() => {
-    if (buildResult?.html) {
+    if (buildOutput.result?.html) {
       if (prevHtmlRef.current) {
         revokeBlobUrls(prevHtmlRef.current);
       }
-      prevHtmlRef.current = buildResult.html;
+      prevHtmlRef.current = buildOutput.result.html;
     }
-  }, [buildResult?.html]);
+  }, [buildOutput.result?.html]);
+
+  const handleRetry = useCallback(() => {
+    setError(null);
+    setIframeError(null);
+    setRetryNonce(n => n + 1);
+  }, []);
 
   if (error) {
     return (
@@ -134,7 +151,7 @@ const ESMPreview = ({ viewport, initialPath }: ESMPreviewProps) => {
             <p className="text-xs text-muted-foreground mt-1">{error}</p>
           </div>
           <button
-            onClick={() => setError(null)}
+            onClick={handleRetry}
             className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 transition-colors"
           >
             <RefreshCw className="w-3 h-3" />
@@ -145,7 +162,7 @@ const ESMPreview = ({ viewport, initialPath }: ESMPreviewProps) => {
     );
   }
 
-  if (!buildResult?.html) {
+  if (!buildOutput.result?.html) {
     return null;
   }
 
@@ -163,12 +180,12 @@ const ESMPreview = ({ viewport, initialPath }: ESMPreviewProps) => {
       {bootMetrics && (
         <div className="px-3 py-1 bg-muted/50 border-b border-border text-[10px] text-muted-foreground flex items-center gap-2">
           <Activity className="w-3 h-3" />
-          <span>Boot: {bootMetrics.bootDurationMs}ms · {bootMetrics.moduleCount} modules · Complexity: {buildResult.complexity}</span>
+          <span>Boot: {bootMetrics.bootDurationMs}ms · {bootMetrics.moduleCount} modules · Complexity: {buildOutput.result.complexity}</span>
         </div>
       )}
       <iframe
         ref={iframeRef}
-        srcDoc={buildResult.html}
+        srcDoc={buildOutput.result.html}
         className="w-full flex-1 border-0 bg-white"
         title="Phoenix Preview"
         sandbox="allow-scripts allow-same-origin allow-popups allow-forms allow-modals"
