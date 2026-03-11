@@ -113,7 +113,7 @@ When CURRENT CODE is provided below:
 4. Every screen: header, main content, action buttons, empty states, loading skeletons
 
 ## PHONEIX DESIGN SYSTEM (MANDATORY)
-/styles/globals.css provides CSS custom properties. You MUST use semantic tokens:
+/styles/globals.css provides a PREMIUM design system. You MUST use semantic tokens AND pre-built component classes:
 
 ### Colors (Tailwind arbitrary values):
 - Primary: bg-[var(--color-primary)], text-[var(--color-primary)], hover:bg-[var(--color-primary-hover)]
@@ -123,9 +123,25 @@ When CURRENT CODE is provided below:
 - Borders: border-[var(--color-border)], border-[var(--color-border-light)]
 - Status: text-[var(--color-success)], text-[var(--color-warning)], text-[var(--color-danger)]
 
-### Component classes from globals.css:
-- Cards: className="card" — Buttons: "btn btn-primary", "btn btn-secondary", "btn btn-danger"
-- Inputs: className="input" — Tables: className="table" — Badges: "badge badge-primary"
+### Pre-Built Component Classes (USE THESE for beautiful UI):
+- **Cards**: "card" (hover glow), "card-glass" (glassmorphism), "card-featured" (highlight)
+- **Buttons**: "btn btn-primary", "btn btn-secondary", "btn btn-danger"
+- **Badges**: "badge badge-primary", "badge-success", "badge-warning", "badge-danger"
+- **Inputs**: "input" — **Tables**: "table" with th/td
+- **Stat Cards**: "stat-card" with "stat-value", "stat-label", "stat-trend stat-trend-up/down"
+- **Modals**: "modal-overlay" → "modal" with "modal-header", "modal-body", "modal-actions"
+- **Toasts**: "toast toast-success/error/warning/info"
+- **Tabs**: "tab-list" with "tab" / "tab tab-active"
+- **Toggle**: "toggle" / "toggle toggle-active"
+- **Avatar**: "avatar avatar-sm/md/lg/xl", groups: "avatar-group"
+- **Progress**: "progress" → "progress-bar" (width %)
+- **Spinner**: "spinner" / "spinner-lg" — **Skeleton**: "skeleton" (shimmer)
+- **Empty States**: "empty-state" → "empty-state-icon", "empty-state-title", "empty-state-text"
+- **Dividers**: "divider" or "divider-gradient"
+- **Gradient Text**: "text-gradient" — **Surfaces**: "surface", "surface-elevated"
+- **Stagger Animations**: "stagger" on parent for sequential entrance
+- **Animations**: "animate-fade-in", "animate-slide-in", "animate-scale-in", "animate-bounce-in"
+- **Tooltip**: "tooltip-wrapper" → "tooltip"
 
 ### BANNED raw colors:
 ❌ bg-gray-50, bg-gray-900, text-gray-400, bg-blue-500, bg-red-500, bg-white, text-black
