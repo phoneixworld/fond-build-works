@@ -13,6 +13,13 @@ export function synthesizeAppJsx(workspace: Workspace): string {
   // Find auth context
   const hasAuth = files.some(f => f.includes("AuthContext"));
   const hasProtectedRoute = files.some(f => f.includes("ProtectedRoute"));
+  // Find toast provider
+  const hasToast = files.some(f => {
+    if (!/\.(jsx?|tsx?)$/.test(f)) return false;
+    const content = workspace.getFile(f) || "";
+    return /export\s+(?:function|const)\s+ToastProvider/.test(content) ||
+           /export\s*\{[^}]*ToastProvider[^}]*\}/.test(content);
+  });
   
   // Build route entries from page files
   const routes: Array<{ path: string; component: string; importPath: string; protect: boolean }> = [];
@@ -64,6 +71,17 @@ export function synthesizeAppJsx(workspace: Workspace): string {
     'import { HashRouter, Routes, Route, Navigate } from "react-router-dom";',
   ];
   
+  if (hasToast) {
+    // Find the file that exports ToastProvider to get correct import path
+    const toastFile = files.find(f => {
+      const content = workspace.getFile(f) || "";
+      return /export\s+(?:function|const)\s+ToastProvider/.test(content) ||
+             /export\s*\{[^}]*ToastProvider[^}]*\}/.test(content);
+    });
+    const toastImportPath = toastFile ? `.${toastFile.replace(/\.\w+$/, "")}` : "./components/ui/Toast";
+    imports.push(`import { ToastProvider } from "${toastImportPath}";`);
+  }
+  
   if (hasAuth) {
     imports.push('import { AuthProvider, useAuth } from "./contexts/AuthContext";');
   }
@@ -87,9 +105,22 @@ export function synthesizeAppJsx(workspace: Workspace): string {
     return `        <Route path="${r.path}" element={${element}} />`;
   }).join("\n");
   
-  // Assemble App
-  const appBody = hasAuth
-    ? `  return (
+  // Assemble App — respect provider ordering: ToastProvider → AuthProvider → Router
+  let appBody: string;
+  if (hasToast && hasAuth) {
+    appBody = `  return (
+    <ToastProvider>
+      <AuthProvider>
+        <HashRouter>
+          <Routes>
+${routeElements}
+          </Routes>
+        </HashRouter>
+      </AuthProvider>
+    </ToastProvider>
+  );`;
+  } else if (hasAuth) {
+    appBody = `  return (
     <AuthProvider>
       <HashRouter>
         <Routes>
@@ -97,14 +128,26 @@ ${routeElements}
         </Routes>
       </HashRouter>
     </AuthProvider>
-  );`
-    : `  return (
+  );`;
+  } else if (hasToast) {
+    appBody = `  return (
+    <ToastProvider>
+      <HashRouter>
+        <Routes>
+${routeElements}
+        </Routes>
+      </HashRouter>
+    </ToastProvider>
+  );`;
+  } else {
+    appBody = `  return (
     <HashRouter>
       <Routes>
 ${routeElements}
       </Routes>
     </HashRouter>
   );`;
+  }
   
   return `${imports.join("\n")}
 

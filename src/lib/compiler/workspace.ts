@@ -197,10 +197,16 @@ function extractExports(code: string): string[] {
 function extractImports(code: string): ImportRef[] {
   const imports: ImportRef[] = [];
 
+  // First, normalize multi-line imports into single lines for regex matching
+  // This handles: import {\n  A,\n  B,\n} from 'path'
+  const normalized = code.replace(/import\s*\{([^}]*)\}/gs, (match) => {
+    return match.replace(/\n/g, " ").replace(/\s+/g, " ");
+  });
+
   // import X from 'path'  /  import { A, B } from 'path'  /  import 'path'
   const importRegex = /import\s+(?:(\w+)(?:\s*,\s*)?)?(?:\{([^}]*)\})?\s*(?:from\s+)?['"]([^'"]+)['"]/g;
   let match;
-  while ((match = importRegex.exec(code)) !== null) {
+  while ((match = importRegex.exec(normalized)) !== null) {
     const defaultImport = match[1];
     const namedImports = match[2];
     const from = match[3];
