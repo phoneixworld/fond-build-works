@@ -218,7 +218,7 @@ const ChatPanel = forwardRef<ChatPanelHandle, { initialPrompt?: string; onVersio
     if (!checkpoint) return;
     if (checkpoint.sandpackFiles) {
       setSandpackFiles(checkpoint.sandpackFiles);
-      setPreviewMode("esm");
+      setPreviewMode("sandpack");
     } else {
       setPreviewHtml(checkpoint.html);
       setPreviewMode("html");
