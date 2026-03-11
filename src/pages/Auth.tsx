@@ -166,6 +166,19 @@ const Auth = () => {
                 />
               </div>
             </div>
+            {isSignUp && (
+              <div className="space-y-1.5">
+                <label className="text-xs font-medium text-muted-foreground">Display Name</label>
+                <input
+                  type="text"
+                  placeholder="Your name"
+                  value={displayName}
+                  onChange={(e) => setDisplayName(e.target.value)}
+                  className="w-full px-4 py-2.5 bg-secondary border border-border rounded-lg text-sm text-foreground placeholder:text-muted-foreground/40 outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary/50 transition-all"
+                />
+              </div>
+            )}
+
             <div className="space-y-1.5">
               <label className="text-xs font-medium text-muted-foreground">Password</label>
               <div className="relative">
@@ -188,7 +201,7 @@ const Auth = () => {
               className="w-full py-2.5 bg-primary text-primary-foreground rounded-lg text-sm font-semibold hover:bg-primary/90 disabled:opacity-50 transition-all flex items-center justify-center gap-2 shadow-lg shadow-primary/20"
             >
               {submitting && <Loader2 className="w-4 h-4 animate-spin" />}
-              Sign In
+              {isSignUp ? "Create Account" : "Sign In"}
             </button>
           </form>
         </div>
