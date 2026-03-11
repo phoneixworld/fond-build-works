@@ -8,8 +8,11 @@ const corsHeaders = {
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
+  let hasExistingCode = false;
   try {
-    const { prompt, hasHistory, hasExistingCode, existingFileNames } = await req.json();
+    const body = await req.json();
+    const { prompt, hasHistory, existingFileNames } = body;
+    hasExistingCode = !!body.hasExistingCode;
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY not configured");
 
