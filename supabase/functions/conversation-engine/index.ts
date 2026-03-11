@@ -785,12 +785,27 @@ Deno.serve(async (req) => {
 
         const chatHistory = (project?.chat_history || []) as Array<{ role: string; content: string }>;
         
-        // Extract meaningful messages (skip short "go ahead" type messages)
+        // Extract meaningful messages — use a low threshold to avoid blocking builds
+        // that have brief but valid instructions (e.g. "add auth" is only 8 chars)
         const substantiveMessages = chatHistory.filter(
-          (m: any) => m.content && m.content.length > 30
+          (m: any) => m.content && m.content.length > 5
         );
 
         if (substantiveMessages.length === 0) {
+          // Even with no chat history, if the project has a name, allow building
+          // with a minimal context — the build agent can handle sparse prompts
+          const projectName = project?.name || "";
+          if (projectName && projectName !== "Untitled" && projectName.length > 3) {
+            const minimalContext = `# APPLICATION REQUIREMENTS\n\n## Project: ${projectName}\n\nBuild an application called "${projectName}". Implement the core features implied by the name.\n`;
+            await transitionState(supabase, projectId, "building", {}, userId, "Build from project name (no chat history)");
+            return json({
+              context: minimalContext,
+              structuredContext: { ir: null, mergedRequirements: null, readiness: { score: 50, isReady: true }, phaseCount: 0 },
+              compiledIR: null, mergedNormalized: null,
+              buildReadiness: { isReady: true, score: 50, checks: [], recommendation: "Building from project name" },
+              requirementCount: 0, source: "project_name",
+            });
+          }
           return json({ error: "No requirements to compile", context: "", buildReadiness: { isReady: false, score: 0 } }, 400);
         }
 
