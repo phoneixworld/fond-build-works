@@ -95,7 +95,9 @@ function detectEntryFile(files: Record<string, string>): string | null {
 export function materializeSnapshot(
   files: Record<string, string>,
   dependencies: Record<string, string>,
-  projectId: string
+  projectId: string,
+  supabaseUrl?: string,
+  supabaseKey?: string
 ): WorkspaceSnapshot {
   const totalSize = Object.values(files).reduce((s, c) => s + c.length, 0);
   const features = detectFeatures(files);
@@ -110,6 +112,8 @@ export function materializeSnapshot(
     hasRouting: features.hasRouting,
     hasAuth: features.hasAuth,
     entryFile: detectEntryFile(files),
+    supabaseUrl,
+    supabaseKey,
   };
 }
 
@@ -158,7 +162,7 @@ export class PreviewOrchestrator {
     supabaseConfig?: { url: string; anonKey: string }
   ): { session: PreviewSession; result: PreviewBuildResult } {
     // 1. Materialize snapshot
-    const snapshot = materializeSnapshot(files, dependencies, projectId);
+    const snapshot = materializeSnapshot(files, dependencies, projectId, supabaseConfig?.url, supabaseConfig?.anonKey);
 
     // 2. Validate limits
     const limitDiags = this.validateLimits(snapshot);

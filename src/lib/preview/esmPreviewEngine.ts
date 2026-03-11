@@ -175,7 +175,8 @@ export class ESMPreviewEngine implements PreviewEngine {
       entryPath: entryPath!,
       projectId: snapshot.projectId,
       assetMap,
-      supabaseUrl: session.entryUrl ? undefined : undefined,
+      supabaseUrl: snapshot.supabaseUrl || "",
+      supabaseKey: snapshot.supabaseKey || "",
     });
 
     // 6. Build module map
