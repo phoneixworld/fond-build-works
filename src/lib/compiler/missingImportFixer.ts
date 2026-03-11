@@ -76,7 +76,7 @@ const KNOWN_IMPORTS: KnownImport[] = [
   },
   {
     usagePattern: /\buseRef\b/,
-    importPattern: /import\s+(?:React|{[^}]*\buseRef\b[^}]*})\s+from\s+['"]react['"]/,
+    importPattern: /import\s+(?:React\s*,\s*\{[^}]*\buseRef\b[^}]*\}|React|{[^}]*\buseRef\b[^}]*})\s+from\s+['"]react['"]/,
     importStatement: `import { useRef } from "react";`,
   },
   {
