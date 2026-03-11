@@ -80,6 +80,7 @@ const ALLOWED_PACKAGES = new Set([
   "react-router-dom", "clsx", "tailwind-merge",
   "react-intersection-observer", "zustand", "zod", "axios",
   "@tanstack/react-query", "@tanstack/react-table", "react-hook-form", "sonner",
+  "@supabase/supabase-js",
 ]);
 
 function isAllowedPkg(pkg: string): boolean {

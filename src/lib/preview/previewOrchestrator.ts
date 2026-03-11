@@ -162,7 +162,7 @@ export class PreviewOrchestrator {
     supabaseConfig?: { url: string; anonKey: string }
   ): { session: PreviewSession; result: PreviewBuildResult } {
     // 1. Materialize snapshot
-    const snapshot = materializeSnapshot(files, dependencies, projectId);
+    const snapshot = materializeSnapshot(files, dependencies, projectId, supabaseConfig?.url, supabaseConfig?.anonKey);
 
     // 2. Validate limits
     const limitDiags = this.validateLimits(snapshot);

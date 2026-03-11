@@ -39,6 +39,9 @@ export interface WorkspaceSnapshot {
   hasRouting: boolean;
   hasAuth: boolean;
   entryFile: string | null;
+  /** Supabase config for runtime injection */
+  supabaseUrl?: string;
+  supabaseKey?: string;
 }
 
 // ─── Build Result ───────────────────────────────────────────────────────────
