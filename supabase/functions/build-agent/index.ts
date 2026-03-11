@@ -102,6 +102,9 @@ When CURRENT CODE is provided below:
 - ALL fetch calls: try/catch + loading skeleton + error state + empty state with CTA
 - Accessibility: labels, 4.5:1 contrast, focus rings, keyboard nav, semantic HTML
 - Performance: React.memo for lists, useCallback for handlers, debounce search 300ms
+- **CRITICAL — COMPLETE FILES ONLY**: Every file you output MUST be syntactically complete with all braces/brackets closed, all functions finished, and a default export. NEVER output a file that ends mid-function or mid-JSX. If you are running out of space, output FEWER files but make each one 100% complete rather than outputting many truncated files.
+- **AuthContext rules**: AuthContext MUST NOT use useNavigate or any react-router-dom hooks. It must work OUTSIDE a Router. Use window.__PROJECT_ID__, window.__SUPABASE_URL__, window.__SUPABASE_KEY__ globals. Handle failed "me" calls gracefully (clear token, set user to null, set loading to false). NEVER throw from AuthContext.
+- **Toast component**: Build a simple self-contained Toast using useState + useEffect + createContext. Do NOT use window events, CustomEvent, or dispatchEvent. Keep it simple: ToastProvider wraps the app, useToast() returns { addToast }, ToastContainer renders the toasts.
 
 ## REQUIREMENTS TRANSLATION
 1. Extract EVERY noun/feature → each = at least 1 component file

@@ -6,6 +6,7 @@
  */
 
 import { streamBuildAgent } from "@/lib/agentPipeline";
+import { detectTruncation } from "@/lib/truncationRecovery";
 import type { BuildContext, CompilerTask, TaskGraph } from "./types";
 import type { Workspace } from "./workspace";
 
@@ -134,6 +135,7 @@ export interface ExecutionCallbacks {
 
 /**
  * Execute a single task: build prompt, call model, parse output, return files.
+ * Includes truncation detection with auto-retry (up to 1 continuation).
  */
 export async function executeTask(
   task: CompilerTask,
@@ -146,36 +148,85 @@ export async function executeTask(
   const prompt = buildTaskPrompt(task, ctx, workspace, taskIndex, totalTasks);
   task.buildPrompt = prompt;
 
-  return new Promise<Record<string, string>>((resolve, reject) => {
-    let fullText = "";
+  const MAX_CONTINUATION_RETRIES = 1;
 
-    streamBuildAgent({
-      messages: [{ role: "user", content: prompt }],
-      projectId: ctx.projectId,
-      techStack: ctx.techStack,
-      schemas: ctx.schemas,
-      model: ctx.model,
-      designTheme: ctx.designTheme,
-      knowledge: ctx.knowledge,
-      currentCode: undefined, // We embed context in the prompt directly
-      onDelta: (chunk) => {
-        fullText += chunk;
-        callbacks.onTaskDelta(task, chunk);
-      },
-      onDone: (responseText) => {
-        const extracted = extractFilesFromOutput(responseText);
-        if (extracted && Object.keys(extracted).length > 0) {
-          resolve(extracted);
-        } else {
-          // No files extracted — this is a failure for a build task
-          resolve({});
-        }
-      },
-      onError: (err) => {
-        reject(new Error(err));
-      },
+  const runStream = (messages: Array<{ role: "user" | "assistant"; content: string }>): Promise<{ text: string; files: Record<string, string> | null }> => {
+    return new Promise((resolve, reject) => {
+      let fullText = "";
+      streamBuildAgent({
+        messages,
+        projectId: ctx.projectId,
+        techStack: ctx.techStack,
+        schemas: ctx.schemas,
+        model: ctx.model,
+        designTheme: ctx.designTheme,
+        knowledge: ctx.knowledge,
+        currentCode: undefined,
+        onDelta: (chunk) => {
+          fullText += chunk;
+          callbacks.onTaskDelta(task, chunk);
+        },
+        onDone: (responseText) => {
+          const extracted = extractFilesFromOutput(responseText);
+          resolve({ text: responseText, files: extracted });
+        },
+        onError: (err) => {
+          reject(new Error(err));
+        },
+      });
     });
-  });
+  };
+
+  // Initial run
+  let { text: responseText, files: extracted } = await runStream([
+    { role: "user", content: prompt },
+  ]);
+
+  // Check for truncation and auto-continue
+  if (extracted && Object.keys(extracted).length > 0) {
+    const truncation = detectTruncation(responseText, extracted);
+    if (truncation.isTruncated) {
+      console.warn(`[Executor] Truncation detected in task '${task.label}': ${truncation.reason}`);
+      task.retries = (task.retries || 0) + 1;
+
+      for (let attempt = 0; attempt < MAX_CONTINUATION_RETRIES; attempt++) {
+        try {
+          const contResult = await runStream([
+            { role: "user", content: prompt },
+            { role: "assistant", content: responseText },
+            { role: "user", content: truncation.continuationPrompt },
+          ]);
+
+          // Merge continuation files into existing extracted files
+          if (contResult.files) {
+            for (const [path, code] of Object.entries(contResult.files)) {
+              // If the file was truncated and this is its continuation, append
+              if (truncation.truncatedFile && path === truncation.truncatedFile && extracted[path]) {
+                extracted[path] = extracted[path] + "\n" + code;
+              } else {
+                extracted[path] = code;
+              }
+            }
+          }
+
+          // Check if still truncated
+          const fullCombined = responseText + "\n" + contResult.text;
+          const recheck = detectTruncation(fullCombined, extracted);
+          if (!recheck.isTruncated) {
+            console.log(`[Executor] Continuation successful for task '${task.label}'`);
+            break;
+          }
+          console.warn(`[Executor] Still truncated after continuation attempt ${attempt + 1}`);
+          responseText = fullCombined;
+        } catch (contErr) {
+          console.warn(`[Executor] Continuation attempt failed:`, contErr);
+          break;
+        }
+      }
+    }
+  }
+
+  return extracted && Object.keys(extracted).length > 0 ? extracted : {};
 }
 
 // ─── Output Parser ────────────────────────────────────────────────────────
