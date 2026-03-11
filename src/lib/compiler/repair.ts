@@ -326,6 +326,17 @@ export function applyDeterministicFix(action: RepairAction, workspace: Workspace
       return true;
     }
 
+    case "missing_import": {
+      // Use the missing import fixer to inject the import
+      const count = fixMissingImports(workspace);
+      return count > 0;
+    }
+
+    case "provider_ordering": {
+      // Use the provider ordering fixer
+      return fixProviderOrdering(workspace);
+    }
+
     default:
       return false;
   }
