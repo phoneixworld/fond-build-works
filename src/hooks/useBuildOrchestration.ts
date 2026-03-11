@@ -125,6 +125,7 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
   const [isLoading, setIsLoading] = useState(false);
   const [selectedTemplate, setSelectedTemplate] = useState<PageTemplate | null>(null);
   const [compilerTasks, setCompilerTasks] = useState<Array<{ id: string; label: string; status: "pending" | "in_progress" | "done" }>>([]);
+  const lastVerificationOkRef = useRef<boolean | null>(null);
 
   const messagesRef = useRef<Msg[]>([]);
   messagesRef.current = messages;
