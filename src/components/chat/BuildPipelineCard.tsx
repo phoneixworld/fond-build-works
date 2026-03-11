@@ -14,7 +14,7 @@ interface BuildPipelineCardProps {
   streamContent: string;
   tasks?: TaskItem[];
   pipelineStep?: PipelineStep | null;
-  currentAgent?: "chat" | "build" | null;
+  currentAgent?: "chat" | "build" | "edit" | null;
   buildTitle?: string;
   onShowPreview?: () => void;
 }
@@ -32,7 +32,7 @@ function detectEditingFiles(content: string): string[] {
   return files.slice(0, 3);
 }
 
-function detectTasks(content: string, isBuilding: boolean, pipelineStep?: PipelineStep | null, currentAgent?: "chat" | "build" | null): TaskItem[] {
+function detectTasks(content: string, isBuilding: boolean, pipelineStep?: PipelineStep | null, currentAgent?: "chat" | "build" | "edit" | null): TaskItem[] {
   const len = content.length;
   const hasCode = content.includes("```react-preview") || content.includes("```jsx") || content.includes("```html") || content.includes("```react");
   const hasClosingFence = hasCode && (() => {
@@ -45,6 +45,25 @@ function detectTasks(content: string, isBuilding: boolean, pipelineStep?: Pipeli
 
   if (currentAgent === "chat") {
     tasks.push({ id: "chat", label: "Chat agent responding", status: isBuilding ? "in_progress" : "done" });
+    if (!isBuilding && len > 0) return tasks.map(t => ({ ...t, status: "done" as const }));
+    return tasks;
+  }
+
+  if (currentAgent === "edit") {
+    if (pipelineStep === "resolving") {
+      tasks.push({ id: "resolve", label: "Finding target files", status: "in_progress" });
+    } else {
+      tasks.push({ id: "resolve", label: "Target files identified", status: "done" });
+    }
+
+    if (pipelineStep === "editing" || (pipelineStep !== "resolving" && len > 0)) {
+      const hasCode = content.includes("---") && content.includes(".jsx");
+      tasks.push({ id: "edit", label: "Applying changes", status: hasCode ? "done" : "in_progress" });
+      if (hasCode) {
+        tasks.push({ id: "merge", label: "Merging into workspace", status: isBuilding ? "in_progress" : "done" });
+      }
+    }
+
     if (!isBuilding && len > 0) return tasks.map(t => ({ ...t, status: "done" as const }));
     return tasks;
   }

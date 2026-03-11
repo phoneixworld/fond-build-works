@@ -36,6 +36,7 @@ import { parseMultiFileOutput } from "@/contexts/VirtualFSContext";
 import { useChatAgent, type ChatAgentConfig } from "@/hooks/useChatAgent";
 import { useInstantBuild, type InstantBuildConfig } from "@/hooks/useInstantBuild";
 import { triggerBuild } from "@/lib/buildPipelineService";
+import { executeEdit, type EditResult } from "@/lib/editEngine";
 
 type Msg = { role: "user" | "assistant"; content: MsgContent; timestamp?: number };
 
@@ -965,7 +966,116 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
     }
   }, [currentProject, saveProject, setPreviewHtml, setIsBuilding, setBuildStep, selectedModel, selectedTheme, onVersionCreated, setVirtualFiles, fetchProjectContext, syncSandpackToVirtualFS, buildMessageContent, currentPreviewHtml, setMessages, setInput, setAttachedImages, setPreviewErrors, setHealAttempts, setSandpackFiles, setSandpackDeps, setPreviewMode, setBuildMetrics, saveSnapshot, selectedTemplate, tryInstantBuild, handleOnError]);
 
-  // Smart routing with conversation state machine
+  // ── Edit Mode: Surgical file editing ──────────────────────────────────────
+  const sendEditMessage = useCallback(async (text: string, images: string[] = []) => {
+    if (!currentProject) return;
+
+    const workspace = sandpackFilesRef.current;
+    if (!workspace || Object.keys(workspace).length === 0) {
+      // No existing code to edit — fall back to build
+      console.log("[EditMode] No workspace files, falling back to build");
+      setCurrentAgent("build");
+      setPipelineStep("planning");
+      sendMessage(text, images);
+      return;
+    }
+
+    // Show user message
+    const content = buildMessageContent(text, images);
+    const userMsg: Msg = { role: "user", content, timestamp: Date.now() };
+    setInput("");
+    setAttachedImages([]);
+    setMessages((prev) => [...prev, userMsg]);
+
+    setIsLoading(true);
+    setIsBuilding(true);
+    isSendingRef.current = true;
+    setBuildStreamContent("");
+
+    try {
+      await executeEdit(
+        {
+          instruction: text,
+          workspace,
+          projectId: currentProject.id,
+          model: selectedModel,
+          designTheme: selectedTheme,
+          knowledge: [],
+          images,
+        },
+        {
+          onResolving: (targetFiles) => {
+            setPipelineStep("resolving");
+            setBuildStep(`Editing ${targetFiles.length} file${targetFiles.length > 1 ? "s" : ""}`);
+            console.log("[EditMode] Target files:", targetFiles);
+          },
+          onStreaming: (chunk) => {
+            setBuildStreamContent((prev) => prev + chunk);
+            setPipelineStep("editing");
+          },
+          onComplete: (result: EditResult) => {
+            console.log("[EditMode] Complete:", Object.keys(result.modifiedFiles));
+
+            // Merge modified files into existing workspace
+            const updatedFiles = { ...workspace };
+            for (const [path, code] of Object.entries(result.modifiedFiles)) {
+              updatedFiles[path] = code;
+            }
+
+            // Update Sandpack
+            setSandpackFiles(updatedFiles);
+            syncSandpackToVirtualFS(updatedFiles);
+            setPreviewMode("sandpack");
+
+            // Add assistant message
+            const fileList = result.targetFiles.map(f => f.split("/").pop()).join(", ");
+            const assistantMsg: Msg = {
+              role: "assistant",
+              content: `✅ **Edited ${result.targetFiles.length} file${result.targetFiles.length > 1 ? "s" : ""}** (${fileList})\n\n${result.explanation}`,
+              timestamp: Date.now(),
+            };
+            setMessages((prev) => [...prev, assistantMsg]);
+
+            // Save
+            const updatedMessages = [...messagesRef.current, userMsg, assistantMsg];
+            saveProject({
+              chat_history: updatedMessages.map(m => ({ role: m.role, content: m.content })),
+            });
+
+            // Save snapshot
+            saveSnapshot(`Edit: ${text.slice(0, 40)}`);
+
+            setPipelineStep("complete");
+            setIsLoading(false);
+            setIsBuilding(false);
+            setBuildStep("");
+            isSendingRef.current = false;
+          },
+          onError: (error) => {
+            console.error("[EditMode] Error:", error);
+            const assistantMsg: Msg = {
+              role: "assistant",
+              content: `⚠️ Edit failed: ${error}\n\nTry being more specific about which page or component to modify.`,
+              timestamp: Date.now(),
+            };
+            setMessages((prev) => [...prev, assistantMsg]);
+            setPipelineStep("error");
+            setIsLoading(false);
+            setIsBuilding(false);
+            setBuildStep("");
+            isSendingRef.current = false;
+          },
+        }
+      );
+    } catch (err: any) {
+      console.error("[EditMode] Unexpected error:", err);
+      setIsLoading(false);
+      setIsBuilding(false);
+      setBuildStep("");
+      isSendingRef.current = false;
+    }
+  }, [currentProject, selectedModel, selectedTheme, sendMessage, buildMessageContent, setInput, setAttachedImages, setMessages, saveProject, setSandpackFiles, syncSandpackToVirtualFS, setPreviewMode, setIsBuilding, setBuildStep, saveSnapshot]);
+
   // ── RULES ──
   // 1. ALL messages go through conversation state machine FIRST
   // 2. Client NEVER builds unless server FSM mode permits it
@@ -1086,6 +1196,13 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
         return;
       }
 
+      if (localIntent === "edit") {
+        setCurrentAgent("edit");
+        setPipelineStep("resolving");
+        sendEditMessage(finalText, images);
+        return;
+      }
+
       if (localIntent !== "build") {
         // Server classification for ambiguous cases
         const classification = await classifyUserIntent(finalText);
@@ -1100,6 +1217,19 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
           setPipelineStep("chatting");
           sendChatMessage(finalText, images);
           return;
+        }
+
+        // Server might also return edit intent (or we detect it locally)
+        const serverIntent = classification?.intent as AgentIntent;
+        if (serverIntent === "edit" || (serverIntent === "build" && sandpackFilesRef.current && Object.keys(sandpackFilesRef.current).length > 0)) {
+          // If server says "build" but we have existing code and it looks like an edit, try edit
+          const hasExisting = sandpackFilesRef.current && Object.keys(sandpackFilesRef.current).length > 0;
+          if (serverIntent === "edit" || (hasExisting && finalText.length < 200)) {
+            setCurrentAgent("edit");
+            setPipelineStep("resolving");
+            sendEditMessage(finalText, images);
+            return;
+          }
         }
       }
     }
@@ -1126,7 +1256,7 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
     setCurrentAgent("build");
     setPipelineStep("planning");
     sendMessage(finalText, images);
-  }, [classifyUserIntent, fastClassifyLocal, sendChatMessage, sendMessage, conversationAnalyze, conversationAddPhase, conversationGetRequirements, conversationStartBuilding, conversationGenerateAck, conversationMode, buildMessageContent, setInput, setAttachedImages, setMessages, saveProject]);
+  }, [classifyUserIntent, fastClassifyLocal, sendChatMessage, sendMessage, sendEditMessage, conversationAnalyze, conversationAddPhase, conversationGetRequirements, conversationStartBuilding, conversationGenerateAck, conversationMode, buildMessageContent, setInput, setAttachedImages, setMessages, saveProject]);
 
   const clearChat = useCallback(() => {
     if (!currentProject || isLoading) return;
@@ -1186,6 +1316,7 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
     // Actions
     sendMessage,
     sendChatMessage,
+    sendEditMessage,
     handleSmartSend,
     clearChat,
     abortBuild,

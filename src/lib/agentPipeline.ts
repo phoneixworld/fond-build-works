@@ -15,7 +15,7 @@ import { transform } from "sucrase";
 type MsgContent = string | Array<{ type: "text"; text: string } | { type: "image_url"; image_url: { url: string } }>;
 type Msg = { role: "user" | "assistant"; content: MsgContent };
 
-export type AgentIntent = "chat" | "build" | "clarify";
+export type AgentIntent = "chat" | "build" | "edit" | "clarify";
 
 export interface ClassifyResult {
   intent: AgentIntent;
@@ -34,6 +34,8 @@ export type PipelineStep =
   | "chatting"
   | "planning"
   | "generating"
+  | "editing"
+  | "resolving"
   | "bundling"
   | "validating"
   | "retrying"

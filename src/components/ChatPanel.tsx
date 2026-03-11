@@ -676,7 +676,7 @@ const ChatPanel = forwardRef<ChatPanelHandle, { initialPrompt?: string; onVersio
               isBuilding={isLoading}
               streamContent={buildStreamContent}
               pipelineStep={pipelineStep}
-              currentAgent={currentAgent === "clarify" ? null : currentAgent}
+              currentAgent={currentAgent === "clarify" ? null : currentAgent as "chat" | "build" | "edit" | null}
               onShowPreview={() => {
                 const event = new CustomEvent("switch-panel", { detail: "preview" });
                 window.dispatchEvent(event);
