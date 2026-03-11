@@ -143,7 +143,6 @@ const ChatPanel = forwardRef<ChatPanelHandle, { initialPrompt?: string; onVersio
     classifyUserIntent,
     fastClassifyLocal,
     // Conversation state machine
-    conversationAnalyze: conversationState.analyzeMessageSync,
     conversationAnalyzeAsync: async (text: string, hasImages: boolean, hasExistingCode: boolean) => {
       return conversationState.analyzeMessage(text, hasImages);
     },
