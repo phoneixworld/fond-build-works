@@ -281,7 +281,7 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
           hasSetBuilding = true;
         }
         streamParseCount++;
-        setPreviewMode("esm");
+        setPreviewMode("sandpack");
       } else if (htmlCode) {
         if (!hasSetBuilding) {
           setBuildStep("Building your app...");
