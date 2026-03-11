@@ -286,6 +286,7 @@ async function readSSEStream(
         const content = parsed.choices?.[0]?.delta?.content;
         if (content) {
           hasReceivedSSEData = true;
+          lastDataTime = Date.now();
           fullText += content;
           onDelta(content);
         }
