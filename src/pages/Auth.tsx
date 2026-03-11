@@ -134,7 +134,7 @@ const Auth = () => {
         <div className="w-full max-w-sm space-y-8">
           {/* Mobile logo (hidden on desktop where banner shows) */}
           <div className="flex flex-col items-center gap-3 lg:hidden">
-            <img src="/logo.png" alt="Phoneix World" className="w-12 h-12 rounded-xl object-cover shadow-lg shadow-primary/25" />
+            <img src="/logo.png" alt="Phoenix World" className="w-12 h-12 rounded-xl object-cover shadow-lg shadow-primary/25" />
             <h1 className="text-xl font-bold text-foreground">Phoneix World</h1>
           </div>
 
