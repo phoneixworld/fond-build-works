@@ -177,7 +177,7 @@ const BuildPipelineCard = ({ isBuilding, streamContent, tasks: externalTasks, pi
           <div className="flex items-center gap-2.5 min-w-0">
             {isBuilding ? (
               <div className="flex flex-col gap-1">
-                <span className="text-xs text-muted-foreground/60">Editing</span>
+                <span className="text-xs text-muted-foreground/60">{agentLabel}</span>
                 <span className="text-sm text-muted-foreground/80">{description}</span>
               </div>
             ) : (
