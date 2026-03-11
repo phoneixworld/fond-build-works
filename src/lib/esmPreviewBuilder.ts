@@ -471,6 +471,7 @@ ${moduleDefinitions}
         await fn(__exports__, __import__);
       } catch(e) {
         console.error("[ESM] Error in " + specifier + ":", e);
+        window.parent.postMessage({ type: "esm-preview-error", message: "Module " + specifier + ": " + e.message }, "*");
         __exports__.default = function ErrorComponent() {
           return { $$typeof: Symbol.for("react.element"), type: "div", props: {
             style: { padding: "2rem", textAlign: "center", color: "#ef4444" },
@@ -490,6 +491,10 @@ ${moduleDefinitions}
       const AppModule = await __import__("${entryPath}");
       const App = AppModule.default || AppModule;
       
+      if (typeof App !== "function" && typeof App !== "object") {
+        throw new Error("App entry point did not export a valid component. Got: " + typeof App);
+      }
+      
       const root = createRoot(document.getElementById("root"));
       root.render(createElement(App));
       
@@ -501,10 +506,21 @@ ${moduleDefinitions}
       });
     } catch(e) {
       console.error("[ESM Preview]", e);
+      window.parent.postMessage({ type: "esm-preview-error", message: e.message }, "*");
       document.getElementById("root").innerHTML = 
-        '<div style="padding:2rem;text-align:center;color:#ef4444;">' +
-        '<h2>Module Load Error</h2><pre style="font-size:12px;color:#64748b;white-space:pre-wrap;max-width:600px;margin:1rem auto">' + 
-        e.message + '</pre></div>';
+        '<div style="padding:2rem;text-align:center;color:#ef4444;font-family:system-ui;">' +
+        '<h2 style="margin-bottom:0.5rem">Preview Error</h2>' +
+        '<pre style="font-size:12px;color:#64748b;white-space:pre-wrap;max-width:600px;margin:1rem auto;text-align:left;background:#f8fafc;padding:1rem;border-radius:8px;border:1px solid #e2e8f0">' + 
+        e.message + (e.stack ? "\\n\\n" + e.stack.split("\\n").slice(0,5).join("\\n") : "") + '</pre></div>';
+    }
+    
+    // Global error handler for runtime errors
+    window.onerror = function(msg) {
+      window.parent.postMessage({ type: "esm-preview-error", message: String(msg) }, "*");
+    };
+    window.addEventListener("unhandledrejection", function(e) {
+      window.parent.postMessage({ type: "esm-preview-error", message: "Unhandled: " + (e.reason?.message || e.reason || "unknown") }, "*");
+    });
     }
   </script>
 </body>
