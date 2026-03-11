@@ -8,6 +8,7 @@
 
 import type { VerificationResult, VerificationIssue, RepairAction, RepairActionType } from "./types";
 import type { Workspace } from "./workspace";
+import { fixMissingImports, fixProviderOrdering } from "./missingImportFixer";
 
 export const MAX_REPAIR_ROUNDS = 2;
 
