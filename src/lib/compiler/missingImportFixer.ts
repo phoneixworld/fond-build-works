@@ -53,7 +53,7 @@ const KNOWN_IMPORTS: KnownImport[] = [
   // ── React hooks ──
   {
     usagePattern: /\buseState\b/,
-    importPattern: /import\s+(?:React|{[^}]*\buseState\b[^}]*})\s+from\s+['"]react['"]/,
+    importPattern: /import\s+(?:React\s*,\s*\{[^}]*\buseState\b[^}]*\}|React|{[^}]*\buseState\b[^}]*})\s+from\s+['"]react['"]/,
     importStatement: (filePath: string) => {
       // Check if React is already imported — if so, skip (useState available via React.useState)
       return `import { useState } from "react";`;
@@ -61,27 +61,27 @@ const KNOWN_IMPORTS: KnownImport[] = [
   },
   {
     usagePattern: /\buseEffect\b/,
-    importPattern: /import\s+(?:React|{[^}]*\buseEffect\b[^}]*})\s+from\s+['"]react['"]/,
+    importPattern: /import\s+(?:React\s*,\s*\{[^}]*\buseEffect\b[^}]*\}|React|{[^}]*\buseEffect\b[^}]*})\s+from\s+['"]react['"]/,
     importStatement: `import { useEffect } from "react";`,
   },
   {
     usagePattern: /\buseCallback\b/,
-    importPattern: /import\s+(?:React|{[^}]*\buseCallback\b[^}]*})\s+from\s+['"]react['"]/,
+    importPattern: /import\s+(?:React\s*,\s*\{[^}]*\buseCallback\b[^}]*\}|React|{[^}]*\buseCallback\b[^}]*})\s+from\s+['"]react['"]/,
     importStatement: `import { useCallback } from "react";`,
   },
   {
     usagePattern: /\buseContext\b/,
-    importPattern: /import\s+(?:React|{[^}]*\buseContext\b[^}]*})\s+from\s+['"]react['"]/,
+    importPattern: /import\s+(?:React\s*,\s*\{[^}]*\buseContext\b[^}]*\}|React|{[^}]*\buseContext\b[^}]*})\s+from\s+['"]react['"]/,
     importStatement: `import { useContext } from "react";`,
   },
   {
     usagePattern: /\buseRef\b/,
-    importPattern: /import\s+(?:React|{[^}]*\buseRef\b[^}]*})\s+from\s+['"]react['"]/,
+    importPattern: /import\s+(?:React\s*,\s*\{[^}]*\buseRef\b[^}]*\}|React|{[^}]*\buseRef\b[^}]*})\s+from\s+['"]react['"]/,
     importStatement: `import { useRef } from "react";`,
   },
   {
     usagePattern: /\buseMemo\b/,
-    importPattern: /import\s+(?:React|{[^}]*\buseMemo\b[^}]*})\s+from\s+['"]react['"]/,
+    importPattern: /import\s+(?:React\s*,\s*\{[^}]*\buseMemo\b[^}]*\}|React|{[^}]*\buseMemo\b[^}]*})\s+from\s+['"]react['"]/,
     importStatement: `import { useMemo } from "react";`,
   },
   // ── Utility: cn ──
