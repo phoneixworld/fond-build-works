@@ -1034,6 +1034,9 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
           },
           onComplete: async (result: EditResult) => {
             console.log("[EditMode] Complete:", Object.keys(result.modifiedFiles));
+            if (Object.keys(result.dependencies).length > 0) {
+              console.log("[EditMode] Dependencies:", result.dependencies);
+            }
 
             // Merge modified files into existing workspace
             const updatedFiles = { ...workspace };
