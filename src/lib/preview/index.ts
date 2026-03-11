@@ -37,6 +37,7 @@ export interface ESMBuildResult {
   sessionId?: string;
   complexity?: number;
   buildDurationMs?: number;
+  modules?: Record<string, string>;
 }
 
 /**
