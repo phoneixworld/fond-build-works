@@ -14,7 +14,7 @@ interface BuildPipelineCardProps {
   streamContent: string;
   tasks?: TaskItem[];
   pipelineStep?: PipelineStep | null;
-  currentAgent?: "chat" | "build" | null;
+  currentAgent?: "chat" | "build" | "edit" | null;
   buildTitle?: string;
   onShowPreview?: () => void;
 }
