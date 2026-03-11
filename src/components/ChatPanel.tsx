@@ -314,8 +314,8 @@ const ChatPanel = forwardRef<ChatPanelHandle, { initialPrompt?: string; onVersio
     setAnalysisResult(null);
     setCurrentAgent("build");
     setPipelineStep("planning");
-    setTimeout(() => sendMessage(enrichedPrompt), 0);
-  }, [followUpQuestions, followUpAnswers, pendingFollowUpPrompt, sendMessage, setCurrentAgent, setPipelineStep]);
+    setTimeout(() => handleSmartSend(enrichedPrompt), 0);
+  }, [followUpQuestions, followUpAnswers, pendingFollowUpPrompt, handleSmartSend, setCurrentAgent, setPipelineStep]);
 
   const skipFollowUpQuestions = useCallback(() => {
     const prompt = pendingFollowUpPrompt;
