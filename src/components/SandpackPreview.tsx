@@ -228,7 +228,7 @@ export default function App() {
 `;
 
 function buildIndexJs(projectId: string, supabaseUrl: string, supabaseKey: string): string {
-  return `import React, { StrictMode } from "react";
+  return `import React, { StrictMode, Component } from "react";
 import { createRoot } from "react-dom/client";
 import App from "./App";
 import "./styles.css";
@@ -237,6 +237,40 @@ import "./styles.css";
 window.__PROJECT_ID__ = "${projectId}";
 window.__SUPABASE_URL__ = "${supabaseUrl}";
 window.__SUPABASE_KEY__ = "${supabaseKey}";
+
+// Runtime error boundary to prevent blank screens
+class AppErrorBoundary extends Component {
+  constructor(props) {
+    super(props);
+    this.state = { hasError: false, error: null };
+  }
+  static getDerivedStateFromError(error) {
+    return { hasError: true, error };
+  }
+  componentDidCatch(error) {
+    console.error("[Preview] App crashed:", error);
+  }
+  render() {
+    if (this.state.hasError) {
+      return React.createElement("div", {
+        style: { minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", background: "#f8fafc", fontFamily: "system-ui, sans-serif", padding: "2rem" }
+      },
+        React.createElement("div", { style: { textAlign: "center", maxWidth: 400 } },
+          React.createElement("div", { style: { fontSize: 48, marginBottom: 16 } }, "⚠️"),
+          React.createElement("h2", { style: { fontSize: 18, fontWeight: 600, color: "#1e293b", marginBottom: 8 } }, "App encountered an error"),
+          React.createElement("p", { style: { fontSize: 14, color: "#64748b", marginBottom: 16 } },
+            this.state.error?.message || "Something went wrong. Send a follow-up message to fix it."
+          ),
+          React.createElement("button", {
+            onClick: () => this.setState({ hasError: false, error: null }),
+            style: { padding: "8px 16px", background: "#3b82f6", color: "white", border: "none", borderRadius: 8, cursor: "pointer", fontSize: 14, fontWeight: 500 }
+          }, "Try Again")
+        )
+      );
+    }
+    return this.props.children;
+  }
+}
 
 // Report route changes to parent for URL bar sync
 function reportRoute() {
@@ -280,7 +314,11 @@ window.addEventListener("message", function(e) {
 
 var root = createRoot(document.getElementById("root"));
 root.render(
-  React.createElement(StrictMode, null, React.createElement(App))
+  React.createElement(StrictMode, null,
+    React.createElement(AppErrorBoundary, null,
+      React.createElement(App)
+    )
+  )
 );
 `;
 }
