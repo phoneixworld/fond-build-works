@@ -194,12 +194,8 @@ ${moduleDefinitions}
       __cache__[specifier] = __exports__;
 
       try {
-        // Polyfill import.meta.url for AsyncFunction context
-        var metaUrl;
-        try { metaUrl = new URL(specifier, location.href).href; } catch(_) { metaUrl = "https://localhost" + specifier; }
-        const wrappedSource = "const import_meta_url = \\"" + metaUrl + "\\";\\n" + source.replace(/import\\.meta\\.url/g, "import_meta_url");
         const AsyncFunction = Object.getPrototypeOf(async function(){}).constructor;
-        const fn = new AsyncFunction("__exports__", "__import__", wrappedSource);
+        const fn = new AsyncFunction("__exports__", "__import__", source);
         await fn(__exports__, __import__);
       } catch(e) {
         console.error("[Phoenix] Error in " + specifier + ":", e);
