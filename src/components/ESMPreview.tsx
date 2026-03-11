@@ -1,8 +1,9 @@
 import { useRef, useEffect, useMemo, useState } from "react";
 import { usePreview } from "@/contexts/PreviewContext";
 import { useProjects } from "@/contexts/ProjectContext";
-import { buildESMPreview, revokeBlobUrls } from "@/lib/esmPreviewBuilder";
-import { AlertTriangle, RefreshCw } from "lucide-react";
+import { buildESMPreview, revokeBlobUrls } from "@/lib/preview";
+import type { PreviewDiagnostic } from "@/lib/preview";
+import { AlertTriangle, RefreshCw, Activity } from "lucide-react";
 
 /** Check if the workspace has a real App entry point or enough files to render */
 function hasAppEntry(files: Record<string, string> | null): boolean {
@@ -30,6 +31,8 @@ const ESMPreview = ({ viewport, initialPath }: ESMPreviewProps) => {
   const { currentProject } = useProjects();
   const [error, setError] = useState<string | null>(null);
   const [iframeError, setIframeError] = useState<string | null>(null);
+  const [diagnostics, setDiagnostics] = useState<PreviewDiagnostic[]>([]);
+  const [bootMetrics, setBootMetrics] = useState<{ bootDurationMs?: number; moduleCount?: number } | null>(null);
   const prevHtmlRef = useRef<string | null>(null);
 
   const projectId = currentProject?.id || "";
@@ -37,20 +40,27 @@ const ESMPreview = ({ viewport, initialPath }: ESMPreviewProps) => {
   const supabaseKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY || "";
 
   const ready = hasAppEntry(sandpackFiles);
-  
+
   if (sandpackFiles && Object.keys(sandpackFiles).length > 0 && !ready) {
     console.warn("[ESMPreview] Files present but no App entry found. File keys:", Object.keys(sandpackFiles));
   }
 
-  // Listen for errors from inside the iframe
+  // Listen for messages from the iframe (errors, diagnostics, ready)
   useEffect(() => {
     const handler = (e: MessageEvent) => {
-      if (e.data?.type === "esm-preview-error") {
-        console.error("[ESMPreview] Iframe error:", e.data.message);
-        setIframeError(e.data.message);
+      if (e.data?.type === "preview-error") {
+        console.error("[Phoenix Preview] Iframe error:", e.data.msg);
+        setIframeError(e.data.msg);
+      }
+      if (e.data?.type === "preview-diagnostic") {
+        setDiagnostics(prev => [...prev, e.data.diagnostic]);
       }
       if (e.data?.type === "preview-ready") {
         setIframeError(null);
+        if (e.data.metrics) {
+          setBootMetrics(e.data.metrics);
+          console.log(`[Phoenix Preview] Mounted in ${e.data.metrics.bootDurationMs}ms, ${e.data.metrics.moduleCount} modules`);
+        }
       }
     };
     window.addEventListener("message", handler);
@@ -59,8 +69,10 @@ const ESMPreview = ({ viewport, initialPath }: ESMPreviewProps) => {
 
   const buildResult = useMemo(() => {
     if (!ready || !sandpackFiles) return null;
-    
+
     try {
+      setDiagnostics([]);
+      setBootMetrics(null);
       const result = buildESMPreview(
         sandpackFiles,
         sandpackDeps,
@@ -68,12 +80,16 @@ const ESMPreview = ({ viewport, initialPath }: ESMPreviewProps) => {
         supabaseUrl,
         supabaseKey
       );
-      console.log("[ESMPreview] Build result: fileCount=", result.fileCount, "errors=", result.errors, "htmlLength=", result.html?.length);
+      console.log(
+        `[Phoenix Preview] Build: ${result.fileCount} modules, ` +
+        `complexity=${result.complexity}, ${result.buildDurationMs}ms, ` +
+        `session=${result.sessionId}, errors=${result.errors.length}`
+      );
       setError(null);
       setIframeError(null);
       return result;
     } catch (e: any) {
-      console.error("[ESMPreview] Build exception:", e);
+      console.error("[Phoenix Preview] Build exception:", e);
       setError(e.message);
       return null;
     }
@@ -134,11 +150,17 @@ const ESMPreview = ({ viewport, initialPath }: ESMPreviewProps) => {
           <span className="truncate">{iframeError}</span>
         </div>
       )}
+      {bootMetrics && (
+        <div className="px-3 py-1 bg-muted/50 border-b border-border text-[10px] text-muted-foreground flex items-center gap-2">
+          <Activity className="w-3 h-3" />
+          <span>Boot: {bootMetrics.bootDurationMs}ms · {bootMetrics.moduleCount} modules · Complexity: {buildResult.complexity}</span>
+        </div>
+      )}
       <iframe
         ref={iframeRef}
         srcDoc={buildResult.html}
         className="w-full flex-1 border-0 bg-white"
-        title="ESM Preview"
+        title="Phoenix Preview"
         sandbox="allow-scripts allow-same-origin allow-popups allow-forms allow-modals"
         style={viewport && viewport.width !== "100%" ? { borderRadius: 8 } : undefined}
       />
