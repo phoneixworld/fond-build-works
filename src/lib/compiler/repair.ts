@@ -115,6 +115,22 @@ function issueToRepairAction(
         prompt: "", // No AI needed — handled deterministically
       };
 
+    case "missing_import":
+      return {
+        type: "fix_deterministic",
+        targetFile: issue.file,
+        issue,
+        prompt: "", // No AI needed — handled by missingImportFixer
+      };
+
+    case "provider_ordering":
+      return {
+        type: "fix_deterministic",
+        targetFile: issue.file,
+        issue,
+        prompt: "", // No AI needed — handled by fixProviderOrdering
+      };
+
     default:
       return null;
   }
