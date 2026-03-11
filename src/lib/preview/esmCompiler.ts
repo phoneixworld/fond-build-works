@@ -124,34 +124,27 @@ export function rewriteToRegistry(
     return resolved;
   }
 
-  // Rewrite new URL("./path", import.meta.url) → resolveAsset from Phoenix runtime
-  // This matches: new URL("./logo.png", import.meta.url)
+  // Rewrite new URL("./path", import.meta.url) → window.__phoenixResolveAsset__("resolved/path")
+  // Uses a global function instead of async import to avoid breaking synchronous expression contexts
   code = code.replace(
     /new\s+URL\(\s*(['"]([^'"]+)['"])\s*,\s*import\.meta\.url\s*\)/g,
     (_m, _quoted, _path: string) => {
-      // Resolve the path relative to the current file's directory
       const dir = filePath.split("/").slice(0, -1).join("/");
       const resolved = _path.startsWith(".")
         ? `${dir}/${_path.replace(/^\.\//, "")}`.replace(/\/+/g, "/")
         : _path;
-      return `(await __import__("/__phoenix__/runtime.js")).resolveAsset("${resolved}")`;
+      return `window.__phoenixResolveAsset__("${resolved}")`;
     }
   );
 
-  // Rewrite new URL(variable, import.meta.url) → resolveAsset(variable)
+  // Rewrite new URL(variable, import.meta.url) → window.__phoenixResolveAsset__(variable)
   code = code.replace(
     /new\s+URL\(\s*([^,)]+)\s*,\s*import\.meta\.url\s*\)/g,
-    (_m, expr: string) => `(await __import__("/__phoenix__/runtime.js")).resolveAsset(${expr.trim()})`
+    (_m, expr: string) => `window.__phoenixResolveAsset__(${expr.trim()})`
   );
 
-  // Rewrite remaining new URL(x, nonHttpBase) that would fail in srcdoc
-  code = code.replace(
-    /new\s+URL\(\s*([^,)]+)\s*,\s*([^)]+)\s*\)/g,
-    (_m, url: string, base: string) => {
-      if (/^['"]https?:/.test(base.trim())) return _m;
-      return `(await __import__("/__phoenix__/runtime.js")).safeURL(${url.trim()}, ${base.trim()})`;
-    }
-  );
+  // Strip any remaining bare import.meta.url references (not in new URL)
+  code = code.replace(/import\.meta\.url/g, '"https://localhost/"');
 
   // Strip CSS imports
   code = code.replace(/import\s+['"][^'"]*\.css['"]\s*;?/g, "");

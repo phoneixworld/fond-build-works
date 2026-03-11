@@ -244,8 +244,12 @@ ${moduleDefinitions}
       const AppModule = await __import__("${entryPath}");
       const App = AppModule.default || AppModule;
 
+      console.log("[Phoenix Boot] Entry: ${entryPath}", "App:", typeof App, App);
+      console.log("[Phoenix Boot] AppModule keys:", Object.keys(AppModule));
+      console.log("[Phoenix Boot] Available modules:", Object.keys(__sources__));
+
       if (typeof App !== "function" && typeof App !== "object") {
-        throw new Error("App entry point did not export a valid component. Got: " + typeof App);
+        throw new Error("App entry point did not export a valid component. Got: " + typeof App + ". Module keys: " + Object.keys(AppModule).join(", "));
       }
 
       const root = createRoot(document.getElementById("root"));
