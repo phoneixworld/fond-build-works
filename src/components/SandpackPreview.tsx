@@ -389,18 +389,15 @@ function buildSandpackFiles(files: SandpackFileSet | null, projectId: string, su
   }
 
   // Map user files into sandpack paths — sanitize imports only, no repair
+  // Normalize ALL .jsx/.tsx/.ts extensions to .js for consistent Sandpack resolution
   for (const [path, code] of Object.entries(files)) {
     const normalized = path.startsWith("/") ? path : `/${path}`;
-    const sandpackPath = normalized.replace(/\.tsx?$/, ".js");
-    base[sandpackPath] = sandpackPath.match(/\.(jsx?|js)$/) ? sanitizeImports(code, sandpackPath) : code;
+    const sandpackPath = normalized.replace(/\.(tsx?|jsx)$/, ".js");
+    base[sandpackPath] = sandpackPath.match(/\.js$/) ? sanitizeImports(code, sandpackPath) : code;
   }
 
-  if (!base["/App.js"] && !base["/App.jsx"]) {
+  if (!base["/App.js"]) {
     base["/App.js"] = DEFAULT_APP;
-  }
-
-  if (base["/App.jsx"] && !base["/App.js"]) {
-    base["/index.js"] = indexJs.replace('./App', './App.jsx');
   }
 
   return base;
