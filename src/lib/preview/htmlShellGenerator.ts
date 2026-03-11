@@ -129,6 +129,18 @@ __exports__.safeURL = function safeURL(url, base) {
     // ── Phoenix Asset Registry ──
     window.__PHOENIX_ASSETS__ = ${JSON.stringify(assetMap)};
 
+    // ── Phoenix Asset Resolver (global, synchronous) ──
+    window.__phoenixResolveAsset__ = function(path) {
+      if (!path) return "";
+      if (typeof path !== "string") return String(path);
+      if (path.startsWith("http://") || path.startsWith("https://") || path.startsWith("data:") || path.startsWith("blob:")) return path;
+      var cleaned = path.replace(/^\\.\\//g, "").replace(/^\\//, "");
+      var assets = window.__PHOENIX_ASSETS__ || {};
+      if (assets[cleaned]) return assets[cleaned];
+      if (assets["/" + cleaned]) return assets["/" + cleaned];
+      return "https://placehold.co/400x300?text=" + encodeURIComponent(cleaned);
+    };
+
     function __phoenixError__(msg, extra) {
       console.error("[Phoenix Preview]", msg, extra || "");
       window.parent.postMessage({ type: "preview-error", msg: String(msg), extra: extra || null }, "*");
