@@ -203,74 +203,7 @@ export class VitePreviewEngine implements PreviewEngine {
     return result.htmlShell;
   }
 
-  // ─── Import Rewriting for SW ────────────────────────────────────────────
-
-  private rewriteImportsForSW(
-    code: string,
-    filePath: string,
-    fileSet: Set<string>
-  ): string {
-    // Rewrite relative imports to resolved .js paths
-    // import X from "./components/Header" → import X from "./components/Header.js"
-    code = code.replace(
-      /(import\s+(?:[\w$*{},\s]+\s+from\s+)?['"])(\.\.?\/[^'"]+)(['"])/g,
-      (match, prefix, importPath, suffix) => {
-        // Skip CSS imports
-        if (importPath.endsWith(".css")) return match;
-        
-        const resolved = this.resolveRelativeImport(filePath, importPath, fileSet);
-        // Convert to .js extension for the compiled version
-        const jsPath = resolved
-          .replace(/\.tsx?$/, ".js")
-          .replace(/\.jsx$/, ".js");
-        return `${prefix}${jsPath}${suffix}`;
-      }
-    );
-
-    // Rewrite @/ alias imports to relative paths
-    code = code.replace(
-      /(import\s+(?:[\w$*{},\s]+\s+from\s+)?['"])@\/([^'"]+)(['"])/g,
-      (match, prefix, importPath, suffix) => {
-        const absPath = "/" + importPath;
-        const resolved = this.findFileWithExtension(absPath, fileSet);
-        const jsPath = resolved
-          ? resolved.replace(/\.tsx?$/, ".js").replace(/\.jsx$/, ".js")
-          : absPath + ".js";
-        return `${prefix}${jsPath}${suffix}`;
-      }
-    );
-
-    // Strip CSS imports (CSS is injected via <style> in index.html)
-    code = code.replace(/import\s+['"][^'"]*\.css['"]\s*;?/g, "");
-
-    // Rewrite new URL("./path", import.meta.url) patterns
-    code = code.replace(
-      /new\s+URL\(\s*(['"]([^'"]+)['"])\s*,\s*import\.meta\.url\s*\)/g,
-      (_m, _quoted, path: string) => {
-        return `new URL("${path}", window.location.origin + "/vfs-preview/")`;
-      }
-    );
-
-    return code;
-  }
-
-  private resolveRelativeImport(
-    fromFile: string,
-    importPath: string,
-    fileSet: Set<string>
-  ): string {
-    // Resolve relative path
-    const fromDir = fromFile.split("/").slice(0, -1).join("/");
-    const parts = [...fromDir.split("/"), ...importPath.split("/")].filter(Boolean);
-    const stack: string[] = [];
-    for (const part of parts) {
-      if (part === "..") stack.pop();
-      else if (part !== ".") stack.push(part);
-    }
-    const resolved = "/" + stack.join("/");
-
-    return this.findFileWithExtension(resolved, fileSet) || resolved;
-  }
+  // ─── Helpers (resolution moved to astImportRewriter.ts) ─────────────────
 
   private findFileWithExtension(path: string, fileSet: Set<string>): string | null {
     if (fileSet.has(path)) return path;
