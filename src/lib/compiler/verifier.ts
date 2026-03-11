@@ -497,6 +497,3 @@ function checkExportValidity(workspace: Workspace): { issues: VerificationIssue[
   }
   return { issues };
 }
-
-  return { issues };
-}
