@@ -307,6 +307,16 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
     try {
       const { schemas, knowledge, irContext } = await fetchProjectContext(currentProject.id);
 
+      // Guard: abort if project switched during async fetch
+      if (isStaleBuild()) {
+        console.warn("[BuildOrch] Project switched during context fetch, aborting");
+        setIsLoading(false);
+        setIsBuilding(false);
+        setBuildStep("");
+        isSendingRef.current = false;
+        return;
+      }
+
       const isFirstMessage = messagesRef.current.filter(m => m.role === "user").length <= 1;
       const hasPersistedHistory = (currentProject.chat_history ?? []).length > 0;
       const shouldIncludeCurrentCode = !isFirstMessage || hasPersistedHistory;
