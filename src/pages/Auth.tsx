@@ -6,7 +6,7 @@ import { useToast } from "@/hooks/use-toast";
 
 const Auth = () => {
   const { user, loading, signIn, signUp } = useAuth();
-  const isSignUp = false;
+  const [isSignUp, setIsSignUp] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [displayName, setDisplayName] = useState("");
@@ -26,10 +26,30 @@ const Auth = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setSubmitting(true);
-    const { error } = await signIn(email, password);
 
+    if (isSignUp) {
+      const { error, needsEmailConfirmation } = await signUp(email, password, displayName || undefined);
+      if (error) {
+        toast({ title: "Signup failed", description: error.message, variant: "destructive" });
+      } else {
+        toast({
+          title: needsEmailConfirmation ? "Check your email" : "Account created",
+          description: needsEmailConfirmation
+            ? "We sent a verification link to your inbox."
+            : "Your account is ready. You can sign in now.",
+        });
+        if (needsEmailConfirmation) {
+          setIsSignUp(false);
+          setPassword("");
+        }
+      }
+      setSubmitting(false);
+      return;
+    }
+
+    const { error } = await signIn(email, password);
     if (error) {
-      toast({ title: "Error", description: error.message, variant: "destructive" });
+      toast({ title: "Sign in failed", description: error.message, variant: "destructive" });
     }
     setSubmitting(false);
   };
