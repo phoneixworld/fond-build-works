@@ -418,17 +418,18 @@ export function isEditIntent(
   
   // Must have existing code AND a modification verb or bug report
   const editVerbs = /\b(change|update|fix|modify|replace|add|remove|make|move|rename|resize|restyle|improve|tweak|adjust|refactor|sort|filter|reorder|swap|hide|show|toggle|enable|disable|increase|decrease|align|center|wrap|unwrap)\b/i;
-  const bugReport = /\b(doesn['']?t work|does not work|not working|broken|bug|crash|error|fails?|failing|wrong|issue|problem|stuck|blank|empty|missing|disappeared)\b/i;
+  const bugReport = /\b(doesn['']?t work|does not work|not working|broken|bug|crash|error|fails?|failing|wrong|issue|problem|stuck|blank|empty|missing|disappeared|nothing shows|nothing loads|nothing happens|white screen|no content|not loading|not showing|not rendering|not displaying|can['']?t see|cannot see|shows nothing|displays nothing|is blank)\b/i;
   
   // Must NOT be a full app/project build request
   const buildSignals = /\b(build|create|generate|scaffold|new app|new project|from scratch|entire|whole app|full app|complete app)\b/i;
   
   // Edit signal: references a specific component/feature
-  const specificity = /\b(table|button|form|sidebar|nav|header|footer|modal|dialog|card|chart|page|column|row|field|input|label|title|heading|text|color|font|spacing|padding|margin|border|icon|image|logo|search|filter|sort|tab|badge|avatar|menu|dropdown|toast|alert|spinner|loading|sign\s*up|signup|login|log\s*in|auth|register|registration|password|session)\b/i;
+  const specificity = /\b(table|button|form|sidebar|nav|header|footer|modal|dialog|card|chart|page|column|row|field|input|label|title|heading|text|color|font|spacing|padding|margin|border|icon|image|logo|search|filter|sort|tab|badge|avatar|menu|dropdown|toast|alert|spinner|loading|sign\s*up|signup|login|log\s*in|auth|register|registration|password|session|portal|screen|app|view|dashboard|layout|content|display|render)\b/i;
   
   if (buildSignals.test(t)) return false;
   if (!(editVerbs.test(t) || bugReport.test(t))) return false;
-  if (!specificity.test(t)) return false;
+  // Bug reports don't require specificity — "it's blank" is enough with existing code
+  if (!bugReport.test(t) && !specificity.test(t)) return false;
   
   // Short messages with edit verbs are edits (not builds)
   if (t.length < 200) return true;

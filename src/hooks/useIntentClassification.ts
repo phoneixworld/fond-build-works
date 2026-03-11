@@ -72,6 +72,10 @@ export function useIntentClassification(
     } catch {
       setIsAnalyzing(false);
       setPipelineStep(null);
+      // Fallback: if classify-intent fails and we have existing code, default to edit (not rebuild)
+      if (hasExistingCode) {
+        return { intent: "edit" as AgentIntent };
+      }
       return null;
     }
   }, [sandpackFiles, previewHtml, messageCount, setPipelineStep]);
@@ -98,8 +102,8 @@ export function useIntentClassification(
     // ── Edit patterns (check BEFORE build — edits are more specific) ──
     const hasExistingCode = !!(sandpackFiles && Object.keys(sandpackFiles).length > 0) || !!(previewHtml && previewHtml.length > 0);
     if (hasExistingCode && isEditIntent(text, true)) return "edit";
-    // Bug reports with existing code → edit (not rebuild)
-    if (hasExistingCode && /\b(doesn['']?t work|does not work|not working|broken|bug|crash|error|fails?|failing|wrong|issue|problem)\b/i.test(t)) return "edit";
+    // Bug reports with existing code → edit (not rebuild) — broad pattern, no target required
+    if (hasExistingCode && /\b(doesn['']?t work|does not work|not working|broken|bug|crash|error|fails?|failing|wrong|issue|problem|stuck|blank|empty|missing|disappeared|nothing shows|nothing loads|nothing happens|white screen|no content|not loading|not showing|not rendering|not displaying|can['']?t see|cannot see|shows nothing|displays nothing|is blank)\b/i.test(t)) return "edit";
 
     // ── Build patterns ──
     // Clear build commands (verb-first)

@@ -6,10 +6,13 @@ const corsHeaders = {
 };
 
 serve(async (req) => {
-  if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
+  if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
+  let hasExistingCode = false;
   try {
-    const { prompt, hasHistory, hasExistingCode, existingFileNames } = await req.json();
+    const body = await req.json();
+    const { prompt, hasHistory, existingFileNames } = body;
+    hasExistingCode = !!body.hasExistingCode;
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY not configured");
 
@@ -237,10 +240,13 @@ Use the classify_intent tool to return your classification.`
     });
   } catch (e) {
     console.error("classify-intent error:", e);
+    // If existing code is present, fallback to edit (not build) to prevent destructive rebuilds
+    const fallbackIntent = hasExistingCode ? "edit" : "build";
     return new Response(JSON.stringify({ 
-      intent: "build", 
-      confidence: 0.5, 
-      questions: [] 
+      intent: fallbackIntent, 
+      confidence: 0.3, 
+      questions: [],
+      analysis: { needsBackend: false, needsAuth: false, complexity: "simple" }
     }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
