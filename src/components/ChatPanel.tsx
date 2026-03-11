@@ -188,7 +188,7 @@ const ChatPanel = forwardRef<ChatPanelHandle, { initialPrompt?: string; onVersio
   }, [orchClearChat, conversationState]);
 
   // Expose handle
-  useImperativeHandle(ref, () => ({ clearChat: handleClearChat, sendMessage: (text: string) => sendMessage(text) }), [handleClearChat, sendMessage]);
+  useImperativeHandle(ref, () => ({ clearChat: handleClearChat, sendMessage: (text: string) => handleSmartSend(text) }), [handleClearChat, handleSmartSend]);
 
   // Listen for refactor actions from CodeEditor
   useEffect(() => {
