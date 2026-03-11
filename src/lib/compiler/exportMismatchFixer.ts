@@ -178,7 +178,15 @@ function replaceNamedImportSymbol(content: string, fromPath: string, fromSym: st
 
   return content.replace(importRegex, (full, clause: string) => {
     if (!clause.includes("{")) return full;
-    const updatedClause = clause.replace(new RegExp(`\\b${escapeRegex(fromSym)}\\b`, "g"), toSym);
+
+    // Keep call-sites stable by aliasing the actual export to the originally imported symbol.
+    // Example: { Sidebar } -> { sidebar as Sidebar }
+    const replacement = `${toSym} as ${fromSym}`;
+    const updatedClause = clause.replace(
+      new RegExp(`\\b${escapeRegex(fromSym)}\\b(?!\\s+as\\s+\\w+)`, "g"),
+      replacement
+    );
+
     return updatedClause === clause ? full : full.replace(clause, updatedClause);
   });
 }
