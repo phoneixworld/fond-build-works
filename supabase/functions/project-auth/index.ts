@@ -122,7 +122,11 @@ serve(async (req) => {
     }
   } catch (e) {
     console.error("project-auth error:", e);
-    const message = e instanceof Error ? e.message : "Unknown error";
+    const message = e instanceof Error
+      ? e.message
+      : typeof e === "object" && e !== null && "message" in e
+        ? String((e as { message?: unknown }).message)
+        : "Unknown error";
     return new Response(JSON.stringify({ error: message, message }), {
       status: 500,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
