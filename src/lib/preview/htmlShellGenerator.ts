@@ -168,6 +168,26 @@ __exports__.safeURL = function safeURL(url, base) {
       }
     })();
 
+    // ── History API Patch (for srcDoc iframes) ──
+    // react-router calls history.pushState/replaceState which throws SecurityError
+    // in about:srcdoc context. Wrap them to silently catch.
+    (function() {
+      var _origPush = history.pushState.bind(history);
+      var _origReplace = history.replaceState.bind(history);
+      history.pushState = function(state, title, url) {
+        try { _origPush(state, title, url); } catch(e) {
+          if (e.name === "SecurityError") { /* silently ignore in srcdoc */ }
+          else { throw e; }
+        }
+      };
+      history.replaceState = function(state, title, url) {
+        try { _origReplace(state, title, url); } catch(e) {
+          if (e.name === "SecurityError") { /* silently ignore in srcdoc */ }
+          else { throw e; }
+        }
+      };
+    })();
+
     // ── Error Bridge ──
     function __phoenixError__(msg, extra) {
       console.error("[Phoenix Preview]", msg, extra || "");
