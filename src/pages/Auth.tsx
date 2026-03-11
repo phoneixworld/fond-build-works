@@ -215,6 +215,7 @@ const Auth = () => {
               {isSignUp ? "Sign In" : "Sign Up"}
             </button>
           </div>
+        </div>
       </div>
     </div>
   );
