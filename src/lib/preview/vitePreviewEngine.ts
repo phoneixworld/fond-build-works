@@ -284,6 +284,11 @@ export default function App() {
   <div id="root"></div>
 
   <script>
+    // ── Phoenix Circular Dep Sentinel Registry ──
+    // Modules register themselves here BEFORE executing.
+    // Circular imports get partially-populated objects instead of deadlocking.
+    window.__phoenix_modules__ = {};
+
     // Asset registry
     window.__PHOENIX_ASSETS__ = ${JSON.stringify(assetMap)};
     window.__PHOENIX_PREVIEW__ = true;
