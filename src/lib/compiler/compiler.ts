@@ -235,7 +235,7 @@ export async function compile(
     console.log("[Compiler] 🔄 Fixed provider ordering: ToastProvider now wraps AuthProvider");
   }
 
-  // ── Phase 3.8: Ensure App.jsx exists ────────────────────────────────
+  // ── Phase 3.10: Ensure App.jsx exists ────────────────────────────────
 
   const appEntryPoints = ["/App.jsx", "/App.tsx", "/App.js", "/App.ts"];
   const hasAppEntry = appEntryPoints.some(p => workspace.hasFile(p));
