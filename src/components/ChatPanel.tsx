@@ -342,6 +342,8 @@ const ChatPanel = forwardRef<ChatPanelHandle, { initialPrompt?: string; onVersio
       // from the previous project before doing anything else
       const previousProjectId = lastProjectIdRef.current;
       lastProjectIdRef.current = currentProject.id;
+      // Sync conversation state project ID immediately (before async restore)
+      conversationState.currentProjectId.current = currentProject.id;
       
       // Abort any in-flight builds from previous project
       if (abortControllerRef.current) {
