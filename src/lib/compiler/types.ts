@@ -174,7 +174,8 @@ export type RepairActionType =
   | "fix_import_syntax"
   | "fix_syntax"
   | "remove_empty_stub"
-  | "generate_missing_module";
+  | "generate_missing_module"
+  | "fix_deterministic";
 
 export interface RepairAction {
   type: RepairActionType;
