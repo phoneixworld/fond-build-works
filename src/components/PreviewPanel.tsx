@@ -63,10 +63,22 @@ const PreviewPanel = () => {
   const buildStepHistory = useBuildStepHistory(buildStep, isBuilding);
 
   const currentViewport = VIEWPORTS_MAP[viewport];
-  const hasAppFile = sandpackFiles ? Object.keys(sandpackFiles).some(p => /\/?(?:src\/)?App\.(tsx?|jsx?)$/.test(p)) : false;
+  
+  // Check for App entry point with multiple patterns
+  const hasAppFile = sandpackFiles ? Object.keys(sandpackFiles).some(p => {
+    const normalized = p.replace(/^\/+/, '/');
+    return /\/?(?:src\/)?App\.(tsx?|jsx?)$/.test(normalized) || 
+           normalized === '/App.jsx' || normalized === '/App.tsx' ||
+           normalized === '/App.js' || normalized === '/App.ts';
+  }) : false;
+  
+  // ESM mode has content if we have an App file OR if we have enough files to suggest a build is in progress
   const hasContent = previewMode === "esm" ? hasAppFile : previewMode === "sandpack" ? !!sandpackFiles : !!previewHtml;
   
-  console.log("[PreviewPanel] mode=", previewMode, "hasAppFile=", hasAppFile, "hasContent=", hasContent, "isBuilding=", isBuilding, "filesCount=", sandpackFiles ? Object.keys(sandpackFiles).length : 0);
+  // Debug: log actual file keys when in ESM mode
+  if (previewMode === "esm" && sandpackFiles && !hasAppFile) {
+    console.log("[PreviewPanel] ESM mode but no App file found. Keys:", Object.keys(sandpackFiles));
+  }
 
   // Listen for route changes from inside the Sandpack iframe
   useEffect(() => {

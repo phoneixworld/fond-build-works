@@ -7,9 +7,12 @@ import { AlertTriangle, RefreshCw } from "lucide-react";
 /** Check if the workspace has a real App entry point */
 function hasAppEntry(files: Record<string, string> | null): boolean {
   if (!files) return false;
-  return Object.keys(files).some(p =>
-    /\/?(?:src\/)?App\.(tsx?|jsx?)$/.test(p)
-  );
+  return Object.keys(files).some(p => {
+    const normalized = p.replace(/^\/+/, '/');
+    return /\/?(?:src\/)?App\.(tsx?|jsx?)$/.test(normalized) || 
+           normalized === '/App.jsx' || normalized === '/App.tsx' ||
+           normalized === '/App.js' || normalized === '/App.ts';
+  });
 }
 
 interface ESMPreviewProps {
@@ -31,7 +34,9 @@ const ESMPreview = ({ viewport, initialPath }: ESMPreviewProps) => {
   // Build preview whenever we have a real App file
   const ready = hasAppEntry(sandpackFiles);
   
-  console.log("[ESMPreview] render: ready=", ready, "filesCount=", sandpackFiles ? Object.keys(sandpackFiles).length : 0, "fileKeys=", sandpackFiles ? Object.keys(sandpackFiles).slice(0, 5) : [], "isBuilding=", isBuilding);
+  if (sandpackFiles && Object.keys(sandpackFiles).length > 0 && !ready) {
+    console.warn("[ESMPreview] Files present but no App entry found. File keys:", Object.keys(sandpackFiles));
+  }
 
   const buildResult = useMemo(() => {
     if (!ready || !sandpackFiles) return null;
