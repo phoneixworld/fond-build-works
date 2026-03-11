@@ -87,15 +87,22 @@ ${workspaceContext ? `### Current code:\n${workspaceContext}` : ""}
 - **NO placeholder text**: Never generate "Loading content...", "Coming soon", or "TODO". Every page must render real, functional UI.
 - **Realistic sample data**: Use useState with hardcoded arrays of 5-10 realistic rows (real names, dates, numbers). Example: \`const [students] = useState([{ id: 1, name: "Sarah Johnson", grade: "10th", gpa: 3.8 }, ...])\`
 - **Rich dashboard pages**: Dashboard pages MUST include:
-  - 4 stat cards with icons (use lucide-react), values, labels, and trend indicators (e.g., "+12% from last month")
-  - At least one data table with 5+ rows showing key entity data
+  - 4 stat cards using "stat-card" class with "stat-value", "stat-label", "stat-trend stat-trend-up"
+  - At least one data table with 5+ rows using "table" class + "badge" classes for status
   - At least one simple chart or visual (can be a CSS bar chart if recharts is unavailable)
-- **Data tables**: Use proper \`<table>\` with thead/tbody, alternating row colors, and action buttons (Edit, Delete, View)
-- **Forms**: Include proper labels, input fields with placeholder text, validation states, and submit/cancel buttons
+- **Data tables**: Use "table" class with thead/tbody, alternating row colors, "badge" status cells, action buttons
+- **Forms**: Include proper labels, "input" class fields, validation states, "btn btn-primary" submit buttons
 - **Navigation**: Sidebar must highlight the active route, show icons (from lucide-react), and have a professional look
-- **Status badges**: Use colored badges for statuses (Active/Inactive, Paid/Pending, Present/Absent)
-- **Layout polish**: Consistent spacing (p-6), rounded corners (rounded-xl), subtle shadows (shadow-sm), proper typography hierarchy (text-2xl for titles, text-sm for labels)
-- **Empty states**: If showing "no data", use an illustration-style empty state with an icon, title, and a CTA button — never just text
+- **Status badges**: Use "badge badge-success", "badge-warning", "badge-danger" for statuses
+- **Loading states**: Use "skeleton" class for shimmer loading, "spinner" for inline spinners
+- **Empty states**: Use "empty-state" class pattern with "empty-state-icon", "empty-state-title", "empty-state-text", and a CTA button
+- **Modals/Dialogs**: Use "modal-overlay" → "modal" with "modal-header", "modal-body", "modal-actions"
+- **Toast feedback**: Use "toast" classes for CRUD operation feedback
+- **Tabs**: Use "tab-list" + "tab" / "tab tab-active" for multi-section pages
+- **Avatars**: Use "avatar avatar-md" in user lists, comments, team views, "avatar-group" for stacks
+- **Animations**: Add "stagger" class on list parents for entrance animations, "animate-fade-in" on page loads
+- **Glass cards**: Use "card-glass" for hero overlays or premium feature sections
+- **Layout polish**: Consistent spacing (p-6), rounded corners (rounded-xl), "surface-elevated" for elevated panels
 - **Color tokens**: Use CSS variables: var(--color-primary), var(--color-bg), var(--color-text), var(--color-border), var(--color-success), var(--color-warning), var(--color-danger)`;
 
 }
