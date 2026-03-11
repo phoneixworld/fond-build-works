@@ -1150,7 +1150,7 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
 
       // ── GATHER: User is providing requirements ──
       if (convResult.action === "gather") {
-        const phase = conversationAddPhase?.(finalText, hasImages, images); // 3rd arg = imageUrls
+        const phase = conversationAddPhase?.(finalText, hasImages, images);
         const ackText = conversationGenerateAck?.(phase) || "✅ Got it! Send the next phase when ready, or say **\"build it\"** to start.";
 
         const content = buildMessageContent(finalText, images);
@@ -1167,19 +1167,21 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
         return;
       }
 
+      // ── EDIT: Route through FSM-wired edit pipeline ──
+      if (convResult.action === "edit") {
+        setCurrentAgent("edit");
+        setPipelineStep("resolving");
+        sendEditMessage(finalText, images);
+        return;
+      }
+
       // ── BUILD: Include accumulated requirements if any phases exist ──
       if (convResult.action === "build") {
-        // Always try to include accumulated requirements when phases exist
-        const hasAccumulatedPhases = conversationMode === "gathering" || conversationMode === "ready" || conversationMode === "complete";
-        
-        // Try server-compiled requirements first
         console.log(`[SmartSend] Build requested, mode=${conversationMode}`);
         conversationStartBuilding?.();
         
-        // Get server-compiled requirements (includes chat history fallback now)
         const requirements = await Promise.resolve(conversationGetRequirements?.() || "");
 
-        // Guard: abort if project switched during async requirements fetch
         if (isSmartSendStale()) {
           console.warn("[SmartSend] Project switched during requirements fetch, aborting");
           return;
@@ -1195,7 +1197,6 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
           return;
         }
         
-        // Fallback: extract from local chat history
         const chatContext = messages
           .filter(m => typeof m.content === "string" && m.content.length > 30)
           .map(m => `**${m.role === "user" ? "User" : "Assistant"}:**\n${m.content}`)
@@ -1203,7 +1204,6 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
         
         if (chatContext.length > 100) {
           const buildPrompt = `# APPLICATION REQUIREMENTS (from conversation)\n\n${chatContext}\n\n## BUILD INSTRUCTION\nBuild the COMPLETE application based on the conversation above.\n\n${finalText}`;
-          console.log(`[SmartSend] Build from chat history fallback: ${buildPrompt.length} chars`);
           
           setCurrentAgent("build");
           setPipelineStep("planning");
