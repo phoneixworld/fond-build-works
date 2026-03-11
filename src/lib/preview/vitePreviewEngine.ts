@@ -21,6 +21,12 @@ import type {
 } from "./types";
 import { compileFile } from "./esmCompiler";
 import { buildImportMap, CdnImportMapProvider } from "./importMapResolver";
+import {
+  rewriteImportsForSW,
+  buildDependencyGraph,
+  detectCircularDeps,
+  isBarrelFile,
+} from "./astImportRewriter";
 
 // ─── Vite Preview Engine ────────────────────────────────────────────────────
 
