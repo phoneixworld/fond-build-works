@@ -152,13 +152,14 @@ function sanitizeImports(code: string, filePath: string): string {
       production: true,
     });
   } catch {
-    // Sucrase couldn't parse it — but DON'T stub it out.
-    // Let Sandpack try to handle it — a Sandpack error overlay is better than a blank screen.
-    // Only stub truly catastrophic files (unclosed strings, completely broken syntax)
-    const hasDefaultExport = /export\s+default\b/.test(code);
-    const hasOpenTags = /<\w/.test(code);
-    if (hasDefaultExport && hasOpenTags) {
-      // Has basic structure — let Sandpack try
+    // Sucrase couldn't parse it — be lenient. 
+    // Context files, hooks, and utility files often use patterns Sucrase struggles with
+    // (async IIFEs, complex destructuring, etc.) but Sandpack's Babel handles fine.
+    // Only stub files that are truly catastrophic (no exports at all, completely empty).
+    const hasExport = /export\s/.test(code);
+    const hasReasonableLength = code.trim().length > 50;
+    if (hasExport && hasReasonableLength) {
+      // Has exports and substantial content — let Sandpack's bundler try
       console.warn(`[SandpackPreview] Sucrase parse warning in ${filePath}, passing through to Sandpack`);
       return code;
     }
