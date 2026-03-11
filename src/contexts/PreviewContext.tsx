@@ -33,8 +33,8 @@ interface PreviewContextType {
   buildStep: string;
   setBuildStep: (step: string) => void;
   // Mode
-  previewMode: "html" | "sandpack" | "esm";
-  setPreviewMode: (mode: "html" | "sandpack" | "esm") => void;
+  previewMode: "html" | "sandpack" | "esm" | "vite";
+  setPreviewMode: (mode: "html" | "sandpack" | "esm" | "vite") => void;
   // Build metrics for timeline
   buildMetrics: BuildMetrics | null;
   setBuildMetrics: (metrics: BuildMetrics | null) => void;
