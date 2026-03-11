@@ -182,7 +182,7 @@ export function useConversationState() {
 
   // ─── ANALYZE SYNC: Client-only fast path (backward compat) ────────
   const analyzeMessageSync = useCallback((text: string, hasImages: boolean): {
-    action: "gather" | "build" | "chat" | "continue";
+    action: "gather" | "build" | "edit" | "chat" | "continue";
     reason: string;
   } => {
     const trimmed = text.trim();
@@ -194,6 +194,7 @@ export function useConversationState() {
     }
     if (PHASED_SIGNALS.test(lower)) return { action: "gather", reason: "Phased approach" };
     if (INFO_PROVIDING_SIGNALS.test(lower)) return { action: "gather", reason: "Info providing" };
+    if (EDIT_VERBS.test(lower) && EDIT_TARGETS.test(lower) && !BUILD_FULL.test(lower)) return { action: "edit", reason: "Edit intent" };
     return { action: "continue", reason: "No signal" };
   }, [mode]);
 
