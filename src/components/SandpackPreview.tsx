@@ -402,6 +402,9 @@ function buildSandpackFiles(files: SandpackFileSet | null, projectId: string, su
       processed = processed.replace(/^\s*const\s+navigate\s*=\s*useNavigate\s*\(\s*\)\s*;?\s*$/gm, "");
       // Step 2: Replace any navigate("/...") calls with no-ops
       processed = processed.replace(/\bnavigate\s*\(\s*['"][^'"]*['"]\s*\)/g, "/* navigate removed */");
+      // Step 2b: Remove "navigate" from dependency arrays like [projectId, navigate]
+      processed = processed.replace(/,\s*navigate\b/g, "");
+      processed = processed.replace(/\bnavigate\s*,\s*/g, "");
       // Step 3: Remove useNavigate from import statements (e.g. "import { useState, useNavigate } from ...")
       processed = processed.replace(/,\s*useNavigate/g, "");
       processed = processed.replace(/useNavigate\s*,\s*/g, "");
