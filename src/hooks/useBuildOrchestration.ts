@@ -777,12 +777,16 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
         ? liveSandpackFiles
         : undefined;
 
-      // FIX 2: CostRouter must score the FULL prompt (including accumulated requirements), not just "build it"
+      // FIX: CostRouter must score the FULL prompt context, not just the short "build it" trigger text
       const fileCount = safeExistingFiles ? Object.keys(safeExistingFiles).length : 0;
+      // Use the full text that will be sent to the build agent (includes accumulated requirements)
+      const fullPromptForScoring = currentCodeSummary 
+        ? `${userText}\n\n${currentCodeSummary}` 
+        : userText;
       // Don't pass user model override for complex builds — let CostRouter decide
-      const isComplexBuild = userText.length > 2000 || /Phase \d+/gi.test(userText);
+      const isComplexBuild = fullPromptForScoring.length > 2000 || /Phase \d+/gi.test(userText) || userText.length > 500;
       const modelOverride = isComplexBuild ? undefined : (selectedModel !== "google/gemini-2.5-pro" ? selectedModel : undefined);
-      const routedModel = clientRouteModel(userText, "build", fileCount, modelOverride);
+      const routedModel = clientRouteModel(fullPromptForScoring, "build", fileCount, modelOverride);
       if (isComplexBuild) {
         console.log(`[BuildOrch] Complex build detected (${userText.length} chars) — CostRouter will select model (no user override)`);
       }
