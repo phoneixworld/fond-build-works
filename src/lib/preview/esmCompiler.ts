@@ -124,6 +124,12 @@ export function rewriteToRegistry(
     return resolved;
   }
 
+  // Rewrite new URL("./path", import.meta.url) → static string
+  code = code.replace(
+    /new\s+URL\(\s*['"]([^'"]+)['"]\s*,\s*import\.meta\.url\s*\)/g,
+    (_m, path: string) => `"${path}"`
+  );
+
   // Strip CSS imports
   code = code.replace(/import\s+['"][^'"]*\.css['"]\s*;?/g, "");
 

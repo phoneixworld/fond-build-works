@@ -174,8 +174,11 @@ ${moduleDefinitions}
       __cache__[specifier] = __exports__;
 
       try {
+        // Polyfill import.meta.url for AsyncFunction context
+        const metaUrl = new URL(specifier, location.href).href;
+        const wrappedSource = "const import_meta_url = \\"" + metaUrl + "\\";\\n" + source.replace(/import\\.meta\\.url/g, "import_meta_url");
         const AsyncFunction = Object.getPrototypeOf(async function(){}).constructor;
-        const fn = new AsyncFunction("__exports__", "__import__", source);
+        const fn = new AsyncFunction("__exports__", "__import__", wrappedSource);
         await fn(__exports__, __import__);
       } catch(e) {
         console.error("[Phoenix] Error in " + specifier + ":", e);
