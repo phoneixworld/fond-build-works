@@ -24,11 +24,22 @@ export function planTaskGraph(ctx: BuildContext): TaskGraph {
   const infraTask = createTask({
     label: "infra",
     type: "infra",
-    description: "Shared UI components, design tokens, global styles",
+    description: `Shared UI components, design tokens, global styles.
+    
+UI components must be production-quality:
+- Toast.jsx: Animated toast notifications with success/error/info variants
+- Spinner.jsx: Loading spinner with size prop
+- DataTable.jsx: Reusable table component with header, rows, sorting indicator, empty state
+- Card.jsx: Versatile card with title, icon, value, trend, and children slots
+- globals.css: Complete design token system with CSS variables for colors, spacing, typography
+
+The Card component should support stat display mode:
+<Card title="Students" icon={Users} value="1,247" trend="+12%" trendUp={true} />`,
     produces: [
       "/components/ui/Toast.jsx",
       "/components/ui/Spinner.jsx",
       "/components/ui/DataTable.jsx",
+      "/components/ui/Card.jsx",
       "/styles/globals.css",
     ],
     priority: 0,
