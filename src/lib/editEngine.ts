@@ -311,9 +311,11 @@ export async function executeEdit(
  * Parse the AI's edit response to extract modified files.
  * Expects the same --- separator format used by the build agent.
  */
-function parseEditOutput(text: string): Record<string, string> | null {
+function parseEditOutput(text: string): { files: Record<string, string>; deps: Record<string, string> } | null {
   const files: Record<string, string> = {};
+  const deps: Record<string, string> = {};
   const separatorRegex = /^-{3}\s+(\/?\w[\w/.-]*\.(?:jsx?|tsx?|css))\s*-{0,3}\s*$/;
+  const depsSeparatorRegex = /^-{3}\s+\/?dependencies\s*-{0,3}\s*$/;
 
   // Find code fence
   const fencePatterns = ["```jsx", "```react", "```react-preview", "```jsx-preview", "```javascript"];
@@ -346,6 +348,8 @@ function parseEditOutput(text: string): Record<string, string> | null {
   const lines = block.split("\n");
   let currentFile: string | null = null;
   let currentLines: string[] = [];
+  let inDeps = false;
+  let depsLines: string[] = [];
 
   function flush() {
     if (currentFile) {
@@ -356,28 +360,46 @@ function parseEditOutput(text: string): Record<string, string> | null {
         files[fname] = code;
       }
     }
+    if (inDeps) {
+      try { Object.assign(deps, JSON.parse(depsLines.join("\n").trim())); } catch {}
+      inDeps = false;
+      depsLines = [];
+    }
     currentFile = null;
     currentLines = [];
   }
 
   for (const line of lines) {
-    const match = line.trim().match(separatorRegex);
+    const trimmed = line.trim();
+
+    // Check for dependencies boundary FIRST (before file separator)
+    if (depsSeparatorRegex.test(trimmed)) {
+      flush();
+      inDeps = true;
+      continue;
+    }
+
+    const match = trimmed.match(separatorRegex);
     if (match) {
       flush();
       currentFile = match[1];
       continue;
     }
-    if (currentFile) currentLines.push(line);
+
+    if (inDeps) {
+      depsLines.push(line);
+    } else if (currentFile) {
+      currentLines.push(line);
+    }
   }
   flush();
 
   // If no separators found but there's code, it's probably a single file edit
   if (Object.keys(files).length === 0 && block.trim().length > 20) {
-    // We can't determine the file path without separators
     return null;
   }
 
-  return Object.keys(files).length > 0 ? files : null;
+  return Object.keys(files).length > 0 ? { files, deps } : null;
 }
 
 // ─── Intent Detection ────────────────────────────────────────────────────────
