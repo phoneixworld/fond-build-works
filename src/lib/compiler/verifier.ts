@@ -416,6 +416,9 @@ function checkUndefinedCalls(workspace: Workspace): { issues: VerificationIssue[
         }
       }
     }
+  }
+
+  return { issues };
 }
 
 // ─── Router Hook Violations ───────────────────────────────────────────────
