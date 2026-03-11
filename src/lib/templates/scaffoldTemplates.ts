@@ -567,13 +567,18 @@ export function getUseApiHook(): string {
 const API_BASE = window.__SUPABASE_URL__ || "";
 const API_KEY = window.__SUPABASE_KEY__ || "";
 
-export function useApi(collection, projectId) {
-  const [data, setData] = useState([]);
+export function useApi(collection, projectId, sampleData) {
+  const fallback = sampleData || [];
+  const [data, setData] = useState(fallback);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
   const fetchData = useCallback(async () => {
-    if (!API_BASE || !projectId) { setLoading(false); return; }
+    if (!API_BASE || !projectId) {
+      setData(fallback);
+      setLoading(false);
+      return;
+    }
     try {
       setLoading(true);
       const res = await fetch(\`\${API_BASE}/functions/v1/project-api\`, {
@@ -582,9 +587,12 @@ export function useApi(collection, projectId) {
         body: JSON.stringify({ project_id: projectId, collection, action: "list" }),
       });
       const json = await res.json();
-      setData(json.data || []);
+      const result = json.data || [];
+      setData(result.length > 0 ? result : fallback);
     } catch (e) {
-      setError(e.message);
+      console.warn("API unavailable, using sample data:", e.message);
+      setData(fallback);
+      setError(null);
     } finally {
       setLoading(false);
     }
