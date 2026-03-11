@@ -114,6 +114,11 @@ function generateStubComponent(
     return generateContextStub(name, issue);
   }
 
+  // Layout files → generate a layout with Outlet for react-router
+  if (path.includes("/layout/") || name.toLowerCase().includes("layout")) {
+    return generateLayoutStub(name, issue);
+  }
+
   // Hook files → generate a custom hook
   if (path.includes("/hooks/") || name.startsWith("use")) {
     return generateHookStub(name, issue);
