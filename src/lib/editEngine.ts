@@ -284,9 +284,9 @@ export async function executeEdit(
   }
 
   // 4. Parse modified files from response
-  const modifiedFiles = parseEditOutput(fullText);
+  const parseResult = parseEditOutput(fullText);
 
-  if (!modifiedFiles || Object.keys(modifiedFiles).length === 0) {
+  if (!parseResult || Object.keys(parseResult.files).length === 0) {
     callbacks.onError("Could not parse the edit result. The AI may have returned an unexpected format.");
     return;
   }
@@ -298,7 +298,8 @@ export async function executeEdit(
     : "Files updated successfully.";
 
   callbacks.onComplete({
-    modifiedFiles,
+    modifiedFiles: parseResult.files,
+    dependencies: parseResult.deps,
     targetFiles,
     explanation,
   });
