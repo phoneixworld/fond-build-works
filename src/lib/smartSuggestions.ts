@@ -155,7 +155,7 @@ const RULES: SuggestionRule[] = [
   // ── Post-build follow-ups (highest priority — react to what just happened) ──
   {
     label: "Test it out",
-    prompt: "Please verify the app works correctly end-to-end — check all pages, forms, and interactions",
+    prompt: "Please verify the app works correctly — check all pages, forms, and interactions. Runtime checks haven't been run yet.",
     icon: "✅",
     score: (s) => s.recentAction === "building" ? 20 : 0,
   },

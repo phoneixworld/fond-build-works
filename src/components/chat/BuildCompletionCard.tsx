@@ -1,22 +1,66 @@
 /**
- * BuildCompletionCard — Shows clear feedback after a build completes.
- * Displays files changed, summary, and next actions.
+ * BuildCompletionCard — Shows clear, evidence-backed feedback after a build completes.
+ * 
+ * Three explicit states:
+ * - Static Verified: compile/syntax/import/route checks passed
+ * - Runtime Pending: no interaction tests executed yet
+ * - Runtime Verified: smoke interactions executed and passed
+ * 
+ * "Works end-to-end" text appears ONLY in Runtime Verified state.
  */
 
 import React from "react";
 import { motion } from "framer-motion";
-import { CheckCircle2, FileCode2, ArrowRight, Eye } from "lucide-react";
+import { CheckCircle2, FileCode2, ArrowRight, Eye, Clock, AlertTriangle, ShieldCheck, XCircle } from "lucide-react";
 import type { BuildResult } from "@/hooks/useConversationState";
 import type { RequirementPhase } from "@/hooks/useConversationState";
+import type { RuntimeStatus, RuntimeCheck } from "@/lib/compiler/types";
 
 interface BuildCompletionCardProps {
-  result: BuildResult;
+  result: BuildResult & {
+    runtimeStatus?: RuntimeStatus;
+    runtimeChecks?: RuntimeCheck[];
+    runtimeSummary?: string;
+  };
   phases?: RequirementPhase[];
   onViewPreview?: () => void;
 }
 
+function RuntimeBadge({ status, summary }: { status: RuntimeStatus; summary: string }) {
+  switch (status) {
+    case "passed":
+      return (
+        <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-100 text-emerald-700">
+          <ShieldCheck className="w-3 h-3" />
+          <span className="text-[10px] font-semibold">Runtime Verified</span>
+        </div>
+      );
+    case "failed":
+      return (
+        <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-destructive/10 text-destructive">
+          <XCircle className="w-3 h-3" />
+          <span className="text-[10px] font-semibold">Runtime Failed</span>
+        </div>
+      );
+    case "pending":
+    default:
+      return (
+        <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-amber-100 text-amber-700">
+          <Clock className="w-3 h-3" />
+          <span className="text-[10px] font-semibold">Runtime Pending</span>
+        </div>
+      );
+  }
+}
+
 export default function BuildCompletionCard({ result, phases, onViewPreview }: BuildCompletionCardProps) {
   const { filesChanged, totalFiles, chatSummary } = result;
+  const runtimeStatus: RuntimeStatus = result.runtimeStatus || "pending";
+  const runtimeChecks = result.runtimeChecks || [];
+  const runtimeSummary = result.runtimeSummary || "Runtime checks not run yet.";
+
+  const isStaticPass = chatSummary?.includes("Static checks passed") || chatSummary?.includes("All checks passed") || !chatSummary?.includes("error");
+  const failedRuntimeChecks = runtimeChecks.filter(c => !c.passed);
 
   return (
     <motion.div
@@ -38,7 +82,46 @@ export default function BuildCompletionCard({ result, phases, onViewPreview }: B
         )}
       </div>
 
+      {/* Verification badges */}
+      <div className="pl-8 flex flex-wrap gap-2">
+        {isStaticPass && (
+          <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-100 text-emerald-700">
+            <CheckCircle2 className="w-3 h-3" />
+            <span className="text-[10px] font-semibold">Static Verified</span>
+          </div>
+        )}
+        <RuntimeBadge status={runtimeStatus} summary={runtimeSummary} />
+      </div>
+
       {/* Summary */}
+      <div className="pl-8 space-y-1">
+        {isStaticPass && (
+          <p className="text-[11px] text-emerald-700 font-medium">
+            Static checks passed.
+          </p>
+        )}
+        <p className="text-[11px] text-muted-foreground">
+          {runtimeStatus === "passed"
+            ? "Runtime smoke checks passed."
+            : runtimeStatus === "failed"
+            ? "Runtime checks found issues."
+            : "Runtime checks not run yet."}
+        </p>
+      </div>
+
+      {/* Failed runtime checks details */}
+      {runtimeStatus === "failed" && failedRuntimeChecks.length > 0 && (
+        <div className="pl-8 space-y-1">
+          {failedRuntimeChecks.map((check, i) => (
+            <div key={i} className="flex items-start gap-1.5 text-[10px] text-destructive">
+              <AlertTriangle className="w-3 h-3 mt-0.5 shrink-0" />
+              <span><strong>{check.name}:</strong> {check.details}</span>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Chat summary — only show "end-to-end" language when runtime passed */}
       {chatSummary && (
         <p className="text-[12px] text-muted-foreground leading-relaxed pl-8">
           {chatSummary}

@@ -10,7 +10,7 @@
 
 import type {
   BuildContext, BuildResult, BuildStatus,
-  CompilerTask, TaskGraph, VerificationResult,
+  CompilerTask, TaskGraph, VerificationResult, RuntimeVerification,
 } from "./types";
 import { assembleBuildContext } from "./context";
 import { planTaskGraph, topologicalSort } from "./planner";
@@ -385,11 +385,11 @@ export async function compile(
 
   cloudLog.info(`Build ${status}: ${doneTasks}/${totalTasks} tasks, ${workspace.fileCount()} files`, "compiler");
 
-  // Build summary
+  // Build summary — only claims static verification, never end-to-end
   const summary = [
     `Build ${status}: ${doneTasks}/${totalTasks} tasks completed`,
     `${workspace.fileCount()} files in workspace (${(workspace.totalSize() / 1024).toFixed(1)}KB)`,
-    verification.ok ? "All checks passed ✅" : `${errorCount} errors, ${verification.issues.length - errorCount} warnings`,
+    verification.ok ? "Static checks passed ✅" : `${errorCount} errors, ${verification.issues.length - errorCount} warnings`,
     repairRound > 0 ? buildRepairSummary(repairRound, totalRepairActions, verification.issues) : "",
   ].filter(Boolean).join("\n");
 
@@ -399,10 +399,18 @@ export async function compile(
 
   const nextActions = buildNextActions(verification, taskGraph);
 
+  // Runtime verification: always starts as pending — no runtime checks ran during build
+  const runtime: RuntimeVerification = {
+    runtimeStatus: "pending",
+    runtimeChecks: [],
+    runtimeSummary: "Runtime checks not run yet.",
+  };
+
   const result: BuildResult = {
     status,
     workspace: workspace.toRecord(),
     verification,
+    runtime,
     trace,
     summary,
     knownIssues,
@@ -437,7 +445,7 @@ function buildNextActions(
   }
 
   if (actions.length === 0) {
-    actions.push("Test the application end-to-end");
+    actions.push("Test the application — runtime checks have not been executed yet");
     actions.push("Add more features");
   }
 

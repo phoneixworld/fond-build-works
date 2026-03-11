@@ -893,9 +893,16 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
           syncSandpackToVirtualFS(result.workspace);
           setPreviewMode("sandpack");
 
-          // Build completion message
+          // Build completion message — evidence-backed, no false claims
           const statusEmoji = result.status === "success" ? "✅" : result.status === "partial" ? "⚠️" : "❌";
-          const msg = `${statusEmoji} ${result.summary}${result.knownIssues.length > 0 ? `\n\n**Known issues:**\n${result.knownIssues.map(i => `- ${i}`).join("\n")}` : ""}${result.nextActions.length > 0 ? `\n\n**Next steps:**\n${result.nextActions.map(a => `- ${a}`).join("\n")}` : ""}`;
+          const staticLine = result.verification.ok ? "Static checks passed." : `${result.verification.issues.filter(i => i.severity === "error").length} static issues found.`;
+          const runtimeLine = result.runtime?.runtimeStatus === "passed"
+            ? "Runtime smoke checks passed."
+            : result.runtime?.runtimeStatus === "failed"
+            ? "Runtime checks found issues."
+            : "Runtime checks not run yet.";
+          
+          const msg = `${statusEmoji} ${result.summary}\n\n**Verification:** ${staticLine}\n**Runtime:** ${runtimeLine}${result.knownIssues.length > 0 ? `\n\n**Known issues:**\n${result.knownIssues.map(i => `- ${i}`).join("\n")}` : ""}${result.nextActions.length > 0 ? `\n\n**Next steps:**\n${result.nextActions.map(a => `- ${a}`).join("\n")}` : ""}`;
 
           setMessages((prev) => {
             const last = prev[prev.length - 1];

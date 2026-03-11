@@ -187,6 +187,22 @@ export interface RepairAction {
   prompt: string;
 }
 
+// ─── Runtime Verification ─────────────────────────────────────────────────
+
+export type RuntimeStatus = "pending" | "passed" | "failed";
+
+export interface RuntimeCheck {
+  name: string;
+  passed: boolean;
+  details: string;
+}
+
+export interface RuntimeVerification {
+  runtimeStatus: RuntimeStatus;
+  runtimeChecks: RuntimeCheck[];
+  runtimeSummary: string;
+}
+
 // ─── Build Result ─────────────────────────────────────────────────────────
 
 export type BuildStatus = "success" | "partial" | "failed";
@@ -195,6 +211,7 @@ export interface BuildResult {
   status: BuildStatus;
   workspace: Record<string, string>;
   verification: VerificationResult;
+  runtime: RuntimeVerification;
   trace: BuildTrace;
   /** Human-readable summary */
   summary: string;
