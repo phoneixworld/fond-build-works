@@ -395,11 +395,24 @@ function buildSandpackFiles(files: SandpackFileSet | null, projectId: string, su
     const sandpackPath = normalized.replace(/\.(tsx?|jsx)$/, ".js");
     let processed = sandpackPath.match(/\.js$/) ? sanitizeImports(code, sandpackPath) : code;
 
-    // Ensure AuthContext has both named + default exports to prevent import mismatches
+    // ── AuthContext fixes: strip useNavigate, ensure exports ──
     if (sandpackPath.includes("AuthContext") && sandpackPath.endsWith(".js")) {
+      // CRITICAL: AuthContext must NOT use useNavigate — it sits outside Router
+      // Remove useNavigate import
+      processed = processed.replace(
+        /,?\s*useNavigate\s*/g,
+        (match) => {
+          // If it's ", useNavigate" or "useNavigate, " inside a destructure/import
+          return "";
+        }
+      );
+      // Remove the "const navigate = useNavigate();" line
+      processed = processed.replace(/^\s*const\s+navigate\s*=\s*useNavigate\(\)\s*;?\s*$/gm, "");
+      // Replace any navigate("/...") calls with no-ops (navigation should be in consuming components)
+      processed = processed.replace(/\bnavigate\s*\(\s*['"][^'"]*['"]\s*\)/g, "/* navigate removed */");
+
       // Ensure AuthProvider is a named export
       if (/export\s+default\s+function\s+AuthProvider/.test(processed)) {
-        // "export default function AuthProvider" → make it also a named export
         processed = processed.replace(
           /export\s+default\s+function\s+AuthProvider/,
           "export function AuthProvider"
@@ -411,12 +424,8 @@ function buildSandpackFiles(files: SandpackFileSet | null, projectId: string, su
       if (/export\s+function\s+AuthProvider/.test(processed) && !/export\s+default/.test(processed)) {
         processed += "\nexport default AuthProvider;\n";
       }
-      // Add named export if only default exists with const pattern
       if (/export\s+default\s+AuthProvider/.test(processed) && !/export\s+(function|const)\s+AuthProvider/.test(processed)) {
-        processed = processed.replace(
-          /^(const\s+AuthProvider\s*=)/m,
-          "export $1"
-        );
+        processed = processed.replace(/^(const\s+AuthProvider\s*=)/m, "export $1");
       }
       // Ensure useAuth is exported
       if (/function\s+useAuth\b/.test(processed) && !/export\s+(function|const)\s+useAuth/.test(processed)) {
