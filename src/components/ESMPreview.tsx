@@ -4,15 +4,21 @@ import { useProjects } from "@/contexts/ProjectContext";
 import { buildESMPreview, revokeBlobUrls } from "@/lib/esmPreviewBuilder";
 import { AlertTriangle, RefreshCw } from "lucide-react";
 
-/** Check if the workspace has a real App entry point */
+/** Check if the workspace has a real App entry point or enough files to render */
 function hasAppEntry(files: Record<string, string> | null): boolean {
   if (!files) return false;
-  return Object.keys(files).some(p => {
+  const keys = Object.keys(files);
+  // Check for explicit App entry
+  const hasExplicitApp = keys.some(p => {
     const normalized = p.replace(/^\/+/, '/');
     return /\/?(?:src\/)?App\.(tsx?|jsx?)$/.test(normalized) || 
            normalized === '/App.jsx' || normalized === '/App.tsx' ||
            normalized === '/App.js' || normalized === '/App.ts';
   });
+  if (hasExplicitApp) return true;
+  // Fallback: if we have JSX/TSX files, auto-generate an App entry
+  const jsxFiles = keys.filter(p => /\.(jsx?|tsx?)$/.test(p));
+  return jsxFiles.length >= 2; // At least 2 component files = worth rendering
 }
 
 interface ESMPreviewProps {

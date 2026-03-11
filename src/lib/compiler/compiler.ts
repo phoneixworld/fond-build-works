@@ -26,6 +26,7 @@ import {
   traceTaskStart, traceTaskEnd, finalizeTrace, printTrace,
 } from "./observability";
 import { cloudLog } from "@/lib/cloudLogBus";
+import { synthesizeAppJsx } from "./appSynthesizer";
 
 // ─── Public API ───────────────────────────────────────────────────────────
 
@@ -211,6 +212,19 @@ export async function compile(
   if (providersInjected > 0) {
     cloudLog.info(`Provider injector: added ${providersInjected} missing provider(s) to App`, "compiler");
     console.log(`[Compiler] 💉 Provider injector: added ${providersInjected} missing provider(s)`);
+  }
+
+  // ── Phase 3.8: Ensure App.jsx exists ────────────────────────────────
+
+  const appEntryPoints = ["/App.jsx", "/App.tsx", "/App.js", "/App.ts"];
+  const hasAppEntry = appEntryPoints.some(p => workspace.hasFile(p));
+
+  if (!hasAppEntry) {
+    callbacks.onPhase("synthesizing-app", "Generating App entry point...");
+    const synthesizedApp = synthesizeAppJsx(workspace);
+    workspace.addFile("/App.jsx", synthesizedApp);
+    cloudLog.warn("App.jsx was missing after build — synthesized from available components", "compiler");
+    console.log(`[Compiler] 🏗️ Synthesized missing App.jsx from available workspace components`);
   }
 
   // ── Phase 4: Verification ──────────────────────────────────────────
