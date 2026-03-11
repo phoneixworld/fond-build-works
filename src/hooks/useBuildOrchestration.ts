@@ -362,7 +362,6 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
           : currentPreviewHtml.slice(0, 12000) + `\n...[truncated — ${Math.round(currentPreviewHtml.length / 1000)}k chars total]`;
       }
 
-      const snippetsContext = getSnippetsPromptContext(userText);
       const currentMessages = messagesRef.current;
       const apiMessages = [...currentMessages, userMsg].map(m => ({
         role: m.role,
@@ -371,6 +370,7 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
 
       const themeInfo = DESIGN_THEMES.find(t => t.id === selectedTheme);
       const userText = typeof text === "string" ? text : "";
+      const snippetsContext = getSnippetsPromptContext(userText);
       const template = selectedTemplate || (currentMessages.length === 0 ? matchTemplate(userText) : null);
       let templateCtx = "";
       if (template) {
