@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { DIRECT_TOUCH_SCRIPT } from "@/components/DirectTouch";
 import SandpackPreview from "@/components/SandpackPreview";
 import ESMPreview from "@/components/ESMPreview";
+import VitePreview from "@/components/VitePreview";
 
 const VIEWPORTS_MAP = {
   desktop: { width: "100%", maxWidth: "none" },
