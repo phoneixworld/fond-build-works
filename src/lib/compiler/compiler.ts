@@ -258,7 +258,18 @@ export async function compile(
 
     for (const action of actions) {
       try {
-        // Create a micro-task for repair
+        // Handle deterministic repairs without AI
+        if (action.type === "fix_deterministic") {
+          const fixed = applyDeterministicFix(action, workspace);
+          if (fixed) {
+            totalRepairActions++;
+            cloudLog.info(`Deterministic fix: ${action.targetFile} (${action.issue.category})`, "compiler");
+            console.log(`[Compiler]   🔧 Deterministic fix: ${action.targetFile} (${action.issue.category})`);
+            continue;
+          }
+        }
+
+        // Create a micro-task for AI repair
         const repairTask: CompilerTask = {
           id: `repair-${repairRound}-${action.targetFile}`,
           label: `repair:${action.type}:${action.targetFile}`,
