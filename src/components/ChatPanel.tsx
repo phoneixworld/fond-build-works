@@ -677,6 +677,7 @@ const ChatPanel = forwardRef<ChatPanelHandle, { initialPrompt?: string; onVersio
             <BuildPipelineCard
               isBuilding={isLoading}
               streamContent={buildStreamContent}
+              tasks={compilerTasks.length > 0 ? compilerTasks : undefined}
               pipelineStep={pipelineStep}
               currentAgent={currentAgent === "clarify" ? null : currentAgent as "chat" | "build" | "edit" | null}
               onShowPreview={() => {
