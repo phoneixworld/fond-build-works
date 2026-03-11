@@ -53,6 +53,14 @@ export function verifyWorkspace(
   const exportResults = checkExportValidity(workspace);
   issues.push(...exportResults.issues);
 
+  // 10. Semantic check: missing imports for common identifiers (clsx, React)
+  const missingImportResults = checkMissingCommonImports(workspace);
+  issues.push(...missingImportResults.issues);
+
+  // 11. Semantic check: provider ordering (ToastProvider must wrap AuthProvider)
+  const providerOrderResults = checkProviderOrdering(workspace);
+  issues.push(...providerOrderResults.issues);
+
   // Stats
   const files = workspace.listFiles();
   const jsFiles = files.filter(f => /\.(jsx?|tsx?)$/.test(f));
