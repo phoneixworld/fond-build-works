@@ -272,6 +272,67 @@ export function useConversationState() {
     // Server transition happens in get_compiled_requirements
   }, []);
 
+  const startEditing = useCallback(async (instruction: string, targetFiles: string[], beforeSnapshots: Record<string, string>) => {
+    setMode("editing");
+    const projectId = currentProjectId.current;
+    if (projectId) {
+      try {
+        await callEngine({
+          action: "edit_started",
+          projectId,
+          instruction,
+          targetFiles,
+          beforeSnapshots: Object.fromEntries(
+            Object.entries(beforeSnapshots).map(([k, v]) => [k, hashSnapshot(v)])
+          ),
+        });
+      } catch (err) {
+        console.warn("[ConvState] edit_started failed:", err);
+      }
+    }
+  }, []);
+
+  const completeEdit = useCallback(async (
+    instruction: string,
+    targetFiles: string[],
+    beforeSnapshots: Record<string, string>,
+    afterSnapshots: Record<string, string>,
+    explanation: string
+  ) => {
+    const projectId = currentProjectId.current;
+    if (projectId) {
+      try {
+        const result = await callEngine({
+          action: "edit_complete",
+          projectId,
+          instruction,
+          targetFiles,
+          beforeSnapshots: Object.fromEntries(
+            Object.entries(beforeSnapshots).map(([k, v]) => [k, hashSnapshot(v)])
+          ),
+          afterSnapshots: Object.fromEntries(
+            Object.entries(afterSnapshots).map(([k, v]) => [k, hashSnapshot(v)])
+          ),
+          explanation,
+        });
+        if (result.postEditReadiness) {
+          syncReadiness(result.postEditReadiness);
+          if (!result.postEditReadiness.isReady) {
+            console.warn("[ConvState] Post-edit readiness check FAILED:", result.postEditReadiness.recommendation);
+          }
+        }
+        setMode("complete");
+        return result.postEditReadiness || null;
+      } catch (err) {
+        console.warn("[ConvState] edit_complete failed:", err);
+        setMode("complete");
+      }
+    } else {
+      setMode("complete");
+    }
+    return null;
+  }, [syncReadiness]);
+
   const completeBuild = useCallback(async (result: BuildResult) => {
     setLastBuildResult(result);
     setMode("complete");
