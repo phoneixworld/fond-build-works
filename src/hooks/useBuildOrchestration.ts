@@ -1219,12 +1219,17 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
           return;
         }
 
-        // Server might also detect edit intent
-        if (classification?.intent === "edit") {
-          setCurrentAgent("edit");
-          setPipelineStep("resolving");
-          sendEditMessage(finalText, images);
-          return;
+        // Server might also return edit intent (or we detect it locally)
+        const serverIntent = classification?.intent as AgentIntent;
+        if (serverIntent === "edit" || (serverIntent === "build" && sandpackFilesRef.current && Object.keys(sandpackFilesRef.current).length > 0)) {
+          // If server says "build" but we have existing code and it looks like an edit, try edit
+          const hasExisting = sandpackFilesRef.current && Object.keys(sandpackFilesRef.current).length > 0;
+          if (serverIntent === "edit" || (hasExisting && finalText.length < 200)) {
+            setCurrentAgent("edit");
+            setPipelineStep("resolving");
+            sendEditMessage(finalText, images);
+            return;
+          }
         }
       }
     }
