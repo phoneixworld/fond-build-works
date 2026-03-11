@@ -79,14 +79,14 @@ serve(async (req) => {
         const { data: user, error } = await supabase
           .from("project_users")
           .insert({ project_id, email: email.toLowerCase(), password_hash: hash, display_name: display_name || name || email.split("@")[0] })
-          .select("id, email, display_name, created_at")
+          .select("id, email, display_name, metadata, created_at")
           .single();
         if (error) {
           if (error.code === "23505") throw new Error("Email already registered");
           throw error;
         }
         const tk = generateToken(user.id, project_id);
-        return json(200, { user, token: tk, access_token: tk });
+        return json(200, { user: normalizeUser(user), token: tk, access_token: tk });
       }
 
       case "login": {
