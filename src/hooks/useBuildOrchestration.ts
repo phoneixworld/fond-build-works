@@ -1142,11 +1142,26 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
       return;
     }
 
-    // ── Step 1: ALWAYS route through conversation state machine ──
-    if (conversationAnalyze) {
-      const convResult = conversationAnalyze(finalText, hasImages);
-      console.log(`[SmartSend] mode=${conversationMode}, action=${convResult.action}, reason=${convResult.reason}`);
+    // ── Step 1: ALWAYS route through async server conversation analyzer ──
+    // This is the SINGLE authoritative classifier. No sync fallback, no dual-path.
+    const hasExistingCode = !!(sandpackFilesRef.current && Object.keys(sandpackFilesRef.current).length > 0);
+    let convResult: { action: string; reason: string } | null = null;
 
+    if (conversationAnalyzeAsync) {
+      try {
+        convResult = await conversationAnalyzeAsync(finalText, hasImages, hasExistingCode);
+        if (isSmartSendStale()) {
+          console.warn("[SmartSend] Project switched during analysis, aborting");
+          return;
+        }
+        console.log(`[SmartSend] Server analysis: mode=${conversationMode}, action=${convResult.action}, reason=${convResult.reason}`);
+      } catch (err) {
+        console.warn("[SmartSend] Server analysis failed, falling back to local classifier:", err);
+      }
+    }
+
+    // If server returned a definitive action, route it
+    if (convResult && convResult.action !== "continue") {
       // ── GATHER: User is providing requirements ──
       if (convResult.action === "gather") {
         const phase = conversationAddPhase?.(finalText, hasImages, images);
@@ -1210,7 +1225,7 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
           return;
         }
         
-        console.log(`[SmartSend] No context found, proceeding as direct build`);
+        // No accumulated context — fall through to direct build below
       }
 
       // ── CHAT: Route to chat agent ──
@@ -1222,8 +1237,8 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
       }
     }
 
-    // ── Step 2: Intent classification (only for ambiguous messages) ──
-    // No legacy short-circuit heuristics — everything goes through classifier
+    // ── Step 2: Fallback classification (ONLY when server returned "continue" or failed) ──
+    // Uses local classifier first, then server intent classifier for ambiguous cases
     if (finalText.length > 15) {
       const localIntent = fastClassifyLocal(finalText);
 
@@ -1242,7 +1257,7 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
       }
 
       if (localIntent !== "build") {
-        // Server classification for ambiguous cases
+        // Server classification for truly ambiguous cases
         const classification = await classifyUserIntent(finalText);
         if (isSmartSendStale()) {
           console.warn("[SmartSend] Project switched during intent classification, aborting");
@@ -1257,25 +1272,18 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
           return;
         }
 
-        // Server might also return edit intent (or we detect it locally)
-        const serverIntent = classification?.intent as AgentIntent;
-        if (serverIntent === "edit" || (serverIntent === "build" && sandpackFilesRef.current && Object.keys(sandpackFilesRef.current).length > 0)) {
-          // If server says "build" but we have existing code and it looks like an edit, try edit
-          const hasExisting = sandpackFilesRef.current && Object.keys(sandpackFilesRef.current).length > 0;
-          if (serverIntent === "edit" || (hasExisting && finalText.length < 200)) {
-            setCurrentAgent("edit");
-            setPipelineStep("resolving");
-            sendEditMessage(finalText, images);
-            return;
-          }
+        if (classification?.intent === "edit") {
+          setCurrentAgent("edit");
+          setPipelineStep("resolving");
+          sendEditMessage(finalText, images);
+          return;
         }
       }
     }
 
-    // ── Step 3: Default to build (only if no gathering mode active) ──
+    // ── Step 3: Default to build ──
     // GATE: If server FSM is in "gathering" mode, DO NOT build — gather instead
     if (conversationMode === "gathering") {
-      // Treat as additional requirements
       const phase = conversationAddPhase?.(finalText, hasImages, images);
       const ackText = conversationGenerateAck?.(phase) || "✅ Got it! Send the next phase when ready, or say **\"build it\"** to start.";
 
@@ -1294,7 +1302,7 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
     setCurrentAgent("build");
     setPipelineStep("planning");
     sendMessage(finalText, images);
-  }, [classifyUserIntent, fastClassifyLocal, sendChatMessage, sendMessage, sendEditMessage, conversationAnalyze, conversationAddPhase, conversationGetRequirements, conversationStartBuilding, conversationGenerateAck, conversationMode, buildMessageContent, setInput, setAttachedImages, setMessages, saveProject]);
+  }, [classifyUserIntent, fastClassifyLocal, sendChatMessage, sendMessage, sendEditMessage, conversationAnalyzeAsync, conversationAddPhase, conversationGetRequirements, conversationStartBuilding, conversationGenerateAck, conversationMode, buildMessageContent, setInput, setAttachedImages, setMessages, saveProject]);
 
   const clearChat = useCallback(() => {
     if (!currentProject || isLoading) return;
