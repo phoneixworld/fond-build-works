@@ -17,7 +17,7 @@ import { planTaskGraph, topologicalSort } from "./planner";
 import { Workspace } from "./workspace";
 import { executeTask, type ExecutionCallbacks } from "./executor";
 import { verifyWorkspace } from "./verifier";
-import { classifyRepairActions, buildRepairSummary, MAX_REPAIR_ROUNDS } from "./repair";
+import { classifyRepairActions, buildRepairSummary, applyDeterministicFix, MAX_REPAIR_ROUNDS } from "./repair";
 import { fixBrokenImports } from "./importFixer";
 import { repairMissingModules } from "./missingModuleGen";
 import { injectMissingProviders } from "./providerInjector";
