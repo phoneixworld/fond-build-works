@@ -437,7 +437,7 @@ function buildNextActions(
   }
 
   if (actions.length === 0) {
-    actions.push("Test the application end-to-end");
+    actions.push("Test the application — runtime checks have not been executed yet");
     actions.push("Add more features");
   }
 
