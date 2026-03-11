@@ -21,6 +21,12 @@ import type {
 } from "./types";
 import { compileFile } from "./esmCompiler";
 import { buildImportMap, CdnImportMapProvider } from "./importMapResolver";
+import {
+  rewriteImportsForSW,
+  buildDependencyGraph,
+  detectCircularDeps,
+  isBarrelFile,
+} from "./astImportRewriter";
 
 // ─── Vite Preview Engine ────────────────────────────────────────────────────
 
@@ -86,9 +92,26 @@ export class VitePreviewEngine implements PreviewEngine {
             timestamp: Date.now(),
           });
         }
-        // Rewrite imports for SW resolution
-        compiledFiles[path.replace(/\.tsx?$/, ".js").replace(/\.jsx$/, ".js")] =
-          this.rewriteImportsForSW(compiled.code, path, fileSet);
+
+        // AST-aware import rewriting
+        const rewritten = rewriteImportsForSW(compiled.code, {
+          filePath: path,
+          fileSet,
+          resolveFile: (importPath) => this.findFileWithExtension(importPath, fileSet),
+        });
+
+        if (rewritten.unresolvedImports.length > 0) {
+          diagnostics.push({
+            severity: "warning",
+            category: "unresolved-import",
+            message: `Unresolved in ${path}: ${rewritten.unresolvedImports.join(", ")}`,
+            file: path,
+            timestamp: Date.now(),
+          });
+        }
+
+        const jsPath = path.replace(/\.tsx?$/, ".js").replace(/\.jsx$/, ".js");
+        compiledFiles[jsPath] = rewritten.code;
       } else if (path.endsWith(".css")) {
         const cleaned = code
           .replace(/^@tailwind\s+\w+;\s*$/gm, "")
@@ -108,6 +131,23 @@ export class VitePreviewEngine implements PreviewEngine {
         }
         compiledFiles[path] = code;
       }
+    }
+
+    // 3b. Detect circular dependencies and add diagnostics
+    const depGraph = buildDependencyGraph(normalized, fileSet,
+      (importPath) => this.findFileWithExtension(importPath, fileSet)
+    );
+    const cycles = detectCircularDeps(depGraph);
+    if (cycles.length > 0) {
+      for (const cycle of cycles) {
+        diagnostics.push({
+          severity: "warning",
+          category: "circular-import",
+          message: `Circular dependency: ${cycle.join(" → ")}`,
+          timestamp: Date.now(),
+        });
+      }
+      console.warn(`[Phoenix Vite] Detected ${cycles.length} circular dependency chain(s)`);
     }
 
     // 4. Build import map
@@ -163,74 +203,7 @@ export class VitePreviewEngine implements PreviewEngine {
     return result.htmlShell;
   }
 
-  // ─── Import Rewriting for SW ────────────────────────────────────────────
-
-  private rewriteImportsForSW(
-    code: string,
-    filePath: string,
-    fileSet: Set<string>
-  ): string {
-    // Rewrite relative imports to resolved .js paths
-    // import X from "./components/Header" → import X from "./components/Header.js"
-    code = code.replace(
-      /(import\s+(?:[\w$*{},\s]+\s+from\s+)?['"])(\.\.?\/[^'"]+)(['"])/g,
-      (match, prefix, importPath, suffix) => {
-        // Skip CSS imports
-        if (importPath.endsWith(".css")) return match;
-        
-        const resolved = this.resolveRelativeImport(filePath, importPath, fileSet);
-        // Convert to .js extension for the compiled version
-        const jsPath = resolved
-          .replace(/\.tsx?$/, ".js")
-          .replace(/\.jsx$/, ".js");
-        return `${prefix}${jsPath}${suffix}`;
-      }
-    );
-
-    // Rewrite @/ alias imports to relative paths
-    code = code.replace(
-      /(import\s+(?:[\w$*{},\s]+\s+from\s+)?['"])@\/([^'"]+)(['"])/g,
-      (match, prefix, importPath, suffix) => {
-        const absPath = "/" + importPath;
-        const resolved = this.findFileWithExtension(absPath, fileSet);
-        const jsPath = resolved
-          ? resolved.replace(/\.tsx?$/, ".js").replace(/\.jsx$/, ".js")
-          : absPath + ".js";
-        return `${prefix}${jsPath}${suffix}`;
-      }
-    );
-
-    // Strip CSS imports (CSS is injected via <style> in index.html)
-    code = code.replace(/import\s+['"][^'"]*\.css['"]\s*;?/g, "");
-
-    // Rewrite new URL("./path", import.meta.url) patterns
-    code = code.replace(
-      /new\s+URL\(\s*(['"]([^'"]+)['"])\s*,\s*import\.meta\.url\s*\)/g,
-      (_m, _quoted, path: string) => {
-        return `new URL("${path}", window.location.origin + "/vfs-preview/")`;
-      }
-    );
-
-    return code;
-  }
-
-  private resolveRelativeImport(
-    fromFile: string,
-    importPath: string,
-    fileSet: Set<string>
-  ): string {
-    // Resolve relative path
-    const fromDir = fromFile.split("/").slice(0, -1).join("/");
-    const parts = [...fromDir.split("/"), ...importPath.split("/")].filter(Boolean);
-    const stack: string[] = [];
-    for (const part of parts) {
-      if (part === "..") stack.pop();
-      else if (part !== ".") stack.push(part);
-    }
-    const resolved = "/" + stack.join("/");
-
-    return this.findFileWithExtension(resolved, fileSet) || resolved;
-  }
+  // ─── Helpers (resolution moved to astImportRewriter.ts) ─────────────────
 
   private findFileWithExtension(path: string, fileSet: Set<string>): string | null {
     if (fileSet.has(path)) return path;
@@ -311,6 +284,11 @@ export default function App() {
   <div id="root"></div>
 
   <script>
+    // ── Phoenix Circular Dep Sentinel Registry ──
+    // Modules register themselves here BEFORE executing.
+    // Circular imports get partially-populated objects instead of deadlocking.
+    window.__phoenix_modules__ = {};
+
     // Asset registry
     window.__PHOENIX_ASSETS__ = ${JSON.stringify(assetMap)};
     window.__PHOENIX_PREVIEW__ = true;

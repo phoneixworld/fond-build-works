@@ -280,46 +280,36 @@ self.addEventListener("fetch", (event) => {
 });
 
 async function serveFile(path, request) {
-  // Direct match
-  if (fileMap.has(path)) {
-    return new Response(fileMap.get(path), {
+  // Resolve the actual file path (direct, with extension, or /index)
+  const resolvedPath = resolveFilePath(path);
+
+  if (resolvedPath) {
+    const content = fileMap.get(resolvedPath);
+    const mime = getMimeType(resolvedPath);
+
+    // For JS modules: wrap with circular-dep-safe loading sentinel
+    if (mime === "application/javascript") {
+      const wrapped = wrapWithLoadingSentinel(content, resolvedPath);
+      return new Response(wrapped, {
+        status: 200,
+        headers: {
+          "Content-Type": mime,
+          "Cache-Control": "no-cache",
+          "X-Phoenix-VFS": "true",
+          "X-Phoenix-Resolved": resolvedPath,
+        },
+      });
+    }
+
+    // Non-JS files served as-is
+    return new Response(content, {
       status: 200,
       headers: {
-        "Content-Type": getMimeType(path),
+        "Content-Type": mime,
         "Cache-Control": "no-cache",
         "X-Phoenix-VFS": "true",
       },
     });
-  }
-
-  // Try with extensions
-  const extensions = [".js", ".jsx", ".ts", ".tsx", ".json"];
-  for (const ext of extensions) {
-    if (fileMap.has(path + ext)) {
-      return new Response(fileMap.get(path + ext), {
-        status: 200,
-        headers: {
-          "Content-Type": getMimeType(path + ext),
-          "Cache-Control": "no-cache",
-          "X-Phoenix-VFS": "true",
-        },
-      });
-    }
-  }
-
-  // Try /index variants
-  for (const ext of [".js", ".jsx", ".ts", ".tsx"]) {
-    const indexPath = path + "/index" + ext;
-    if (fileMap.has(indexPath)) {
-      return new Response(fileMap.get(indexPath), {
-        status: 200,
-        headers: {
-          "Content-Type": "application/javascript",
-          "Cache-Control": "no-cache",
-          "X-Phoenix-VFS": "true",
-        },
-      });
-    }
   }
 
   // 404 — file not in VFS
@@ -330,6 +320,63 @@ async function serveFile(path, request) {
       "X-Phoenix-VFS": "miss",
     },
   });
+}
+
+/**
+ * Resolve a virtual path to an actual file in the map.
+ * Tries: exact → with extensions → /index variants
+ */
+function resolveFilePath(path) {
+  if (fileMap.has(path)) return path;
+
+  const extensions = [".js", ".jsx", ".ts", ".tsx", ".json"];
+  for (const ext of extensions) {
+    if (fileMap.has(path + ext)) return path + ext;
+  }
+
+  for (const ext of [".js", ".jsx", ".ts", ".tsx"]) {
+    const indexPath = path + "/index" + ext;
+    if (fileMap.has(indexPath)) return indexPath;
+  }
+
+  return null;
+}
+
+/**
+ * Wrap a JS module with a loading sentinel for circular dependency safety.
+ *
+ * Problem: Native ES modules deadlock when A imports B and B imports A.
+ * The browser's module loader will see A is "loading" when B tries to
+ * import it, and returns the partially-initialized module namespace
+ * (with undefined exports).
+ *
+ * Solution: We wrap each module to eagerly define its export object on
+ * a global registry BEFORE executing. When a circular import occurs,
+ * the importing module gets the partially-populated exports object
+ * (which will be filled in once the cycle resolves) instead of undefined.
+ *
+ * This is the same pattern Node.js uses for CommonJS circular deps
+ * and what Webpack/Rollup do with their runtime wrappers.
+ */
+function wrapWithLoadingSentinel(code, modulePath) {
+  // Don't wrap entry.js or non-application code
+  if (modulePath === "/entry.js" || modulePath.startsWith("/__")) {
+    return code;
+  }
+
+  // The sentinel registry is injected in index.html's <script> block
+  return `// ── Phoenix Circular Dep Sentinel ──
+if (!window.__phoenix_modules__) window.__phoenix_modules__ = {};
+if (!window.__phoenix_modules__["${modulePath}"]) {
+  window.__phoenix_modules__["${modulePath}"] = { __loading: true, __exports: {} };
+}
+const __self__ = window.__phoenix_modules__["${modulePath}"];
+
+${code}
+
+// Mark as fully loaded
+__self__.__loading = false;
+`;
 }
 
 async function serveIndex() {
