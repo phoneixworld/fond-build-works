@@ -125,6 +125,40 @@ function sanitizeImports(code: string, filePath: string): string {
     return true;
   }).join("\n");
 
+  // ── Rename local declarations that collide with imported identifiers ──
+  {
+    // Collect all imported identifiers
+    const importedIds = new Set<string>();
+    const importLineRe = /^\s*import\s+(?:(\w+)(?:\s*,\s*)?)?(?:\{([^}]*)\})?\s*from\s+['"][^'"]+['"]/gm;
+    let im;
+    while ((im = importLineRe.exec(code)) !== null) {
+      if (im[1]) importedIds.add(im[1]);
+      if (im[2]) {
+        im[2].split(",").forEach(s => {
+          const name = s.trim().split(/\s+as\s+/).pop()!.trim();
+          if (name) importedIds.add(name);
+        });
+      }
+    }
+
+    // For each imported name, rename any local re-declarations to __LOCAL_STUB_<Name>
+    if (importedIds.size > 0) {
+      for (const id of importedIds) {
+        // Match: const/let/var <Name> = ... OR function <Name>(
+        const localDeclRe = new RegExp(
+          `((?:const|let|var)\\s+)${id}(\\s*=)`,
+          "g"
+        );
+        const localFnRe = new RegExp(
+          `(function\\s+)${id}(\\s*\\()`,
+          "g"
+        );
+        code = code.replace(localDeclRe, `$1__LOCAL_STUB_${id}$2`);
+        code = code.replace(localFnRe, `$1__LOCAL_STUB_${id}$2`);
+      }
+    }
+  }
+
   // Strip import/export from blocked packages
   code = code.replace(
     /^\s*(?:import|export)\s+[\s\S]*?\s+from\s+['"]([^'"]+)['"]\s*;?\s*$/gm,
