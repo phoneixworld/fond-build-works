@@ -95,18 +95,24 @@ export function useIntentClassification(
     // Asking about something (even without question mark)
     if (/\b(what does|how does|how do|what is|what are|can i|should i|is there|would it|will it)\b/i.test(t)) return "chat";
 
+    // ── Edit patterns (check BEFORE build — edits are more specific) ──
+    const hasExistingCode = !!(sandpackFiles && Object.keys(sandpackFiles).length > 0) || !!(previewHtml && previewHtml.length > 0);
+    if (hasExistingCode && isEditIntent(text, true)) return "edit";
+
     // ── Build patterns ──
     // Clear build commands (verb-first)
     if (/^(build|create|make|add|generate|implement|develop|set up|scaffold|wire up)\b/i.test(t)) return "build";
-    // Modification commands (verb-first)
-    if (/^(change|update|fix|modify|replace|remove|delete|move|rename|resize|recolor|restyle)\b/i.test(t)) return "build";
+    // Modification commands (verb-first) — only if no existing code (otherwise it's an edit)
+    if (/^(change|update|fix|modify|replace|remove|delete|move|rename|resize|recolor|restyle)\b/i.test(t)) {
+      return hasExistingCode ? "edit" : "build";
+    }
     // Descriptive app prompts — require a build verb AND a target noun
     if (/\b(build|create|make|generate|design)\b/i.test(t) && /\b(app|website|dashboard|landing page|portal|system|platform|page|form|module|component)\b/i.test(t)) return "build";
     // Affirmative confirmations (only short ones — long "yes" messages might be specs)
     if (/^(yes|go ahead|do it|build it|sounds good|sure|let's go|proceed)\b/i.test(t) && t.length < 100) return "build";
 
     return null;
-  }, []);
+  }, [sandpackFiles, previewHtml]);
 
   const resetClassificationState = useCallback(() => {
     setFollowUpQuestions([]);
