@@ -354,17 +354,46 @@ export function buildESMPreview(
     }
   }
 
-  // Find entry point
-  const entryPath = [
+  // Find entry point — or synthesize one
+  let entryPath = [
     "/App.tsx", "/App.jsx", "/App.js", "/App.ts",
     "/src/App.tsx", "/src/App.jsx", "/src/App.js", "/src/App.ts",
   ].find(p => fileSet.has(p))
     || Array.from(fileSet).find(p => /\/App\.(tsx?|jsx?)$/.test(p));
 
   if (!entryPath) {
-    const allFiles = Array.from(fileSet).join(", ");
-    errors.push("No App entry point found");
-    return { html: buildErrorPage(`No App found. Files: ${allFiles}`), fileCount: 0, errors };
+    // Auto-synthesize a minimal App.jsx from available pages/components
+    const jsxFiles = Array.from(fileSet).filter(p => /\.(jsx?|tsx?)$/.test(p) && !p.includes("/ui/"));
+    if (jsxFiles.length > 0) {
+      const pageFiles = jsxFiles.filter(p => p.includes("/pages/"));
+      const mainComponent = pageFiles[0] || jsxFiles[0];
+      const compName = mainComponent.split("/").pop()!.replace(/\.\w+$/, "");
+      const hasAuthCtx = Array.from(fileSet).some(p => p.includes("AuthContext"));
+      
+      let appCode = `import React from "react";\n`;
+      appCode += `import ${compName} from ".${mainComponent.replace(/\.\w+$/, "")}";\n`;
+      if (hasAuthCtx) {
+        appCode += `import { AuthProvider } from "./contexts/AuthContext";\n`;
+        appCode += `\nexport default function App() {\n  return (\n    <AuthProvider>\n      <${compName} />\n    </AuthProvider>\n  );\n}\n`;
+      } else {
+        appCode += `\nexport default function App() {\n  return <${compName} />;\n}\n`;
+      }
+      
+      entryPath = "/App.jsx";
+      normalized[entryPath] = appCode;
+      fileSet.add(entryPath);
+      
+      // Compile and add to modules
+      const compiled = compileFile(appCode, entryPath);
+      const rewritten = rewriteToRegistry(compiled, entryPath, fileSet, npmImports);
+      modules.push({ path: entryPath, code: rewritten });
+      
+      console.log(`[ESM] Auto-synthesized App.jsx wrapping ${compName}`);
+    } else {
+      const allFiles = Array.from(fileSet).join(", ");
+      errors.push("No App entry point found");
+      return { html: buildErrorPage(`No App found. Files: ${allFiles}`), fileCount: 0, errors };
+    }
   }
 
   console.log(`[ESM] Building preview: ${modules.length} modules, entry: ${entryPath}`);
