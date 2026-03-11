@@ -37,6 +37,10 @@ import { useChatAgent, type ChatAgentConfig } from "@/hooks/useChatAgent";
 import { useInstantBuild, type InstantBuildConfig } from "@/hooks/useInstantBuild";
 import { triggerBuild } from "@/lib/buildPipelineService";
 import { executeEdit, type EditResult } from "@/lib/editEngine";
+import { Workspace } from "@/lib/compiler/workspace";
+import { repairMissingModules } from "@/lib/compiler/missingModuleGen";
+import { fixMissingImports } from "@/lib/compiler/missingImportFixer";
+import { fixExportMismatches } from "@/lib/compiler/exportMismatchFixer";
 
 type Msg = { role: "user" | "assistant"; content: MsgContent; timestamp?: number };
 
@@ -1035,6 +1039,33 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
             const updatedFiles = { ...workspace };
             for (const [path, code] of Object.entries(result.modifiedFiles)) {
               updatedFiles[path] = code;
+            }
+
+            // ── Post-edit deterministic repair passes ──────────────────
+            // Run the same repair pipeline as the full compiler to catch
+            // broken imports / missing modules introduced by the edit.
+            try {
+              const repairWorkspace = new Workspace(updatedFiles);
+              const { created } = repairMissingModules(repairWorkspace);
+              if (created.length > 0) {
+                console.log(`[EditMode] 🔧 Generated ${created.length} missing module(s):`, created);
+              }
+              const importsFixed = fixMissingImports(repairWorkspace);
+              if (importsFixed > 0) {
+                console.log(`[EditMode] 🔧 Fixed ${importsFixed} missing import(s)`);
+              }
+              const exportsFixed = fixExportMismatches(repairWorkspace);
+              if (exportsFixed > 0) {
+                console.log(`[EditMode] 🔧 Fixed ${exportsFixed} export mismatch(es)`);
+              }
+              // Extract repaired files back
+              const repairedFiles: Record<string, string> = {};
+              for (const f of repairWorkspace.listFiles()) {
+                repairedFiles[f] = repairWorkspace.getFile(f)!;
+              }
+              Object.assign(updatedFiles, repairedFiles);
+            } catch (repairErr) {
+              console.warn("[EditMode] Post-edit repair failed (non-blocking):", repairErr);
             }
 
             // Capture after-snapshots for audit
