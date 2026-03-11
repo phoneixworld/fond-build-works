@@ -125,6 +125,7 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
   const [isLoading, setIsLoading] = useState(false);
   const [selectedTemplate, setSelectedTemplate] = useState<PageTemplate | null>(null);
   const [compilerTasks, setCompilerTasks] = useState<Array<{ id: string; label: string; status: "pending" | "in_progress" | "done" }>>([]);
+  const lastVerificationOkRef = useRef<boolean | null>(null);
 
   const messagesRef = useRef<Msg[]>([]);
   messagesRef.current = messages;
@@ -913,6 +914,9 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
           setBuildStep(`🔧 Auto-repair round ${round}: fixing ${actionCount} issues...`);
         },
         onComplete: (result: BuildResult) => {
+          // Store verification result for conversation state
+          lastVerificationOkRef.current = result.verification.ok;
+
           // Set final files
           setSandpackFiles(result.workspace);
           syncSandpackToVirtualFS(result.workspace);
@@ -1430,6 +1434,7 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
     sandpackFilesRef,
     abortControllerRef,
     lastProjectIdRef,
+    lastVerificationOkRef,
 
     // Actions
     sendMessage,

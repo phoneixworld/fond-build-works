@@ -173,6 +173,7 @@ const ChatPanel = forwardRef<ChatPanelHandle, { initialPrompt?: string; onVersio
     selectedTemplate, setSelectedTemplate, buildRetryCount,
     compilerTasks,
     isSendingRef, isLoadingRef, messagesRef, sandpackFilesRef, abortControllerRef, lastProjectIdRef,
+    lastVerificationOkRef,
     sendMessage, sendChatMessage, handleSmartSend, clearChat: orchClearChat, abortBuild,
     syncSandpackToVirtualFS,
     setCurrentAgent, setCurrentPlan, setCurrentTaskIndex, setTotalPlanTasks,
@@ -244,6 +245,7 @@ const ChatPanel = forwardRef<ChatPanelHandle, { initialPrompt?: string; onVersio
         totalFiles: filesChanged.length,
         chatSummary: chatSummary.replace(/```[\s\S]*?```/g, "").trim().slice(0, 150),
         timestamp: Date.now(),
+        verificationOk: lastVerificationOkRef.current ?? undefined,
       });
     }
     prevPipelineStep.current = pipelineStep;
