@@ -65,6 +65,9 @@ export interface AgentState {
 const BUILD_NOW_SIGNALS = /^(now build|go ahead|build it|start building|that's all|thats all|that's everything|thats everything|you can start|proceed|let's build|lets build|ready to build|start now|begin|execute|generate|now create|do it)\b/i;
 const PHASED_SIGNALS = /\b(phase by phase|step by step|i['']ll give you|ill give you|one at a time|let me explain|first let me|i['']ll share|ill share|i['']ll provide|ill provide|wait for my|before you start|i will share|i will give|phase\s*\d|step\s*\d|part\s*\d|section\s*\d)\b/i;
 const INFO_PROVIDING_SIGNALS = /^(these are|here are|here is|this is|below are|following are|attached are|now for|next is|the next|moving on|continuing with|for phase|for step|for part)\b/i;
+const EDIT_VERBS = /\b(change|update|fix|modify|replace|add|remove|make|move|rename|resize|restyle|improve|tweak|adjust|refactor|sort|filter|reorder|swap|hide|show|toggle|enable|disable|increase|decrease|align|center)\b/i;
+const EDIT_TARGETS = /\b(table|button|form|sidebar|nav|header|footer|modal|dialog|card|chart|page|column|row|field|input|label|title|heading|text|color|font|spacing|padding|margin|border|icon|image|logo|search|tab|badge|avatar|menu|dropdown)\b/i;
+const BUILD_FULL = /\b(build|create|generate|scaffold|new app|new project|from scratch|entire|whole app|full app|complete app)\b/i;
 
 const API_BASE = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/conversation-engine`;
 const API_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
