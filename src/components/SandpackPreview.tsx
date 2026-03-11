@@ -556,8 +556,8 @@ const SandpackPreview = ({ viewport, showConsole = false, initialPath }: Sandpac
               "https://cdn.tailwindcss.com",
             ],
             recompileMode: "delayed",
-            recompileDelay: 800,
-            bundlerTimeOut: 120000,
+            recompileDelay: 1200,
+            bundlerTimeOut: 240000,
           }}
         >
           <div className="h-full flex flex-col" style={viewport ? { width: viewport.width, maxWidth: viewport.maxWidth, height: '100%' } : { height: '100%' }}>
