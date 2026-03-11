@@ -451,6 +451,94 @@ const DEFAULT_INDEX_HTML = `<!DOCTYPE html>
 </body>
 </html>`;
 
+/**
+ * Auto-repair broken relative imports by resolving against actual file set.
+ * Runs as a last-resort pass before Sandpack compiles.
+ */
+function repairRelativeImports(files: Record<string, string>): Record<string, string> {
+  const allPaths = Object.keys(files);
+
+  // Build a lookup: basename (no ext) → full paths
+  const basenameLookup = new Map<string, string[]>();
+  for (const p of allPaths) {
+    const base = p.split("/").pop()!.replace(/\.\w+$/, "").toLowerCase();
+    if (!basenameLookup.has(base)) basenameLookup.set(base, []);
+    basenameLookup.get(base)!.push(p);
+  }
+
+  function resolveInFiles(fromFile: string, importPath: string): string | null {
+    if (!importPath.startsWith(".")) return null; // skip packages
+
+    const fromDir = fromFile.substring(0, fromFile.lastIndexOf("/"));
+    const parts = [...fromDir.split("/"), ...importPath.split("/")].filter(Boolean);
+    const stack: string[] = [];
+    for (const part of parts) {
+      if (part === "..") stack.pop();
+      else if (part !== ".") stack.push(part);
+    }
+    const resolved = "/" + stack.join("/");
+    const exts = ["", ".jsx", ".tsx", ".js", ".ts"];
+    for (const ext of exts) {
+      if (allPaths.includes(resolved + ext)) return null; // already valid
+    }
+    // Also check /index variants
+    for (const ext of [".jsx", ".tsx", ".js", ".ts"]) {
+      if (allPaths.includes(resolved + "/index" + ext)) return null;
+    }
+    return resolved; // broken — return what it resolved to
+  }
+
+  function buildRelPath(fromFile: string, toFile: string): string {
+    const fromParts = fromFile.split("/").filter(Boolean);
+    fromParts.pop();
+    const toParts = toFile.split("/").filter(Boolean);
+    let common = 0;
+    while (common < fromParts.length && common < toParts.length && fromParts[common] === toParts[common]) common++;
+    const ups = fromParts.length - common;
+    const rel = (ups === 0 ? "./" : "../".repeat(ups)) + toParts.slice(common).join("/");
+    return rel.replace(/\.\w+$/, ""); // strip extension
+  }
+
+  function pickBest(target: string, candidates: string[], dirHints: string[]): string {
+    if (candidates.length === 1) return candidates[0];
+    let bestScore = -1, best = candidates[0];
+    for (const c of candidates) {
+      let score = 0;
+      const cParts = c.split("/").filter(Boolean);
+      for (const h of dirHints) { if (cParts.includes(h)) score += 10; }
+      if (c.includes("/components/")) score += 2;
+      if (c.includes("/contexts/")) score += 2;
+      if (score > bestScore) { bestScore = score; best = c; }
+    }
+    return best;
+  }
+
+  const result: Record<string, string> = {};
+  const importRe = /(import\s+(?:[\w{},\s*]+\s+from\s+|))(['"])(\.\.?\/[^'"]+)\2/g;
+
+  for (const [filePath, code] of Object.entries(files)) {
+    if (!/\.(jsx?|tsx?)$/.test(filePath)) { result[filePath] = code; continue; }
+
+    result[filePath] = code.replace(importRe, (match, prefix, quote, importPath) => {
+      const broken = resolveInFiles(filePath, importPath);
+      if (!broken) return match; // valid import
+
+      const targetBase = importPath.split("/").pop()!.replace(/\.\w+$/, "").toLowerCase();
+      const candidates = basenameLookup.get(targetBase);
+      if (!candidates || candidates.length === 0) return match; // can't fix
+
+      const dirHints = importPath.replace(/^\.\.?\//, "").split("/").slice(0, -1);
+      const best = pickBest(broken, candidates, dirHints);
+      const newPath = buildRelPath(filePath, best);
+
+      console.log(`[SandpackImportRepair] ${filePath}: '${importPath}' → '${newPath}'`);
+      return `${prefix}${quote}${newPath}${quote}`;
+    });
+  }
+
+  return result;
+}
+
 function buildSandpackFiles(files: SandpackFileSet | null, projectId: string, supabaseUrl: string, supabaseKey: string): Record<string, string> {
   // Determine the actual App entry extension from user files
   let appExt = ".js";
@@ -478,15 +566,13 @@ function buildSandpackFiles(files: SandpackFileSet | null, projectId: string, su
     return base;
   }
 
-  // Map user files into sandpack paths — keep original extensions so Sandpack
-  // processes TypeScript natively via its Babel preset.
+  // Map user files into sandpack paths
   for (const [path, code] of Object.entries(files)) {
     const normalized = path.startsWith("/") ? path : `/${path}`;
     const sandpackPath = normalized;
     const isCodeFile = /\.(jsx?|tsx?)$/.test(sandpackPath);
     let processed = isCodeFile ? sanitizeImports(code, sandpackPath) : code;
 
-    // Ensure all component files have a default export — prevents "Element type is invalid"
     if (isCodeFile && !sandpackPath.includes("styles") && !sandpackPath.includes(".css")) {
       if (!/export\s+default\b/.test(processed)) {
         const mainExportMatch = processed.match(/export\s+(?:function|const)\s+([A-Z]\w+)/);
@@ -503,7 +589,10 @@ function buildSandpackFiles(files: SandpackFileSet | null, projectId: string, su
     base["/App.js"] = DEFAULT_APP;
   }
 
-  return base;
+  // ── Last-resort import repair pass ──
+  // Fixes broken relative imports that slipped through the compiler's import fixer
+  // (e.g. when AI tasks produce 0 files and stale imports persist)
+  return repairRelativeImports(base);
 }
 
 // ─── Content hash for stable Sandpack remounting ─────────────────────────
