@@ -239,9 +239,11 @@ async function readSSEStream(
   let hasReceivedSSEData = false;
   let chunkCount = 0;
 
-  // Timeout: if no SSE data received within 60s, abort
-  const timeoutMs = 120_000;
+  // Timeout: must be longer than the build safety timeout (480s)
+  // Complex multi-task builds can take 3-5 minutes with sequential AI calls
+  const timeoutMs = 600_000; // 10 minutes
   const startTime = Date.now();
+  let lastDataTime = Date.now(); // Track last SSE data for idle timeout
 
   while (!done) {
     if (Date.now() - startTime > timeoutMs) {
