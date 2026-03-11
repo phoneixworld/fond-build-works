@@ -11,6 +11,7 @@
 
 import { useState, useCallback } from "react";
 import { classifyIntent, type AgentIntent } from "@/lib/agentPipeline";
+import { isEditIntent } from "@/lib/editEngine";
 
 interface ClassificationHookResult {
   // Follow-up questions
