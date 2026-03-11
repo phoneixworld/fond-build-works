@@ -179,6 +179,46 @@ function extractRoutes(raw: string): IRRoute[] {
       auth: !path.includes("login") && !path.includes("signup"),
     });
   }
+
+  // ── Semantic route inference from natural language ──
+  // If regex found no explicit routes, infer from module/page keywords
+  if (routes.length === 0) {
+    const routePatterns: Array<{ pattern: RegExp; path: string; page: string }> = [
+      { pattern: /\b(dashboard|overview|home)\b/i, path: "/", page: "DashboardPage" },
+      { pattern: /\bstudent/i, path: "/students", page: "StudentsPage" },
+      { pattern: /\b(teacher|staff|faculty)\b/i, path: "/teachers", page: "TeachersPage" },
+      { pattern: /\b(parent|guardian)\b/i, path: "/parents", page: "ParentsPage" },
+      { pattern: /\battendance\b/i, path: "/attendance", page: "AttendancePage" },
+      { pattern: /\b(grade|gradebook|marks|assessment)\b/i, path: "/grades", page: "GradesPage" },
+      { pattern: /\b(fee|payment|billing)\b/i, path: "/fees", page: "FeesPage" },
+      { pattern: /\b(timetable|schedule|calendar)\b/i, path: "/timetable", page: "TimetablePage" },
+      { pattern: /\b(announcement|notice|notification)\b/i, path: "/announcements", page: "AnnouncementsPage" },
+      { pattern: /\b(contact|lead|customer)\b/i, path: "/contacts", page: "ContactsPage" },
+      { pattern: /\b(deal|opportunity|pipeline)\b/i, path: "/deals", page: "DealsPage" },
+      { pattern: /\b(task|ticket|issue)\b/i, path: "/tasks", page: "TasksPage" },
+      { pattern: /\b(project)\b/i, path: "/projects", page: "ProjectsPage" },
+      { pattern: /\b(product|inventory|catalog)\b/i, path: "/products", page: "ProductsPage" },
+      { pattern: /\b(order|purchase)\b/i, path: "/orders", page: "OrdersPage" },
+      { pattern: /\b(employee|team|hr)\b/i, path: "/employees", page: "EmployeesPage" },
+      { pattern: /\breport/i, path: "/reports", page: "ReportsPage" },
+      { pattern: /\bsetting/i, path: "/settings", page: "SettingsPage" },
+    ];
+
+    // Always add dashboard for new apps
+    const hasDashboardKeyword = /\b(dashboard|overview|home)\b/i.test(raw);
+    if (!hasDashboardKeyword) {
+      routes.push({ path: "/", page: "DashboardPage", auth: true });
+    }
+
+    const seenPages = new Set<string>();
+    for (const rp of routePatterns) {
+      if (rp.pattern.test(raw) && !seenPages.has(rp.page)) {
+        routes.push({ path: rp.path, page: rp.page, auth: !rp.path.includes("login") });
+        seenPages.add(rp.page);
+      }
+    }
+  }
+
   return routes;
 }
 
