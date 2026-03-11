@@ -20,6 +20,7 @@ import type {
 } from "./types";
 import { DEFAULT_ORCHESTRATOR_CONFIG } from "./types";
 import { ESMPreviewEngine } from "./esmPreviewEngine";
+import { VitePreviewEngine } from "./vitePreviewEngine";
 
 // ─── Complexity Scoring ─────────────────────────────────────────────────────
 
