@@ -21,6 +21,7 @@ import { classifyRepairActions, buildRepairSummary, applyDeterministicFix, MAX_R
 import { fixBrokenImports } from "./importFixer";
 import { repairMissingModules } from "./missingModuleGen";
 import { injectMissingProviders } from "./providerInjector";
+import { fixMissingImports, fixProviderOrdering } from "./missingImportFixer";
 import {
   createTrace, startPass, endPass,
   traceTaskStart, traceTaskEnd, finalizeTrace, printTrace,
