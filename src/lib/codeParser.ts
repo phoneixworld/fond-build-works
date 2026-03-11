@@ -198,7 +198,7 @@ export function parseFileSections(block: string): { files: Record<string, string
       continue;
     }
     
-    if (/^-{3}\s+dependencies\s*-{0,3}\s*$/.test(trimmed)) {
+    if (/^-{3}\s+\/?dependencies\s*-{0,3}\s*$/.test(trimmed)) {
       flushFile();
       inDeps = true;
       prevWasDashes = false;
