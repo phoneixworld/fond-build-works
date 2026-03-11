@@ -22,11 +22,16 @@ export function buildTaskPrompt(
   const existingFiles = workspace.listFiles();
   const workspaceContext = buildWorkspaceContext(workspace, 24000);
 
+  // Always include raw requirements so the build-agent understands the domain
+  const requirementsSection = ctx.rawRequirements
+    ? `\n### Application Requirements:\n${ctx.rawRequirements.slice(0, 4000)}\n`
+    : "";
+
   return `## BUILD TASK ${taskIndex + 1}/${totalTasks}: ${task.label}
 
 ### What to build:
 ${task.description}
-
+${requirementsSection}
 ### Files to create/modify:
 ${task.produces.map(f => `- CREATE: ${f}`).join("\n")}
 ${task.touches.length > 0 ? task.touches.map(f => `- MODIFY: ${f}`).join("\n") : ""}
