@@ -236,6 +236,16 @@ export async function compile(
     console.log("[Compiler] 🔄 Fixed provider ordering: ToastProvider now wraps AuthProvider");
   }
 
+  // ── Phase 3.95: Export Mismatch Fix ──────────────────────────────────
+
+  callbacks.onPhase("fixing-export-mismatches", "Fixing default/named export mismatches...");
+
+  const exportMismatchesFixed = fixExportMismatches(workspace);
+  if (exportMismatchesFixed > 0) {
+    cloudLog.info(`Export mismatch fixer: fixed ${exportMismatchesFixed} default/named mismatch(es)`, "compiler");
+    console.log(`[Compiler] 🔀 Export mismatch fixer: fixed ${exportMismatchesFixed} default/named mismatch(es)`);
+  }
+
   // ── Phase 3.10: Ensure App.jsx exists and has valid imports ──────────
 
   const appEntryPoints = ["/App.jsx", "/App.tsx", "/App.js", "/App.ts"];
