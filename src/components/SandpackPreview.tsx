@@ -393,7 +393,24 @@ function buildSandpackFiles(files: SandpackFileSet | null, projectId: string, su
   for (const [path, code] of Object.entries(files)) {
     const normalized = path.startsWith("/") ? path : `/${path}`;
     const sandpackPath = normalized.replace(/\.(tsx?|jsx)$/, ".js");
-    base[sandpackPath] = sandpackPath.match(/\.js$/) ? sanitizeImports(code, sandpackPath) : code;
+    let processed = sandpackPath.match(/\.js$/) ? sanitizeImports(code, sandpackPath) : code;
+
+    // Ensure AuthContext has both named + default exports to prevent import mismatches
+    if (sandpackPath.includes("AuthContext") && sandpackPath.endsWith(".js")) {
+      // Add default export if missing
+      if (/export\s+function\s+AuthProvider/.test(processed) && !/export\s+default/.test(processed)) {
+        processed += "\nexport default AuthProvider;\n";
+      }
+      // Add named export if only default exists
+      if (/export\s+default\s+AuthProvider/.test(processed) && !/export\s+(function|const)\s+AuthProvider/.test(processed)) {
+        processed = processed.replace(
+          /^(const\s+AuthProvider\s*=)/m,
+          "export $1"
+        );
+      }
+    }
+
+    base[sandpackPath] = processed;
   }
 
   if (!base["/App.js"]) {
