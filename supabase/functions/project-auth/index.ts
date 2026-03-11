@@ -94,14 +94,14 @@ serve(async (req) => {
         const hash = await hashPassword(password);
         const { data: user, error } = await supabase
           .from("project_users")
-          .select("id, email, display_name, created_at")
+          .select("id, email, display_name, metadata, created_at")
           .eq("project_id", project_id)
           .eq("email", email.toLowerCase())
           .eq("password_hash", hash)
           .single();
         if (error || !user) throw new Error("Invalid email or password");
         const tk = generateToken(user.id, project_id);
-        return json(200, { user, token: tk, access_token: tk });
+        return json(200, { user: normalizeUser(user), token: tk, access_token: tk });
       }
 
       case "me": {
