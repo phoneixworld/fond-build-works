@@ -140,11 +140,13 @@ function sanitizeImports(code: string, filePath: string): string {
 
   // Final safety: use Sucrase to parse the code — catches real syntax errors
   // that would crash Sandpack's bundler with "Cannot assign to read only property 'message'"
-  // IMPORTANT: Only use ["jsx"] transform — do NOT add "imports" as it converts
-  // ES modules to CommonJS (import→require) which breaks Sandpack completely.
+  // IMPORTANT: Do NOT add "imports" transform — it converts ES modules to
+  // CommonJS (import→require) which breaks Sandpack completely.
+  // Use "typescript" transform for .ts/.tsx files to strip type annotations.
   try {
+    const isTS = filePath.endsWith(".ts") || filePath.endsWith(".tsx");
     transform(code, {
-      transforms: ["jsx"],
+      transforms: isTS ? ["typescript", "jsx"] : ["jsx"],
       jsxRuntime: "automatic",
       production: true,
     });
