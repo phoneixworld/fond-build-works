@@ -99,6 +99,22 @@ function issueToRepairAction(
         prompt: buildFixStubPrompt(issue, workspace),
       };
 
+    case "router_hook_violation":
+      return {
+        type: "fix_deterministic",
+        targetFile: issue.file,
+        issue,
+        prompt: "", // No AI needed — handled deterministically
+      };
+
+    case "undefined_export":
+      return {
+        type: "fix_deterministic",
+        targetFile: issue.file,
+        issue,
+        prompt: "", // No AI needed — handled deterministically
+      };
+
     default:
       return null;
   }
