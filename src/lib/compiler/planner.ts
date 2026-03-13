@@ -281,13 +281,18 @@ Import PageHeader from ../../components/PageHeader.`,
   // ── Pass 5: App entry + routing ───────────────────────────────────
 
   const routesList = ir.routes.length > 0
-    ? ir.routes.map(r => r.path).join(", ")
+    ? ir.routes.map(r => `${r.path} → ${r.page}`).join(", ")
     : "(infer from generated pages)";
 
   const appTask = createTask({
     label: "app:routing",
     type: "frontend",
-    description: `App.jsx with routing for: ${routesList}. Import ALL page components generated in previous tasks. If routes are not listed above, scan the workspace for /pages/**/*.jsx files and create routes for each.`,
+    description: `App.jsx with routing for: ${routesList}.
+
+CRITICAL: Import page components from their DIRECTORY structure: /pages/ModuleName/ModuleName.jsx.
+Scan the workspace for /pages/**/*.jsx and /layout/AppLayout.jsx files.
+Use AppLayout as a parent route with <Outlet /> for nested page routes.
+Include AuthContext provider, ToastProvider, and ProtectedRoute wrappers.`,
     produces: ["/App.jsx"],
     dependsOn: [...pageTaskIds, authTaskId],
     touches: ["/App.jsx"],
