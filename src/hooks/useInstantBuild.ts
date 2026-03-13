@@ -244,7 +244,7 @@ ${Object.entries(files).map(([path, code]) => `--- ${path}\n${code}`).join("\n\n
             syncSandpackToVirtualFS(mergedFiles);
             if (Object.keys(reactResult.deps).length > 0) setSandpackDeps(reactResult.deps);
 
-            const polishedPayload = { files: reactResult.files, deps: reactResult.deps || {} };
+            const polishedPayload = { files: mergedFiles, deps: { ...deps, ...(reactResult.deps || {}) } };
             supabase
               .from("project_data")
               .upsert(
