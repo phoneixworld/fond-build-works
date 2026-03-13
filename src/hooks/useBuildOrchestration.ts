@@ -1376,6 +1376,25 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
     // ── Step 1: ALWAYS route through async server conversation analyzer ──
     // This is the SINGLE authoritative classifier. No sync fallback, no dual-path.
     const hasExistingCode = !!(sandpackFilesRef.current && Object.keys(sandpackFilesRef.current).length > 0);
+    const normalizedText = finalText.toLowerCase();
+    const looksLikeRuntimeFixRequest = hasExistingCode && !hasImages && (
+      normalizedText.includes("fix") ||
+      normalizedText.includes("bug") ||
+      normalizedText.includes("error") ||
+      normalizedText.includes("not working") ||
+      normalizedText.includes("not clickable") ||
+      normalizedText.includes("doesn't work") ||
+      normalizedText.includes("doesnt work") ||
+      normalizedText.includes("broken") ||
+      normalizedText.includes("crash") ||
+      normalizedText.includes("failed") ||
+      normalizedText.includes("fails") ||
+      normalizedText.includes("preview") ||
+      normalizedText.includes("generated code") ||
+      normalizedText.includes("runtime") ||
+      normalizedText.includes("problem")
+    );
+
     let convResult: { action: string; reason: string } | null = null;
 
     if (conversationAnalyzeAsync) {
