@@ -1532,6 +1532,14 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
         if (classification?.intent === "clarify") return;
 
         if (classification?.intent === "chat") {
+          if (looksLikeRuntimeFixRequest) {
+            console.log("[SmartSend] Server chat intent overridden → edit for runtime fix request");
+            setCurrentAgent("edit");
+            setPipelineStep("resolving");
+            sendEditMessage(finalText, images);
+            return;
+          }
+
           setCurrentAgent("chat");
           setPipelineStep("chatting");
           sendChatMessage(finalText, images);
