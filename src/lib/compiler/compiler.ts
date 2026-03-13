@@ -203,6 +203,16 @@ export async function compile(
     endPass(passTiming);
   }
 
+  // ── Phase 3.45: File Deduplication ───────────────────────────────────
+
+  callbacks.onPhase("deduplicating", "Removing duplicate content blocks...");
+
+  const deduplicatedCount = deduplicateFiles(workspace);
+  if (deduplicatedCount > 0) {
+    cloudLog.warn(`Deduplicator: cleaned ${deduplicatedCount} file(s) with duplicate content`, "compiler");
+    console.log(`[Compiler] 🧹 Deduplicator: cleaned ${deduplicatedCount} file(s) with duplicate content`);
+  }
+
   // ── Phase 3.5: Deterministic Import Fix ─────────────────────────────
 
   callbacks.onPhase("fixing-imports", "Fixing broken import paths...");
