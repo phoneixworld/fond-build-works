@@ -22,6 +22,9 @@ export function planTaskGraph(ctx: BuildContext): TaskGraph {
   const tasks: CompilerTask[] = [];
   const { ir, buildIntent } = ctx;
 
+  // ── Detect app type from requirements ──────────────────────────────
+  const appType = detectAppType(ctx.rawRequirements, ir);
+
   // ── Pass 1: Infrastructure (contexts, shared UI, styles) ──────────
 
   const infraTask = createTask({
