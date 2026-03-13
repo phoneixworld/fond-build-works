@@ -163,21 +163,10 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
     };
   }, []);
 
-  // Pre-scaffolded UI component paths — compiler infrastructure.
-  // Keep the explorer clean, but still surface any scaffolded UI files that
-  // are actually imported by generated user code.
-  const SCAFFOLDED_UI_PATHS = new Set([
-    "/components/ui/utils.js", "/components/ui/Button.jsx", "/components/ui/Card.jsx",
-    "/components/ui/Input.jsx", "/components/ui/Label.jsx", "/components/ui/Badge.jsx",
-    "/components/ui/Separator.jsx", "/components/ui/Skeleton.jsx", "/components/ui/Checkbox.jsx",
-    "/components/ui/Dialog.jsx", "/components/ui/Table.jsx", "/components/ui/Textarea.jsx",
-    "/components/ui/Select.jsx", "/components/ui/Tabs.jsx", "/components/ui/Alert.jsx",
-    "/components/ui/Avatar.jsx", "/components/ui/Progress.jsx", "/components/ui/Switch.jsx",
-    "/components/ui/Tooltip.jsx", "/components/ui/ScrollArea.jsx", "/components/ui/Dropdown.jsx",
-    "/components/ui/Sheet.jsx", "/components/ui/Popover.jsx", "/components/ui/Accordion.jsx",
-    "/components/ui/Modal.jsx", "/components/ui/DataTable.jsx", "/components/ui/Toast.jsx",
-    "/components/ui/Spinner.jsx", "/components/ui/SectionHeader.jsx",
-  ]);
+  // Pre-scaffolded UI component paths — previously hidden from explorer.
+  // Now shown to match professional IDE standards (Lovable shows all shadcn components).
+  // All UI components are always visible in the file tree.
+  const SCAFFOLDED_UI_PATHS = new Set<string>();
 
   const normalizeVirtualPath = (value: string) => {
     const parts = value.split("/");
