@@ -665,7 +665,11 @@ const SandpackPreview = ({ viewport, showConsole = false, initialPath }: Sandpac
   const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || "";
   const supabaseKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY || "";
 
-  const files = useMemo(() => buildSandpackFiles(sandpackFiles, projectId, supabaseUrl, supabaseKey), [sandpackFiles, projectId, supabaseUrl, supabaseKey]);
+  const files = useMemo(() => {
+    const built = buildSandpackFiles(sandpackFiles, projectId, supabaseUrl, supabaseKey);
+    console.log("[SandpackPreview] Building with", Object.keys(built).length, "files. Entry:", Object.keys(built).filter(k => k.includes("App")).join(", "));
+    return built;
+  }, [sandpackFiles, projectId, supabaseUrl, supabaseKey]);
 
   // Include content hash in the key so Sandpack remounts when files change
   // This ensures subsequent builds within the same project update the preview
