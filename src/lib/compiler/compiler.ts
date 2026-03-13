@@ -23,6 +23,7 @@ import { repairMissingModules } from "./missingModuleGen";
 import { injectMissingProviders } from "./providerInjector";
 import { fixMissingImports, fixProviderOrdering } from "./missingImportFixer";
 import { fixExportMismatches } from "./exportMismatchFixer";
+import { deduplicateFiles } from "./deduplicator";
 import {
   createTrace, startPass, endPass,
   traceTaskStart, traceTaskEnd, finalizeTrace, printTrace,
@@ -201,6 +202,16 @@ export async function compile(
     }
 
     endPass(passTiming);
+  }
+
+  // ── Phase 3.45: File Deduplication ───────────────────────────────────
+
+  callbacks.onPhase("deduplicating", "Removing duplicate content blocks...");
+
+  const deduplicatedCount = deduplicateFiles(workspace);
+  if (deduplicatedCount > 0) {
+    cloudLog.warn(`Deduplicator: cleaned ${deduplicatedCount} file(s) with duplicate content`, "compiler");
+    console.log(`[Compiler] 🧹 Deduplicator: cleaned ${deduplicatedCount} file(s) with duplicate content`);
   }
 
   // ── Phase 3.5: Deterministic Import Fix ─────────────────────────────
