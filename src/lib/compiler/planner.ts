@@ -3,6 +3,9 @@
  * 
  * Turns a BuildContext into a TaskGraph (DAG of build tasks).
  * Deterministic: same inputs → same graph.
+ * 
+ * v1.1: Richer structure — generates reusable domain components,
+ * individual page tasks, and dashboard widget tasks for professional output.
  */
 
 import type { BuildContext, CompilerTask, TaskGraph, TaskType } from "./types";
@@ -70,7 +73,6 @@ Only generate globals.css with design tokens. All UI components are pre-scaffold
   const authTaskId = authTask.id;
 
   // ── Pass 3: Data models / backend services ────────────────────────
-  // (only if IR extraction found explicit entities)
 
   const modelTaskIds: string[] = [];
   for (const entity of ir.entities) {
@@ -115,7 +117,7 @@ Only generate globals.css with design tokens. All UI components are pre-scaffold
     }
   } else if (ctx.buildIntent === "new_app") {
     // ── SEMANTIC FALLBACK: No routes extracted from regex ──────────
-    // Split into layout + individual page tasks to avoid truncation.
+    // Split into layout + components + individual page tasks.
 
     // Task A: Layout shell (sidebar + app wrapper)
     const layoutTask = createTask({
@@ -131,6 +133,7 @@ Create TWO files:
    - Active state highlighting using useLocation() from react-router-dom
    - User info section at the bottom with logout button
    - Smooth hover transitions and proper spacing
+   - Collapsible on mobile with hamburger toggle
 
 Analyze the app name to determine the correct navigation items. Examples:
 - "School ERP" → Dashboard, Students, Staff, Attendance, Gradebook, Fees, Timetable, Announcements
@@ -147,30 +150,154 @@ Use NavLink from react-router-dom for active state detection. Make the sidebar c
     });
     tasks.push(layoutTask);
 
-    // Task B: Domain pages (split by concern to avoid truncation)
-    const domainPagesTask = createTask({
-      label: "domain:pages",
+    // Task B: Reusable domain components (widgets, panels, charts)
+    const componentsTask = createTask({
+      label: "domain:components",
       type: "frontend",
-      description: `Generate ALL the main page components for this application.
-The user asked for: "${ctx.rawRequirements.slice(0, 1500)}"
+      description: `Generate reusable domain components for: "${ctx.rawRequirements.slice(0, 1000)}"
 
-IMPORTANT QUALITY RULES:
-- Create 5-8 domain-appropriate pages based on the app name/requirements
-- The DASHBOARD page MUST include: 4 stat cards with icons and trends, a data table with 5+ sample rows, and section headers
-- LIST pages MUST include: search bar, filter button, add button, data table with sample data, status badges, action buttons
-- FORM pages MUST include: proper labeled inputs, validation, submit/cancel buttons
-- Every page must use useState with realistic hardcoded sample data (real names, dates, numbers)
-- Use lucide-react for icons everywhere
-- Use color tokens: var(--color-primary), var(--color-bg), var(--color-text), var(--color-border), var(--color-success), var(--color-warning), var(--color-danger)
-- NO placeholder text like "Loading..." or "Coming soon" — every page must render complete UI
+IMPORTANT: Create 6-10 reusable components that pages will import. Each component should be self-contained with sample data.
 
-Put each page in its own directory: /pages/ModuleName/ModuleName.jsx`,
-      produces: [],  // Dynamic — compiler will capture whatever files are generated
-      dependsOn: [infraTask.id, authTaskId, layoutTask.id],
+REQUIRED components to generate:
+1. /components/StatCard.jsx — Reusable stat card with icon, value, label, trend (up/down), and background color props. Uses CSS animations for entrance.
+2. /components/DataTable.jsx — Reusable sortable table with props: columns (array of {key, label, render?}), data, onRowClick, searchable, pagination. Includes empty state.
+3. /components/StatusBadge.jsx — Reusable badge with status prop mapping to colors (active→green, pending→yellow, inactive→gray, overdue→red, etc.)
+4. /components/PageHeader.jsx — Reusable page header with title, subtitle, action buttons slot, breadcrumbs
+5. /components/SearchFilterBar.jsx — Reusable search + filter bar with search input, filter dropdown, optional date range, add button
+6. /components/ActivityFeed.jsx — Recent activity list with avatar, action text, timestamp. Uses sample data (5+ items).
+7. /components/QuickActions.jsx — Grid of shortcut action cards with icons and labels
+8. /components/NotificationBell.jsx — Notification icon with badge count and dropdown list
+
+OPTIONAL (generate if relevant to the domain):
+- /components/ChartCard.jsx — Simple bar/line chart using CSS (no external lib needed)
+- /components/KPIGrid.jsx — Grid of KPI metrics with sparklines
+- /components/FormModal.jsx — Reusable modal form wrapper with title, fields, submit/cancel
+
+Each component must:
+- Accept props for customization
+- Include realistic default/sample data
+- Use CSS variables for theming: var(--color-primary), var(--color-text), etc.
+- Use lucide-react icons
+- Have smooth hover transitions and entrance animations
+- Export as default`,
+      produces: [
+        "/components/StatCard.jsx",
+        "/components/DataTable.jsx",
+        "/components/StatusBadge.jsx",
+        "/components/PageHeader.jsx",
+        "/components/SearchFilterBar.jsx",
+        "/components/ActivityFeed.jsx",
+        "/components/QuickActions.jsx",
+        "/components/NotificationBell.jsx",
+      ],
+      dependsOn: [infraTask.id],
       priority: 3,
     });
-    tasks.push(domainPagesTask);
-    pageTaskIds.push(layoutTask.id, domainPagesTask.id);
+    tasks.push(componentsTask);
+
+    // Task C: Dashboard page (separate task for richness)
+    const dashboardTask = createTask({
+      label: "page:Dashboard",
+      type: "frontend",
+      description: `Generate a RICH, production-grade Dashboard page for: "${ctx.rawRequirements.slice(0, 1000)}"
+
+The Dashboard page (/pages/Dashboard/Dashboard.jsx) MUST include ALL of these:
+1. Welcome header with user greeting and current date
+2. 4 StatCard components imported from /components/StatCard — with domain-relevant metrics
+3. ActivityFeed component imported from /components/ActivityFeed — showing recent actions
+4. QuickActions component imported from /components/QuickActions — showing 4-6 shortcut cards
+5. A DataTable component imported from /components/DataTable — showing recent records (5+ rows)
+6. Optional: ChartCard with a simple CSS bar chart showing weekly/monthly trends
+
+CRITICAL:
+- Import reusable components from ../components/ — do NOT inline them
+- Use domain-specific data (not generic "Sarah Johnson"). E.g., for School ERP: student names, class data, attendance rates
+- Use useState for interactive search/filter
+- Entrance animations using "animate-fade-in" class
+- Responsive grid: stat cards in 4-col grid, activity + actions side by side on desktop`,
+      produces: ["/pages/Dashboard/Dashboard.jsx"],
+      dependsOn: [infraTask.id, authTaskId, layoutTask.id, componentsTask.id],
+      priority: 4,
+    });
+    tasks.push(dashboardTask);
+    pageTaskIds.push(dashboardTask.id);
+
+    // Task D: Individual domain pages (split into max 3 pages per task to avoid truncation)
+    const domainPagesTask1 = createTask({
+      label: "domain:pages-1",
+      type: "frontend",
+      description: `Generate the FIRST batch of domain pages for: "${ctx.rawRequirements.slice(0, 1200)}"
+
+Generate 3 pages. Analyze the app name to determine which modules are most important.
+
+RULES:
+- Each page goes in /pages/ModuleName/ModuleName.jsx
+- Each page MUST import from /components/ (StatCard, DataTable, StatusBadge, PageHeader, SearchFilterBar)
+- Each page must have useState with realistic hardcoded data (5-10 rows, real names, dates, numbers)
+- Include search, filter, add button, data table, status badges, row actions (edit/delete)
+- Use domain-specific column names and data types
+- Each page must have an "Add New" modal using a simple form
+- Pages must export default
+
+Examples by domain:
+- School ERP → Students list, Staff list, Attendance tracker
+- CRM → Contacts list, Deals pipeline, Activities log
+- Hospital → Patients list, Appointments, Doctors directory
+- Inventory → Products list, Orders, Suppliers`,
+      produces: [],
+      dependsOn: [infraTask.id, authTaskId, layoutTask.id, componentsTask.id],
+      priority: 4,
+    });
+    tasks.push(domainPagesTask1);
+    pageTaskIds.push(domainPagesTask1.id);
+
+    const domainPagesTask2 = createTask({
+      label: "domain:pages-2",
+      type: "frontend",
+      description: `Generate the SECOND batch of domain pages for: "${ctx.rawRequirements.slice(0, 1200)}"
+
+Generate 2-3 MORE pages that were NOT created in the previous task. Check the workspace for already-created pages and create DIFFERENT ones.
+
+RULES:
+- Each page goes in /pages/ModuleName/ModuleName.jsx
+- Import from /components/ (reuse StatCard, DataTable, StatusBadge, PageHeader, SearchFilterBar)
+- Include realistic sample data, search, filters, CRUD actions
+- These should be secondary/supporting modules. Examples:
+  - School ERP → Fees & Billing, Timetable, Announcements, Reports
+  - CRM → Reports/Analytics, Email campaigns, Settings
+  - Hospital → Billing, Lab Reports, Pharmacy
+  - Inventory → Reports, Categories, Warehouses
+- Each page must be complete and functional — no placeholders`,
+      produces: [],
+      dependsOn: [infraTask.id, authTaskId, layoutTask.id, componentsTask.id, domainPagesTask1.id],
+      priority: 4,
+    });
+    tasks.push(domainPagesTask2);
+    pageTaskIds.push(domainPagesTask2.id);
+
+    // Task E: Settings page
+    const settingsTask = createTask({
+      label: "page:Settings",
+      type: "frontend",
+      description: `Generate a Settings page at /pages/Settings/Settings.jsx for: "${ctx.rawRequirements.slice(0, 500)}"
+
+The Settings page MUST include:
+1. Tabs component with sections: General, Profile, Notifications, Security
+2. General tab: App name, timezone, language dropdown
+3. Profile tab: Avatar upload area, name, email, phone inputs
+4. Notifications tab: Toggle switches for email, SMS, push notifications
+5. Security tab: Change password form, two-factor toggle, active sessions list
+
+Use Tabs pattern (tab-list + tab buttons + content panels). Include form validation states.
+Import PageHeader from /components/PageHeader.`,
+      produces: ["/pages/Settings/Settings.jsx"],
+      dependsOn: [infraTask.id, componentsTask.id],
+      priority: 4,
+    });
+    tasks.push(settingsTask);
+    pageTaskIds.push(settingsTask.id);
+
+    pageTaskIds.push(layoutTask.id);
   }
 
   // ── Pass 5: App entry + routing ───────────────────────────────────
@@ -186,7 +313,7 @@ Put each page in its own directory: /pages/ModuleName/ModuleName.jsx`,
     produces: ["/App.jsx"],
     dependsOn: [...pageTaskIds, authTaskId],
     touches: ["/App.jsx"],
-    priority: 4,
+    priority: 5,
   });
   tasks.push(appTask);
 
@@ -199,10 +326,6 @@ Put each page in its own directory: /pages/ModuleName/ModuleName.jsx`,
 
 // ─── Pass Grouping ────────────────────────────────────────────────────────
 
-/**
- * Group tasks into passes based on dependency resolution.
- * Tasks in the same pass have no inter-dependencies and can run in parallel.
- */
 function buildPasses(tasks: CompilerTask[]): string[][] {
   const passes: string[][] = [];
   const completed = new Set<string>();
@@ -220,13 +343,11 @@ function buildPasses(tasks: CompilerTask[]): string[][] {
     }
 
     if (pass.length === 0) {
-      // Circular dependency — force remaining into a single pass
       console.warn("[Planner] Circular dependency detected, forcing remaining tasks");
       passes.push([...remaining]);
       break;
     }
 
-    // Sort by priority within pass
     pass.sort((a, b) => {
       const ta = tasks.find(t => t.id === a)!;
       const tb = tasks.find(t => t.id === b)!;
@@ -279,7 +400,7 @@ function createTask(params: {
     label: params.label,
     type: params.type,
     description: params.description,
-    buildPrompt: "", // Filled by executor with full context
+    buildPrompt: "",
     dependsOn: params.dependsOn || [],
     produces: params.produces,
     touches: params.touches || [],

@@ -451,20 +451,144 @@ export default function ${name}() {
 }
 
 function generateStaticPage(name: string, title: string): string {
-  return `import React from "react";
-import { FileText } from "lucide-react";
+  return `import React, { useState } from "react";
+import { FileText, Plus, Search, Filter, MoreVertical, Edit, Trash2, Eye } from "lucide-react";
+
+const SAMPLE_DATA = [
+  { id: 1, name: "Item Alpha", category: "Category A", status: "Active", updated: "Mar 15, 2024", assignee: "Sarah Johnson" },
+  { id: 2, name: "Item Beta", category: "Category B", status: "Pending", updated: "Mar 14, 2024", assignee: "Michael Chen" },
+  { id: 3, name: "Item Gamma", category: "Category A", status: "Active", updated: "Mar 13, 2024", assignee: "Emily Brown" },
+  { id: 4, name: "Item Delta", category: "Category C", status: "Inactive", updated: "Mar 12, 2024", assignee: "James Wilson" },
+  { id: 5, name: "Item Epsilon", category: "Category B", status: "Active", updated: "Mar 11, 2024", assignee: "Sophia Martinez" },
+  { id: 6, name: "Item Zeta", category: "Category A", status: "Pending", updated: "Mar 10, 2024", assignee: "David Lee" },
+];
 
 export default function ${name}() {
+  const [search, setSearch] = useState("");
+  const [showModal, setShowModal] = useState(false);
+  const filtered = SAMPLE_DATA.filter(item =>
+    item.name.toLowerCase().includes(search.toLowerCase()) ||
+    item.assignee.toLowerCase().includes(search.toLowerCase())
+  );
+
   return (
-    <div className="p-6 space-y-6">
-      <h1 className="text-2xl font-bold text-[var(--color-text)]">${title}</h1>
-      <div className="bg-white rounded-xl border border-[var(--color-border)] p-8 text-center">
-        <div className="w-12 h-12 mx-auto rounded-xl bg-[var(--color-primary)]/10 flex items-center justify-center mb-4">
-          <FileText className="w-6 h-6 text-[var(--color-primary)]" />
+    <div className="p-6 space-y-6 animate-fade-in">
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-[var(--color-text)]">${title}</h1>
+          <p className="text-sm text-[var(--color-text-muted)] mt-1">{SAMPLE_DATA.length} total records</p>
         </div>
-        <h2 className="text-lg font-semibold text-[var(--color-text)] mb-2">${title}</h2>
-        <p className="text-sm text-[var(--color-text-muted)] max-w-md mx-auto">This section will display ${title.toLowerCase()} data and management tools.</p>
+        <button
+          onClick={() => setShowModal(true)}
+          className="flex items-center gap-2 px-4 py-2 bg-[var(--color-primary)] text-white rounded-lg text-sm font-medium hover:opacity-90 transition-opacity shadow-sm"
+        >
+          <Plus className="w-4 h-4" />
+          Add New
+        </button>
       </div>
+
+      <div className="flex gap-3">
+        <div className="relative flex-1 max-w-sm">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--color-text-muted)]" />
+          <input
+            type="text"
+            placeholder="Search ${title.toLowerCase()}..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="w-full pl-9 pr-4 py-2 text-sm border border-[var(--color-border)] rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]/20 focus:border-[var(--color-primary)]"
+          />
+        </div>
+        <button className="flex items-center gap-2 px-3 py-2 text-sm border border-[var(--color-border)] rounded-lg hover:bg-[var(--color-bg-secondary)] transition-colors">
+          <Filter className="w-4 h-4" />
+          Filter
+        </button>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="bg-white rounded-xl border border-[var(--color-border)] p-4">
+          <p className="text-xs font-medium text-[var(--color-text-secondary)] uppercase tracking-wide">Total</p>
+          <p className="text-2xl font-bold text-[var(--color-text)] mt-1">{SAMPLE_DATA.length}</p>
+          <p className="text-xs text-[var(--color-success)] mt-1">+12% from last month</p>
+        </div>
+        <div className="bg-white rounded-xl border border-[var(--color-border)] p-4">
+          <p className="text-xs font-medium text-[var(--color-text-secondary)] uppercase tracking-wide">Active</p>
+          <p className="text-2xl font-bold text-[var(--color-text)] mt-1">{SAMPLE_DATA.filter(d => d.status === "Active").length}</p>
+          <p className="text-xs text-[var(--color-success)] mt-1">+8% from last month</p>
+        </div>
+        <div className="bg-white rounded-xl border border-[var(--color-border)] p-4">
+          <p className="text-xs font-medium text-[var(--color-text-secondary)] uppercase tracking-wide">Pending</p>
+          <p className="text-2xl font-bold text-[var(--color-text)] mt-1">{SAMPLE_DATA.filter(d => d.status === "Pending").length}</p>
+          <p className="text-xs text-[var(--color-warning)] mt-1">Needs attention</p>
+        </div>
+      </div>
+
+      <div className="bg-white rounded-xl border border-[var(--color-border)] overflow-hidden">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="border-b border-[var(--color-border)] bg-[var(--color-bg-secondary)]">
+              <th className="text-left px-5 py-3 text-xs font-medium text-[var(--color-text-secondary)] uppercase">Name</th>
+              <th className="text-left px-5 py-3 text-xs font-medium text-[var(--color-text-secondary)] uppercase">Category</th>
+              <th className="text-left px-5 py-3 text-xs font-medium text-[var(--color-text-secondary)] uppercase">Status</th>
+              <th className="text-left px-5 py-3 text-xs font-medium text-[var(--color-text-secondary)] uppercase">Assignee</th>
+              <th className="text-left px-5 py-3 text-xs font-medium text-[var(--color-text-secondary)] uppercase">Updated</th>
+              <th className="text-right px-5 py-3 text-xs font-medium text-[var(--color-text-secondary)] uppercase">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {filtered.map((row) => (
+              <tr key={row.id} className="border-b border-[var(--color-border)] last:border-0 hover:bg-[var(--color-bg-secondary)] transition-colors">
+                <td className="px-5 py-3.5 font-medium text-[var(--color-text)]">{row.name}</td>
+                <td className="px-5 py-3.5 text-[var(--color-text-secondary)]">{row.category}</td>
+                <td className="px-5 py-3.5">
+                  <span className={\`px-2 py-0.5 rounded-full text-xs font-medium \${row.status === "Active" ? "bg-green-100 text-green-700" : row.status === "Pending" ? "bg-yellow-100 text-yellow-700" : "bg-gray-100 text-gray-600"}\`}>{row.status}</span>
+                </td>
+                <td className="px-5 py-3.5 text-[var(--color-text-secondary)]">{row.assignee}</td>
+                <td className="px-5 py-3.5 text-[var(--color-text-secondary)]">{row.updated}</td>
+                <td className="px-5 py-3.5 text-right">
+                  <div className="flex items-center justify-end gap-1">
+                    <button className="p-1.5 hover:bg-[var(--color-bg-secondary)] rounded-lg" title="View"><Eye className="w-3.5 h-3.5 text-[var(--color-text-muted)]" /></button>
+                    <button className="p-1.5 hover:bg-[var(--color-bg-secondary)] rounded-lg" title="Edit"><Edit className="w-3.5 h-3.5 text-[var(--color-text-muted)]" /></button>
+                    <button className="p-1.5 hover:bg-red-50 rounded-lg" title="Delete"><Trash2 className="w-3.5 h-3.5 text-[var(--color-danger)]" /></button>
+                  </div>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+        {filtered.length === 0 && (
+          <div className="py-12 text-center">
+            <Search className="w-10 h-10 mx-auto text-[var(--color-text-muted)] mb-3" />
+            <p className="text-sm font-medium text-[var(--color-text)]">No results found</p>
+            <p className="text-xs text-[var(--color-text-muted)] mt-1">Try adjusting your search terms</p>
+          </div>
+        )}
+      </div>
+
+      {showModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onClick={() => setShowModal(false)}>
+          <div className="bg-white rounded-xl p-6 w-full max-w-md shadow-xl" onClick={e => e.stopPropagation()}>
+            <h2 className="text-lg font-semibold text-[var(--color-text)] mb-4">Add New Record</h2>
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-[var(--color-text)] mb-1">Name</label>
+                <input type="text" placeholder="Enter name" className="w-full px-3 py-2 text-sm border border-[var(--color-border)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]/20" />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-[var(--color-text)] mb-1">Category</label>
+                <select className="w-full px-3 py-2 text-sm border border-[var(--color-border)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]/20">
+                  <option>Category A</option>
+                  <option>Category B</option>
+                  <option>Category C</option>
+                </select>
+              </div>
+              <div className="flex gap-3 pt-2">
+                <button className="flex-1 px-4 py-2 bg-[var(--color-primary)] text-white rounded-lg text-sm font-medium hover:opacity-90">Save</button>
+                <button onClick={() => setShowModal(false)} className="px-4 py-2 border border-[var(--color-border)] rounded-lg text-sm hover:bg-[var(--color-bg-secondary)]">Cancel</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
