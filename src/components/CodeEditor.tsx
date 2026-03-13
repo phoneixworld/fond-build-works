@@ -54,8 +54,20 @@ const CodeEditor = () => {
   const editorRef = useRef<any>(null);
 
   const currentFile = getFile(activeFile);
-  const code = editing ? editContent : (currentFile?.content || "// Select a file from the explorer");
   const lang = currentFile?.language || "text";
+
+  // Sync editContent when the active file changes or file content updates from build
+  useEffect(() => {
+    if (currentFile) {
+      // Only update if we're not dirty (user hasn't made changes) or file just appeared
+      if (!dirty || editContent === "") {
+        setEditContent(currentFile.content);
+        setDirty(false);
+      }
+    }
+  }, [activeFile, currentFile?.content]);
+
+  const code = editing ? editContent : (currentFile?.content || "// Select a file from the explorer");
 
   // Determine if project has backend files
   const hasBackend = useMemo(() =>
