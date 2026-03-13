@@ -1501,6 +1501,14 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
       const localIntent = fastClassifyLocal(finalText);
 
       if (localIntent === "chat") {
+        if (looksLikeRuntimeFixRequest) {
+          console.log("[SmartSend] Local chat intent overridden → edit for runtime fix request");
+          setCurrentAgent("edit");
+          setPipelineStep("resolving");
+          sendEditMessage(finalText, images);
+          return;
+        }
+
         setCurrentAgent("chat");
         setPipelineStep("chatting");
         sendChatMessage(finalText, images);
