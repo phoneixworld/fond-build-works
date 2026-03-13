@@ -41,6 +41,7 @@ import { Workspace } from "@/lib/compiler/workspace";
 import { repairMissingModules } from "@/lib/compiler/missingModuleGen";
 import { fixMissingImports } from "@/lib/compiler/missingImportFixer";
 import { fixExportMismatches } from "@/lib/compiler/exportMismatchFixer";
+import { deduplicateFiles } from "@/lib/compiler/deduplicator";
 
 type Msg = { role: "user" | "assistant"; content: MsgContent; timestamp?: number };
 
