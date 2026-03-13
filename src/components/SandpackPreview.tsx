@@ -561,10 +561,32 @@ function buildSandpackFiles(files: SandpackFileSet | null, projectId: string, su
     }
   }
 
-  const indexJs = buildIndexJs(projectId, supabaseUrl, supabaseKey).replace(
+  // Detect user CSS files that should also be imported
+  const userCssPaths: string[] = [];
+  if (files) {
+    for (const p of Object.keys(files)) {
+      const norm = p.startsWith("/") ? p : `/${p}`;
+      if (/\.css$/.test(norm) && norm !== "/styles.css") {
+        userCssPaths.push(norm);
+      }
+    }
+  }
+
+  // Build index.js with user CSS imports appended
+  let indexJs = buildIndexJs(projectId, supabaseUrl, supabaseKey).replace(
     'import App from "./App"',
     `import App from "./App${appExt === ".js" ? "" : appExt.replace(/\./, ".")}"`
   );
+
+  // Inject imports for user CSS files (e.g. /styles/globals.css)
+  if (userCssPaths.length > 0) {
+    const cssImports = userCssPaths.map(p => `import ".${p}";`).join("\n");
+    indexJs = indexJs.replace(
+      'import "./styles.css";',
+      `import "./styles.css";\n${cssImports}`
+    );
+  }
+
   const base: Record<string, string> = {
     "/index.js": indexJs,
     "/styles.css": DEFAULT_STYLES,
@@ -595,13 +617,21 @@ function buildSandpackFiles(files: SandpackFileSet | null, projectId: string, su
     base[sandpackPath] = processed;
   }
 
+  // If user has a globals.css, also merge its content into /styles.css as a fallback
+  // so CSS variables are always available even if the dynamic import fails
+  const globalsCssPath = userCssPaths.find(p => p.includes("globals"));
+  if (globalsCssPath && files) {
+    const globalsCss = files[globalsCssPath] || files[globalsCssPath.slice(1)];
+    if (globalsCss) {
+      base["/styles.css"] = DEFAULT_STYLES + "\n\n/* === User globals.css merged === */\n" + globalsCss;
+    }
+  }
+
   if (!base["/App.tsx"] && !base["/App.jsx"] && !base["/App.js"]) {
     base["/App.js"] = DEFAULT_APP;
   }
 
   // ── Last-resort import repair pass ──
-  // Fixes broken relative imports that slipped through the compiler's import fixer
-  // (e.g. when AI tasks produce 0 files and stale imports persist)
   return repairRelativeImports(base);
 }
 
