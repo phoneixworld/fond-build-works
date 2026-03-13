@@ -138,6 +138,8 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
   sandpackFilesRef.current = currentSandpackFiles;
   const streamingControllerRef = useRef<StreamingPreviewController | null>(null);
   const lastProjectIdRef = useRef<string | null>(null);
+  const deferredPreviewFilesRef = useRef<Record<string, string> | null>(null);
+  const deferredPreviewTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // NOTE: lastProjectIdRef is managed by ChatPanel's project-switch effect.
   // Do NOT set it here — it would race with the restore logic.
