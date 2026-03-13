@@ -88,7 +88,31 @@ export function useInstantBuild(config: InstantBuildConfig) {
 
     const promptDesc = userText.replace(/build|create|make|website|app|called|named|beautiful|simple/gi, "").trim();
     const projectName = currentProject.name || "My App";
-    const { files, deps } = hydrateTemplate(instantTemplate, projectName, promptDesc || "Build applications at the speed of thought");
+    const { files: templateFiles, deps } = hydrateTemplate(instantTemplate, projectName, promptDesc || "Build applications at the speed of thought");
+
+    // Inject shared UI component library + design tokens (matches Lovable's file count)
+    const { getSharedUIComponents, getGlobalStyles, getUseApiHook } = await import("@/lib/templates/scaffoldTemplates");
+    const uiComponents = getSharedUIComponents();
+    const files: Record<string, string> = { ...templateFiles };
+    
+    // Add UI components (don't overwrite template-specific files)
+    for (const [path, code] of Object.entries(uiComponents)) {
+      if (!files[path]) {
+        files[path] = code;
+      }
+    }
+    
+    // Add globals.css with full design tokens if not already present
+    if (!files["/styles/globals.css"] || files["/styles/globals.css"].length < 500) {
+      files["/styles/globals.css"] = getGlobalStyles();
+    }
+    
+    // Add useApi hook
+    if (!files["/hooks/useApi.js"]) {
+      files["/hooks/useApi.js"] = getUseApiHook();
+    }
+    
+    console.log(`[InstantBuild] Enriched template: ${Object.keys(templateFiles).length} → ${Object.keys(files).length} files`);
 
     setSandpackFiles(files);
     syncSandpackToVirtualFS(files);
