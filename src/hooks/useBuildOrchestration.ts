@@ -162,9 +162,28 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
     };
   }, []);
 
+  // Pre-scaffolded UI component paths — these are infrastructure injected by the compiler
+  // and should NOT appear in the user-facing code editor / file tree
+  const SCAFFOLDED_UI_PATHS = new Set([
+    "/components/ui/utils.js", "/components/ui/Button.jsx", "/components/ui/Card.jsx",
+    "/components/ui/Input.jsx", "/components/ui/Label.jsx", "/components/ui/Badge.jsx",
+    "/components/ui/Separator.jsx", "/components/ui/Skeleton.jsx", "/components/ui/Checkbox.jsx",
+    "/components/ui/Dialog.jsx", "/components/ui/Table.jsx", "/components/ui/Textarea.jsx",
+    "/components/ui/Select.jsx", "/components/ui/Tabs.jsx", "/components/ui/Alert.jsx",
+    "/components/ui/Avatar.jsx", "/components/ui/Progress.jsx", "/components/ui/Switch.jsx",
+    "/components/ui/Tooltip.jsx", "/components/ui/ScrollArea.jsx", "/components/ui/Dropdown.jsx",
+    "/components/ui/Sheet.jsx", "/components/ui/Popover.jsx", "/components/ui/Accordion.jsx",
+    "/components/ui/Modal.jsx", "/components/ui/DataTable.jsx", "/components/ui/Toast.jsx",
+    "/components/ui/Spinner.jsx", "/components/ui/SectionHeader.jsx",
+  ]);
+
   const syncSandpackToVirtualFS = useCallback((sandpackFiles: Record<string, string>) => {
     const virtualFiles: Record<string, { path: string; content: string; language: string }> = {};
     for (const [path, content] of Object.entries(sandpackFiles)) {
+      // Skip pre-scaffolded UI components — they're infrastructure, not user code
+      const normalizedPath = path.startsWith("/") ? path : `/${path}`;
+      if (SCAFFOLDED_UI_PATHS.has(normalizedPath)) continue;
+
       const cleanPath = path.startsWith("/") ? path.slice(1) : path;
       const displayPath = toExportPath(cleanPath);
       const ext = displayPath.split(".").pop()?.toLowerCase() || "";
