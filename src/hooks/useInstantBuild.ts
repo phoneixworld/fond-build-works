@@ -235,11 +235,16 @@ ${Object.entries(files).map(([path, code]) => `--- ${path}\n${code}`).join("\n\n
           if (hasErrors) {
             console.warn("[InstantBuild] Polish pass produced broken code, keeping instant template");
           } else {
-            setSandpackFiles(reactResult.files);
-            syncSandpackToVirtualFS(reactResult.files);
+            // CRITICAL: Merge polished files INTO the enriched template, don't replace.
+            // The AI polish pass only returns modified files, so we must preserve
+            // the 27+ UI components, globals.css, hooks, etc. from the original set.
+            const mergedFiles = { ...files, ...reactResult.files };
+            console.log(`[InstantBuild] Merged polish: ${Object.keys(reactResult.files).length} polished + ${Object.keys(files).length} base = ${Object.keys(mergedFiles).length} total`);
+            setSandpackFiles(mergedFiles);
+            syncSandpackToVirtualFS(mergedFiles);
             if (Object.keys(reactResult.deps).length > 0) setSandpackDeps(reactResult.deps);
 
-            const polishedPayload = { files: reactResult.files, deps: reactResult.deps || {} };
+            const polishedPayload = { files: mergedFiles, deps: { ...deps, ...(reactResult.deps || {}) } };
             supabase
               .from("project_data")
               .upsert(
