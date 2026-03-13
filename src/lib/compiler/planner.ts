@@ -146,7 +146,7 @@ Only generate globals.css with design tokens. All UI components are pre-scaffold
         `/hooks/use${entity.name}.jsx`,
         `/services/${entity.name.toLowerCase()}Service.js`,
       ],
-      dependsOn: [infraTask.id, authTaskId],
+      dependsOn: [infraTask.id, ...(authTaskId ? [authTaskId] : [])],
       priority: 2,
     });
     tasks.push(modelTask);
