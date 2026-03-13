@@ -52,8 +52,20 @@ ${workspaceContext ? `### Current code:\n${workspaceContext}` : ""}
 1. Generate ONLY the files listed above
 2. Import from existing workspace files — do NOT recreate them
 3. **CRITICAL FILE STRUCTURE**: All files use these directories from root:
-   - /components/ui/ — shared UI library (Card, Button, Modal, DataTable, Toast, Spinner, Dialog, Sheet, Badge, Tabs, Select, Avatar, Input, Dropdown, Alert)
-   - /components/ — reusable DOMAIN components (StatCard, DataTable, StatusBadge, PageHeader, SearchFilterBar, ActivityFeed, QuickActions, NotificationBell, ChartCard, FormModal)
+   - /components/ui/ — 22 pre-scaffolded shadcn-compatible UI components:
+     utils.js (cn helper), Button, Card (+ CardHeader/Title/Description/Content/Footer),
+     Input, Label, Badge, Separator, Skeleton, Checkbox,
+     Dialog (+ DialogContent/Header/Title/Description/Footer),
+     Table (+ TableHeader/Body/Footer/Head/Row/Cell/Caption),
+     Textarea, Select (+ SelectTrigger/Value/Content/Item/Group/Label),
+     Tabs (+ TabsList/Trigger/Content), Alert (+ AlertTitle/AlertDescription),
+     Avatar (+ AvatarImage/AvatarFallback), Progress, Switch,
+     Tooltip (+ TooltipProvider/Trigger/Content), ScrollArea,
+     DropdownMenu (+ Trigger/Content/Item/Separator/Label),
+     Sheet (+ SheetTrigger/Content/Header/Title/Description/Close),
+     Popover (+ PopoverTrigger/Content), Accordion (+ Item/Trigger/Content),
+     Modal, DataTable, Toast (showToast), Spinner
+   - /components/ — reusable DOMAIN components (StatCard, StatusBadge, PageHeader, SearchFilterBar, ActivityFeed, QuickActions, NotificationBell, ChartCard, FormModal)
    - /contexts/ — React contexts (AuthContext, etc.)
    - /pages/ModuleName/ — page components in named directories (e.g. /pages/Dashboard/Dashboard.jsx, /pages/Students/Students.jsx)
    - /hooks/ — custom hooks
@@ -61,10 +73,15 @@ ${workspaceContext ? `### Current code:\n${workspaceContext}` : ""}
    - /styles/ — CSS files
    - /layout/ — layout wrappers (AppLayout.jsx, Sidebar.jsx)
    When importing, always use correct relative paths from the file's location.
-4. **COMPONENT DECOMPOSITION (CRITICAL)**: Pages must NOT be monolithic. Every page MUST import and use reusable components from /components/:
-   - Use StatCard for metrics, DataTable for lists, StatusBadge for statuses, PageHeader for headers, SearchFilterBar for search/filter UI
-   - If a component doesn't exist yet in the workspace, create it in /components/
-   - Each component must be in its own file with a default export
+   Import cn from "./ui/utils" in component files, or from "../ui/utils" from page files.
+4. **COMPONENT DECOMPOSITION (CRITICAL)**: Pages must NOT be monolithic. Every page MUST import and use components from /components/ui/:
+   - Use Table + TableHeader/TableBody/TableRow/TableHead/TableCell for data lists (NOT raw <table> tags)
+   - Use Tabs + TabsList/TabsTrigger/TabsContent for multi-section views
+   - Use Dialog for modals, Sheet for slide-out panels, Select for dropdowns
+   - Use Card + CardHeader/CardContent for sections, Badge for statuses, Avatar for users
+   - Use Button for all actions, Input/Label/Textarea for forms, Checkbox/Switch for toggles
+   - Use Progress for progress bars, Skeleton for loading states, Separator for dividers
+   - If a domain component doesn't exist yet, create it in /components/ using /components/ui/ primitives
 4. Use the project's data API pattern: fetch(\`\${window.__SUPABASE_URL__}/functions/v1/project-api\`, { body: { project_id: window.__PROJECT_ID__, action, collection, data } })
 5. For auth, use the AuthContext pattern. Import path depends on file location.
    - AuthContext MUST read window.__PROJECT_ID__, window.__SUPABASE_URL__, window.__SUPABASE_KEY__ for API calls

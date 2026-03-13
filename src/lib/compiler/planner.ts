@@ -30,22 +30,35 @@ export function planTaskGraph(ctx: BuildContext): TaskGraph {
     description: `Shared UI component library with design tokens and global styles.
     
 Pre-built components are already scaffolded in the workspace — do NOT regenerate them.
-The following components are available for import in all subsequent tasks:
-- Card.jsx: Stat card mode (<Card title icon value trend trendUp />) and generic card mode
-- Button.jsx: Variants: primary, secondary, danger, ghost, outline. Sizes: sm, md, lg, icon
-- Modal.jsx: Accessible modal with backdrop, ESC close, size variants
-- DataTable.jsx: Sortable columns, pagination, empty state, row click handler
-- Toast.jsx: Multi-toast stack with showToast(message, type) API
-- Spinner.jsx: Loading spinner with size prop
-- Dialog.jsx: Compound component (Dialog, DialogHeader, DialogTitle, DialogContent, DialogFooter)
-- Sheet.jsx: Slide-in panel from any edge (Sheet with side="right|left|top|bottom")
-- Badge.jsx: Status badges (default, success, warning, danger, info, outline variants)
-- Tabs.jsx: Compound tabs (Tabs, TabsList, TabsTrigger, TabsContent)
-- Select.jsx: Custom dropdown select with search
-- Avatar.jsx: User avatar with image or initials fallback
-- Input.jsx: Styled input with label, error state, and icon support
-- Dropdown.jsx: Action menu (DropdownMenu, DropdownItem, DropdownSeparator)
-- Alert.jsx: Notification banners (info, success, warning, error variants)
+The following 22 shadcn-compatible components are available for import from /components/ui/:
+- utils.js: cn() class-merge helper — import { cn } from "./ui/utils"
+- Button.jsx: Variants: default, secondary, destructive, ghost, outline, link. Sizes: default, sm, lg, icon
+- Card.jsx: Compound: Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter
+- Input.jsx: Styled text input with focus ring
+- Label.jsx: Form label component
+- Badge.jsx: Status badges (default, secondary, success, warning, destructive, outline)
+- Separator.jsx: Horizontal/vertical separator
+- Skeleton.jsx: Loading placeholder with pulse animation
+- Checkbox.jsx: Accessible checkbox with checked/onCheckedChange
+- Dialog.jsx: Compound: Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter (open/onOpenChange)
+- Table.jsx: Compound: Table, TableHeader, TableBody, TableFooter, TableHead, TableRow, TableCell, TableCaption
+- Textarea.jsx: Multi-line text input
+- Select.jsx: Compound: Select, SelectTrigger, SelectValue, SelectContent, SelectItem, SelectGroup, SelectLabel
+- Tabs.jsx: Compound: Tabs, TabsList, TabsTrigger, TabsContent
+- Alert.jsx: Compound: Alert, AlertTitle, AlertDescription (default, destructive, success, warning)
+- Avatar.jsx: Compound: Avatar, AvatarImage, AvatarFallback
+- Progress.jsx: Progress bar with value/max props
+- Switch.jsx: Toggle switch with checked/onCheckedChange
+- Tooltip.jsx: Compound: TooltipProvider, Tooltip, TooltipTrigger, TooltipContent
+- ScrollArea.jsx: Scrollable container
+- Dropdown.jsx: Compound: DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuLabel
+- Sheet.jsx: Compound: Sheet, SheetTrigger, SheetContent, SheetHeader, SheetTitle, SheetDescription, SheetClose
+- Popover.jsx: Compound: Popover, PopoverTrigger, PopoverContent
+- Accordion.jsx: Compound: Accordion, AccordionItem, AccordionTrigger, AccordionContent
+- Modal.jsx: Simple modal with isOpen/onClose/title
+- DataTable.jsx: Sortable/paginated table with columns/data props
+- Toast.jsx: ToastContainer + showToast(message, type)
+- Spinner.jsx: Loading spinner
 
 Only generate globals.css with design tokens. All UI components are pre-scaffolded.`,
     produces: [
