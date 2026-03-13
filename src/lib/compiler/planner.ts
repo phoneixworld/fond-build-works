@@ -114,22 +114,25 @@ Only generate globals.css with design tokens. All UI components are pre-scaffold
   });
   tasks.push(infraTask);
 
-  // ── Pass 2: Auth (always generated — build prompt mandates AuthContext) ──
+  // ── Pass 2: Auth (skip for landing pages unless explicitly needed) ──
 
-  const authTask = createTask({
-    label: "auth",
-    type: "frontend",
-    description: `Auth system with roles: ${ir.roles.map(r => r.name).join(", ") || "user"}. Must create AuthContext, LoginPage, and ProtectedRoute.`,
-    produces: [
-      "/contexts/AuthContext.jsx",
-      "/pages/Auth/LoginPage.jsx",
-      "/components/ProtectedRoute.jsx",
-    ],
-    dependsOn: [infraTask.id],
-    priority: 1,
-  });
-  tasks.push(authTask);
-  const authTaskId = authTask.id;
+  let authTaskId: string = "";
+  if (appType !== "landing" || ir.roles.length > 0) {
+    const authTask = createTask({
+      label: "auth",
+      type: "frontend",
+      description: `Auth system with roles: ${ir.roles.map(r => r.name).join(", ") || "user"}. Must create AuthContext, LoginPage, and ProtectedRoute.`,
+      produces: [
+        "/contexts/AuthContext.jsx",
+        "/pages/Auth/LoginPage.jsx",
+        "/components/ProtectedRoute.jsx",
+      ],
+      dependsOn: [infraTask.id],
+      priority: 1,
+    });
+    tasks.push(authTask);
+    authTaskId = authTask.id;
+  }
 
   // ── Pass 3: Data models / backend services ────────────────────────
 
