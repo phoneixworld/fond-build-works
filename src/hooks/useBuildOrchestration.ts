@@ -152,6 +152,16 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
     }
   }, [isLoading]);
 
+  // Cleanup deferred preview timer
+  useEffect(() => {
+    return () => {
+      if (deferredPreviewTimerRef.current) {
+        clearTimeout(deferredPreviewTimerRef.current);
+        deferredPreviewTimerRef.current = null;
+      }
+    };
+  }, []);
+
   const syncSandpackToVirtualFS = useCallback((sandpackFiles: Record<string, string>) => {
     const virtualFiles: Record<string, { path: string; content: string; language: string }> = {};
     for (const [path, content] of Object.entries(sandpackFiles)) {
