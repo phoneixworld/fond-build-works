@@ -138,6 +138,8 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
   sandpackFilesRef.current = currentSandpackFiles;
   const streamingControllerRef = useRef<StreamingPreviewController | null>(null);
   const lastProjectIdRef = useRef<string | null>(null);
+  const deferredPreviewFilesRef = useRef<Record<string, string> | null>(null);
+  const deferredPreviewTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // NOTE: lastProjectIdRef is managed by ChatPanel's project-switch effect.
   // Do NOT set it here — it would race with the restore logic.
@@ -149,6 +151,16 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
       buildSafetyTimeoutRef.current = null;
     }
   }, [isLoading]);
+
+  // Cleanup deferred preview timer
+  useEffect(() => {
+    return () => {
+      if (deferredPreviewTimerRef.current) {
+        clearTimeout(deferredPreviewTimerRef.current);
+        deferredPreviewTimerRef.current = null;
+      }
+    };
+  }, []);
 
   const syncSandpackToVirtualFS = useCallback((sandpackFiles: Record<string, string>) => {
     const virtualFiles: Record<string, { path: string; content: string; language: string }> = {};
@@ -894,7 +906,22 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
             if (totalFileCount > 30) {
               sandpackFilesRef.current = mergedFiles;
               syncSandpackToVirtualFS(mergedFiles);
-              console.log(`[Compiler] Large workspace (${totalFileCount} files) — deferring preview refresh`);
+              deferredPreviewFilesRef.current = mergedFiles;
+
+              if (!deferredPreviewTimerRef.current) {
+                deferredPreviewTimerRef.current = setTimeout(() => {
+                  deferredPreviewTimerRef.current = null;
+                  if (lastProjectIdRef.current !== buildProjectId) return;
+                  const pending = deferredPreviewFilesRef.current;
+                  if (!pending) return;
+
+                  setSandpackFiles({ ...pending });
+                  setPreviewMode("sandpack");
+                  console.log(`[Compiler] Large workspace (${Object.keys(pending).length} files) — flushed deferred preview update`);
+                }, 900);
+              }
+
+              console.log(`[Compiler] Large workspace (${totalFileCount} files) — throttling preview refresh`);
             } else {
               setSandpackFiles(mergedFiles);
               syncSandpackToVirtualFS(mergedFiles);
