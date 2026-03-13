@@ -1478,8 +1478,16 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
         // No accumulated context — fall through to direct build below
       }
 
-      // ── CHAT: Route to chat agent ──
+      // ── CHAT: Route to chat agent (unless this is clearly a runtime fix request) ──
       if (convResult.action === "chat") {
+        if (looksLikeRuntimeFixRequest) {
+          console.log("[SmartSend] Overriding chat → edit for runtime fix request");
+          setCurrentAgent("edit");
+          setPipelineStep("resolving");
+          sendEditMessage(finalText, images);
+          return;
+        }
+
         setCurrentAgent("chat");
         setPipelineStep("chatting");
         sendChatMessage(finalText, images);
