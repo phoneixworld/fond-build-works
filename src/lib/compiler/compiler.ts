@@ -29,6 +29,7 @@ import {
 } from "./observability";
 import { cloudLog } from "@/lib/cloudLogBus";
 import { synthesizeAppJsx } from "./appSynthesizer";
+import { getSharedUIComponents, getGlobalStyles } from "@/lib/templates/scaffoldTemplates";
 
 // ─── Public API ───────────────────────────────────────────────────────────
 
@@ -113,6 +114,28 @@ export async function compile(
   callbacks.onPhase("executing", `Running ${taskGraph.tasks.length} tasks across ${taskGraph.passes.length} passes...`);
 
   const workspace = new Workspace(ctx.existingWorkspace);
+
+  // ── Pre-scaffold UI component library into workspace ──────────────
+  // These are the "pre-built" components referenced by the planner's infra task.
+  // Without this step, generated pages import from /components/ui/ but find empty files.
+  const uiComponents = getSharedUIComponents();
+  let scaffoldedCount = 0;
+  for (const [path, content] of Object.entries(uiComponents)) {
+    if (!workspace.hasFile(path)) {
+      workspace.addFile(path, content);
+      scaffoldedCount++;
+    }
+  }
+  // Also inject globals.css with design tokens + animations
+  if (!workspace.hasFile("/styles/globals.css")) {
+    workspace.addFile("/styles/globals.css", getGlobalStyles());
+    scaffoldedCount++;
+  }
+  if (scaffoldedCount > 0) {
+    cloudLog.info(`Pre-scaffolded ${scaffoldedCount} UI components + design tokens`, "compiler");
+    console.log(`[Compiler] 🎨 Pre-scaffolded ${scaffoldedCount} UI components into workspace`);
+  }
+
   const sortedTasks = topologicalSort(taskGraph.tasks);
 
   const executionCallbacks: ExecutionCallbacks = {
