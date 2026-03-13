@@ -906,7 +906,22 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
             if (totalFileCount > 30) {
               sandpackFilesRef.current = mergedFiles;
               syncSandpackToVirtualFS(mergedFiles);
-              console.log(`[Compiler] Large workspace (${totalFileCount} files) — deferring preview refresh`);
+              deferredPreviewFilesRef.current = mergedFiles;
+
+              if (!deferredPreviewTimerRef.current) {
+                deferredPreviewTimerRef.current = setTimeout(() => {
+                  deferredPreviewTimerRef.current = null;
+                  if (lastProjectIdRef.current !== buildProjectId) return;
+                  const pending = deferredPreviewFilesRef.current;
+                  if (!pending) return;
+
+                  setSandpackFiles({ ...pending });
+                  setPreviewMode("sandpack");
+                  console.log(`[Compiler] Large workspace (${Object.keys(pending).length} files) — flushed deferred preview update`);
+                }, 900);
+              }
+
+              console.log(`[Compiler] Large workspace (${totalFileCount} files) — throttling preview refresh`);
             } else {
               setSandpackFiles(mergedFiles);
               syncSandpackToVirtualFS(mergedFiles);
