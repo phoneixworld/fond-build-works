@@ -10,6 +10,49 @@
 
 import type { BuildContext, CompilerTask, TaskGraph, TaskType } from "./types";
 
+type AppType = "landing" | "dashboard" | "crud";
+
+/**
+ * Detect the app type from requirements to generate appropriate components.
+ * Landing pages get section components; dashboard/CRUD apps get data components.
+ */
+function detectAppType(rawRequirements: string, ir: BuildContext["ir"]): AppType {
+  const text = rawRequirements.toLowerCase();
+  
+  const landingSignals = [
+    "landing page", "website", "homepage", "home page", "marketing",
+    "portfolio", "hero section", "testimonials", "pricing page",
+    "saas", "startup", "company website", "business website",
+    "brochure", "informational", "promotional", "showcase",
+    "college website", "school website", "university", "institution",
+    "restaurant website", "agency website", "personal website",
+    "features section", "about us", "contact page",
+  ];
+  
+  const dashboardSignals = [
+    "dashboard", "admin panel", "management system", "crm", "erp",
+    "inventory", "tracking", "analytics", "reporting", "monitor",
+    "crud", "data table", "records", "manage users", "manage orders",
+    "employee", "task manager", "project management",
+  ];
+  
+  const landingScore = landingSignals.filter(s => text.includes(s)).length;
+  const dashboardScore = dashboardSignals.filter(s => text.includes(s)).length;
+  
+  // If IR has entities (data models), lean toward dashboard/CRUD
+  if (ir.entities.length >= 2 && dashboardScore >= landingScore) return "dashboard";
+  
+  // Strong landing signals
+  if (landingScore > dashboardScore) return "landing";
+  if (landingScore > 0 && ir.entities.length === 0) return "landing";
+  
+  // Default to dashboard for apps with data models
+  if (ir.entities.length > 0) return "dashboard";
+  
+  // Default based on overall tone
+  return dashboardScore > 0 ? "dashboard" : "landing";
+}
+
 let taskCounter = 0;
 function nextId(): string {
   return `task-${++taskCounter}`;
