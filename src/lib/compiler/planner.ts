@@ -501,7 +501,7 @@ Import PageHeader from ../../components/PageHeader.`,
 
       const deps = [...modelTaskIds];
       if (authTaskId && route.auth) deps.push(authTaskId);
-      if (deps.length === 0) deps.push(infraTask.id, authTaskId);
+      if (deps.length === 0) { deps.push(infraTask.id); if (authTaskId) deps.push(authTaskId); }
 
       const pageTask = createTask({
         label: `page:${route.page}`,
