@@ -162,8 +162,9 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
     };
   }, []);
 
-  // Pre-scaffolded UI component paths — these are infrastructure injected by the compiler
-  // and should NOT appear in the user-facing code editor / file tree
+  // Pre-scaffolded UI component paths — compiler infrastructure.
+  // Keep the explorer clean, but still surface any scaffolded UI files that
+  // are actually imported by generated user code.
   const SCAFFOLDED_UI_PATHS = new Set([
     "/components/ui/utils.js", "/components/ui/Button.jsx", "/components/ui/Card.jsx",
     "/components/ui/Input.jsx", "/components/ui/Label.jsx", "/components/ui/Badge.jsx",
@@ -177,12 +178,117 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
     "/components/ui/Spinner.jsx", "/components/ui/SectionHeader.jsx",
   ]);
 
+  const normalizeVirtualPath = (value: string) => {
+    const parts = value.split("/");
+    const stack: string[] = [];
+    for (const part of parts) {
+      if (!part || part === ".") continue;
+      if (part === "..") {
+        stack.pop();
+        continue;
+      }
+      stack.push(part);
+    }
+    return `/${stack.join("/")}`;
+  };
+
+  const IMPORT_RESOLVE_EXTENSIONS = [".tsx", ".ts", ".jsx", ".js", ".css", ".json"];
+
+  const resolveExistingVirtualModulePath = (basePath: string, fileLookup: Set<string>) => {
+    const cleanBasePath = basePath.replace(/[?#].*$/, "");
+    if (fileLookup.has(cleanBasePath)) return cleanBasePath;
+
+    for (const ext of IMPORT_RESOLVE_EXTENSIONS) {
+      const withExt = `${cleanBasePath}${ext}`;
+      if (fileLookup.has(withExt)) return withExt;
+    }
+
+    for (const ext of IMPORT_RESOLVE_EXTENSIONS) {
+      const asIndex = `${cleanBasePath}/index${ext}`;
+      if (fileLookup.has(asIndex)) return asIndex;
+    }
+
+    return null;
+  };
+
+  const resolveVirtualImportPath = (importPath: string, importerPath: string) => {
+    if (!importPath) return null;
+
+    if (importPath.startsWith("@/")) {
+      return normalizeVirtualPath(`/${importPath.slice(2)}`);
+    }
+
+    if (importPath.startsWith("/")) {
+      return normalizeVirtualPath(importPath);
+    }
+
+    if (importPath.startsWith(".")) {
+      const importerDir = importerPath.slice(0, importerPath.lastIndexOf("/") + 1);
+      return normalizeVirtualPath(`${importerDir}${importPath}`);
+    }
+
+    if (importPath.startsWith("components/") || importPath.startsWith("src/")) {
+      return normalizeVirtualPath(`/${importPath.replace(/^src\//, "")}`);
+    }
+
+    return null;
+  };
+
+  const extractImportSpecifiers = (code: string) => {
+    const specifiers: string[] = [];
+    const importRegex = /(?:import|export)\s+(?:[^"'`]*?\s+from\s+)?["']([^"']+)["']|import\s*\(\s*["']([^"']+)["']\s*\)/g;
+    let match: RegExpExecArray | null = null;
+
+    while ((match = importRegex.exec(code)) !== null) {
+      const specifier = match[1] || match[2];
+      if (specifier) specifiers.push(specifier);
+    }
+
+    return specifiers;
+  };
+
   const syncSandpackToVirtualFS = useCallback((sandpackFiles: Record<string, string>) => {
+    const normalizedEntries = Object.entries(sandpackFiles).map(([path, content]) => [normalizeVirtualPath(path), content] as const);
+    const normalizedFileLookup = new Set(normalizedEntries.map(([path]) => path));
+
+    const referencedScaffoldedUiPaths = new Set<string>();
+    const queue: string[] = [];
+
+    const enqueueIfScaffolded = (candidatePath: string | null) => {
+      if (!candidatePath || !SCAFFOLDED_UI_PATHS.has(candidatePath) || referencedScaffoldedUiPaths.has(candidatePath)) return;
+      referencedScaffoldedUiPaths.add(candidatePath);
+      queue.push(candidatePath);
+    };
+
+    for (const [path, content] of normalizedEntries) {
+      if (SCAFFOLDED_UI_PATHS.has(path)) continue;
+
+      for (const specifier of extractImportSpecifiers(content)) {
+        const resolvedImportBasePath = resolveVirtualImportPath(specifier, path);
+        const resolvedImportPath = resolvedImportBasePath
+          ? resolveExistingVirtualModulePath(resolvedImportBasePath, normalizedFileLookup)
+          : null;
+        enqueueIfScaffolded(resolvedImportPath);
+      }
+    }
+
+    while (queue.length > 0) {
+      const currentPath = queue.pop();
+      if (!currentPath) continue;
+      const currentContent = sandpackFiles[currentPath] ?? sandpackFiles[currentPath.slice(1)] ?? "";
+
+      for (const specifier of extractImportSpecifiers(currentContent)) {
+        const resolvedImportBasePath = resolveVirtualImportPath(specifier, currentPath);
+        const resolvedImportPath = resolvedImportBasePath
+          ? resolveExistingVirtualModulePath(resolvedImportBasePath, normalizedFileLookup)
+          : null;
+        enqueueIfScaffolded(resolvedImportPath);
+      }
+    }
+
     const virtualFiles: Record<string, { path: string; content: string; language: string }> = {};
-    for (const [path, content] of Object.entries(sandpackFiles)) {
-      // Skip pre-scaffolded UI components — they're infrastructure, not user code
-      const normalizedPath = path.startsWith("/") ? path : `/${path}`;
-      if (SCAFFOLDED_UI_PATHS.has(normalizedPath)) continue;
+    for (const [path, content] of normalizedEntries) {
+      if (SCAFFOLDED_UI_PATHS.has(path) && !referencedScaffoldedUiPaths.has(path)) continue;
 
       const cleanPath = path.startsWith("/") ? path.slice(1) : path;
       const displayPath = toExportPath(cleanPath);
@@ -193,6 +299,7 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
       };
       virtualFiles[displayPath] = { path: displayPath, content, language: langMap[ext] || "text" };
     }
+
     setVirtualFiles(virtualFiles);
   }, [setVirtualFiles]);
 
