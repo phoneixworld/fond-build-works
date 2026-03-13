@@ -522,21 +522,38 @@ Import PageHeader from ../../components/PageHeader.`,
     ? ir.routes.map(r => `${r.path} → ${r.page}`).join(", ")
     : "(infer from generated pages)";
 
-  const appTask = createTask({
-    label: "app:routing",
-    type: "frontend",
-    description: `App.jsx with routing for: ${routesList}.
+  const appRoutingDescription = appType === "landing"
+    ? `App.jsx for a landing page/website.
+
+CRITICAL: This is a LANDING PAGE, not a dashboard app.
+- Import the main page from /pages/Index.jsx
+- Use HashRouter with a single route: "/" → Index
+- Include ToastProvider wrapper
+- Do NOT use AppLayout with sidebar — landing pages don't have sidebars
+- Do NOT include AuthContext unless auth files exist in the workspace
+- Scan workspace for actual generated files and import them correctly.`
+    : `App.jsx with routing for: ${routesList}.
 
 CRITICAL: Import page components from their DIRECTORY structure: /pages/ModuleName/ModuleName.jsx.
 Scan the workspace for /pages/**/*.jsx and /layout/AppLayout.jsx files.
 Use AppLayout as a parent route with <Outlet /> for nested page routes.
-Include AuthContext provider, ToastProvider, and ProtectedRoute wrappers.`,
+Include AuthContext provider, ToastProvider, and ProtectedRoute wrappers.`;
+
+  const appDeps = [...pageTaskIds];
+  if (authTaskId) appDeps.push(authTaskId);
+
+  const appTask = createTask({
+    label: "app:routing",
+    type: "frontend",
+    description: appRoutingDescription,
     produces: ["/App.jsx"],
-    dependsOn: [...pageTaskIds, authTaskId],
+    dependsOn: appDeps,
     touches: ["/App.jsx"],
     priority: 5,
   });
   tasks.push(appTask);
+
+  console.log(`[Planner] App type: ${appType}, tasks: ${tasks.length}, passes: ${buildPasses(tasks).length}`);
 
   // ── Build passes ──────────────────────────────────────────────────
 
