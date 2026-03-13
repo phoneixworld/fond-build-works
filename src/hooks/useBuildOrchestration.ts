@@ -1242,6 +1242,11 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
             // broken imports / missing modules introduced by the edit.
             try {
               const repairWorkspace = new Workspace(updatedFiles);
+              // Phase 1: Deduplicate (AI sometimes concatenates files twice)
+              const deduped = deduplicateFiles(repairWorkspace);
+              if (deduped > 0) {
+                console.log(`[EditMode] 🧹 Deduplicated ${deduped} file(s)`);
+              }
               const { created } = repairMissingModules(repairWorkspace);
               if (created.length > 0) {
                 console.log(`[EditMode] 🔧 Generated ${created.length} missing module(s):`, created);
