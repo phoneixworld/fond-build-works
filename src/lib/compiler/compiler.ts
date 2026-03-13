@@ -29,6 +29,7 @@ import {
 } from "./observability";
 import { cloudLog } from "@/lib/cloudLogBus";
 import { synthesizeAppJsx } from "./appSynthesizer";
+import { getSharedUIComponents, getGlobalStyles } from "@/lib/templates/scaffoldTemplates";
 
 // ─── Public API ───────────────────────────────────────────────────────────
 
