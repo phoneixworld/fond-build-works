@@ -53,14 +53,18 @@ ${workspaceContext ? `### Current code:\n${workspaceContext}` : ""}
 2. Import from existing workspace files — do NOT recreate them
 3. **CRITICAL FILE STRUCTURE**: All files use these directories from root:
    - /components/ui/ — shared UI library (Card, Button, Modal, DataTable, Toast, Spinner, Dialog, Sheet, Badge, Tabs, Select, Avatar, Input, Dropdown, Alert)
-   - /components/ — reusable components (ProtectedRoute, Sidebar, etc.)
+   - /components/ — reusable DOMAIN components (StatCard, DataTable, StatusBadge, PageHeader, SearchFilterBar, ActivityFeed, QuickActions, NotificationBell, ChartCard, FormModal)
    - /contexts/ — React contexts (AuthContext, etc.)
-   - /pages/ — page components (can be nested: /pages/Auth/LoginPage.jsx)
+   - /pages/ModuleName/ — page components in named directories (e.g. /pages/Dashboard/Dashboard.jsx, /pages/Students/Students.jsx)
    - /hooks/ — custom hooks
    - /services/ — API services
    - /styles/ — CSS files
-   - /layout/ — layout wrappers
+   - /layout/ — layout wrappers (AppLayout.jsx, Sidebar.jsx)
    When importing, always use correct relative paths from the file's location.
+4. **COMPONENT DECOMPOSITION (CRITICAL)**: Pages must NOT be monolithic. Every page MUST import and use reusable components from /components/:
+   - Use StatCard for metrics, DataTable for lists, StatusBadge for statuses, PageHeader for headers, SearchFilterBar for search/filter UI
+   - If a component doesn't exist yet in the workspace, create it in /components/
+   - Each component must be in its own file with a default export
 4. Use the project's data API pattern: fetch(\`\${window.__SUPABASE_URL__}/functions/v1/project-api\`, { body: { project_id: window.__PROJECT_ID__, action, collection, data } })
 5. For auth, use the AuthContext pattern. Import path depends on file location.
    - AuthContext MUST read window.__PROJECT_ID__, window.__SUPABASE_URL__, window.__SUPABASE_KEY__ for API calls
