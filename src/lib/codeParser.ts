@@ -252,6 +252,79 @@ export function parseFileSections(block: string): { files: Record<string, string
   return { files, deps, fileCount: Object.keys(files).length };
 }
 
+/**
+ * Deduplicate a single file's content.
+ * Detects when the AI concatenates the same file twice (imports reappear after exports).
+ * This is the ROOT-CAUSE fix — runs before files reach any preview engine.
+ */
+function deduplicateFileContent(code: string, filePath: string): string {
+  if (code.length < 120) return code;
+
+  // Strategy 1: Detect import statements appearing after export/function/const code.
+  // This is the #1 AI duplication pattern: the entire module is concatenated twice.
+  const lines = code.split("\n");
+  let lastImportLine = -1;
+  let firstCodeLine = -1;
+
+  for (let i = 0; i < lines.length; i++) {
+    const trimmed = lines[i].trim();
+    if (!trimmed || trimmed.startsWith("//") || trimmed.startsWith("/*") || trimmed.startsWith("*")) continue;
+    
+    if (/^import\s/.test(trimmed)) {
+      if (firstCodeLine === -1) {
+        lastImportLine = i;
+      } else if (i > lastImportLine + 5 && firstCodeLine !== -1) {
+        // Found an import statement appearing AFTER real code — duplicate block starts here
+        const before = lines.slice(0, i).join("\n").trim();
+        // Verify the "before" section is a complete module (has exports)
+        if (/export\s/.test(before) && before.length > 80) {
+          console.warn(`[Dedup] Truncated duplicate block in ${filePath} at line ${i + 1} (${code.length} → ${before.length} chars)`);
+          return before;
+        }
+      }
+    } else if (firstCodeLine === -1 && lastImportLine >= 0) {
+      firstCodeLine = i;
+    }
+  }
+
+  // Strategy 2: Exact-half duplication (entire file repeated)
+  const halfLen = Math.floor(code.length / 2);
+  for (let offset = -15; offset <= 15; offset++) {
+    const splitPoint = halfLen + offset;
+    if (splitPoint < 50 || splitPoint >= code.length - 50) continue;
+    const firstHalf = code.slice(0, splitPoint).trim();
+    const secondHalf = code.slice(splitPoint).trim();
+    if (firstHalf === secondHalf) {
+      console.warn(`[Dedup] Removed exact-half duplication in ${filePath} (${code.length} → ${firstHalf.length} chars)`);
+      return firstHalf;
+    }
+  }
+
+  // Strategy 3: Duplicate export default
+  const exportDefaultMatches = [...code.matchAll(/export\s+default\s+(?:function\s+)?(\w+)/g)];
+  if (exportDefaultMatches.length >= 2) {
+    const first = exportDefaultMatches[0];
+    const second = exportDefaultMatches[1];
+    if (first[1] && second[1] && first[1] === second[1]) {
+      // Same component exported twice — find where the duplicate starts
+      const secondPos = second.index!;
+      // Look backward for the start of the duplicate's import block
+      const beforeSecond = code.slice(0, secondPos);
+      const lastImportIdx = beforeSecond.lastIndexOf("\nimport ");
+      if (lastImportIdx > code.length * 0.3) {
+        const lineStart = code.lastIndexOf("\n", lastImportIdx - 1) + 1;
+        const truncated = code.slice(0, lineStart).trim();
+        if (truncated.length > 100 && /export\s/.test(truncated)) {
+          console.warn(`[Dedup] Removed duplicate ${first[1]} in ${filePath} (${code.length} → ${truncated.length} chars)`);
+          return truncated;
+        }
+      }
+    }
+  }
+
+  return code;
+}
+
 /** Parse react/jsx code fences into a file map for Sandpack */
 export function parseReactFiles(text: string): { chatText: string; files: Record<string, string> | null; deps: Record<string, string> } {
   const files: Record<string, string> = {};
@@ -313,13 +386,20 @@ export function parseReactFiles(text: string): { chatText: string; files: Record
   if (parsedFiles.fileCount === 0) {
     const cleaned = block.replace(/^---\s+\/?\w[\w/.-]*\.\w+\s*-{0,3}\s*\n/gm, "").trim();
     console.log(`[parseReactFiles] Single-file mode: treating block as /App.jsx (${cleaned.length} chars)`);
-    files["/App.jsx"] = sanitizeImports(cleaned);
+    files["/App.jsx"] = sanitizeImports(deduplicateFileContent(cleaned, "/App.jsx"));
     return { chatText, files, deps };
   }
   
+  let dedupCount = 0;
   for (const [fname, code] of Object.entries(parsedFiles.files)) {
-    files[fname] = fname.match(/\.(jsx?|tsx?)$/) ? sanitizeImports(code) : code;
+    const deduped = fname.match(/\.(jsx?|tsx?)$/) ? deduplicateFileContent(code, fname) : code;
+    if (deduped !== code) dedupCount++;
+    files[fname] = fname.match(/\.(jsx?|tsx?)$/) ? sanitizeImports(deduped) : deduped;
   }
+  if (dedupCount > 0) {
+    console.warn(`[parseReactFiles] Deduplicated ${dedupCount} file(s) with duplicate AI content`);
+  }
+  
   for (const [pkg, ver] of Object.entries(parsedFiles.deps)) {
     if (ALLOWED_PACKAGES.has(pkg)) deps[pkg] = ver;
   }
