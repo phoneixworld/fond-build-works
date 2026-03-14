@@ -613,6 +613,7 @@ function buildSandpackFiles(files: SandpackFileSet | null, projectId: string, su
   let appExt = ".js";
   if (files) {
     for (const p of Object.keys(files)) {
+      if (!p) continue; // Guard against null/undefined keys
       const norm = p.startsWith("/") ? p : `/${p}`;
       if (/^\/(?:src\/)?App\.tsx$/.test(norm)) { appExt = ".tsx"; break; }
       if (/^\/(?:src\/)?App\.jsx$/.test(norm)) { appExt = ".jsx"; break; }
@@ -624,6 +625,7 @@ function buildSandpackFiles(files: SandpackFileSet | null, projectId: string, su
   const userCssPaths: string[] = [];
   if (files) {
     for (const p of Object.keys(files)) {
+      if (!p) continue;
       const norm = p.startsWith("/") ? p : `/${p}`;
       if (/\.css$/.test(norm) && norm !== "/styles.css") {
         userCssPaths.push(norm);
@@ -657,8 +659,12 @@ function buildSandpackFiles(files: SandpackFileSet | null, projectId: string, su
     return base;
   }
 
-  // Map user files into sandpack paths
+  // Map user files into sandpack paths — guard against null/undefined paths and content
   for (const [path, code] of Object.entries(files)) {
+    if (!path || code == null) {
+      console.warn(`[SandpackPreview] Skipping invalid file entry: path=${path}`);
+      continue;
+    }
     const normalized = path.startsWith("/") ? path : `/${path}`;
     const sandpackPath = normalized;
     const isCodeFile = /\.(jsx?|tsx?)$/.test(sandpackPath);
