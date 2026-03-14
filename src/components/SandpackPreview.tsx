@@ -110,6 +110,58 @@ export default function ${safeName}() {
 `;
 }
 
+function trimLateImportTail(code: string, filePath: string): string {
+  const lines = code.split("\n");
+  let inPreambleImportBlock = true;
+
+  for (let i = 0; i < lines.length; i++) {
+    const trimmed = lines[i].trim();
+    if (!trimmed || trimmed.startsWith("//") || trimmed.startsWith("/*") || trimmed.startsWith("*")) continue;
+
+    const isTopLevelImport = /^import(?:\s|\{|\*)/.test(trimmed);
+
+    if (inPreambleImportBlock) {
+      if (isTopLevelImport) continue;
+      inPreambleImportBlock = false;
+      continue;
+    }
+
+    if (isTopLevelImport) {
+      const before = lines.slice(0, i).join("\n").trim();
+      if (before.length > 80) {
+        const truncated = lines.slice(0, i).join("\n").trim();
+        if (/export\s|return\s+\(|function\s+\w+|const\s+\w+\s*=|class\s+\w+/.test(before) && truncated.length > 60) {
+          console.warn(`[SandpackPreview] Trimmed duplicate late import block in ${filePath} at line ${i + 1}`);
+          return truncated;
+        }
+      }
+    }
+  }
+
+  return code;
+}
+
+function collapseDuplicateReactImports(code: string, filePath: string): string {
+  const lines = code.split("\n");
+  const reactImportLines: Array<{ index: number; line: string }> = [];
+
+  for (let i = 0; i < lines.length; i++) {
+    if (/^\s*import\s+.+\s+from\s+['"]react['"]\s*;?\s*$/.test(lines[i])) {
+      reactImportLines.push({ index: i, line: lines[i] });
+    }
+  }
+
+  if (reactImportLines.length < 2) return code;
+
+  // Keep the richest import (usually includes both default + hooks), remove others.
+  const keep = reactImportLines.reduce((best, curr) => (curr.line.length > best.line.length ? curr : best));
+  const removeSet = new Set(reactImportLines.filter(r => r.index !== keep.index).map(r => r.index));
+  const collapsed = lines.filter((_line, idx) => !removeSet.has(idx)).join("\n");
+
+  console.warn(`[SandpackPreview] Collapsed duplicate React imports in ${filePath}`);
+  return collapsed;
+}
+
 /**
  * Minimal sanitization — strip blocked imports only. No repair, no mutation.
  * Files reaching this point have already been validated upstream by the build engine.
@@ -124,6 +176,10 @@ function sanitizeImports(code: string, filePath: string): string {
     if (/^-{3}\s+\/?\w[\w/.-]*\.\w+\s*-{0,3}\s*$/.test(t)) return false;
     return true;
   }).join("\n");
+
+  // Repair common AI concatenation artifacts before parse.
+  code = trimLateImportTail(code, filePath);
+  code = collapseDuplicateReactImports(code, filePath);
 
   // ── Rename local declarations that collide with imported identifiers ──
   {
@@ -185,20 +241,23 @@ function sanitizeImports(code: string, filePath: string): string {
       jsxRuntime: "automatic",
       production: true,
     });
-  } catch {
-    // Sucrase couldn't parse it — be lenient. 
-    // Context files, hooks, and utility files often use patterns Sucrase struggles with
-    // (async IIFEs, complex destructuring, etc.) but Sandpack's Babel handles fine.
-    // Only stub files that are truly catastrophic (no exports at all, completely empty).
-    const hasExport = /export\s/.test(code);
-    const hasReasonableLength = code.trim().length > 50;
-    if (hasExport && hasReasonableLength) {
-      // Has exports and substantial content — let Sandpack's bundler try
-      console.warn(`[SandpackPreview] Sucrase parse warning in ${filePath}, passing through to Sandpack`);
-      return code;
+  } catch (e: any) {
+    const message = String(e?.message || e || "");
+
+    // Hard parse failures are unsafe to pass through to Sandpack.
+    const hardSyntaxFailure = /has already been declared|Identifier\s+['"`].+['"`]\s+has already been declared|Unexpected token|Unterminated|Unexpected end of input/i.test(message);
+
+    if (!hardSyntaxFailure) {
+      // Sucrase can be stricter than Sandpack Babel for some valid patterns.
+      const hasExport = /export\s/.test(code);
+      const hasReasonableLength = code.trim().length > 50;
+      if (hasExport && hasReasonableLength) {
+        console.warn(`[SandpackPreview] Sucrase parse warning in ${filePath}, passing through to Sandpack`);
+        return code;
+      }
     }
-    // Truly broken — use stub
-    console.warn(`[SandpackPreview] Syntax error in ${filePath}, using safe stub`);
+
+    console.warn(`[SandpackPreview] Syntax error in ${filePath}, using safe stub: ${message}`);
     return makeSafeStub(filePath);
   }
 
