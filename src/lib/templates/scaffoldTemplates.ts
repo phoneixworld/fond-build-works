@@ -653,6 +653,7 @@ const AuthContext = createContext(null);
 
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
+  const [token, setToken] = useState(() => localStorage.getItem("auth_token"));
   const [loading, setLoading] = useState(true);
 
   const getConfig = () => ({
@@ -661,72 +662,109 @@ export function AuthProvider({ children }) {
     projectId: window.__PROJECT_ID__ || "",
   });
 
-  // Check for existing session on mount
-  useEffect(() => {
-    const token = localStorage.getItem("auth_token");
-    const savedUser = localStorage.getItem("auth_user");
-    if (token && savedUser) {
-      try { setUser(JSON.parse(savedUser)); } catch {}
-    }
-    setLoading(false);
+  const persistSession = useCallback((nextUser, nextToken) => {
+    setUser(nextUser || null);
+    setToken(nextToken || null);
+
+    if (nextToken) localStorage.setItem("auth_token", nextToken);
+    else localStorage.removeItem("auth_token");
+
+    if (nextUser) localStorage.setItem("auth_user", JSON.stringify(nextUser));
+    else localStorage.removeItem("auth_user");
   }, []);
 
-  const authFetch = useCallback(async (action, body = {}) => {
+  const clearSession = useCallback(() => {
+    persistSession(null, null);
+  }, [persistSession]);
+
+  const authFetch = useCallback(async (action, body = {}, providedToken) => {
     const { apiBase, apiKey, projectId } = getConfig();
+    if (!apiBase || !projectId) throw new Error("Auth is not configured for this project yet");
+
+    const payload = { project_id: projectId, action, ...body };
+    if (providedToken) {
+      payload.token = providedToken;
+      payload.access_token = providedToken;
+    }
+
     const res = await fetch(\`\${apiBase}/functions/v1/project-auth\`, {
       method: "POST",
       headers: { "Content-Type": "application/json", "Authorization": \`Bearer \${apiKey}\` },
-      body: JSON.stringify({ project_id: projectId, action, ...body }),
+      body: JSON.stringify(payload),
     });
-    return res.json();
+
+    const json = await res.json();
+    if (!res.ok || json?.error) throw new Error(json?.error || "Authentication request failed");
+    return json;
   }, []);
+
+  const extractSession = useCallback((json) => {
+    const payload = json?.data || json || {};
+    const nextUser = payload.user || null;
+    const nextToken = payload.token || payload.access_token || json?.token || json?.access_token || null;
+    return { nextUser, nextToken };
+  }, []);
+
+  // Restore and validate existing session on mount
+  useEffect(() => {
+    let cancelled = false;
+
+    const restore = async () => {
+      const savedToken = localStorage.getItem("auth_token");
+      if (!savedToken) {
+        if (!cancelled) setLoading(false);
+        return;
+      }
+
+      try {
+        const json = await authFetch("me", {}, savedToken);
+        const { nextUser } = extractSession(json);
+
+        if (!cancelled && nextUser) persistSession(nextUser, savedToken);
+        else if (!cancelled) clearSession();
+      } catch {
+        if (!cancelled) clearSession();
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    };
+
+    restore();
+    return () => { cancelled = true; };
+  }, [authFetch, extractSession, persistSession, clearSession]);
 
   const login = useCallback(async (email, password) => {
     setLoading(true);
     try {
       const json = await authFetch("login", { email, password });
-      if (json.user) {
-        setUser(json.user);
-        localStorage.setItem("auth_token", json.token);
-        localStorage.setItem("auth_user", JSON.stringify(json.user));
-      } else if (json.data?.user) {
-        setUser(json.data.user);
-        localStorage.setItem("auth_token", json.data.token || json.token);
-        localStorage.setItem("auth_user", JSON.stringify(json.data.user));
-      } else if (json.error) {
-        throw new Error(json.error);
-      }
+      const { nextUser, nextToken } = extractSession(json);
+      if (!nextUser || !nextToken) throw new Error("Invalid login response");
+      persistSession(nextUser, nextToken);
       return json;
-    } finally { setLoading(false); }
-  }, [authFetch]);
+    } finally {
+      setLoading(false);
+    }
+  }, [authFetch, extractSession, persistSession]);
 
   const signup = useCallback(async (email, password, displayName) => {
     setLoading(true);
     try {
       const json = await authFetch("signup", { email, password, display_name: displayName });
-      if (json.user) {
-        setUser(json.user);
-        localStorage.setItem("auth_token", json.token);
-        localStorage.setItem("auth_user", JSON.stringify(json.user));
-      } else if (json.data?.user) {
-        setUser(json.data.user);
-        localStorage.setItem("auth_token", json.data.token || json.token);
-        localStorage.setItem("auth_user", JSON.stringify(json.data.user));
-      } else if (json.error) {
-        throw new Error(json.error);
-      }
+      const { nextUser, nextToken } = extractSession(json);
+      if (!nextUser || !nextToken) throw new Error("Invalid signup response");
+      persistSession(nextUser, nextToken);
       return json;
-    } finally { setLoading(false); }
-  }, [authFetch]);
+    } finally {
+      setLoading(false);
+    }
+  }, [authFetch, extractSession, persistSession]);
 
   const logout = useCallback(() => {
-    setUser(null);
-    localStorage.removeItem("auth_token");
-    localStorage.removeItem("auth_user");
-  }, []);
+    clearSession();
+  }, [clearSession]);
 
   return (
-    <AuthContext.Provider value={{ user, loading, login, signup, logout, isAuthenticated: !!user }}>
+    <AuthContext.Provider value={{ user, token, loading, login, signup, logout, isAuthenticated: !!user }}>
       {children}
     </AuthContext.Provider>
   );
