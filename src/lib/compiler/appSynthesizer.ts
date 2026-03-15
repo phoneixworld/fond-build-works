@@ -26,22 +26,31 @@ export function synthesizeAppJsx(workspace: Workspace): string {
   
   for (const page of pages) {
     const fileName = page.split("/").pop()!.replace(/\.\w+$/, "");
-    const isLogin = /login/i.test(fileName);
-    const routePath = isLogin ? "/login" : `/${fileName.toLowerCase().replace(/page$/, "")}`;
-    
+    const normalized = fileName.toLowerCase();
+
+    const isLogin = /^login(page)?$|^signin(page)?$/.test(normalized);
+    const isSignup = /^signup(page)?$|^register(page)?$/.test(normalized);
+    const isPublicAuthRoute = isLogin || isSignup || /forgot|reset|auth/.test(normalized);
+
+    const routePath = isLogin
+      ? "/login"
+      : isSignup
+        ? "/signup"
+        : `/${normalized.replace(/page$/, "")}`;
+
     routes.push({
       path: routePath,
       component: fileName,
       importPath: `.${page.replace(/\.\w+$/, "")}`,
-      protect: !isLogin && hasAuth,
+      protect: hasAuth && !isPublicAuthRoute,
     });
   }
-  
+
   // If no pages found, find any component to render
   if (routes.length === 0) {
-    const components = files.filter(f => 
-      /\.(jsx?|tsx?)$/.test(f) && 
-      !f.includes("Context") && 
+    const components = files.filter(f =>
+      /\.(jsx?|tsx?)$/.test(f) &&
+      !f.includes("Context") &&
       !f.includes("ProtectedRoute") &&
       !f.includes("/ui/")
     );
@@ -56,12 +65,13 @@ export function synthesizeAppJsx(workspace: Workspace): string {
       });
     }
   }
-  
+
   // Ensure we have a root route
   if (routes.length > 0 && !routes.some(r => r.path === "/")) {
-    const nonLogin = routes.find(r => r.path !== "/login");
-    if (nonLogin) {
-      routes.unshift({ ...nonLogin, path: "/" });
+    const nonAuthRoute = routes.find(r => !["/login", "/signup", "/auth"].includes(r.path));
+    const fallback = nonAuthRoute || routes.find(r => r.path === "/login") || routes[0];
+    if (fallback) {
+      routes.unshift({ ...fallback, path: "/" });
     }
   }
   

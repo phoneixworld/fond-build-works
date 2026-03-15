@@ -121,10 +121,11 @@ Only generate globals.css with design tokens. All UI components are pre-scaffold
     const authTask = createTask({
       label: "auth",
       type: "frontend",
-      description: `Auth system with roles: ${ir.roles.map(r => r.name).join(", ") || "user"}. Must create AuthContext, LoginPage, and ProtectedRoute.`,
+      description: `Auth system with roles: ${ir.roles.map(r => r.name).join(", ") || "user"}. Must create AuthContext, LoginPage, SignupPage, and ProtectedRoute. Login/Signup routes must stay public (never wrapped in ProtectedRoute).`,
       produces: [
         "/contexts/AuthContext.jsx",
         "/pages/Auth/LoginPage.jsx",
+        "/pages/Auth/SignupPage.jsx",
         "/components/ProtectedRoute.jsx",
       ],
       dependsOn: [infraTask.id],

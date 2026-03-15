@@ -452,7 +452,9 @@ function checkUndefinedCalls(workspace: Workspace): { issues: VerificationIssue[
           new RegExp(`const\\s+${fnName}\\s*=`),
           new RegExp(`let\\s+${fnName}\\s*=`),
           new RegExp(`var\\s+${fnName}\\s*=`),
-          new RegExp(`\\{[^}]*\\b${fnName}\\b[^}]*\\}\\s*=`), // destructuring
+          new RegExp(`\\{[^}]*\\b${fnName}\\b[^}]*\\}\\s*=`), // destructuring assignment
+          new RegExp(`function\\s+\\w+\\s*\\(\\s*\\{[^)]*\\b${fnName}\\b[^)]*\\}\\s*\\)`), // function params
+          new RegExp(`(?:const|let|var)\\s+\\w+\\s*=\\s*(?:async\\s*)?\\(\\s*\\{[^)]*\\b${fnName}\\b[^)]*\\}\\s*\\)\\s*=>`), // arrow params
           new RegExp(`import\\b[^;]*\\b${fnName}\\b`),
         ];
 
