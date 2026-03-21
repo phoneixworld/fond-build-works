@@ -97,6 +97,16 @@ const ChatPanel = forwardRef<ChatPanelHandle, { initialPrompt?: string; onVersio
     setPipelineStepProxy,
   );
 
+  // Real refs for self-healing timing guards (wired to orchestrator state below)
+  const selfHealSendingRef = useRef(false);
+  const selfHealLoadingRef = useRef(false);
+  const selfHealSandpackRef = useRef<Record<string, string> | null>(currentSandpackFiles);
+  // Keep sandpack ref in sync
+  useEffect(() => { selfHealSandpackRef.current = currentSandpackFiles; }, [currentSandpackFiles]);
+
+  // Surgical edit ref — wired after build orchestration is initialized
+  const sendEditRef = useRef<(text: string) => void>(() => {});
+
   // Self-healing hook (declared first, uses sendMessage ref)
   const {
     previewErrors, setPreviewErrors,
@@ -108,10 +118,11 @@ const ChatPanel = forwardRef<ChatPanelHandle, { initialPrompt?: string; onVersio
   } = useSelfHealing({
     isBuildingValue: usePreview().isBuilding,
     isLoading: false,
-    sandpackFilesRef: { current: currentSandpackFiles } as React.RefObject<Record<string, string> | null>,
-    isSendingRef: { current: false } as React.RefObject<boolean>,
-    isLoadingRef: { current: false } as React.RefObject<boolean>,
+    sandpackFilesRef: selfHealSandpackRef,
+    isSendingRef: selfHealSendingRef,
+    isLoadingRef: selfHealLoadingRef,
     sendMessage: (text: string) => sendMessageRef.current(text),
+    sendEditMessage: (text: string) => sendEditRef.current(text),
   });
 
   // Keep ref in sync
@@ -205,6 +216,12 @@ const ChatPanel = forwardRef<ChatPanelHandle, { initialPrompt?: string; onVersio
   // Sync refs after both hooks are initialized
   useEffect(() => { sendMessageRef.current = sendMessage; }, [sendMessage]);
   useEffect(() => { setPipelineStepRef.current = setPipelineStep; }, [setPipelineStep]);
+
+  // Wire self-healing guard refs to real orchestrator state
+  useEffect(() => { selfHealSendingRef.current = isSendingRef.current; }, [isLoading]);
+  useEffect(() => { selfHealLoadingRef.current = isLoading; }, [isLoading]);
+  // Wire surgical edit path for self-healing (sendMessage is the fallback, but edit is preferred)
+  useEffect(() => { sendEditRef.current = sendMessage; }, [sendMessage]);
 
   const handleClearChat = useCallback(() => {
     orchClearChat();

@@ -32,6 +32,32 @@ interface CategorizedError {
   identifier?: string;
 }
 
+/**
+ * Extract component name from "Check the render method of `X`" or stack traces.
+ */
+function guessComponentFromError(error: string): { component?: string; file?: string } {
+  // "Check the render method of `StatCard`" or "Check the render method of StatCard"
+  const renderMethodMatch = error.match(/Check the render method of [`']?(\w+)[`']?/i);
+  if (renderMethodMatch) {
+    const comp = renderMethodMatch[1];
+    return { component: comp, file: `/components/${comp}.jsx` };
+  }
+
+  // Stack trace: "at StatCard (http://localhost:.../src/components/StatCard.jsx:12:5)"
+  const stackMatch = error.match(/at\s+(\w+)\s+\([^)]*\/([\w/.-]+\.(?:jsx?|tsx?))/);
+  if (stackMatch) {
+    return { component: stackMatch[1], file: `/${stackMatch[2]}` };
+  }
+
+  // File path anywhere in the error
+  const fileMatch = error.match(/\/(components\/[\w/.-]+\.(?:jsx?|tsx?))/);
+  if (fileMatch) {
+    return { file: `/${fileMatch[1]}` };
+  }
+
+  return {};
+}
+
 function categorizeError(error: string): CategorizedError {
   // "Module not found" or "Cannot find module"
   if (/module\s+not\s+found|cannot\s+find\s+module/i.test(error)) {
@@ -39,10 +65,15 @@ function categorizeError(error: string): CategorizedError {
     return { type: "import", message: error, file: fileMatch?.[1] };
   }
 
-  // "Element type is invalid"
+  // "Element type is invalid" — generic React mismatch error
   if (/element\s+type\s+is\s+invalid/i.test(error)) {
-    const compMatch = error.match(/type\s+(?:of|is)\s+(?:the\s+)?(?:element|component)\s+['"]?(\w+)/i);
-    return { type: "export", message: error, identifier: compMatch?.[1] };
+    const guess = guessComponentFromError(error);
+    return {
+      type: "export",
+      message: error,
+      identifier: guess.component,
+      file: guess.file,
+    };
   }
 
   // Duplicate symbol export/declaration
@@ -59,7 +90,6 @@ function categorizeError(error: string): CategorizedError {
     const idMatch = error.match(/(\w+)\s+is\s+not/);
     const fileMatch = error.match(/\/([^\s:]+\.\w+)/);
     const identifier = idMatch?.[1];
-    // In Sandpack classic JSX runtime, missing React import appears as "React is not defined".
     if (identifier === "React") {
       return { type: "import", message: error, identifier, file: fileMatch?.[1] };
     }
@@ -199,15 +229,32 @@ export function useSelfHealing(config: SelfHealingConfig) {
     if (currentFiles) {
       const errorFiles = new Set<string>();
       
-      // Extract files from errors
+      // Extract files from categorized errors (includes component inference)
       for (const err of categorized) {
         if (err.file) errorFiles.add(err.file.startsWith("/") ? err.file : `/${err.file}`);
+        // Also try component name → file path inference
+        if (err.identifier && !err.file) {
+          const guessedPath = `/components/${err.identifier}.jsx`;
+          if (currentFiles[guessedPath]) errorFiles.add(guessedPath);
+          // Try .tsx variant too
+          const guessedTsx = `/components/${err.identifier}.tsx`;
+          if (currentFiles[guessedTsx]) errorFiles.add(guessedTsx);
+        }
       }
       
       // Also extract from raw messages
       for (const err of previewErrors) {
         const match = err.match(/\/([\w/.-]+\.\w+)/);
         if (match) errorFiles.add(`/${match[1]}`);
+        // Extract from "Check the render method of X"
+        const renderMatch = err.match(/Check the render method of [`']?(\w+)/i);
+        if (renderMatch) {
+          const comp = renderMatch[1];
+          for (const ext of [".jsx", ".tsx"]) {
+            const path = `/components/${comp}${ext}`;
+            if (currentFiles[path]) errorFiles.add(path);
+          }
+        }
       }
       
       // Always include App.jsx
@@ -224,11 +271,12 @@ export function useSelfHealing(config: SelfHealingConfig) {
     const healPrompt = buildSmartFixPrompt(categorized, fileContext, attempt);
     setPreviewErrors([]);
     
-    Promise.resolve(sendMessage(healPrompt)).finally(() => {
+    // Use surgical edit path when available to avoid full rebuild loops
+    Promise.resolve(healSend(healPrompt)).finally(() => {
       setIsHealing(false);
       setHealingStatus("");
     });
-  }, [isHealing, healAttempts, previewErrors, sendMessage, sandpackFilesRef, isSendingRef, isLoadingRef]);
+  }, [isHealing, healAttempts, previewErrors, healSend, sandpackFilesRef, isSendingRef, isLoadingRef]);
 
   // Auto-run self-heal when preview errors appear and build is idle
   useEffect(() => {
@@ -261,8 +309,8 @@ export function useSelfHealing(config: SelfHealingConfig) {
     }
 
     const prompt = buildSmartFixPrompt(categorized, fileContext, 1);
-    sendMessage(prompt);
-  }, [previewErrors, sendMessage, sandpackFilesRef]);
+    healSend(prompt);
+  }, [previewErrors, healSend, sandpackFilesRef]);
 
   const resetHealing = useCallback(() => {
     setHealAttempts(0);
