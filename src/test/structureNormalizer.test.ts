@@ -51,4 +51,28 @@ describe("structureNormalizer", () => {
     const dashboard = ws.getFile("/pages/Dashboard/DashboardPage.jsx") || "";
     expect(dashboard).toContain('import { useClasses as useClass } from "../../hooks/useClass";');
   });
+
+  it("prevents ToastContainer toasts.map crashes by normalizing app wiring and container defaults", () => {
+    const ws = new Workspace({
+      "/components/ui/Toast.jsx": `import React from "react";
+export function ToastProvider({ children }) { return <>{children}</>; }
+export function ToastContainer({ toasts, removeToast }) {
+  return <div>{toasts.map((t) => <span key={t.id}>{t.message}</span>)}</div>;
+}`,
+      "/App.jsx": `import { ToastProvider, ToastContainer } from "./components/ui/Toast";
+export default function App(){
+  return <ToastProvider><div>App</div><ToastContainer /></ToastProvider>;
+}`,
+    });
+
+    const fixed = normalizeGeneratedStructure(ws);
+
+    expect(fixed).toBeGreaterThan(0);
+    const toast = ws.getFile("/components/ui/Toast.jsx") || "";
+    const app = ws.getFile("/App.jsx") || "";
+
+    expect(toast).toContain("ToastContainer({ toasts = [], removeToast = () => {} })");
+    expect(app).toContain('import { ToastProvider } from "./components/ui/Toast";');
+    expect(app).not.toContain("<ToastContainer />");
+  });
 });

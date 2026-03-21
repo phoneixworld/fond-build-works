@@ -42,6 +42,7 @@ import { repairMissingModules } from "@/lib/compiler/missingModuleGen";
 import { fixMissingImports } from "@/lib/compiler/missingImportFixer";
 import { fixExportMismatches } from "@/lib/compiler/exportMismatchFixer";
 import { deduplicateFiles } from "@/lib/compiler/deduplicator";
+import { normalizeGeneratedStructure } from "@/lib/compiler/structureNormalizer";
 
 type Msg = { role: "user" | "assistant"; content: MsgContent; timestamp?: number };
 
@@ -1293,6 +1294,10 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
               const exportsFixed = fixExportMismatches(repairWorkspace);
               if (exportsFixed > 0) {
                 console.log(`[EditMode] 🔧 Fixed ${exportsFixed} export mismatch(es)`);
+              }
+              const structureFixed = normalizeGeneratedStructure(repairWorkspace);
+              if (structureFixed > 0) {
+                console.log(`[EditMode] 🧱 Applied ${structureFixed} structural normalization fix(es)`);
               }
               // Extract repaired files back
               const repairedFiles: Record<string, string> = {};
