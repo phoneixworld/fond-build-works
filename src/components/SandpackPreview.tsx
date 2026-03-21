@@ -33,11 +33,20 @@ class SandpackErrorBoundary extends Component<
   }
 
   componentDidCatch(error: Error) {
-    // Safely log — don't try to modify the error
+    // Safely log and bridge error to self-healing without mutating readonly Error objects
+    let msg = "Preview encountered an error";
     try {
-      console.error("[SandpackErrorBoundary]", error?.message || String(error));
+      msg = error?.message || String(error);
+      console.error("[SandpackErrorBoundary]", msg);
     } catch {
       console.error("[SandpackErrorBoundary] Error caught");
+    }
+
+    try {
+      const errorType = /syntax|unexpected token|already been (?:declared|exported)/i.test(msg) ? "syntax" : "runtime";
+      window.postMessage({ type: "preview-error", errorType, message: msg }, "*");
+    } catch {
+      // swallow message bridge failures
     }
   }
 
