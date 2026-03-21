@@ -194,6 +194,8 @@ function ensureReactInScope(code: string, filePath: string): string {
     /^\s*import\s+\*\s+as\s+React\s+from\s+['"]react['"]/m.test(code) ||
     /\bconst\s+React\s*=\s*require\(\s*['"]react['"]\s*\)/.test(code)
   ) {
+    // React default is imported — but check hooks are included too
+    code = ensureReactHooksImported(code, filePath);
     return code;
   }
 
@@ -204,11 +206,50 @@ function ensureReactInScope(code: string, filePath: string): string {
       (_m, names) => `import React, {${String(names).trim()}} from "react";`
     );
     console.warn(`[SandpackPreview] Added default React import to existing react import in ${filePath}`);
-    return upgraded;
+    return ensureReactHooksImported(upgraded, filePath);
   }
 
   console.warn(`[SandpackPreview] Injected missing React import in ${filePath}`);
-  return `import React from "react";\n${code}`;
+  code = `import React from "react";\n${code}`;
+  return ensureReactHooksImported(code, filePath);
+}
+
+const REACT_HOOKS = ["useState", "useEffect", "useContext", "useCallback", "useRef", "useMemo", "useReducer", "useLayoutEffect", "useId", "useDeferredValue", "useTransition", "useSyncExternalStore", "useImperativeHandle", "useDebugValue", "useInsertionEffect"];
+
+function ensureReactHooksImported(code: string, filePath: string): string {
+  const missingHooks: string[] = [];
+  for (const hook of REACT_HOOKS) {
+    const used = new RegExp(`\\b${hook}\\b`).test(code);
+    if (!used) continue;
+    // Check if already imported from react
+    const imported = new RegExp(`import\\s+(?:React\\s*,\\s*)?\\{[^}]*\\b${hook}\\b[^}]*\\}\\s+from\\s+['"]react['"]`).test(code);
+    if (imported) continue;
+    missingHooks.push(hook);
+  }
+  if (missingHooks.length === 0) return code;
+
+  // Try to extend existing react import
+  const reactImportMatch = code.match(/^(\s*import\s+(?:React\s*,\s*)?\{([^}]*)\}\s+from\s+['"]react['"]\s*;?\s*)$/m);
+  if (reactImportMatch) {
+    const existingHooks = reactImportMatch[2].split(",").map(s => s.trim()).filter(Boolean);
+    const allHooks = [...new Set([...existingHooks, ...missingHooks])];
+    const hasDefault = /import\s+React\s*,/.test(reactImportMatch[1]);
+    const newImport = hasDefault
+      ? `import React, { ${allHooks.join(", ")} } from "react";`
+      : `import { ${allHooks.join(", ")} } from "react";`;
+    code = code.replace(reactImportMatch[0].trim(), newImport);
+  } else if (/^\s*import\s+React\s+from\s+['"]react['"]/m.test(code)) {
+    // Only default import — upgrade to include hooks
+    code = code.replace(
+      /^\s*import\s+React\s+from\s+['"]react['"]\s*;?/m,
+      `import React, { ${missingHooks.join(", ")} } from "react";`
+    );
+  } else {
+    // No react import at all — add one
+    code = `import { ${missingHooks.join(", ")} } from "react";\n${code}`;
+  }
+  console.warn(`[SandpackPreview] Injected missing React hooks {${missingHooks.join(", ")}} in ${filePath}`);
+  return code;
 }
 
 function resolveRelativePath(fromFile: string, rel: string): string {
