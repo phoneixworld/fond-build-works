@@ -9,8 +9,47 @@
  * v1.2: Extend/fix builds reuse rich page instructions and avoid hollow tasks.
  */
 
-import type { BuildContext, CompilerTask, TaskGraph, TaskType } from "./types";
+import type { BuildContext, CompilerTask, IRManifest, TaskGraph, TaskType } from "./types";
 import type { IR } from "@/lib/ir";
+
+/**
+ * Converts new structured IR into the legacy IRManifest format used by the planner.
+ * When structuredIR is available, it becomes the source of truth for entities, routes, etc.
+ */
+function mergeStructuredIR(legacyIR: IRManifest, sir: IR): IRManifest {
+  const entities = Object.entries(sir.entities).map(([name, entity]) => ({
+    name,
+    fields: Object.entries(entity.fields).map(([fieldName, field]) => ({
+      name: fieldName,
+      type: field.type,
+      required: field.required,
+    })),
+    relationships: Object.entries(entity.fields)
+      .filter(([, f]) => f.relation)
+      .map(([, f]) => ({
+        target: f.relation!.entity,
+        type: f.relation!.type === "many" ? "one-to-many" as const : "many-to-one" as const,
+      })),
+  }));
+
+  const routes = sir.pages.map(page => ({
+    path: page.path,
+    page: page.name,
+    auth: page.type !== "custom" && page.path !== "/login" && page.path !== "/signup",
+    roles: [] as string[],
+  }));
+
+  // Preserve legacy roles/workflows/modules/constraints, override entities & routes
+  return {
+    entities: entities.length > 0 ? entities : legacyIR.entities,
+    roles: legacyIR.roles,
+    workflows: legacyIR.workflows,
+    routes: routes.length > 0 ? routes : legacyIR.routes,
+    modules: legacyIR.modules,
+    constraints: legacyIR.constraints,
+  };
+}
+
 
 type AppType = "landing" | "dashboard" | "crud";
 
