@@ -1,4 +1,5 @@
-import type { IR } from "./ir";
+import type { IR } from "../ir";
+import { Workspace } from "./workspace";
 
 export function synthesizeAppFromIR(ir: IR): string {
   const pageImports = ir.pages.map((p) => {
