@@ -183,6 +183,30 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
     return `/${stack.join("/")}`;
   };
 
+  const sanitizeWorkspaceForPreview = useCallback((files: Record<string, string> | null | undefined) => {
+    if (!files) return {} as Record<string, string>;
+
+    const sanitized: Record<string, string> = {};
+    for (const [rawPath, rawContent] of Object.entries(files)) {
+      if (typeof rawPath !== "string") continue;
+      const trimmedPath = rawPath.trim();
+      if (!trimmedPath) continue;
+      if (/^(null|undefined)$/i.test(trimmedPath) || /\/(?:null|undefined)$/i.test(trimmedPath)) {
+        console.warn(`[BuildOrch] Skipping invalid preview file path: ${trimmedPath}`);
+        continue;
+      }
+      if (typeof rawContent !== "string") {
+        console.warn(`[BuildOrch] Skipping non-string file content for ${trimmedPath}`);
+        continue;
+      }
+
+      const normalizedPath = normalizeVirtualPath(trimmedPath);
+      sanitized[normalizedPath] = rawContent;
+    }
+
+    return sanitized;
+  }, []);
+
   const IMPORT_RESOLVE_EXTENSIONS = [".tsx", ".ts", ".jsx", ".js", ".css", ".json"];
 
   const resolveExistingVirtualModulePath = (basePath: string, fileLookup: Set<string>) => {
@@ -1014,36 +1038,15 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
           setCompilerTasks(prev => prev.map(t => t.label === task.label ? { ...t, status: "done" as const } : t));
 
           // Update preview with accumulated files on each task completion
-          // BUT skip interim refreshes for large workspaces (>30 files) to avoid thrashing
+          // Keep preview stable during task execution; only apply to preview on onComplete.
+          // This prevents transient task-level compile states from flashing runtime errors.
           if (Object.keys(files).length > 0) {
             const currentFiles = sandpackFilesRef.current || {};
-            const mergedFiles = { ...currentFiles, ...files };
-            const totalFileCount = Object.keys(mergedFiles).length;
-            
-            if (totalFileCount > 30) {
-              sandpackFilesRef.current = mergedFiles;
-              syncSandpackToVirtualFS(mergedFiles);
-              deferredPreviewFilesRef.current = mergedFiles;
-
-              if (!deferredPreviewTimerRef.current) {
-                deferredPreviewTimerRef.current = setTimeout(() => {
-                  deferredPreviewTimerRef.current = null;
-                  if (lastProjectIdRef.current !== buildProjectId) return;
-                  const pending = deferredPreviewFilesRef.current;
-                  if (!pending) return;
-
-                  setSandpackFiles({ ...pending });
-                  setPreviewMode("sandpack");
-                  console.log(`[Compiler] Large workspace (${Object.keys(pending).length} files) — flushed deferred preview update`);
-                }, 900);
-              }
-
-              console.log(`[Compiler] Large workspace (${totalFileCount} files) — throttling preview refresh`);
-            } else {
-              setSandpackFiles(mergedFiles);
-              syncSandpackToVirtualFS(mergedFiles);
-              setPreviewMode("sandpack");
-            }
+            const mergedFiles = sanitizeWorkspaceForPreview({ ...currentFiles, ...files });
+            sandpackFilesRef.current = mergedFiles;
+            deferredPreviewFilesRef.current = mergedFiles;
+            syncSandpackToVirtualFS(mergedFiles);
+            console.log(`[Compiler] Buffered task output (${Object.keys(mergedFiles).length} files) — preview will update on build completion`);
           }
         },
         onTaskError: (task, error) => {
@@ -1065,9 +1068,15 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
           // Store verification result for conversation state
           lastVerificationOkRef.current = result.verification.ok;
 
-          // Set final files
-          setSandpackFiles(result.workspace);
-          syncSandpackToVirtualFS(result.workspace);
+          // Set final files (sanitized) once build is complete
+          if (deferredPreviewTimerRef.current) {
+            clearTimeout(deferredPreviewTimerRef.current);
+            deferredPreviewTimerRef.current = null;
+          }
+
+          const finalWorkspace = sanitizeWorkspaceForPreview(result.workspace);
+          setSandpackFiles(finalWorkspace);
+          syncSandpackToVirtualFS(finalWorkspace);
           setPreviewMode("sandpack");
 
           // Build completion message — evidence-backed, no false claims
@@ -1106,8 +1115,8 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
           }));
           saveProject({ chat_history: persistMessages, html_content: currentProject.html_content || "" });
 
-          if (Object.keys(result.workspace).length > 0) {
-            const payload = { files: result.workspace, deps: {} };
+          if (Object.keys(finalWorkspace).length > 0) {
+            const payload = { files: finalWorkspace, deps: {} };
             supabase
               .from("project_data")
               .upsert(
@@ -1121,7 +1130,7 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
 
             triggerBuild(
               currentProject.id,
-              result.workspace,
+              finalWorkspace,
               {},
               { model: selectedModel, theme: selectedTheme }
             ).then((buildResult) => {
