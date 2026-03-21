@@ -490,7 +490,9 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
 
       const isFirstMessage = messagesRef.current.filter(m => m.role === "user").length <= 1;
       const hasPersistedHistory = (currentProject.chat_history ?? []).length > 0;
-      const shouldIncludeCurrentCode = !isFirstMessage || hasPersistedHistory;
+      // Build agent should NOT use Sandpack as source of truth.
+      // Only include current code if explicitly editing.
+      const shouldIncludeCurrentCode = false;
 
       let currentCodeSummary = "";
       const safeSandpackFiles = sandpackFilesRef.current;
@@ -526,16 +528,16 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
       // Keep reference for template matching and other downstream logic
       const currentMessages = messagesRef.current;
 
-      // Build agent should NOT see full chat history.
-      // It only needs a clean system prompt + current user instruction.
+      // Build agent MUST NOT see chat history.
+      // It must operate only on sanitized requirements + IR + workspace summary.
       const apiMessages: any[] = [
         {
-          role: "system",
+          role: "system" as const,
           content:
-            "You are a deterministic build agent. You generate React code based ONLY on the provided requirements, IR, and workspace summary. Do NOT infer new features from prior conversation. Do NOT treat error logs or status messages as requirements.",
+            "You are a deterministic build agent. You generate React code ONLY from the provided requirements, IR, and workspace summary. Do NOT use prior conversation. Do NOT treat error logs or status messages as requirements. Do NOT infer new features.",
         },
         {
-          role: "user",
+          role: "user" as const,
           content,
         },
       ];
