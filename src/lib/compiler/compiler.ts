@@ -10,6 +10,7 @@
 
 import type { IR } from "@/lib/ir";
 import { scaffoldPagesFromIR } from "@/lib/pageScaffolder";
+import { scaffoldEntitiesFromIR } from "@/lib/entityScaffolder";
 import { synthesizeAppFromIR } from "./appSynthesizer";
 import type {
   BuildContext, BuildResult, BuildStatus,
@@ -238,8 +239,19 @@ export async function compile(
   // Seed the workspace with page files and App.jsx generated from structured IR
   // BEFORE any model code is streamed. The model refines these instead of inventing them.
   if (structuredIR && structuredIR.pages.length > 0) {
-    const irPages = scaffoldPagesFromIR(structuredIR);
     let irScaffoldCount = 0;
+
+    // Seed mock APIs + contexts for every entity
+    const entityFiles = scaffoldEntitiesFromIR(structuredIR);
+    for (const [path, content] of Object.entries(entityFiles)) {
+      if (!workspace.hasFile(path)) {
+        workspace.addFile(path, content);
+        irScaffoldCount++;
+      }
+    }
+
+    // Seed page files from IR
+    const irPages = scaffoldPagesFromIR(structuredIR);
     for (const [path, content] of Object.entries(irPages)) {
       if (!workspace.hasFile(path)) {
         workspace.addFile(path, content);
@@ -255,7 +267,7 @@ export async function compile(
     }
 
     if (irScaffoldCount > 0) {
-      cloudLog.info(`IR scaffolder: seeded ${irScaffoldCount} page files + App.jsx from structured IR`, "compiler");
+      cloudLog.info(`IR scaffolder: seeded ${irScaffoldCount} files (entities + pages + App.jsx) from structured IR`, "compiler");
       console.log(`[Compiler] 📄 IR scaffolder: seeded ${irScaffoldCount} files from structured IR`);
     }
   }
