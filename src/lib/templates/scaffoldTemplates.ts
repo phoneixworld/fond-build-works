@@ -881,6 +881,200 @@ export function getSharedUIComponents(): Record<string, string> {
   return getAllUIComponents();
 }
 
+// ─── Domain Component Templates (hardcoded fallbacks) ─────────────────────
+
+const STAT_CARD_COMPONENT = `import React from "react";
+import { TrendingUp, TrendingDown } from "lucide-react";
+
+export default function StatCard({ title, value, trend, trendLabel, icon: Icon, color = "var(--color-primary)" }) {
+  const isPositive = trend && !String(trend).startsWith("-");
+  return (
+    <div className="bg-white rounded-xl border border-[var(--color-border)] p-5 hover:shadow-md transition-shadow">
+      <div className="flex items-center justify-between mb-3">
+        <span className="text-xs font-medium text-[var(--color-text-secondary)] uppercase tracking-wide">{title}</span>
+        {Icon && (
+          <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: color + "15" }}>
+            <Icon className="w-4 h-4" style={{ color }} />
+          </div>
+        )}
+      </div>
+      <p className="text-2xl font-bold text-[var(--color-text)]">{value}</p>
+      {trend && (
+        <p className="text-xs mt-1 flex items-center gap-1">
+          {isPositive ? <TrendingUp className="w-3 h-3 text-green-600" /> : <TrendingDown className="w-3 h-3 text-red-500" />}
+          <span className={isPositive ? "text-green-600 font-medium" : "text-red-500 font-medium"}>{trend}</span>
+          {trendLabel && <span className="text-[var(--color-text-muted)]">{trendLabel}</span>}
+        </p>
+      )}
+    </div>
+  );
+}
+`;
+
+const STATUS_BADGE_COMPONENT = `import React from "react";
+
+const STATUS_COLORS = {
+  active: "bg-green-100 text-green-700",
+  pending: "bg-yellow-100 text-yellow-700",
+  inactive: "bg-gray-100 text-gray-600",
+  completed: "bg-blue-100 text-blue-700",
+  cancelled: "bg-red-100 text-red-700",
+  default: "bg-gray-100 text-gray-600",
+};
+
+export default function StatusBadge({ status = "default", className = "" }) {
+  const key = String(status).toLowerCase();
+  const colors = STATUS_COLORS[key] || STATUS_COLORS.default;
+  return (
+    <span className={\`px-2.5 py-0.5 rounded-full text-xs font-medium \${colors} \${className}\`}>
+      {status}
+    </span>
+  );
+}
+`;
+
+const PAGE_HEADER_COMPONENT = `import React from "react";
+
+export default function PageHeader({ title, subtitle, children }) {
+  return (
+    <div className="flex items-center justify-between">
+      <div>
+        <h1 className="text-2xl font-bold text-[var(--color-text)]">{title}</h1>
+        {subtitle && <p className="text-sm text-[var(--color-text-muted)] mt-1">{subtitle}</p>}
+      </div>
+      {children && <div className="flex items-center gap-2">{children}</div>}
+    </div>
+  );
+}
+`;
+
+const SEARCH_FILTER_BAR_COMPONENT = `import React from "react";
+import { Search, Filter } from "lucide-react";
+
+export default function SearchFilterBar({ searchValue = "", onSearchChange, placeholder = "Search...", filters, onFilterChange, children }) {
+  return (
+    <div className="flex items-center gap-3 flex-wrap">
+      <div className="relative flex-1 min-w-[200px]">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--color-text-muted)]" />
+        <input
+          type="text"
+          value={searchValue}
+          onChange={e => onSearchChange?.(e.target.value)}
+          placeholder={placeholder}
+          className="w-full pl-9 pr-4 py-2 text-sm border border-[var(--color-border)] rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]/20 focus:border-[var(--color-primary)]"
+        />
+      </div>
+      {children}
+    </div>
+  );
+}
+`;
+
+const ACTIVITY_FEED_COMPONENT = `import React from "react";
+import { Clock } from "lucide-react";
+
+const SAMPLE_ACTIVITIES = [
+  { id: 1, text: "New record created", time: "2 min ago", avatar: "S" },
+  { id: 2, text: "Status updated to Active", time: "15 min ago", avatar: "M" },
+  { id: 3, text: "Report generated", time: "1 hour ago", avatar: "E" },
+  { id: 4, text: "New user registered", time: "3 hours ago", avatar: "J" },
+];
+
+export default function ActivityFeed({ activities = SAMPLE_ACTIVITIES, title = "Recent Activity" }) {
+  return (
+    <div className="bg-white rounded-xl border border-[var(--color-border)] p-5">
+      <h3 className="text-sm font-semibold text-[var(--color-text)] mb-4">{title}</h3>
+      <div className="space-y-3">
+        {(activities || []).map((item, i) => (
+          <div key={item.id || i} className="flex items-start gap-3">
+            <div className="w-8 h-8 rounded-full bg-[var(--color-primary)]/10 text-[var(--color-primary)] flex items-center justify-center text-xs font-semibold flex-shrink-0">
+              {item.avatar || "?"}
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm text-[var(--color-text)]">{item.text}</p>
+              <p className="text-xs text-[var(--color-text-muted)] flex items-center gap-1 mt-0.5">
+                <Clock className="w-3 h-3" /> {item.time}
+              </p>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+`;
+
+const QUICK_ACTIONS_COMPONENT = `import React from "react";
+import { Plus, FileText, Users, Settings } from "lucide-react";
+
+const DEFAULT_ACTIONS = [
+  { label: "Add New", icon: Plus, color: "var(--color-primary)" },
+  { label: "Reports", icon: FileText, color: "var(--color-info)" },
+  { label: "Users", icon: Users, color: "var(--color-success)" },
+  { label: "Settings", icon: Settings, color: "var(--color-warning)" },
+];
+
+export default function QuickActions({ actions = DEFAULT_ACTIONS, onAction }) {
+  return (
+    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+      {(actions || []).map((action, i) => {
+        const Icon = action.icon || Plus;
+        return (
+          <button
+            key={i}
+            onClick={() => onAction?.(action)}
+            className="flex flex-col items-center gap-2 p-4 bg-white rounded-xl border border-[var(--color-border)] hover:shadow-md transition-all hover:-translate-y-0.5"
+          >
+            <div className="w-10 h-10 rounded-lg flex items-center justify-center" style={{ background: (action.color || "var(--color-primary)") + "15" }}>
+              <Icon className="w-5 h-5" style={{ color: action.color || "var(--color-primary)" }} />
+            </div>
+            <span className="text-xs font-medium text-[var(--color-text)]">{action.label}</span>
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+`;
+
+const NOTIFICATION_BELL_COMPONENT = `import React, { useState } from "react";
+import { Bell } from "lucide-react";
+
+export default function NotificationBell({ count = 3 }) {
+  const [isOpen, setIsOpen] = useState(false);
+  return (
+    <div className="relative">
+      <button onClick={() => setIsOpen(!isOpen)} className="relative p-2 rounded-lg hover:bg-[var(--color-bg-secondary)] transition-colors">
+        <Bell className="w-5 h-5 text-[var(--color-text-secondary)]" />
+        {count > 0 && (
+          <span className="absolute -top-0.5 -right-0.5 w-4 h-4 rounded-full bg-[var(--color-danger)] text-white text-[10px] flex items-center justify-center font-bold">
+            {count > 9 ? "9+" : count}
+          </span>
+        )}
+      </button>
+      {isOpen && (
+        <div className="absolute right-0 top-full mt-1 w-72 bg-white rounded-xl border border-[var(--color-border)] shadow-lg z-50 p-3">
+          <p className="text-xs font-semibold text-[var(--color-text)] mb-2">Notifications</p>
+          <p className="text-xs text-[var(--color-text-muted)]">No new notifications</p>
+        </div>
+      )}
+    </div>
+  );
+}
+`;
+
+export function getDomainComponents(): Record<string, string> {
+  return {
+    "/components/StatCard.jsx": STAT_CARD_COMPONENT,
+    "/components/StatusBadge.jsx": STATUS_BADGE_COMPONENT,
+    "/components/PageHeader.jsx": PAGE_HEADER_COMPONENT,
+    "/components/SearchFilterBar.jsx": SEARCH_FILTER_BAR_COMPONENT,
+    "/components/ActivityFeed.jsx": ACTIVITY_FEED_COMPONENT,
+    "/components/QuickActions.jsx": QUICK_ACTIONS_COMPONENT,
+    "/components/NotificationBell.jsx": NOTIFICATION_BELL_COMPONENT,
+  };
+}
+
 // ─── Utility Generators ───────────────────────────────────────────────────
 
 export function getUseApiHook(): string {

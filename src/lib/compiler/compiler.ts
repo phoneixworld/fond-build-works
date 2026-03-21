@@ -31,7 +31,7 @@ import {
 } from "./observability";
 import { cloudLog } from "@/lib/cloudLogBus";
 import { synthesizeAppJsx } from "./appSynthesizer";
-import { getSharedUIComponents, getGlobalStyles } from "@/lib/templates/scaffoldTemplates";
+import { getSharedUIComponents, getGlobalStyles, getDomainComponents } from "@/lib/templates/scaffoldTemplates";
 import {
   runPreBuildAgents, runPostBuildAgents, createPipelineContext,
   type AgentCallbacks, type OrchestratorResult,
