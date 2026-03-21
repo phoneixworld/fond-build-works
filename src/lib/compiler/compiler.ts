@@ -15,6 +15,7 @@ import type {
 } from "./types";
 import { assembleBuildContext } from "./context";
 import { planTaskGraph, topologicalSort } from "./planner";
+import { extractIRWithModel } from "./irExtractor";
 import { Workspace } from "./workspace";
 import { executeTask, type ExecutionCallbacks } from "./executor";
 import { verifyWorkspace } from "./verifier";
