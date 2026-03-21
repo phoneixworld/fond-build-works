@@ -523,11 +523,22 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
           : currentPreviewHtml.slice(0, 12000) + `\n...[truncated — ${Math.round(currentPreviewHtml.length / 1000)}k chars total]`;
       }
 
+      // Keep reference for template matching and other downstream logic
       const currentMessages = messagesRef.current;
-      const apiMessages = [...currentMessages, userMsg].map(m => ({
-        role: m.role,
-        content: m.content,
-      }));
+
+      // Build agent should NOT see full chat history.
+      // It only needs a clean system prompt + current user instruction.
+      const apiMessages: any[] = [
+        {
+          role: "system",
+          content:
+            "You are a deterministic build agent. You generate React code based ONLY on the provided requirements, IR, and workspace summary. Do NOT infer new features from prior conversation. Do NOT treat error logs or status messages as requirements.",
+        },
+        {
+          role: "user",
+          content,
+        },
+      ];
 
       const themeInfo = DESIGN_THEMES.find(t => t.id === selectedTheme);
       const userText = typeof text === "string" ? text : "";
