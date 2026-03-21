@@ -69,11 +69,9 @@ ${existingSchemas?.length ? `\n## EXISTING SCHEMAS (don't duplicate):\n${JSON.st
         ],
         tools: [
           {
-            type: "function",
-            function: {
-              name: "create_domain_model",
-              description: "Create a structured domain model for the application",
-              parameters: {
+            name: "create_domain_model",
+            description: "Create a structured domain model for the application",
+            input_schema: {
                 type: "object",
                 properties: {
                   templateName: { type: "string", description: "Name of the application type" },
@@ -157,12 +155,10 @@ ${existingSchemas?.length ? `\n## EXISTING SCHEMAS (don't duplicate):\n${JSON.st
                   },
                 },
                 required: ["templateName", "requiresAuth", "entities", "apiEndpoints", "suggestedPages", "suggestedNavItems"],
-                additionalProperties: false,
-              },
             },
           },
         ],
-        tool_choice: { type: "function", function: { name: "create_domain_model" } },
+        tool_choice: { type: "tool", name: "create_domain_model" },
       }),
     });
 
