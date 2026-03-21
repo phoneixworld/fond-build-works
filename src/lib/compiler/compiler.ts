@@ -395,7 +395,27 @@ export async function compile(
     console.log(`[Compiler] 📥 Missing import fixer: injected ${missingImportsFixed} missing import(s)`);
   }
 
-  // ── Phase 3.9: Provider Ordering Fix ────────────────────────────────
+  // ── Phase 3.85: AuthContext Guard ───────────────────────────────────
+  // If the LLM regenerated AuthContext with useNavigate, replace it with
+  // the hardened router-agnostic template.
+  {
+    const authPath = workspace.hasFile("/contexts/AuthContext.jsx")
+      ? "/contexts/AuthContext.jsx"
+      : workspace.hasFile("/contexts/AuthContext.tsx")
+        ? "/contexts/AuthContext.tsx"
+        : null;
+
+    if (authPath) {
+      const currentAuth = workspace.getFile(authPath) || "";
+      if (currentAuth.includes("useNavigate")) {
+        workspace.updateFile(authPath, generateAuthContext());
+        cloudLog.info("AuthContext guard: replaced useNavigate version with hardened template", "compiler");
+        console.log("[Compiler] 🔐 AuthContext guard: replaced useNavigate version with hardened template");
+      }
+    }
+  }
+
+
 
   callbacks.onPhase("fixing-provider-order", "Validating provider nesting order...");
 
