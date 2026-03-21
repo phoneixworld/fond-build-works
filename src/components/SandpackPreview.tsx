@@ -374,10 +374,15 @@ function sanitizeImports(code: string, filePath: string): string {
   if (!filePath.match(/\.(jsx?|tsx?)$/)) return code;
 
   // Strip file separator lines (leftover from AI output formatting)
+  // Catches: --- /path/to/file.jsx, --- /path/File.jsx (truncated), --- /dependencies, etc.
   code = code.split("\n").filter(line => {
     const t = line.trim();
-    if (/^-{3}\s+\/?.+?\.(?:jsx?|tsx?|css|js|ts)\b(?:\s+\(.*\))?\s*-{0,3}\s*$/i.test(t)) return false;
+    // Standard file separator: --- /some/path.ext [optional metadata]
+    if (/^-{3}\s+\/?.+?\.(?:jsx?|tsx?|css|js|ts)\b/i.test(t)) return false;
+    // Dependencies separator
     if (/^-{3}\s+\/?dependencies\b/i.test(t)) return false;
+    // Bare triple-dash followed by a path-like string (catch-all for unusual AI headers)
+    if (/^-{3}\s+\/[a-zA-Z]/.test(t) && !t.includes("import") && !t.includes("export")) return false;
     return true;
   }).join("\n");
 
