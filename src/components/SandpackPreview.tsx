@@ -375,15 +375,9 @@ function sanitizeImports(code: string, filePath: string): string {
     }
   }
 
-  // Strip import/export from blocked packages
-  code = code.replace(
-    /^\s*(?:import|export)\s+[\s\S]*?\s+from\s+['"]([^'"]+)['"]\s*;?\s*$/gm,
-    (match, pkg) => isAllowedPkg(pkg) ? match : `// [BLOCKED] ${pkg}`
-  );
-  code = code.replace(
-    /^\s*import\s+['"]([^'"]+)['"]\s*;?\s*$/gm,
-    (match, pkg) => isAllowedPkg(pkg) ? match : `// [BLOCKED] ${pkg}`
-  );
+  // Keep ESM imports/exports intact so Sandpack can report real dependency errors.
+  // Rewriting them to comments can create misleading runtime failures
+  // like "X is not defined" (e.g. PopoverPrimitive) instead of the true cause.
   code = code.replace(
     /\brequire\s*\(\s*['"]([^'"]+)['"]\s*\)/g,
     (match, pkg) => isAllowedPkg(pkg) ? match : `undefined /* BLOCKED: ${pkg} */`
