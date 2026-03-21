@@ -1557,6 +1557,17 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
       // ── BUILD: Include accumulated requirements if any phases exist ──
       if (convResult.action === "build") {
         console.log(`[SmartSend] Build requested, mode=${conversationMode}`);
+
+        // CRITICAL FIX: If workspace already has files, this is an iterative change
+        // (e.g. "change color to gold"), NOT a fresh build. Route to edit pipeline.
+        if (hasExistingCode && !explicitRebuildRequest) {
+          console.log("[SmartSend] Workspace has existing code — routing 'build' to edit pipeline instead of full rebuild");
+          setCurrentAgent("edit");
+          setPipelineStep("resolving");
+          sendEditMessage(finalText, images);
+          return;
+        }
+
         conversationStartBuilding?.();
         
         const requirements = await Promise.resolve(conversationGetRequirements?.() || "");
