@@ -73,6 +73,7 @@ export interface BuildOrchestrationConfig {
   // UI state
   setInput: (s: string) => void;
   setAttachedImages: React.Dispatch<React.SetStateAction<string[]>>;
+  previewErrors: string[];
   setPreviewErrors: React.Dispatch<React.SetStateAction<string[]>>;
   setHealAttempts: (n: number) => void;
   resetHealing: () => void;
@@ -105,7 +106,7 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
     currentProject, saveProject, onVersionCreated,
     setPreviewHtml, setIsBuilding, setBuildStep, setSandpackFiles, setSandpackDeps,
     setPreviewMode, setBuildMetrics, saveSnapshot, currentPreviewHtml, currentSandpackFiles,
-    setVirtualFiles, messages, setMessages, setInput, setAttachedImages, setPreviewErrors,
+    setVirtualFiles, messages, setMessages, setInput, setAttachedImages, previewErrors, setPreviewErrors,
     setHealAttempts, resetHealing, inputRef,
     selectedModel, selectedTheme,
     fetchProjectContext, classifyUserIntent, fastClassifyLocal,
@@ -1160,13 +1161,21 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
   const sendEditMessage = useCallback(async (text: string, images: string[] = []) => {
     if (!currentProject) return;
 
+    const genericRuntimeFix = /\b(fix|resolve|repair)\b/i.test(text)
+      && /\b(error|preview|runtime|crash|broken|issue|same error|something went wrong)\b/i.test(text)
+      && !/\/[\w/.-]+\.(?:jsx?|tsx?|css)/i.test(text);
+    const diagnostics = previewErrors.slice(-5).join("\n");
+    const enrichedInstruction = genericRuntimeFix && diagnostics
+      ? `${text}\n\nCurrent preview errors:\n${diagnostics}`
+      : text;
+
     const workspace = sandpackFilesRef.current;
     if (!workspace || Object.keys(workspace).length === 0) {
       // No existing code to edit — fall back to build
       console.log("[EditMode] No workspace files, falling back to build");
       setCurrentAgent("build");
       setPipelineStep("planning");
-      sendMessage(text, images);
+      sendMessage(enrichedInstruction, images);
       return;
     }
 
@@ -1189,7 +1198,7 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
     try {
       await executeEdit(
         {
-          instruction: text,
+          instruction: enrichedInstruction,
           workspace,
           projectId: currentProject.id,
           model: selectedModel,
@@ -1209,7 +1218,7 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
             console.log("[EditMode] Target files:", targetFiles);
 
             // FSM transition: → editing (fire & forget)
-            conversationStartEditing?.(text, targetFiles, beforeSnapshots);
+            conversationStartEditing?.(enrichedInstruction, targetFiles, beforeSnapshots);
           },
           onStreaming: (chunk) => {
             setBuildStreamContent((prev) => prev + chunk);
@@ -1276,7 +1285,7 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
 
             // FSM transition: editing → complete + audit record + post-edit readiness
             const postEditReadiness = await conversationCompleteEdit?.(
-              text, resolvedTargetFiles, beforeSnapshots, afterSnapshots, result.explanation
+              enrichedInstruction, resolvedTargetFiles, beforeSnapshots, afterSnapshots, result.explanation
             );
 
             // Build assistant message with readiness info
@@ -1338,7 +1347,7 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
       setBuildStep("");
       isSendingRef.current = false;
     }
-  }, [currentProject, selectedModel, selectedTheme, sendMessage, buildMessageContent, setInput, setAttachedImages, setMessages, saveProject, setSandpackFiles, syncSandpackToVirtualFS, setPreviewMode, setIsBuilding, setBuildStep, saveSnapshot, conversationStartEditing, conversationCompleteEdit]);
+  }, [currentProject, selectedModel, selectedTheme, previewErrors, sendMessage, buildMessageContent, setInput, setAttachedImages, setMessages, saveProject, setSandpackFiles, syncSandpackToVirtualFS, setPreviewMode, setIsBuilding, setBuildStep, saveSnapshot, conversationStartEditing, conversationCompleteEdit]);
 
   // ── RULES ──
   // 1. ALL messages go through conversation state machine FIRST

@@ -167,6 +167,7 @@ const ChatPanel = forwardRef<ChatPanelHandle, { initialPrompt?: string; onVersio
     setMessages,
     setInput,
     setAttachedImages,
+    previewErrors,
     setPreviewErrors: stableSetPreviewErrors,
     setHealAttempts: stableSetHealAttempts,
     resetHealing: stableResetHealing,
