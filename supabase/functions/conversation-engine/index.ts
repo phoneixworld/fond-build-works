@@ -689,6 +689,7 @@ Deno.serve(async (req) => {
             } else {
               console.warn(`[conversation-engine] Vision API failed: ${visionResp.status}`);
             }
+            } // end ANTHROPIC_API_KEY check
           }
         } catch (visionErr) {
           console.error("[conversation-engine] Vision extraction error:", visionErr);
