@@ -21,7 +21,7 @@ serve(async (req) => {
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "claude-haiku-3-5-20241022",
+        model: "claude-3-5-haiku-20241022",
         max_tokens: 200,
         system: `You generate short, catchy project names from user descriptions.
 Rules:

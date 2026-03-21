@@ -163,7 +163,7 @@ Use the classify_intent tool to return your classification.`;
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "claude-haiku-3-5-20241022",
+        model: "claude-3-5-haiku-20241022",
         max_tokens: 2000,
         temperature: 0.1,
         system: systemContent,

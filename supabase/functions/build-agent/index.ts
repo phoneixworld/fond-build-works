@@ -374,7 +374,7 @@ FIX CHECKLIST:
       selectedModel = "claude-sonnet-4-20250514";
       routeReason = `Low complexity (${complexity}/100) → Sonnet 4`;
     } else {
-      selectedModel = "claude-haiku-3-5-20241022";
+      selectedModel = "claude-3-5-haiku-20241022";
       routeReason = `Trivial (${complexity}/100) → Haiku 3.5`;
     }
     
