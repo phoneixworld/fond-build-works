@@ -62,7 +62,7 @@ function nextId(): string {
 
 // ─── Task Graph Generation ────────────────────────────────────────────────
 
-export function planTaskGraph(ctx: BuildContext): TaskGraph {
+export function planTaskGraph(ctx: BuildContext, structuredIR?: IR): TaskGraph {
   taskCounter = 0;
   const tasks: CompilerTask[] = [];
   const { ir, buildIntent } = ctx;
