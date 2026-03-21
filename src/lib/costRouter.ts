@@ -39,14 +39,10 @@ export interface CostRouteResult {
   costTier: number;
 }
 
-// Model cost tiers (relative)
+// Anthropic Claude model tiers
 const MODELS = {
-  "google/gemini-2.5-flash-lite": { costTier: 1, maxContext: 32000, label: "Flash Lite" },
-  "google/gemini-3-flash-preview": { costTier: 2, maxContext: 64000, label: "Flash 3" },
-  "google/gemini-2.5-flash": { costTier: 2, maxContext: 64000, label: "Flash 2.5" },
-  "openai/gpt-5-mini": { costTier: 3, maxContext: 64000, label: "GPT-5 Mini" },
-  "google/gemini-2.5-pro": { costTier: 4, maxContext: 128000, label: "Pro" },
-  "openai/gpt-5": { costTier: 5, maxContext: 128000, label: "GPT-5" },
+  "claude-haiku-3-5-20241022": { costTier: 1, maxContext: 200000, label: "Haiku 3.5" },
+  "claude-sonnet-4-20250514": { costTier: 3, maxContext: 200000, label: "Sonnet 4" },
 } as const;
 
 /**
