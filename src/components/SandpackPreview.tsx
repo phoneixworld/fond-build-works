@@ -243,7 +243,7 @@ function removeDefaultExportConflict(code: string, filePath: string): string {
   if (!defaultName) return code;
 
   let removed = false;
-  const cleaned = code.replace(/^\s*export\s*\{([^}]+)\}\s*;?\s*$/gm, (line, names) => {
+  const cleaned = code.replace(/export\s*\{([\s\S]*?)\}\s*;?/gm, (line, names) => {
     const entries = String(names)
       .split(",")
       .map((p) => p.trim())
@@ -265,6 +265,54 @@ function removeDefaultExportConflict(code: string, filePath: string): string {
   }
 
   return cleaned;
+}
+
+function removeDuplicateNamedExports(code: string, filePath: string): string {
+  const exportedNames = new Set<string>();
+  let changed = false;
+
+  // Seed with direct declaration exports (export const X, export function X, etc.)
+  for (const m of code.matchAll(/\bexport\s+(?:const|let|var|function|class)\s+([A-Za-z_$][\w$]*)/g)) {
+    exportedNames.add(m[1]);
+  }
+
+  const deduped = code.replace(/export\s*\{([\s\S]*?)\}\s*;?/gm, (_line, names) => {
+    const entries = String(names)
+      .split(",")
+      .map((p) => p.trim())
+      .filter(Boolean);
+
+    const kept: string[] = [];
+    for (const entry of entries) {
+      const parts = entry.split(/\s+as\s+/i).map((p) => p.trim());
+      const exported = parts[1] || parts[0];
+      if (!exported) continue;
+      if (exportedNames.has(exported)) {
+        changed = true;
+        continue;
+      }
+      exportedNames.add(exported);
+      kept.push(entry);
+    }
+
+    if (kept.length === 0) {
+      changed = true;
+      return "";
+    }
+
+    if (kept.length !== entries.length) {
+      changed = true;
+      return `export { ${kept.join(", ")} };`;
+    }
+
+    return `export { ${entries.join(", ")} };`;
+  });
+
+  if (changed) {
+    console.warn(`[SandpackPreview] Removed duplicate named exports in ${filePath}`);
+  }
+
+  return deduped;
 }
 
 /**
