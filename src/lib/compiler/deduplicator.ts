@@ -3,8 +3,8 @@
  * 
  * Detects when the AI generates a file with duplicate content blocks
  * (e.g., the entire file content repeated twice) and removes the duplicate.
- * This is a common failure mode when the AI model concatenates two copies
- * of the same module.
+ * Also catches duplicate React imports, secondary import blocks after code,
+ * and duplicate component declarations.
  */
 
 import type { Workspace } from "./workspace";
@@ -20,7 +20,7 @@ export function deduplicateFiles(workspace: Workspace): number {
     if (!/\.(jsx?|tsx?)$/.test(filePath)) continue;
 
     const content = workspace.getFile(filePath)!;
-    if (content.length < 100) continue; // Too small to have meaningful duplicates
+    if (content.length < 100) continue;
 
     const deduplicated = deduplicateContent(content);
     if (deduplicated !== null) {
@@ -39,9 +39,8 @@ export function deduplicateFiles(workspace: Workspace): number {
  */
 function deduplicateContent(content: string): string | null {
   // Strategy 1: Exact-half duplication
-  // The AI sometimes outputs the entire file twice
   const halfLen = Math.floor(content.length / 2);
-  const tolerance = 20; // Allow slight whitespace differences
+  const tolerance = 20;
   
   for (let offset = -tolerance; offset <= tolerance; offset++) {
     const splitPoint = halfLen + offset;
@@ -55,35 +54,27 @@ function deduplicateContent(content: string): string | null {
     }
   }
 
-  // Strategy 2: Detect duplicate import blocks
-  // Find the first import block, then check if it appears again later in the file
+  // Strategy 2: Detect secondary import block after functional code
   const importBlockEnd = findImportBlockEnd(content);
   if (importBlockEnd > 0 && importBlockEnd < content.length * 0.8) {
     const importBlock = content.slice(0, importBlockEnd).trim();
     const rest = content.slice(importBlockEnd);
     
-    // Look for the import block repeated in the rest of the file
     const secondImportStart = findSecondImportBlock(rest);
     if (secondImportStart !== -1) {
       const afterSecondImport = rest.slice(secondImportStart).trim();
       const originalAfterImports = rest.slice(0, secondImportStart).trim();
       
-      // Check if the second half is a near-duplicate of the full file
       const secondBlock = afterSecondImport;
       const firstBlock = content.slice(0, importBlockEnd + secondImportStart).trim();
       
-      // If the content after the second import block duplicates what came before,
-      // keep only the first occurrence
       if (isDuplicateBlock(firstBlock, importBlock + "\n\n" + secondBlock)) {
         return firstBlock;
       }
       
-      // Simpler check: if we find import statements appearing after function/component code,
-      // that's always wrong — truncate at the second import block
       if (originalAfterImports.length > 50) {
         const hasExportOrFunction = /(?:export\s+(?:default\s+)?(?:function|const|class)|function\s+\w+|const\s+\w+\s*=)/.test(originalAfterImports);
         if (hasExportOrFunction) {
-          // The real code is between the first imports and the second import block
           return (importBlock + "\n\n" + originalAfterImports).trim();
         }
       }
@@ -91,24 +82,18 @@ function deduplicateContent(content: string): string | null {
   }
 
   // Strategy 3: Detect duplicate function/component declarations
-  // Find `export default function X` or `export default` appearing twice
   const exportDefaultMatches = [...content.matchAll(/export\s+default\s+(?:function\s+)?(\w+)?/g)];
   if (exportDefaultMatches.length >= 2) {
     const firstMatch = exportDefaultMatches[0];
     const secondMatch = exportDefaultMatches[1];
     
-    // If the same default export name appears twice, keep the first complete version
     if (firstMatch[1] && secondMatch[1] && firstMatch[1] === secondMatch[1]) {
-      // Find where the second declaration starts (go back to its import block)
       const secondExportPos = secondMatch.index!;
       
-      // Look backwards from secondExportPos to find imports that belong to the duplicate
       const beforeSecondExport = content.slice(0, secondExportPos);
       const lastImportBeforeSecond = beforeSecondExport.lastIndexOf("\nimport ");
       
       if (lastImportBeforeSecond > content.length * 0.3) {
-        // There's an import statement appearing late in the file — likely start of duplicate
-        // Find the actual start of the duplicate block (first import in the second cluster)
         const lineStart = content.lastIndexOf("\n", lastImportBeforeSecond - 1) + 1;
         const truncated = content.slice(0, lineStart).trim();
         
@@ -119,21 +104,17 @@ function deduplicateContent(content: string): string | null {
     }
   }
 
-  // Strategy 4: Detect duplicate `import { useState...} from "react"` lines
-  // This catches the exact error pattern from the bug report
-  const reactImportPattern = /^import\s+\{[^}]*\}\\s+from\s+['"]react['"];?\s*$/gm;
+  // Strategy 4: Detect duplicate React import lines (FIXED regex — was broken with \\s)
+  const reactImportPattern = /^import\s+\{[^}]*\}\s+from\s+['"]react['"];?\s*$/gm;
   const reactImports = [...content.matchAll(reactImportPattern)];
   if (reactImports.length >= 2) {
     const firstPos = reactImports[0].index!;
     const secondPos = reactImports[reactImports.length - 1].index!;
     
-    // If the second react import is far from the first, we likely have a duplicate block
     if (secondPos - firstPos > content.length * 0.3) {
-      // Truncate at the line before the second react import
       const lineStart = content.lastIndexOf("\n", secondPos - 1);
       if (lineStart > 100) {
         const truncated = content.slice(0, lineStart).trim();
-        // Verify the truncated version still has exports
         if (/export\s/.test(truncated)) {
           return truncated;
         }
@@ -141,7 +122,106 @@ function deduplicateContent(content: string): string | null {
     }
   }
 
+  // Strategy 5: Detect `import React` appearing more than once (default import pattern)
+  const reactDefaultImports = [...content.matchAll(/^import\s+React[\s,]/gm)];
+  if (reactDefaultImports.length >= 2) {
+    const secondPos = reactDefaultImports[1].index!;
+    const lineStart = content.lastIndexOf("\n", secondPos - 1);
+    if (lineStart > 100) {
+      const truncated = content.slice(0, lineStart).trim();
+      if (/export\s/.test(truncated)) {
+        return truncated;
+      }
+    }
+  }
+
+  // Strategy 6: Detect "Identifier 'X' has already been declared" pattern
+  // Look for any identifier declared twice (const X = ... appears twice)
+  const constDecls = [...content.matchAll(/^(?:const|let|var|function)\s+(\w+)\s*[=(]/gm)];
+  const seen = new Map<string, number>();
+  for (const m of constDecls) {
+    const name = m[1];
+    if (seen.has(name)) {
+      // Same identifier declared twice — truncate at the second occurrence
+      const secondPos = m.index!;
+      // Walk back to find the start of the duplicate block (likely an import)
+      const before = content.slice(0, secondPos);
+      const lastImport = before.lastIndexOf("\nimport ");
+      const cutPoint = lastImport > before.length * 0.3 ? lastImport : secondPos;
+      const lineStart = content.lastIndexOf("\n", cutPoint - 1) + 1;
+      const truncated = content.slice(0, lineStart).trim();
+      if (truncated.length > 100 && /export\s/.test(truncated)) {
+        return truncated;
+      }
+    }
+    seen.set(name, m.index!);
+  }
+
+  // Strategy 7: Merge duplicate import lines from same source
+  const result = mergeDuplicateImports(content);
+  if (result !== content) return result;
+
   return null;
+}
+
+/**
+ * Merge duplicate import lines from the same source module.
+ * e.g., two `import { X } from "react"` lines → one `import { X, Y } from "react"`
+ */
+function mergeDuplicateImports(content: string): string {
+  const lines = content.split("\n");
+  const importsBySource = new Map<string, { indices: number[]; names: Set<string>; defaultName: string | null }>();
+  
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i].trim();
+    // Match: import { X, Y } from "source" or import Default from "source" or import Default, { X } from "source"
+    const match = line.match(/^import\s+(?:(\w+)\s*,?\s*)?(?:\{([^}]*)\})?\s*from\s*['"]([^'"]+)['"]/);
+    if (!match) continue;
+    
+    const defaultName = match[1] || null;
+    const namedStr = match[2] || "";
+    const source = match[3];
+    
+    const names = namedStr.split(",").map(s => s.trim()).filter(Boolean);
+    
+    if (!importsBySource.has(source)) {
+      importsBySource.set(source, { indices: [i], names: new Set(names), defaultName });
+    } else {
+      const existing = importsBySource.get(source)!;
+      existing.indices.push(i);
+      for (const n of names) existing.names.add(n);
+      if (defaultName && !existing.defaultName) existing.defaultName = defaultName;
+    }
+  }
+  
+  let modified = false;
+  for (const [source, info] of importsBySource) {
+    if (info.indices.length < 2) continue;
+    modified = true;
+    
+    // Build merged import
+    const parts: string[] = [];
+    if (info.defaultName) parts.push(info.defaultName);
+    if (info.names.size > 0) parts.push(`{ ${[...info.names].join(", ")} }`);
+    const merged = `import ${parts.join(", ")} from "${source}";`;
+    
+    // Replace first occurrence, blank out others
+    lines[info.indices[0]] = merged;
+    for (let j = 1; j < info.indices.length; j++) {
+      lines[info.indices[j]] = "";
+    }
+  }
+  
+  if (!modified) return content;
+  return lines.filter((l, i) => {
+    // Remove blanked-out lines but keep intentional empty lines
+    if (l === "" && importsBySource) {
+      for (const info of importsBySource.values()) {
+        if (info.indices.slice(1).includes(i)) return false;
+      }
+    }
+    return true;
+  }).join("\n");
 }
 
 /**
@@ -166,34 +246,27 @@ function findImportBlockEnd(content: string): number {
         lastImportLine = i;
       }
     } else if (trimmed === "" && lastImportLine >= 0) {
-      // Allow blank lines between imports
       continue;
     } else if (lastImportLine >= 0 && !trimmed.startsWith("//") && !trimmed.startsWith("/*") && !trimmed.startsWith("*")) {
-      // Non-import, non-comment line found — end of import block
       break;
     }
   }
 
   if (lastImportLine < 0) return 0;
 
-  // Return the character offset after the last import line
   let offset = 0;
   for (let i = 0; i <= lastImportLine; i++) {
-    offset += lines[i].length + 1; // +1 for \n
-
+    offset += lines[i].length + 1;
   }
   return offset;
 }
 
 /**
  * Find the start position of a second import block in the remaining content.
- * Returns -1 if no second import block is found.
  */
 function findSecondImportBlock(content: string): number {
-  // Look for import statements that appear after non-import code
   const match = content.match(/\n(import\s+(?:\{[^}]*\}|\w+)?\s*(?:,\s*\{[^}]*\})?\s*from\s+['"][^'"]+['"])/);
   if (match && match.index !== undefined) {
-    // Make sure there's real code before this import (not just whitespace)
     const before = content.slice(0, match.index).trim();
     if (before.length > 50 && /[};)]/.test(before.slice(-5))) {
       return match.index;
@@ -203,7 +276,7 @@ function findSecondImportBlock(content: string): number {
 }
 
 /**
- * Check if two blocks are near-duplicates (allowing minor whitespace differences).
+ * Check if two blocks are near-duplicates.
  */
 function isDuplicateBlock(a: string, b: string): boolean {
   const normalize = (s: string) => s.replace(/\s+/g, " ").trim();
@@ -212,7 +285,6 @@ function isDuplicateBlock(a: string, b: string): boolean {
   
   if (na === nb) return true;
   
-  // Check similarity — if >90% of characters match, consider it a duplicate
   const shorter = Math.min(na.length, nb.length);
   const longer = Math.max(na.length, nb.length);
   if (shorter / longer > 0.85) {
