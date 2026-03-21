@@ -384,24 +384,49 @@ export async function compile(
 
   let repairRound = 0;
   let totalRepairActions = 0;
+  let totalAIRepairs = 0;
+  const repairStartTime = Date.now();
+  const REPAIR_TIMEOUT_MS = 90_000; // 90 second max for all repairs
 
   while (!verification.ok && repairRound < MAX_REPAIR_ROUNDS) {
     repairRound++;
+
+    // Check timeout
+    if (Date.now() - repairStartTime > REPAIR_TIMEOUT_MS) {
+      console.warn(`[Compiler] Repair timeout (${REPAIR_TIMEOUT_MS}ms) — shipping with remaining issues`);
+      cloudLog.warn(`Repair timeout after ${repairRound} rounds`, "compiler");
+      break;
+    }
+
     const repairTiming = startPass(trace, `repair-${repairRound}`);
 
     const actions = classifyRepairActions(verification.issues, workspace);
     if (actions.length === 0) break;
 
+    // Cap AI repairs to prevent long builds
+    const remainingBudget = MAX_REPAIR_ACTIONS_TOTAL - totalAIRepairs;
+    if (remainingBudget <= 0) {
+      console.warn(`[Compiler] AI repair budget exhausted (${MAX_REPAIR_ACTIONS_TOTAL} max) — shipping with remaining issues`);
+      cloudLog.warn(`AI repair budget exhausted after ${totalAIRepairs} repairs`, "compiler");
+      break;
+    }
+
     callbacks.onRepairStart(repairRound, actions.length);
     callbacks.onPhase("repairing", `Repair round ${repairRound}: ${actions.length} issues...`);
     trace.repairActions.push(...actions);
 
-    cloudLog.warn(`Repair round ${repairRound}: ${actions.length} actions`, "compiler");
-    console.log(`[Compiler] Repair round ${repairRound}: ${actions.length} actions`);
+    cloudLog.warn(`Repair round ${repairRound}: ${actions.length} actions (budget: ${remainingBudget})`, "compiler");
+    console.log(`[Compiler] Repair round ${repairRound}: ${actions.length} actions (AI budget: ${remainingBudget})`);
 
     for (const action of actions) {
+      // Check timeout inside loop too
+      if (Date.now() - repairStartTime > REPAIR_TIMEOUT_MS) {
+        console.warn(`[Compiler] Repair timeout mid-round — stopping`);
+        break;
+      }
+
       try {
-        // Handle deterministic repairs without AI
+        // Handle deterministic repairs without AI (these are free, no cap)
         if (action.type === "fix_deterministic") {
           const fixed = applyDeterministicFix(action, workspace);
           if (fixed) {
@@ -410,6 +435,12 @@ export async function compile(
             console.log(`[Compiler]   🔧 Deterministic fix: ${action.targetFile} (${action.issue.category})`);
             continue;
           }
+        }
+
+        // Check AI budget before making AI call
+        if (totalAIRepairs >= MAX_REPAIR_ACTIONS_TOTAL) {
+          console.warn(`[Compiler]   ⏭️ Skipping AI repair for ${action.targetFile} — budget exhausted`);
+          continue;
         }
 
         // Create a micro-task for AI repair
@@ -433,9 +464,10 @@ export async function compile(
 
         workspace.applyPatch(repairFiles);
         totalRepairActions++;
+        totalAIRepairs++;
 
-        cloudLog.info(`Repaired: ${action.targetFile}`, "compiler");
-        console.log(`[Compiler]   🔧 Repaired: ${action.targetFile}`);
+        cloudLog.info(`Repaired: ${action.targetFile} (${totalAIRepairs}/${MAX_REPAIR_ACTIONS_TOTAL})`, "compiler");
+        console.log(`[Compiler]   🔧 Repaired: ${action.targetFile} (${totalAIRepairs}/${MAX_REPAIR_ACTIONS_TOTAL})`);
       } catch (err: any) {
         console.warn(`[Compiler]   ⚠️ Repair failed for ${action.targetFile}:`, err.message);
       }
