@@ -165,8 +165,9 @@ export function parseFileSections(block: string): { files: Record<string, string
   let inDeps = false;
   let depsLines: string[] = [];
   
-  const separatorRegex = /^-{3}\s+(\/?\w[\w/.-]*\.(?:jsx?|tsx?|css))\s*-{0,3}\s*$/;
-  const bareFilenameRegex = /^\/?(\w[\w/.-]*\.(?:jsx?|tsx?|css))\s*$/;
+  // Accept filenames with spaces/symbols (e.g. /pages/News & Events.jsx)
+  const separatorRegex = /^-{3}\s+(.+?\.(?:jsx?|tsx?|css))\s*-{0,3}\s*$/;
+  const bareFilenameRegex = /^\/?(.+?\.(?:jsx?|tsx?|css))\s*$/;
   const justDashes = /^-{3}\s*$/;
   
   function flushFile() {
@@ -387,7 +388,16 @@ export function parseReactFiles(text: string): { chatText: string; files: Record
   const parsedFiles = parseFileSections(block);
   
   if (parsedFiles.fileCount === 0) {
-    const cleaned = block.replace(/^---\s+\/?\w[\w/.-]*\.\w+\s*-{0,3}\s*\n/gm, "").trim();
+    const hasSectionMarkers = /^\s*-{3}\s+/m.test(block);
+
+    // If the model attempted multi-file output but we couldn't parse file sections,
+    // DO NOT force it into /App.jsx (that can inject lines like `--- /pages/...` and crash preview).
+    if (hasSectionMarkers) {
+      console.warn("[parseReactFiles] Detected file-section markers but parsed 0 files; skipping unsafe App.jsx fallback");
+      return { chatText, files: null, deps };
+    }
+
+    const cleaned = block.replace(/^---\s+.+?\.(?:jsx?|tsx?|css)\s*-{0,3}\s*\n/gm, "").trim();
     console.log(`[parseReactFiles] Single-file mode: treating block as /App.jsx (${cleaned.length} chars)`);
     files["/App.jsx"] = sanitizeImports(deduplicateFileContent(cleaned, "/App.jsx"));
     return { chatText, files, deps };
