@@ -6,6 +6,7 @@
  */
 
 import type { BuildContext, BuildIntent, IRManifest, IREntity, IRRole, IRRoute, IRModule } from "./types";
+import { sanitizeRequirements } from "../conversationSanitizer";
 
 // ─── Intent Detection ─────────────────────────────────────────────────────
 
