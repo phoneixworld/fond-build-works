@@ -9,6 +9,8 @@
  */
 
 import type { IR } from "@/lib/ir";
+import { scaffoldPagesFromIR } from "@/lib/pageScaffolder";
+import { synthesizeAppFromIR } from "./appSynthesizer";
 import type {
   BuildContext, BuildResult, BuildStatus,
   CompilerTask, TaskGraph, VerificationResult, RuntimeVerification,
