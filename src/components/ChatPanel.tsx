@@ -641,68 +641,18 @@ const ChatPanel = forwardRef<ChatPanelHandle, { initialPrompt?: string; onVersio
             </div>
           )}
 
-          <AnimatePresence initial={false}>
-            {messages.map((msg, i) => {
-              const isUser = msg.role === "user";
-              const isEditing = editingIndex === i;
-
-              if (isEditing) {
-                return (
-                  <motion.div
-                    key={i}
-                    initial={{ opacity: 0, y: 8 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    className="flex gap-3"
-                  >
-                    <div className="w-7 h-7 rounded-lg bg-primary/15 ring-1 ring-primary/20 flex items-center justify-center shrink-0 mt-0.5">
-                      <User className="w-3.5 h-3.5 text-primary" />
-                    </div>
-                    <div className="flex-1 min-w-0 space-y-2">
-                      <textarea
-                        value={editText}
-                        onChange={(e) => setEditText(e.target.value)}
-                        className="w-full bg-secondary rounded-xl px-3 py-2 text-[13px] text-foreground outline-none ring-1 ring-primary/30 resize-none leading-[1.7]"
-                        rows={Math.min(editText.split("\n").length + 1, 6)}
-                        autoFocus
-                        onKeyDown={(e) => {
-                          if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSubmitEdit(); }
-                          if (e.key === "Escape") handleCancelEdit();
-                        }}
-                      />
-                      <div className="flex gap-2">
-                        <button
-                          onClick={handleSubmitEdit}
-                          className="px-3 py-1.5 rounded-lg text-[11px] font-semibold bg-primary text-primary-foreground hover:bg-primary/90 transition-colors"
-                        >
-                          Save & Regenerate
-                        </button>
-                        <button
-                          onClick={handleCancelEdit}
-                          className="px-3 py-1.5 rounded-lg text-[11px] font-medium text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors"
-                        >
-                          Cancel
-                        </button>
-                      </div>
-                    </div>
-                  </motion.div>
-                );
-              }
-
-              return (
-                <ChatMessage
-                  key={i}
-                  content={msg.content}
-                  role={msg.role}
-                  timestamp={msg.timestamp}
-                  isLoading={isLoading}
-                  onEdit={isUser ? () => handleEditMessage(i) : undefined}
-                  onRegenerate={!isUser ? () => handleRegenerate(i) : undefined}
-                  showActions={!isLoading}
-                  onSuggestionClick={!isUser ? (text) => handleSmartSend(text) : undefined}
-                />
-              );
-            })}
-          </AnimatePresence>
+          <ChatMessageList
+            messages={messages}
+            isLoading={isLoading}
+            onSmartSend={handleSmartSend}
+            onEditMessage={handleEditMessage}
+            onRegenerate={handleRegenerate}
+            editingIndex={editingIndex}
+            editText={editText}
+            onEditTextChange={setEditText}
+            onSubmitEdit={handleSubmitEdit}
+            onCancelEdit={handleCancelEdit}
+          />
 
           {/* Build Pipeline Progress Card */}
           {(buildStreamContent.length > 0 || currentAgent) && (isLoading || pipelineStep === "complete") && (
