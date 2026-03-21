@@ -565,7 +565,7 @@ CRITICAL:
   });
   tasks.push(appTask);
 
-  console.log(`[Planner] App type: ${appType}, tasks: ${tasks.length}, passes: ${buildPasses(tasks).length}`);
+  console.log(`[Planner] App type: ${appType}, tasks: ${tasks.length}, passes: ${buildPasses(tasks).length}${structuredIR ? `, structuredIR: ${Object.keys(structuredIR.entities).length} entities, ${structuredIR.pages.length} pages` : ''}`);
 
   const passes = buildPasses(tasks);
 
