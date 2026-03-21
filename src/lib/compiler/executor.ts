@@ -20,7 +20,7 @@ export function buildTaskPrompt(
   totalTasks: number
 ): string {
   const existingFiles = workspace.listFiles();
-  const workspaceContext = buildWorkspaceContext(workspace, 24000);
+  const workspaceContext = buildWorkspaceContext(workspace, 24000, task.label);
 
   // Always include raw requirements so the build-agent understands the domain
   const requirementsSection = ctx.rawRequirements
