@@ -370,6 +370,17 @@ export async function compile(
     }
   }
 
+  // ── Phase 3.11: Re-run export mismatch fix on synthesized App.jsx ──
+  // The synthesizer may produce default imports for files that only have named exports.
+  // Running the fixer again catches these post-synthesis mismatches.
+  {
+    const postSynthFixes = fixExportMismatches(workspace);
+    if (postSynthFixes > 0) {
+      cloudLog.info(`Post-synthesis export mismatch fixer: fixed ${postSynthFixes} mismatch(es)`, "compiler");
+      console.log(`[Compiler] 🔀 Post-synthesis export fix: ${postSynthFixes} mismatch(es)`);
+    }
+  }
+
   // ── Phase 4: Verification ──────────────────────────────────────────
 
   callbacks.onPhase("verifying", "Verifying workspace...");
