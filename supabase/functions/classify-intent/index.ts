@@ -13,27 +13,15 @@ serve(async (req) => {
     const body = await req.json();
     const { prompt, hasHistory, existingFileNames } = body;
     hasExistingCode = !!body.hasExistingCode;
-    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-    if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY not configured");
+    const ANTHROPIC_API_KEY = Deno.env.get("ANTHROPIC_API_KEY");
+    if (!ANTHROPIC_API_KEY) throw new Error("ANTHROPIC_API_KEY not configured");
 
     // Build file context for smarter questions
     const fileContext = existingFileNames?.length
       ? `\n\nEXISTING PROJECT FILES:\n${existingFileNames.slice(0, 40).join("\n")}\n\nUse these file names to generate CONTEXTUAL questions. For example, if you see "/pages/Dashboard/Dashboard.jsx" and "/pages/Students/StudentManagement.jsx", ask which specific pages to improve.`
       : "";
 
-    const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${LOVABLE_API_KEY}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: "google/gemini-2.5-flash-lite",
-        temperature: 0.1,
-        messages: [
-          {
-            role: "system",
-            content: `You are an intent classifier for an AI web app builder. Classify user messages into one of three intents.
+    const systemContent = `You are an intent classifier for an AI web app builder. Classify user messages into one of three intents.
 
 INTENTS:
 1. "chat" — The user is asking a question, having a conversation, or exploring ideas. They do NOT want code generated yet.
