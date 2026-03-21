@@ -402,74 +402,67 @@ FIX CHECKLIST:
     }
     console.log(`[build-agent] 💰 maxTokens=${maxTokens} | temp=${temperature}`);
 
-    // Retry logic for transient AI gateway failures
+    // ─── Anthropic Messages API call ───────────────────────────────────
+    // Convert OpenAI-style messages to Anthropic format
+    // Anthropic requires system prompt as a separate parameter, not in messages array
+    const anthropicMessages = messages
+      .filter((m: any) => m.role !== "system")
+      .map((m: any) => ({
+        role: m.role === "assistant" ? "assistant" : "user",
+        content: typeof m.content === "string" ? m.content : JSON.stringify(m.content),
+      }));
+
     let response: Response | null = null;
     let lastError = "";
     for (let attempt = 0; attempt < 2; attempt++) {
       try {
-        response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+        response = await fetch("https://api.anthropic.com/v1/messages", {
           method: "POST",
           headers: {
-            Authorization: `Bearer ${LOVABLE_API_KEY}`,
+            "x-api-key": ANTHROPIC_API_KEY,
+            "anthropic-version": "2023-06-01",
             "Content-Type": "application/json",
           },
           body: JSON.stringify({
             model: selectedModel,
-            messages: [
-              { role: "system", content: systemPrompt },
-              ...messages,
-            ],
-            stream: true,
-            temperature,
             max_tokens: maxTokens,
+            temperature,
+            system: systemPrompt,
+            messages: anthropicMessages,
+            stream: true,
           }),
         });
 
-        if (response.ok) {
-          // Verify the response has a body and correct content type
-          const contentType = response.headers.get("content-type") || "";
-          if (!response.body) {
-            console.warn(`[build-agent] Attempt ${attempt + 1}: Response OK but no body`);
-            lastError = "Empty response body from AI gateway";
-            continue;
-          }
-          
-          // If the gateway returns JSON instead of SSE (error wrapped in 200), detect and retry
-          if (contentType.includes("application/json") && !contentType.includes("text/event-stream")) {
-            const text = await response.text();
-            console.warn(`[build-agent] Attempt ${attempt + 1}: Got JSON instead of SSE:`, text.slice(0, 500));
-            try {
-              const errJson = JSON.parse(text);
-              if (errJson.error) {
-                lastError = typeof errJson.error === "string" ? errJson.error : errJson.error.message || "AI gateway error";
-                continue;
-              }
-            } catch {}
-            lastError = "Unexpected JSON response from AI gateway";
-            continue;
-          }
-
-          console.log(`[build-agent] ✅ Streaming response (attempt ${attempt + 1})`);
+        if (response.ok && response.body) {
+          console.log(`[build-agent] ✅ Anthropic streaming response (attempt ${attempt + 1})`);
           break;
         }
 
         if (response.status === 429) {
-          return new Response(JSON.stringify({ error: "Rate limit exceeded." }), {
+          const retryAfter = response.headers.get("retry-after");
+          return new Response(JSON.stringify({ error: `Rate limited by Anthropic. ${retryAfter ? `Retry after ${retryAfter}s.` : "Try again shortly."}` }), {
             status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" },
           });
         }
-        if (response.status === 402) {
-          return new Response(JSON.stringify({ error: "Usage limit reached." }), {
-            status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        if (response.status === 401) {
+          return new Response(JSON.stringify({ error: "Invalid ANTHROPIC_API_KEY. Check your API key in project secrets." }), {
+            status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
           });
         }
+        if (response.status === 402 || response.status === 400) {
+          const t = await response.text();
+          console.error(`[build-agent] Anthropic ${response.status}:`, t.slice(0, 500));
+          return new Response(JSON.stringify({ error: `Anthropic billing error (${response.status}): ${t.slice(0, 200)}` }), {
+            status: response.status, headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+        
         const t = await response.text();
         console.error(`[build-agent] Attempt ${attempt + 1} error:`, response.status, t.slice(0, 500));
         lastError = `Status ${response.status}: ${t.slice(0, 200)}`;
         
-        // Retry on 5xx errors
         if (response.status >= 500 && attempt === 0) {
-          console.log("[build-agent] Retrying after 5xx...");
+          console.log("[build-agent] Retrying after Anthropic 5xx...");
           await new Promise(r => setTimeout(r, 2000));
           continue;
         }
@@ -494,7 +487,71 @@ FIX CHECKLIST:
       });
     }
 
-    return new Response(response.body, {
+    // ─── Transform Anthropic SSE → OpenAI-compatible SSE ──────────────
+    // The client expects OpenAI format: data: {"choices":[{"delta":{"content":"..."}}]}
+    const reader = response.body.getReader();
+    const encoder = new TextEncoder();
+    const decoder = new TextDecoder();
+
+    const transformedStream = new ReadableStream({
+      async start(controller) {
+        let buffer = "";
+        try {
+          while (true) {
+            const { done, value } = await reader.read();
+            if (done) {
+              controller.enqueue(encoder.encode("data: [DONE]\n\n"));
+              controller.close();
+              break;
+            }
+            
+            buffer += decoder.decode(value, { stream: true });
+            const lines = buffer.split("\n");
+            buffer = lines.pop() || "";
+            
+            for (const line of lines) {
+              const trimmed = line.trim();
+              if (!trimmed || trimmed.startsWith(":")) continue;
+              
+              if (trimmed.startsWith("event: ")) {
+                // Anthropic sends event types — we only care about content_block_delta
+                continue;
+              }
+              
+              if (trimmed.startsWith("data: ")) {
+                const jsonStr = trimmed.slice(6);
+                try {
+                  const event = JSON.parse(jsonStr);
+                  
+                  if (event.type === "content_block_delta" && event.delta?.text) {
+                    // Convert to OpenAI-compatible format
+                    const openaiChunk = {
+                      choices: [{ delta: { content: event.delta.text }, index: 0 }],
+                    };
+                    controller.enqueue(encoder.encode(`data: ${JSON.stringify(openaiChunk)}\n\n`));
+                  } else if (event.type === "message_stop") {
+                    controller.enqueue(encoder.encode("data: [DONE]\n\n"));
+                  } else if (event.type === "error") {
+                    console.error("[build-agent] Anthropic stream error:", event.error);
+                    const errChunk = { choices: [{ delta: { content: `\n\n[ERROR: ${event.error?.message || "Stream error"}]` }, index: 0 }] };
+                    controller.enqueue(encoder.encode(`data: ${JSON.stringify(errChunk)}\n\n`));
+                    controller.enqueue(encoder.encode("data: [DONE]\n\n"));
+                  }
+                  // Ignore: content_block_start, content_block_stop, message_start, message_delta, ping
+                } catch {
+                  // Non-JSON data line, skip
+                }
+              }
+            }
+          }
+        } catch (err) {
+          console.error("[build-agent] Stream transform error:", err);
+          controller.error(err);
+        }
+      },
+    });
+
+    return new Response(transformedStream, {
       headers: { ...corsHeaders, "Content-Type": "text/event-stream" },
     });
   } catch (e) {
