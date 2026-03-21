@@ -396,27 +396,42 @@ export default function Footer() {
   );
 }`,
 
-    "/components/ui/Toast.jsx": `import React, { useState, useEffect } from "react";
+    "/components/ui/Toast.jsx": `import React, { createContext, useContext, useState, useEffect, useCallback } from "react";
 
 let toastHandler = null;
 
 export function showToast(message, type = "success") {
-  if (toastHandler) toastHandler({ message, type });
+  if (toastHandler) toastHandler({ message, type, id: Date.now() });
+}
+
+const ToastContext = createContext({ addToast: () => {} });
+export function useToast() { return useContext(ToastContext); }
+
+export function ToastProvider({ children }) {
+  const [toasts, setToasts] = useState([]);
+  const addToast = useCallback((t) => {
+    const toast = typeof t === "string" ? { message: t, type: "success", id: Date.now() } : { ...t, id: t.id || Date.now() };
+    setToasts(p => [...p, toast]);
+    setTimeout(() => setToasts(p => p.filter(x => x.id !== toast.id)), 4000);
+  }, []);
+  useEffect(() => { toastHandler = (t) => addToast(t); return () => { toastHandler = null; }; }, [addToast]);
+  const colors = { success: "bg-emerald-500", error: "bg-red-500", info: "bg-blue-500" };
+  return (
+    <ToastContext.Provider value={{ addToast }}>
+      {children}
+      <div className="fixed bottom-4 right-4 z-50 flex flex-col gap-2">
+        {toasts.map(t => (
+          <div key={t.id} className={\`px-4 py-3 rounded-lg text-white text-sm shadow-lg \${colors[t.type] || colors.success}\`}>
+            {t.message}
+          </div>
+        ))}
+      </div>
+    </ToastContext.Provider>
+  );
 }
 
 export default function ToastContainer() {
-  const [toast, setToast] = useState(null);
-  useEffect(() => {
-    toastHandler = (t) => { setToast(t); setTimeout(() => setToast(null), 3000); };
-    return () => { toastHandler = null; };
-  }, []);
-  if (!toast) return null;
-  const colors = { success: "bg-emerald-500", error: "bg-red-500", info: "bg-blue-500" };
-  return (
-    <div className={\`fixed bottom-4 right-4 z-50 px-4 py-3 rounded-lg text-white text-sm shadow-lg \${colors[toast.type] || colors.success}\`}>
-      {toast.message}
-    </div>
-  );
+  return <ToastProvider>{null}</ToastProvider>;
 }`,
 
     "/styles/globals.css": `@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
