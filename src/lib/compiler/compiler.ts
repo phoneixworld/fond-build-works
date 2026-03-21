@@ -31,7 +31,7 @@ import {
 } from "./observability";
 import { cloudLog } from "@/lib/cloudLogBus";
 import { synthesizeAppJsx } from "./appSynthesizer";
-import { getSharedUIComponents, getGlobalStyles } from "@/lib/templates/scaffoldTemplates";
+import { getSharedUIComponents, getGlobalStyles, getDomainComponents } from "@/lib/templates/scaffoldTemplates";
 import {
   runPreBuildAgents, runPostBuildAgents, createPipelineContext,
   type AgentCallbacks, type OrchestratorResult,
@@ -186,9 +186,17 @@ export async function compile(
     workspace.addFile("/styles/globals.css", getGlobalStyles());
     scaffoldedCount++;
   }
+  // Pre-scaffold domain components (StatCard, StatusBadge, etc.) as reliable fallbacks
+  const domainComponents = getDomainComponents();
+  for (const [path, content] of Object.entries(domainComponents)) {
+    if (!workspace.hasFile(path)) {
+      workspace.addFile(path, content);
+      scaffoldedCount++;
+    }
+  }
   if (scaffoldedCount > 0) {
-    cloudLog.info(`Pre-scaffolded ${scaffoldedCount} UI components + design tokens`, "compiler");
-    console.log(`[Compiler] 🎨 Pre-scaffolded ${scaffoldedCount} UI components into workspace`);
+    cloudLog.info(`Pre-scaffolded ${scaffoldedCount} UI + domain components + design tokens`, "compiler");
+    console.log(`[Compiler] 🎨 Pre-scaffolded ${scaffoldedCount} UI + domain components into workspace`);
   }
 
   const sortedTasks = topologicalSort(taskGraph.tasks);
