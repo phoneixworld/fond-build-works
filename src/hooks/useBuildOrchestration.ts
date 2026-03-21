@@ -395,25 +395,30 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
     setBuildStep(images.length > 0 ? "🖼️ Analyzing image..." : "🏗️ Build agent generating code...");
     setPipelineStep("generating");
 
-    // Safety timeout
-    if (buildSafetyTimeoutRef.current) clearTimeout(buildSafetyTimeoutRef.current);
-    buildSafetyTimeoutRef.current = setTimeout(() => {
-      console.warn("[BuildOrch] Build safety timeout — forcing isBuilding=false");
-      setIsBuilding(false);
-      setIsLoading(false);
-      setBuildStep("");
-      setPipelineStep(null);
-      setCurrentAgent(null);
-      isSendingRef.current = false;
-      setMessages((prev) => {
-        const msg = "⚠️ Build timed out after 8 minutes. The AI model may be under heavy load — please try again, or break the request into smaller steps.";
-        const last = prev[prev.length - 1];
-        if (last?.role === "assistant") {
-          return prev.map((m, i) => (i === prev.length - 1 ? { ...m, content: msg } : m));
-        }
-        return [...prev, { role: "assistant", content: msg, timestamp: Date.now() }];
-      });
-    }, 480_000); // 8 minutes for planned builds with multiple tasks
+    // Safety timeout (resets on any build activity)
+    const BUILD_TIMEOUT_MS = 600_000; // 10 minutes
+    const resetBuildSafetyTimeout = () => {
+      if (buildSafetyTimeoutRef.current) clearTimeout(buildSafetyTimeoutRef.current);
+      buildSafetyTimeoutRef.current = setTimeout(() => {
+        console.warn("[BuildOrch] Build safety timeout — forcing isBuilding=false");
+        setIsBuilding(false);
+        setIsLoading(false);
+        setBuildStep("");
+        setPipelineStep(null);
+        setCurrentAgent(null);
+        isSendingRef.current = false;
+        setMessages((prev) => {
+          const msg = "⚠️ Build timed out after 10 minutes without progress. The AI model may be under heavy load — please try again, or break the request into smaller steps.";
+          const last = prev[prev.length - 1];
+          if (last?.role === "assistant") {
+            return prev.map((m, i) => (i === prev.length - 1 ? { ...m, content: msg } : m));
+          }
+          return [...prev, { role: "assistant", content: msg, timestamp: Date.now() }];
+        });
+      }, BUILD_TIMEOUT_MS);
+    };
+
+    resetBuildSafetyTimeout();
 
     const abortController = new AbortController();
     abortControllerRef.current = abortController;
@@ -425,6 +430,7 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
 
     const upsert = (chunk: string) => {
       if (abortController.signal.aborted) return;
+      resetBuildSafetyTimeout();
       fullResponse += chunk;
       setBuildStreamContent(fullResponse);
 
