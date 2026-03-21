@@ -531,7 +531,53 @@ function parseEditOutput(
     }
   }
 
+  // P2 FIX: Validate all parsed files — reject structurally corrupt output
+  for (const [path, code] of Object.entries(files)) {
+    if (!isStructurallyValid(code)) {
+      console.warn(`[EditEngine] Rejecting corrupt file: ${path}`);
+      delete files[path];
+    }
+  }
+
   return Object.keys(files).length > 0 ? { files, deps } : null;
+}
+
+/**
+ * P2: Structural validation gate.
+ * Rejects files with unbalanced braces/brackets or missing exports.
+ */
+function isStructurallyValid(code: string): boolean {
+  if (!code || code.length < 10) return false;
+
+  // Strip strings and comments to avoid false positives
+  const stripped = code
+    .replace(/\/\/.*$/gm, "")
+    .replace(/\/\*[\s\S]*?\*\//g, "")
+    .replace(/"(?:[^"\\]|\\.)*"/g, '""')
+    .replace(/'(?:[^'\\]|\\.)*'/g, "''")
+    .replace(/`(?:[^`\\]|\\.)*`/g, '""');
+
+  // Check balanced braces
+  let braces = 0, parens = 0, brackets = 0;
+  for (const ch of stripped) {
+    if (ch === "{") braces++;
+    else if (ch === "}") braces--;
+    else if (ch === "(") parens++;
+    else if (ch === ")") parens--;
+    else if (ch === "[") brackets++;
+    else if (ch === "]") brackets--;
+
+    // Early exit on negative (closing without opening)
+    if (braces < -1 || parens < -1 || brackets < -1) return false;
+  }
+
+  // Allow off-by-one (common in streaming) but reject major imbalance
+  if (Math.abs(braces) > 1 || Math.abs(parens) > 1 || Math.abs(brackets) > 1) return false;
+
+  // Must have at least one export (function, const, or default)
+  if (!/export\s/.test(code)) return false;
+
+  return true;
 }
 // ─── Intent Detection ────────────────────────────────────────────────────────
 
