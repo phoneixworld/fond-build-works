@@ -747,6 +747,9 @@ function buildSandpackFiles(files: SandpackFileSet | null, projectId: string, su
         const mainExportMatch = processed.match(/export\s+(?:function|const)\s+([A-Z]\w+)/);
         if (mainExportMatch) {
           processed += `\nexport default ${mainExportMatch[1]};\n`;
+          // If a named export for the same symbol exists, remove it to avoid
+          // parser-level duplicate export failures in Sandpack's transform pipeline.
+          processed = removeDefaultExportConflict(processed, sandpackPath);
         }
       }
     }
