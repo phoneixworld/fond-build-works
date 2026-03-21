@@ -284,82 +284,88 @@ export async function compile(
     },
   };
 
-  for (let passIdx = 0; passIdx < taskGraph.passes.length; passIdx++) {
-    const passTaskIds = taskGraph.passes[passIdx];
-    const passTiming = startPass(trace, `pass-${passIdx + 1}`);
-    executionCallbacks.onPassStart(passIdx, passTaskIds);
+  let buildAborted = false;
+  try {
+    for (let passIdx = 0; passIdx < taskGraph.passes.length; passIdx++) {
+      const passTaskIds = taskGraph.passes[passIdx];
+      const passTiming = startPass(trace, `pass-${passIdx + 1}`);
+      executionCallbacks.onPassStart(passIdx, passTaskIds);
 
-    // Execute tasks in this pass sequentially
-    // (parallel execution is a future optimization)
-    for (const taskId of passTaskIds) {
-      const task = taskGraph.tasks.find(t => t.id === taskId)!;
-      const taskIdx = sortedTasks.findIndex(t => t.id === taskId);
-      const taskTrace = traceTaskStart(trace, task);
-      const taskStartTime = performance.now();
+      // Execute tasks in this pass sequentially
+      for (const taskId of passTaskIds) {
+        const task = taskGraph.tasks.find(t => t.id === taskId)!;
+        const taskIdx = sortedTasks.findIndex(t => t.id === taskId);
+        const taskTrace = traceTaskStart(trace, task);
+        const taskStartTime = performance.now();
 
-      task.status = "in_progress";
-      callbacks.onTaskStart(task, taskIdx, sortedTasks.length);
+        task.status = "in_progress";
+        callbacks.onTaskStart(task, taskIdx, sortedTasks.length);
 
-      try {
-        const taskFiles = await executeTask(
-          task, ctx, workspace, taskIdx, sortedTasks.length, executionCallbacks
-        );
+        try {
+          const taskFiles = await executeTask(
+            task, ctx, workspace, taskIdx, sortedTasks.length, executionCallbacks
+          );
 
-        const producedFiles = workspace.applyPatch(taskFiles);
-        task.status = "done";
+          const producedFiles = workspace.applyPatch(taskFiles);
+          task.status = "done";
 
-        callbacks.onTaskDone(task, taskFiles);
-        traceTaskEnd(taskTrace, taskStartTime, {
-          status: "done",
-          filesProduced: producedFiles,
-          retries: task.retries,
-          cacheHit: false,
-        });
+          callbacks.onTaskDone(task, taskFiles);
+          traceTaskEnd(taskTrace, taskStartTime, {
+            status: "done",
+            filesProduced: producedFiles,
+            retries: task.retries,
+            cacheHit: false,
+          });
 
-        cloudLog.info(`Task '${task.label}' completed: ${producedFiles.length} files`, "compiler");
-        console.log(`[Compiler] ✅ Task '${task.label}' done: ${producedFiles.length} files`);
-      } catch (err: any) {
-        task.status = "failed";
-        task.error = err.message;
+          cloudLog.info(`Task '${task.label}' completed: ${producedFiles.length} files`, "compiler");
+          console.log(`[Compiler] ✅ Task '${task.label}' done: ${producedFiles.length} files`);
+        } catch (err: any) {
+          task.status = "failed";
+          task.error = err.message;
 
-        callbacks.onTaskError(task, err.message);
-        traceTaskEnd(taskTrace, taskStartTime, {
-          status: "failed",
-          filesProduced: [],
-          retries: task.retries,
-          cacheHit: false,
-          error: err.message,
-        });
+          callbacks.onTaskError(task, err.message);
+          traceTaskEnd(taskTrace, taskStartTime, {
+            status: "failed",
+            filesProduced: [],
+            retries: task.retries,
+            cacheHit: false,
+            error: err.message,
+          });
 
-        cloudLog.error(`Task '${task.label}' failed: ${err.message}`, "compiler");
-        console.error(`[Compiler] ❌ Task '${task.label}' failed:`, err.message);
+          cloudLog.error(`Task '${task.label}' failed: ${err.message}`, "compiler");
+          console.error(`[Compiler] ❌ Task '${task.label}' failed:`, err.message);
 
-        // ── FAIL-FAST on credit/billing errors ──
-        // Don't waste remaining tasks if the AI gateway is rejecting requests
-        const isCreditError = /usage limit|credit|402|rate limit|429/i.test(err.message);
-        if (isCreditError) {
-          cloudLog.error(`[Compiler] ⛔ Aborting build — AI gateway credit/rate limit hit`, "compiler");
-          console.error(`[Compiler] ⛔ Aborting remaining tasks — credit/rate limit error`);
-          // Mark all remaining tasks as skipped
-          for (const remainingId of passTaskIds.slice(passTaskIds.indexOf(taskId) + 1)) {
-            const rt = taskGraph.tasks.find(t => t.id === remainingId);
-            if (rt) { rt.status = "failed"; rt.error = "Skipped — AI usage limit reached"; }
-          }
-          for (let futurePass = passIdx + 1; futurePass < taskGraph.passes.length; futurePass++) {
-            for (const futureId of taskGraph.passes[futurePass]) {
-              const ft = taskGraph.tasks.find(t => t.id === futureId);
-              if (ft) { ft.status = "failed"; ft.error = "Skipped — AI usage limit reached"; }
+          // ── FAIL-FAST on credit/billing errors ──
+          const isCreditError = /usage limit|credit|402|rate limit|429/i.test(err.message);
+          if (isCreditError) {
+            cloudLog.error(`[Compiler] ⛔ Aborting build — AI gateway credit/rate limit hit`, "compiler");
+            // Mark all remaining tasks as skipped
+            for (const remainingId of passTaskIds.slice(passTaskIds.indexOf(taskId) + 1)) {
+              const rt = taskGraph.tasks.find(t => t.id === remainingId);
+              if (rt) { rt.status = "failed"; rt.error = "Skipped — AI usage limit reached"; }
             }
+            for (let futurePass = passIdx + 1; futurePass < taskGraph.passes.length; futurePass++) {
+              for (const futureId of taskGraph.passes[futurePass]) {
+                const ft = taskGraph.tasks.find(t => t.id === futureId);
+                if (ft) { ft.status = "failed"; ft.error = "Skipped — AI usage limit reached"; }
+              }
+            }
+            endPass(passTiming);
+            throw new Error("AI_USAGE_LIMIT_REACHED");
           }
-          endPass(passTiming);
-          // Jump to verification with whatever we have so far
-          callbacks.onPhase("verifying", "Build aborted — AI usage limit reached. Verifying partial output...");
-          throw new Error("AI_USAGE_LIMIT_REACHED");
         }
       }
-    }
 
-    endPass(passTiming);
+      endPass(passTiming);
+    }
+  } catch (abortErr: any) {
+    if (abortErr.message === "AI_USAGE_LIMIT_REACHED") {
+      buildAborted = true;
+      callbacks.onPhase("verifying", "Build aborted — AI usage limit reached. Verifying partial output...");
+      cloudLog.error(`Build aborted due to AI usage limit. Partial output will be verified.`, "compiler");
+    } else {
+      throw abortErr;
+    }
   }
 
   // ── Phase 3.45: File Deduplication ───────────────────────────────────
