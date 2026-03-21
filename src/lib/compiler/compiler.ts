@@ -396,6 +396,16 @@ export async function compile(
     }
   }
 
+  // ── Phase 3.97: Sidebar–Router Reconciliation ────────────────────────
+  
+  callbacks.onPhase("reconciling-sidebar", "Ensuring sidebar navigation matches routes...");
+
+  const reconciliation = reconcileSidebarAndRouter(workspace);
+  if (reconciliation.routesAdded > 0 || reconciliation.stubsGenerated.length > 0) {
+    cloudLog.info(`Sidebar reconciler: added ${reconciliation.routesAdded} route(s), generated ${reconciliation.stubsGenerated.length} stub(s)`, "compiler");
+    console.log(`[Compiler] 🔗 Sidebar reconciler: ${reconciliation.routesAdded} routes added, ${reconciliation.stubsGenerated.length} stubs generated`);
+  }
+
   // ── Phase 3.11: Re-run export mismatch fix on synthesized App.jsx ──
   // The synthesizer may produce default imports for files that only have named exports.
   // Running the fixer again catches these post-synthesis mismatches.
