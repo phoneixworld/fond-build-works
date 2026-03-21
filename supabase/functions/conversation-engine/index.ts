@@ -648,28 +648,29 @@ Deno.serve(async (req) => {
         try {
           const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
           if (LOVABLE_API_KEY) {
+            // Use Anthropic for vision extraction (Claude supports vision natively)
+            const ANTHROPIC_API_KEY = Deno.env.get("ANTHROPIC_API_KEY");
+            if (ANTHROPIC_API_KEY) {
             const visionMessages = [
-              {
-                role: "system",
-                content: `You are a requirements extraction engine. Extract ALL text, requirements, features, user stories, UI descriptions, roles, workflows, and technical specifications from the provided image(s). Output ONLY the extracted content as structured text. Preserve all details, numbers, lists, and hierarchies. If there are diagrams, describe them. Do NOT summarize — extract EVERYTHING verbatim where possible.`
-              },
               {
                 role: "user",
                 content: [
                   { type: "text", text: text || "Extract all requirements and specifications from these images:" },
-                  ...imageUrls.map((url: string) => ({ type: "image_url", image_url: { url } })),
+                  ...imageUrls.map((url: string) => ({ type: "image", source: { type: "url", url } })),
                 ],
               },
             ];
 
-            const visionResp = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+            const visionResp = await fetch("https://api.anthropic.com/v1/messages", {
               method: "POST",
               headers: {
-                Authorization: `Bearer ${LOVABLE_API_KEY}`,
+                "x-api-key": ANTHROPIC_API_KEY,
+                "anthropic-version": "2023-06-01",
                 "Content-Type": "application/json",
               },
               body: JSON.stringify({
-                model: "google/gemini-2.5-flash",
+                model: "claude-sonnet-4-20250514",
+                system: `You are a requirements extraction engine. Extract ALL text, requirements, features, user stories, UI descriptions, roles, workflows, and technical specifications from the provided image(s). Output ONLY the extracted content as structured text. Preserve all details, numbers, lists, and hierarchies. If there are diagrams, describe them. Do NOT summarize — extract EVERYTHING verbatim where possible.`,
                 messages: visionMessages,
                 max_tokens: 8000,
               }),
@@ -677,7 +678,7 @@ Deno.serve(async (req) => {
 
             if (visionResp.ok) {
               const visionData = await visionResp.json();
-              const extractedText = visionData.choices?.[0]?.message?.content || "";
+              const extractedText = visionData.content?.[0]?.text || "";
               if (extractedText.length > 10) {
                 console.log(`[conversation-engine] Vision extracted ${extractedText.length} chars from ${imageUrls.length} image(s)`);
                 // Merge extracted text with any user-provided text
