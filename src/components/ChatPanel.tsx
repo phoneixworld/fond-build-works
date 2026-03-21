@@ -756,11 +756,21 @@ const ChatPanel = forwardRef<ChatPanelHandle, { initialPrompt?: string; onVersio
           )}
         </AnimatePresence>
 
-        {/* Status banners (healing, errors, template chip, attached images) */}
+        {/* Error recovery banner (improved) */}
+        <ErrorRecoveryBanner
+          errors={previewErrors}
+          healAttempts={healAttempts}
+          maxHealAttempts={MAX_HEAL_ATTEMPTS}
+          onAutoFix={handleAutoFix}
+          onResetAndFix={() => { setHealAttempts(0); handleAutoFix(); }}
+          isLoading={isLoading}
+        />
+
+        {/* Status banners (healing, template chip, attached images) */}
         <ChatStatusBanners
           isHealing={isHealing}
           healingStatus={healingStatus}
-          previewErrors={previewErrors}
+          previewErrors={[]}
           isLoading={isLoading}
           healAttempts={healAttempts}
           maxHealAttempts={MAX_HEAL_ATTEMPTS}
@@ -773,31 +783,14 @@ const ChatPanel = forwardRef<ChatPanelHandle, { initialPrompt?: string; onVersio
         />
 
         {/* Smart context-aware suggestions */}
-        {!isLoading && followUpQuestions.length === 0 && !input && (
-          <div className="px-3 pt-2 pb-1">
-            <div className="flex flex-wrap gap-1.5">
-              {(() => {
-                const codeForAnalysis = currentPreviewHtml ||
-                  (currentSandpackFiles ? Object.values(currentSandpackFiles).join("\n") : "");
-                const chatMsgs = messages.map(m => ({
-                  role: m.role,
-                  content: typeof m.content === "string" ? m.content : ""
-                }));
-                const suggestions = generateSmartSuggestions(codeForAnalysis, chatMsgs, 4);
-                return suggestions.map((s) => (
-                  <button
-                    key={s.label}
-                    onClick={() => handleSmartSend(s.prompt)}
-                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-medium border border-border/60 text-muted-foreground hover:text-foreground hover:border-primary/30 hover:bg-primary/5 transition-all group"
-                  >
-                    <span className="text-xs group-hover:scale-110 transition-transform">{s.icon}</span>
-                    {s.label}
-                  </button>
-                ));
-              })()}
-            </div>
-          </div>
-        )}
+        <ChatSmartSuggestions
+          codeForAnalysis={currentPreviewHtml || (currentSandpackFiles ? Object.values(currentSandpackFiles).join("\n") : "")}
+          messages={messages.map(m => ({ role: m.role, content: typeof m.content === "string" ? m.content : "" }))}
+          onSend={handleSmartSend}
+          isLoading={isLoading}
+          hasFollowUp={followUpQuestions.length > 0}
+          hasInput={!!input}
+        />
 
         <ChatInput
           input={input}
