@@ -1,6 +1,7 @@
 // src/lib/irPlanner.ts
 
 import type { IR } from "./ir";
+import { sanitizeName, sanitizeRoute } from "./nameSanitizer";
 
 /**
  * Generic interface for calling your LLM.
