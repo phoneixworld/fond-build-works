@@ -1127,7 +1127,7 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
         },
         onTaskDone: (task, files) => {
           resetBuildSafetyTimeout();
-          if (lastProjectIdRef.current !== buildProjectId) {
+          if (lastProjectIdRef.current !== null && lastProjectIdRef.current !== buildProjectId) {
             console.warn(`[Compiler] ⛔ Blocked cross-project file injection`);
             return;
           }
