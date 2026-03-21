@@ -8,6 +8,9 @@
 export { compile } from "./compiler";
 export type { CompileOptions, CompileCallbacks } from "./compiler";
 
+// IR Extractor
+export { extractIRWithModel, createEmptyIR } from "./irExtractor";
+
 // Types
 export type {
   BuildContext,

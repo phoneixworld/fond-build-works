@@ -8,12 +8,14 @@
  * This replaces the ad-hoc buildEngine pipeline with a deterministic compiler.
  */
 
+import type { IR } from "@/lib/ir";
 import type {
   BuildContext, BuildResult, BuildStatus,
   CompilerTask, TaskGraph, VerificationResult, RuntimeVerification,
 } from "./types";
 import { assembleBuildContext } from "./context";
 import { planTaskGraph, topologicalSort } from "./planner";
+import { extractIRWithModel } from "./irExtractor";
 import { Workspace } from "./workspace";
 import { executeTask, type ExecutionCallbacks } from "./executor";
 import { verifyWorkspace } from "./verifier";
@@ -48,6 +50,8 @@ export interface CompileOptions {
   techStack: string;
   semanticSummary?: string;
   ir?: any;
+  /** Structured IR from the new type system — if provided, skips AI extraction */
+  structuredIR?: IR;
   schemas?: any[];
   knowledge?: string[];
   designTheme?: string;
@@ -143,11 +147,33 @@ export async function compile(
     console.warn("[Compiler] Pre-build agents failed (non-fatal):", err.message);
   }
 
+  // ── Phase 1.8: AI-Powered IR Extraction ──────────────────────────────
+
+  callbacks.onPhase("ir-extraction", "Extracting structured IR from requirements...");
+
+  let structuredIR: IR | undefined = options.structuredIR;
+
+  if (!structuredIR) {
+    try {
+      structuredIR = await extractIRWithModel(ctx.rawRequirements, {
+        projectId: options.projectId,
+        techStack: options.techStack,
+        model: options.model,
+      });
+      cloudLog.info(`[Compiler] IR extracted: ${Object.keys(structuredIR.entities).length} entities, ${structuredIR.pages.length} pages`, "compiler");
+    } catch (err: any) {
+      console.warn("[Compiler] IR extraction failed (non-fatal):", err.message);
+    }
+  }
+
+  // Attach structured IR to context for downstream consumption
+  (ctx as any).structuredIR = structuredIR;
+
   // ── Phase 2: Planning ──────────────────────────────────────────────
 
   callbacks.onPhase("planning", "Building task graph...");
 
-  const taskGraph = planTaskGraph(ctx);
+  const taskGraph = planTaskGraph(ctx, structuredIR);
 
   cloudLog.info(`Task graph: ${taskGraph.tasks.length} tasks across ${taskGraph.passes.length} passes`, "compiler");
   console.log(`[Compiler] Task graph: ${taskGraph.tasks.length} tasks, ${taskGraph.passes.length} passes`);
