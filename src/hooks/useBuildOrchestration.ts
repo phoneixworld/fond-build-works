@@ -989,10 +989,52 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
       // to rebundle every 500ms, which causes severe flickering and crashes.
       // Files are now only sent to Sandpack on task completion (onFilesReady).
 
+      // ─── IR ORCHESTRATOR: seed deterministic scaffolds ────────────
+      let irScaffoldFiles: Record<string, string> = {};
+      if (isFirstBuild) {
+        try {
+          setBuildStep("🧠 Planning IR scaffolds...");
+          const callLLM = async (opts: { system: string; user: string }) => {
+            const resp = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/chat`, {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+              },
+              body: JSON.stringify({
+                messages: [
+                  { role: "system", content: opts.system },
+                  { role: "user", content: opts.user },
+                ],
+              }),
+            });
+            if (!resp.ok) throw new Error(`LLM call failed: ${resp.status}`);
+            const data = await resp.json();
+            return data.choices?.[0]?.message?.content || await resp.text();
+          };
+
+          irScaffoldFiles = await orchestrateBuild({
+            rawRequirements: userText,
+            callLLM,
+          });
+
+          // Persist IR to project for future edits
+          if (irScaffoldFiles["/App.jsx"]) {
+            console.log(`[BuildOrch] ✅ IR scaffold generated: ${Object.keys(irScaffoldFiles).length} files`);
+          }
+        } catch (err) {
+          console.warn("[BuildOrch] IR orchestrator failed, proceeding without scaffolds:", err);
+          irScaffoldFiles = {};
+        }
+      }
+
+      // Merge IR scaffolds into existing workspace so compiler has a complete seed
+      const seededWorkspace = { ...irScaffoldFiles, ...(safeExistingFiles || {}) };
+
       // ─── COMPILER V1.0 PATH ───────────────────────────────────────
       const compileOptions: CompileOptions = {
         rawRequirements: userText,
-        existingWorkspace: safeExistingFiles || {},
+        existingWorkspace: seededWorkspace,
         projectId: buildProjectId,
         techStack: currentProject.tech_stack || "react-cdn",
         schemas: schemas.length > 0 ? schemas : undefined,
