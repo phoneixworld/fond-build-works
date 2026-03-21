@@ -254,11 +254,12 @@ export function useSelfHealing(config: SelfHealingConfig) {
     const healPrompt = buildSmartFixPrompt(categorized, fileContext, attempt);
     setPreviewErrors([]);
     
-    Promise.resolve(sendMessage(healPrompt)).finally(() => {
+    // Use surgical edit path when available to avoid full rebuild loops
+    Promise.resolve(healSend(healPrompt)).finally(() => {
       setIsHealing(false);
       setHealingStatus("");
     });
-  }, [isHealing, healAttempts, previewErrors, sendMessage, sandpackFilesRef, isSendingRef, isLoadingRef]);
+  }, [isHealing, healAttempts, previewErrors, healSend, sandpackFilesRef, isSendingRef, isLoadingRef]);
 
   // Auto-run self-heal when preview errors appear and build is idle
   useEffect(() => {
