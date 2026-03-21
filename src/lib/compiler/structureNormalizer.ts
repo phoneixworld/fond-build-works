@@ -11,6 +11,49 @@ export function normalizeGeneratedStructure(workspace: Workspace): number {
   fixed += normalizeToastWiring(workspace);
   fixed += normalizeDomainComponentSafety(workspace);
   fixed += normalizeContextReferences(workspace);
+  fixed += normalizeExportDuplication(workspace);
+  return fixed;
+}
+
+/**
+ * Removes duplicate exports: if a file has both `export { X }` and `export default X`,
+ * strip the named re-export to prevent "already exported" runtime errors.
+ */
+function normalizeExportDuplication(workspace: Workspace): number {
+  let fixed = 0;
+  for (const path of workspace.listFiles()) {
+    if (!CODE_FILE_RE.test(path)) continue;
+    const content = workspace.getFile(path)!;
+
+    // Find default export name
+    const defaultMatch = content.match(/export\s+default\s+(?:function\s+)?(\w+)/);
+    if (!defaultMatch) continue;
+    const defaultName = defaultMatch[1];
+
+    // Check for `export { defaultName }` or `export { defaultName, ... }`
+    const namedExportRegex = new RegExp(
+      `^export\\s*\\{([^}]*\\b${defaultName}\\b[^}]*)\\}\\s*;?\\s*$`,
+      "m"
+    );
+    const namedMatch = content.match(namedExportRegex);
+    if (!namedMatch) continue;
+
+    const symbols = namedMatch[1].split(",").map(s => s.trim()).filter(Boolean);
+    if (symbols.length === 1 && symbols[0] === defaultName) {
+      // Only symbol — remove the entire export { X } line
+      const newContent = content.replace(namedExportRegex, "").replace(/\n{3,}/g, "\n\n");
+      workspace.updateFile(path, newContent);
+      fixed++;
+      console.log(`[StructureNormalizer] Removed duplicate export { ${defaultName} } from ${path}`);
+    } else {
+      // Multiple symbols — just remove the default name from the list
+      const newSymbols = symbols.filter(s => s !== defaultName);
+      const newContent = content.replace(namedExportRegex, `export { ${newSymbols.join(", ")} };`);
+      workspace.updateFile(path, newContent);
+      fixed++;
+      console.log(`[StructureNormalizer] Removed '${defaultName}' from named exports in ${path}`);
+    }
+  }
   return fixed;
 }
 
