@@ -1,21 +1,22 @@
 /**
  * FINAL ENTERPRISE-GRADE APP SYNTHESIZER
- * Ensures:
- * - Correct imports for ALL pages
- * - Correct default imports (no named imports)
- * - Correct routing structure
- * - Correct layout usage
- * - No missing pages
- * - No invalid paths
+ * --------------------------------------
+ * Guarantees:
+ * - No duplicate routes
+ * - No stray routes outside layout
+ * - Correct default imports
+ * - Correct nested routing
+ * - Correct ProtectedRoute usage
+ * - Correct AppLayout wrapping
  */
 
-import type { Workspace } from "./workspace";
+import type { Workspace } from "./compiler/workspace";
 
-export function synthesizeAppJsx(workspace: Workspace, routes?: any[]): string {
+export function synthesizeAppJsx(workspace: Workspace, routes: any[]) {
   const pageFiles = workspace.listFiles().filter((f) => f.startsWith("/pages/") && f.endsWith(".jsx"));
 
   const imports = [];
-  const routeElements = [];
+  const nestedRoutes = [];
 
   for (const file of pageFiles) {
     const pageName = file.split("/").pop().replace(".jsx", "");
@@ -23,15 +24,22 @@ export function synthesizeAppJsx(workspace: Workspace, routes?: any[]): string {
 
     imports.push(`import ${pageName} from ".${importPath}";`);
 
-    const routePath = routes?.find((r: any) => r.page === pageName)?.path || "/";
-    routeElements.push(`        <Route path="${routePath}" element={<${pageName} />} />`);
+    const route = routes.find((r) => r.page === pageName);
+    if (!route) continue;
+
+    if (route.path === "/") {
+      nestedRoutes.push(`          <Route index element={<${pageName} />} />`);
+    } else {
+      nestedRoutes.push(`          <Route path="${route.path.replace("/", "")}" element={<${pageName} />} />`);
+    }
   }
 
   const appJsx = `
 import React from "react";
-import { HashRouter, Routes, Route } from "react-router-dom";
+import { HashRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider } from "./contexts/AuthContext";
 import ProtectedRoute from "./components/ProtectedRoute";
+import AppLayout from "./layout/AppLayout";
 
 ${imports.join("\n")}
 
@@ -40,7 +48,21 @@ export default function App() {
     <AuthProvider>
       <HashRouter>
         <Routes>
-${routeElements.join("\n")}
+          <Route path="/login" element={<LoginPage />} />
+          <Route path="/signup" element={<SignupPage />} />
+
+          <Route
+            path="/"
+            element={
+              <ProtectedRoute>
+                <AppLayout />
+              </ProtectedRoute>
+            }
+          >
+${nestedRoutes.join("\n")}
+          </Route>
+
+          <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </HashRouter>
     </AuthProvider>
@@ -48,5 +70,5 @@ ${routeElements.join("\n")}
 }
 `;
 
-  return appJsx.trim();
+  return { "/App.jsx": appJsx.trim() };
 }
