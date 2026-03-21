@@ -1293,27 +1293,12 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
             // broken imports / missing modules introduced by the edit.
             try {
               const repairWorkspace = new Workspace(updatedFiles);
-              // Phase 1: Deduplicate (AI sometimes concatenates files twice)
-              const deduped = deduplicateFiles(repairWorkspace);
-              if (deduped > 0) {
-                console.log(`[EditMode] 🧹 Deduplicated ${deduped} file(s)`);
-              }
-              const { created } = repairMissingModules(repairWorkspace);
-              if (created.length > 0) {
-                console.log(`[EditMode] 🔧 Generated ${created.length} missing module(s):`, created);
-              }
-              const importsFixed = fixMissingImports(repairWorkspace);
-              if (importsFixed > 0) {
-                console.log(`[EditMode] 🔧 Fixed ${importsFixed} missing import(s)`);
-              }
-              const exportsFixed = fixExportMismatches(repairWorkspace);
-              if (exportsFixed > 0) {
-                console.log(`[EditMode] 🔧 Fixed ${exportsFixed} export mismatch(es)`);
-              }
-              const structureFixed = normalizeGeneratedStructure(repairWorkspace);
-              if (structureFixed > 0) {
-                console.log(`[EditMode] 🧱 Applied ${structureFixed} structural normalization fix(es)`);
-              }
+              // ── Mutation pipeline DISABLED for surgical test ──
+              // repairMissingModules(repairWorkspace);
+              // fixMissingImports(repairWorkspace);
+              // fixExportMismatches(repairWorkspace);
+              // normalizeGeneratedStructure(repairWorkspace);
+              // deduplicateFiles(repairWorkspace);
               // Extract repaired files back
               const repairedFiles: Record<string, string> = {};
               for (const f of repairWorkspace.listFiles()) {
