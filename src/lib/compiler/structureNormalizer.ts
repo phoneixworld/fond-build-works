@@ -1,4 +1,5 @@
 import type { Workspace } from "./workspace";
+import { getDomainComponents } from "@/lib/templates/scaffoldTemplates";
 
 const CODE_FILE_RE = /\.(jsx?|tsx?)$/;
 
@@ -8,6 +9,7 @@ export function normalizeGeneratedStructure(workspace: Workspace): number {
   fixed += normalizeUtilityModules(workspace);
   fixed += normalizeHookDefaultImports(workspace);
   fixed += normalizeToastWiring(workspace);
+  fixed += normalizeDomainComponentSafety(workspace);
   fixed += normalizeContextReferences(workspace);
   return fixed;
 }
@@ -225,6 +227,115 @@ function normalizeToastWiring(workspace: Workspace): number {
   }
 
   return fixed;
+}
+
+function normalizeDomainComponentSafety(workspace: Workspace): number {
+  let fixed = 0;
+  const fallbackComponents = getDomainComponents();
+
+  for (const [filePath, fallbackSource] of Object.entries(fallbackComponents)) {
+    const current = workspace.getFile(filePath);
+
+    if (!current) {
+      workspace.addFile(filePath, fallbackSource);
+      fixed++;
+      console.log(`[StructureNormalizer] Added missing domain component fallback: ${filePath}`);
+      continue;
+    }
+
+    if (!isRenderableComponent(current)) {
+      workspace.updateFile(filePath, fallbackSource);
+      fixed++;
+      console.log(`[StructureNormalizer] Replaced malformed domain component with fallback: ${filePath}`);
+    }
+  }
+
+  return fixed;
+}
+
+function isRenderableComponent(content: string): boolean {
+  if (!/export\s+default\s+/.test(content)) return false;
+  const unresolved = findUndefinedJsxComponents(content);
+  return unresolved.length === 0;
+}
+
+function findUndefinedJsxComponents(content: string): string[] {
+  const identifiers = new Set<string>([
+    ...extractImportedIdentifiers(content),
+    ...extractDeclaredIdentifiers(content),
+    ...extractDestructuredIdentifiers(content),
+  ]);
+
+  const unresolved = new Set<string>();
+  for (const match of content.matchAll(/<([A-Z][A-Za-z0-9_]*)\b/g)) {
+    const componentName = match[1];
+    if (componentName === "Fragment") continue;
+    if (!identifiers.has(componentName)) {
+      unresolved.add(componentName);
+    }
+  }
+
+  return [...unresolved];
+}
+
+function extractImportedIdentifiers(content: string): string[] {
+  const names = new Set<string>();
+
+  for (const m of content.matchAll(/^import\s+([A-Za-z_$][\w$]*)\s*(?:,\s*\{[^}]*\})?\s+from\s+["'][^"']+["'];?$/gm)) {
+    names.add(m[1]);
+  }
+
+  for (const m of content.matchAll(/import\s+\*\s+as\s+([A-Za-z_$][\w$]*)\s+from\s+["'][^"']+["'];?/g)) {
+    names.add(m[1]);
+  }
+
+  for (const m of content.matchAll(/import\s+\{([^}]+)\}\s+from\s+["'][^"']+["'];?/g)) {
+    for (const raw of m[1].split(",")) {
+      const token = raw.trim();
+      if (!token) continue;
+      const aliasParts = token.split(/\s+as\s+/i).map((p) => p.trim()).filter(Boolean);
+      const finalName = aliasParts.length > 1 ? aliasParts[aliasParts.length - 1] : aliasParts[0];
+      if (finalName) names.add(finalName);
+    }
+  }
+
+  return [...names];
+}
+
+function extractDeclaredIdentifiers(content: string): string[] {
+  const names = new Set<string>();
+
+  for (const m of content.matchAll(/\b(?:function|class|const|let|var)\s+([A-Za-z_$][\w$]*)/g)) {
+    names.add(m[1]);
+  }
+
+  return [...names];
+}
+
+function extractDestructuredIdentifiers(content: string): string[] {
+  const names = new Set<string>();
+  const destructuringBlocks = [
+    ...content.matchAll(/\{\s*([^}]*)\s*\}\s*=\s*[^;\n]+/g),
+    ...content.matchAll(/function\s+[A-Za-z_$][\w$]*\s*\(\s*\{([^}]*)\}/g),
+    ...content.matchAll(/\(\s*\{([^}]*)\}\s*\)\s*=>/g),
+  ];
+
+  for (const block of destructuringBlocks) {
+    const raw = block[1] || "";
+    for (const part of raw.split(",")) {
+      const token = part.trim().replace(/^\.\.\./, "");
+      if (!token) continue;
+      const clean = token
+        .split("=")[0]
+        .split(":")[1] || token.split("=")[0].split(":")[0];
+      const id = clean.trim();
+      if (/^[A-Za-z_$][\w$]*$/.test(id)) {
+        names.add(id);
+      }
+    }
+  }
+
+  return [...names];
 }
 
 function rewriteImportsToCanonical(workspace: Workspace, duplicatePath: string, canonicalPath: string): number {
