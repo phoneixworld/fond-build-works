@@ -32,6 +32,32 @@ interface CategorizedError {
   identifier?: string;
 }
 
+/**
+ * Extract component name from "Check the render method of `X`" or stack traces.
+ */
+function guessComponentFromError(error: string): { component?: string; file?: string } {
+  // "Check the render method of `StatCard`" or "Check the render method of StatCard"
+  const renderMethodMatch = error.match(/Check the render method of [`']?(\w+)[`']?/i);
+  if (renderMethodMatch) {
+    const comp = renderMethodMatch[1];
+    return { component: comp, file: `/components/${comp}.jsx` };
+  }
+
+  // Stack trace: "at StatCard (http://localhost:.../src/components/StatCard.jsx:12:5)"
+  const stackMatch = error.match(/at\s+(\w+)\s+\([^)]*\/([\w/.-]+\.(?:jsx?|tsx?))/);
+  if (stackMatch) {
+    return { component: stackMatch[1], file: `/${stackMatch[2]}` };
+  }
+
+  // File path anywhere in the error
+  const fileMatch = error.match(/\/(components\/[\w/.-]+\.(?:jsx?|tsx?))/);
+  if (fileMatch) {
+    return { file: `/${fileMatch[1]}` };
+  }
+
+  return {};
+}
+
 function categorizeError(error: string): CategorizedError {
   // "Module not found" or "Cannot find module"
   if (/module\s+not\s+found|cannot\s+find\s+module/i.test(error)) {
@@ -39,10 +65,15 @@ function categorizeError(error: string): CategorizedError {
     return { type: "import", message: error, file: fileMatch?.[1] };
   }
 
-  // "Element type is invalid"
+  // "Element type is invalid" — generic React mismatch error
   if (/element\s+type\s+is\s+invalid/i.test(error)) {
-    const compMatch = error.match(/type\s+(?:of|is)\s+(?:the\s+)?(?:element|component)\s+['"]?(\w+)/i);
-    return { type: "export", message: error, identifier: compMatch?.[1] };
+    const guess = guessComponentFromError(error);
+    return {
+      type: "export",
+      message: error,
+      identifier: guess.component,
+      file: guess.file,
+    };
   }
 
   // Duplicate symbol export/declaration
@@ -59,7 +90,6 @@ function categorizeError(error: string): CategorizedError {
     const idMatch = error.match(/(\w+)\s+is\s+not/);
     const fileMatch = error.match(/\/([^\s:]+\.\w+)/);
     const identifier = idMatch?.[1];
-    // In Sandpack classic JSX runtime, missing React import appears as "React is not defined".
     if (identifier === "React") {
       return { type: "import", message: error, identifier, file: fileMatch?.[1] };
     }
