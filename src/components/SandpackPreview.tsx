@@ -675,21 +675,50 @@ const DEFAULT_INDEX_HTML = `<!DOCTYPE html>
 </html>`;
 
 /**
- * Sanitize CSS by ensuring all braces are balanced.
+ * Sanitize CSS by ensuring braces are balanced while ignoring comments/strings.
  * Appends closing braces if needed to prevent "Unclosed block" errors.
  */
 function sanitizeCss(css: string): string {
-  // Strip comments to count braces accurately
-  const stripped = css.replace(/\/\*[\s\S]*?\*\//g, "");
   let depth = 0;
-  for (const ch of stripped) {
+  let inComment = false;
+  let inSingle = false;
+  let inDouble = false;
+
+  for (let i = 0; i < css.length; i++) {
+    const ch = css[i];
+    const next = css[i + 1];
+    const prev = css[i - 1];
+
+    if (!inSingle && !inDouble && !inComment && ch === "/" && next === "*") {
+      inComment = true;
+      i++;
+      continue;
+    }
+    if (inComment && ch === "*" && next === "/") {
+      inComment = false;
+      i++;
+      continue;
+    }
+    if (inComment) continue;
+
+    if (!inDouble && ch === "'" && prev !== "\\") {
+      inSingle = !inSingle;
+      continue;
+    }
+    if (!inSingle && ch === '"' && prev !== "\\") {
+      inDouble = !inDouble;
+      continue;
+    }
+    if (inSingle || inDouble) continue;
+
     if (ch === "{") depth++;
-    else if (ch === "}") depth--;
+    else if (ch === "}" && depth > 0) depth--;
   }
+
   if (depth > 0) {
-    // Append missing closing braces
     css += "\n" + "}".repeat(depth) + " /* auto-closed */";
   }
+
   return css;
 }
 
