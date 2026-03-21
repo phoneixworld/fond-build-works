@@ -1514,7 +1514,7 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
         
         // Filter out error messages, frustrated replies, and non-requirement content from chat history
         const ERROR_NOISE = /\b(element type is invalid|unclosed block|unclosed bracket|is not a function|is not defined|something went wrong|syntax error|check the render|you likely forgot|mixed up default|module not found|cannot find module|auto-fix|auto fix|✅ Fixed|⚠️ Found|⚠️ Build)\b/i;
-        const FRUSTRATION_NOISE = /^(stupid|idiot|bloody|damn|hell|wtf|omg|ugh|why|????|\.{3,}|\?{2,}|!{2,})$/i;
+        const FRUSTRATION_NOISE = /^(stupid|idiot|bloody|damn|hell|wtf|omg|ugh|why|\?{2,}|\.{3,}|!{2,})$/i;
         const chatContext = messages
           .filter(m => {
             const text = typeof m.content === "string" ? m.content : "";
