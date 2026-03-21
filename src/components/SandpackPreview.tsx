@@ -33,11 +33,20 @@ class SandpackErrorBoundary extends Component<
   }
 
   componentDidCatch(error: Error) {
-    // Safely log — don't try to modify the error
+    // Safely log and bridge error to self-healing without mutating readonly Error objects
+    let msg = "Preview encountered an error";
     try {
-      console.error("[SandpackErrorBoundary]", error?.message || String(error));
+      msg = error?.message || String(error);
+      console.error("[SandpackErrorBoundary]", msg);
     } catch {
       console.error("[SandpackErrorBoundary] Error caught");
+    }
+
+    try {
+      const errorType = /syntax|unexpected token|already been (?:declared|exported)/i.test(msg) ? "syntax" : "runtime";
+      window.postMessage({ type: "preview-error", errorType, message: msg }, "*");
+    } catch {
+      // swallow message bridge failures
     }
   }
 
@@ -245,7 +254,7 @@ function sanitizeImports(code: string, filePath: string): string {
     const message = String(e?.message || e || "");
 
     // Hard parse failures are unsafe to pass through to Sandpack.
-    const hardSyntaxFailure = /has already been declared|Identifier\s+['"`].+['"`]\s+has already been declared|Unexpected token|Unterminated|Unexpected end of input/i.test(message);
+    const hardSyntaxFailure = /has already been declared|has already been exported|Identifier\s+['"`].+['"`]\s+has already been declared|Unexpected token|Unterminated|Unexpected end of input/i.test(message);
 
     if (!hardSyntaxFailure) {
       // Sucrase can be stricter than Sandpack Babel for some valid patterns.

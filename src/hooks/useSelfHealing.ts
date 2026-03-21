@@ -43,11 +43,13 @@ function categorizeError(error: string): CategorizedError {
     return { type: "export", message: error, identifier: compMatch?.[1] };
   }
 
-  // "Identifier 'X' has already been declared"
-  if (/already\s+been\s+declared/i.test(error)) {
-    const idMatch = error.match(/Identifier\s+'(\w+)'/);
+  // Duplicate symbol export/declaration
+  if (/already\s+been\s+(?:declared|exported)/i.test(error)) {
+    const idMatch =
+      error.match(/Identifier\s+['"`](\w+)['"`]/i)?.[1] ||
+      error.match(/`(\w+)`\s+has\s+already\s+been\s+exported/i)?.[1];
     const fileMatch = error.match(/\/([^\s:]+\.\w+)/);
-    return { type: "syntax", message: error, identifier: idMatch?.[1], file: fileMatch?.[1] };
+    return { type: "syntax", message: error, identifier: idMatch, file: fileMatch?.[1] };
   }
 
   // "X is not defined" or "X is not a function"
@@ -87,7 +89,7 @@ function buildSmartFixPrompt(errors: CategorizedError[], fileContext: string, at
     parts.push("**SYNTAX ERRORS** (fix these first — they block everything else):");
     for (const err of syntaxErrs) {
       parts.push(`- ${err.message}`);
-      if (err.identifier) parts.push(`  → Identifier '${err.identifier}' is declared twice. Remove the duplicate declaration.`);
+      if (err.identifier) parts.push(`  → Identifier '${err.identifier}' is declared/exported twice. Remove the duplicate declaration/export.`);
       if (err.file) parts.push(`  → In file: ${err.file}`);
     }
     parts.push("");
@@ -129,7 +131,7 @@ function buildSmartFixPrompt(errors: CategorizedError[], fileContext: string, at
 
   parts.push("");
   parts.push("Fix ALL errors. Output COMPLETE corrected files. Do not skip any file that needs changes.");
-  parts.push("CRITICAL: Check for duplicate import blocks and duplicate function declarations before outputting.");
+  parts.push("CRITICAL: Check for duplicate import blocks, duplicate function declarations, and duplicate exports before outputting.");
 
   return parts.join("\n");
 }
@@ -143,12 +145,12 @@ export function useSelfHealing(config: SelfHealingConfig) {
   const [healingStatus, setHealingStatus] = useState<string>("");
   const lastHealTimeRef = useRef<number>(0);
 
-  // Listen for preview errors from Sandpack
+  // Listen for preview errors from Sandpack/Vite/iframe bridge
   useEffect(() => {
     const handler = (event: MessageEvent) => {
       if (event.data?.type === "preview-error") {
-        const errorType = event.data.errorType || "unknown";
-        const msg = event.data.message || "Unknown error";
+        const msg = event.data.message || event.data.msg || "Unknown error";
+        const errorType = event.data.errorType || (/syntax|unexpected token|already been (?:declared|exported)/i.test(msg) ? "syntax" : "unknown");
         const enriched = `[${errorType}] ${msg}`;
         setPreviewErrors((prev) => {
           if (prev.includes(enriched)) return prev;
@@ -213,6 +215,13 @@ export function useSelfHealing(config: SelfHealingConfig) {
       setHealingStatus("");
     });
   }, [isHealing, healAttempts, previewErrors, sendMessage, sandpackFilesRef, isSendingRef, isLoadingRef]);
+
+  // Auto-run self-heal when preview errors appear and build is idle
+  useEffect(() => {
+    if (isBuildingValue || isLoading) return;
+    if (previewErrors.length === 0) return;
+    triggerSelfHeal();
+  }, [previewErrors, isBuildingValue, isLoading, triggerSelfHeal]);
 
   const handleAutoFix = useCallback(() => {
     setHealAttempts(0);

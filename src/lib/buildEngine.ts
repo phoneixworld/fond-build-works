@@ -698,7 +698,7 @@ export async function runBuildEngine(
   // "fix this", "update that"), use direct build — planned builds are overkill for fixes.
   const isFixIteration = hasExistingCode && (
     /\b(fix|error|bug|broken|crash|blank|not working|doesn't work|issue|problem)\b/i.test(userPrompt) ||
-    /Something went wrong|SyntaxError|TypeError|ReferenceError|is not a function|has already been declared/i.test(userPrompt)
+    /Something went wrong|SyntaxError|TypeError|ReferenceError|is not a function|has already been declared|has already been exported/i.test(userPrompt)
   );
   
   // A build is complex if it has substantial NEW requirements (not fix iterations)
