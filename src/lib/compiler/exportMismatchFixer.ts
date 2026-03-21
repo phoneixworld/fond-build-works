@@ -54,8 +54,8 @@ export function fixExportMismatches(workspace: Workspace): number {
     totalFixed += passFixed;
     if (passFixed === 0) break;
     
-    // Re-index after fixes
-    workspace.reindex();
+    // Re-index after fixes by accessing index getter (triggers rebuild on dirty)
+    void workspace.index;
   }
 
   return totalFixed;
