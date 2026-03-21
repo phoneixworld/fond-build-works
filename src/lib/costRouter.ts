@@ -39,14 +39,10 @@ export interface CostRouteResult {
   costTier: number;
 }
 
-// Model cost tiers (relative)
+// Anthropic Claude model tiers
 const MODELS = {
-  "google/gemini-2.5-flash-lite": { costTier: 1, maxContext: 32000, label: "Flash Lite" },
-  "google/gemini-3-flash-preview": { costTier: 2, maxContext: 64000, label: "Flash 3" },
-  "google/gemini-2.5-flash": { costTier: 2, maxContext: 64000, label: "Flash 2.5" },
-  "openai/gpt-5-mini": { costTier: 3, maxContext: 64000, label: "GPT-5 Mini" },
-  "google/gemini-2.5-pro": { costTier: 4, maxContext: 128000, label: "Pro" },
-  "openai/gpt-5": { costTier: 5, maxContext: 128000, label: "GPT-5" },
+  "claude-haiku-3-5-20241022": { costTier: 1, maxContext: 200000, label: "Haiku 3.5" },
+  "claude-sonnet-4-20250514": { costTier: 3, maxContext: 200000, label: "Sonnet 4" },
 } as const;
 
 /**
@@ -129,33 +125,20 @@ export function routeCost(input: CostRouteInput): CostRouteResult {
 
   // ── Route based on complexity score ──
   if (input.taskType === "chat") {
-    // Chat never needs expensive models
-    model = "google/gemini-2.5-flash-lite";
-    reason = `Chat task → Flash Lite (cheapest)`;
+    model = "claude-haiku-3-5-20241022";
+    reason = `Chat task → Haiku 3.5 (cheapest)`;
   } else if (input.isRetry) {
-    // Retries: use flash — retries have focused context
-    model = "google/gemini-2.5-flash";
-    reason = `Retry → Flash 2.5 (focused fix)`;
+    model = "claude-sonnet-4-20250514";
+    reason = `Retry → Sonnet 4 (focused fix)`;
   } else if (input.taskType === "schema" || input.taskType === "backend") {
-    // Schema/backend: precision matters but input is small
-    model = "google/gemini-2.5-flash";
-    reason = `${input.taskType} task → Flash 2.5 (precise + affordable)`;
-  } else if (complexity >= 70) {
-    // High complexity: needs strong reasoning
-    model = "google/gemini-2.5-pro";
-    reason = `High complexity (${complexity}/100) → Pro`;
-  } else if (complexity >= 40) {
-    // Medium complexity: Flash 3 is capable enough
-    model = "google/gemini-3-flash-preview";
-    reason = `Medium complexity (${complexity}/100) → Flash 3`;
+    model = "claude-sonnet-4-20250514";
+    reason = `${input.taskType} task → Sonnet 4`;
   } else if (complexity >= 20) {
-    // Low complexity: Flash 2.5 handles well
-    model = "google/gemini-2.5-flash";
-    reason = `Low complexity (${complexity}/100) → Flash 2.5`;
+    model = "claude-sonnet-4-20250514";
+    reason = `Complexity (${complexity}/100) → Sonnet 4`;
   } else {
-    // Trivial: cheapest option
-    model = "google/gemini-2.5-flash-lite";
-    reason = `Trivial (${complexity}/100) → Flash Lite`;
+    model = "claude-haiku-3-5-20241022";
+    reason = `Trivial (${complexity}/100) → Haiku 3.5`;
   }
 
   const modelInfo = MODELS[model as keyof typeof MODELS];

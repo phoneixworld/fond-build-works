@@ -648,28 +648,29 @@ Deno.serve(async (req) => {
         try {
           const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
           if (LOVABLE_API_KEY) {
+            // Use Anthropic for vision extraction (Claude supports vision natively)
+            const ANTHROPIC_API_KEY = Deno.env.get("ANTHROPIC_API_KEY");
+            if (ANTHROPIC_API_KEY) {
             const visionMessages = [
-              {
-                role: "system",
-                content: `You are a requirements extraction engine. Extract ALL text, requirements, features, user stories, UI descriptions, roles, workflows, and technical specifications from the provided image(s). Output ONLY the extracted content as structured text. Preserve all details, numbers, lists, and hierarchies. If there are diagrams, describe them. Do NOT summarize — extract EVERYTHING verbatim where possible.`
-              },
               {
                 role: "user",
                 content: [
                   { type: "text", text: text || "Extract all requirements and specifications from these images:" },
-                  ...imageUrls.map((url: string) => ({ type: "image_url", image_url: { url } })),
+                  ...imageUrls.map((url: string) => ({ type: "image", source: { type: "url", url } })),
                 ],
               },
             ];
 
-            const visionResp = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+            const visionResp = await fetch("https://api.anthropic.com/v1/messages", {
               method: "POST",
               headers: {
-                Authorization: `Bearer ${LOVABLE_API_KEY}`,
+                "x-api-key": ANTHROPIC_API_KEY,
+                "anthropic-version": "2023-06-01",
                 "Content-Type": "application/json",
               },
               body: JSON.stringify({
-                model: "google/gemini-2.5-flash",
+                model: "claude-sonnet-4-20250514",
+                system: `You are a requirements extraction engine. Extract ALL text, requirements, features, user stories, UI descriptions, roles, workflows, and technical specifications from the provided image(s). Output ONLY the extracted content as structured text. Preserve all details, numbers, lists, and hierarchies. If there are diagrams, describe them. Do NOT summarize — extract EVERYTHING verbatim where possible.`,
                 messages: visionMessages,
                 max_tokens: 8000,
               }),
@@ -677,7 +678,7 @@ Deno.serve(async (req) => {
 
             if (visionResp.ok) {
               const visionData = await visionResp.json();
-              const extractedText = visionData.choices?.[0]?.message?.content || "";
+              const extractedText = visionData.content?.[0]?.text || "";
               if (extractedText.length > 10) {
                 console.log(`[conversation-engine] Vision extracted ${extractedText.length} chars from ${imageUrls.length} image(s)`);
                 // Merge extracted text with any user-provided text
@@ -688,6 +689,7 @@ Deno.serve(async (req) => {
             } else {
               console.warn(`[conversation-engine] Vision API failed: ${visionResp.status}`);
             }
+            } // end ANTHROPIC_API_KEY check
           }
         } catch (visionErr) {
           console.error("[conversation-engine] Vision extraction error:", visionErr);
@@ -936,24 +938,22 @@ Deno.serve(async (req) => {
       // Also try AI-powered semantic extraction for richer understanding
       let aiExtractedContext = "";
       try {
-        const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-        if (LOVABLE_API_KEY && allReqs.length > 2) {
+        const ANTHROPIC_API_KEY = Deno.env.get("ANTHROPIC_API_KEY");
+        if (ANTHROPIC_API_KEY && allReqs.length > 2) {
           const allRawText = allReqs.map((r: any) => r.raw_text).join("\n\n");
-          // Only do AI extraction for complex requirements (> 1000 chars)
           if (allRawText.length > 1000) {
-            const extractionResp = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+            const extractionResp = await fetch("https://api.anthropic.com/v1/messages", {
               method: "POST",
               headers: {
-                Authorization: `Bearer ${LOVABLE_API_KEY}`,
+                "x-api-key": ANTHROPIC_API_KEY,
+                "anthropic-version": "2023-06-01",
                 "Content-Type": "application/json",
               },
               body: JSON.stringify({
-                model: "google/gemini-2.5-flash",
+                model: "claude-haiku-3-5-20241022",
+                max_tokens: 4000,
                 temperature: 0.1,
-                messages: [
-                  {
-                    role: "system",
-                    content: `You are a requirements analysis engine. Extract a precise build manifest from the requirements. Output JSON with:
+                system: `You are a requirements analysis engine. Extract a precise build manifest from the requirements. Output JSON with:
 {
   "modules": [{"name": "string", "description": "string", "entities": ["string"], "features": ["string"], "dependsOn": ["string"]}],
   "buildOrder": ["module names in dependency order"],
@@ -961,17 +961,14 @@ Deno.serve(async (req) => {
   "totalFeatures": number,
   "complexity": "simple" | "medium" | "complex" | "enterprise"
 }
-Output ONLY valid JSON. No markdown, no explanation.`
-                  },
-                  { role: "user", content: allRawText.slice(0, 30000) }
-                ],
-                max_tokens: 4000,
+Output ONLY valid JSON. No markdown, no explanation.`,
+                messages: [{ role: "user", content: allRawText.slice(0, 30000) }],
               }),
             });
 
             if (extractionResp.ok) {
               const extractionData = await extractionResp.json();
-              const extracted = extractionData.choices?.[0]?.message?.content?.trim() || "";
+              const extracted = extractionData.content?.[0]?.text?.trim() || "";
               try {
                 const cleaned = extracted.replace(/```json?\s*/g, "").replace(/```/g, "").trim();
                 const manifest = JSON.parse(cleaned);
