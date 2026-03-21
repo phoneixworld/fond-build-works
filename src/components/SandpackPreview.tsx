@@ -818,11 +818,21 @@ function buildSandpackFiles(files: SandpackFileSet | null, projectId: string, su
 
   // Map user files into sandpack paths — guard against null/undefined paths and content
   for (const [path, code] of Object.entries(files)) {
-    if (!path || code == null) {
+    const trimmedPath = typeof path === "string" ? path.trim() : "";
+    if (!trimmedPath || code == null) {
       console.warn(`[SandpackPreview] Skipping invalid file entry: path=${path}`);
       continue;
     }
-    const normalized = path.startsWith("/") ? path : `/${path}`;
+    if (/^(null|undefined)$/i.test(trimmedPath) || /\/(?:null|undefined)$/i.test(trimmedPath)) {
+      console.warn(`[SandpackPreview] Skipping invalid file path token: ${trimmedPath}`);
+      continue;
+    }
+    if (typeof code !== "string") {
+      console.warn(`[SandpackPreview] Skipping non-string file content for path=${trimmedPath}`);
+      continue;
+    }
+
+    const normalized = trimmedPath.startsWith("/") ? trimmedPath : `/${trimmedPath}`;
     const sandpackPath = normalized;
     const isCodeFile = /\.(jsx?|tsx?)$/.test(sandpackPath);
     let processed = isCodeFile ? sanitizeImports(code, sandpackPath) : code;
