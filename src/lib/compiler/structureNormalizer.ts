@@ -399,6 +399,16 @@ function normalizeContextReferences(workspace: Workspace): number {
         const fromApp = allContextNames.find(n => contextMap.get(n)?.match(/\/App\./));
         const replacement = fromApp || allContextNames[0];
         if (replacement) {
+          // Remove obviously invalid imports for unknown context symbols (common bad pattern: default import AppContext)
+          updated = updated.replace(
+            new RegExp(`^\\s*import\\s+${escapeRegex(usedName)}\\s+from\\s+["'][^"']+["'];?\\s*\\n?`, "gm"),
+            ""
+          );
+          updated = updated.replace(
+            new RegExp(`^\\s*import\\s+\\{\\s*${escapeRegex(usedName)}\\s*\\}\\s+from\\s+["'][^"']+["'];?\\s*\\n?`, "gm"),
+            ""
+          );
+
           updated = updated.replace(
             new RegExp(`useContext\\(\\s*${escapeRegex(usedName)}\\s*\\)`, "g"),
             `useContext(${replacement})`
