@@ -1022,6 +1022,7 @@ const SandpackPreview = ({ viewport, showConsole = false, initialPath }: Sandpac
     "react-router-dom": "^6.22.0",
     "clsx": "^2.1.0",
     "tailwind-merge": "^2.2.0",
+    "class-variance-authority": "^0.7.1",
     "react-intersection-observer": "^9.10.0",
     "@tanstack/react-table": "^8.17.0",
     "@supabase/supabase-js": "^2.38.0",

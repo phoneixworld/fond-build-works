@@ -143,6 +143,7 @@ const PublishedApp = () => {
               "lucide-react": "^0.400.0",
               "clsx": "^2.1.0",
               "tailwind-merge": "^2.2.0",
+              "class-variance-authority": "^0.7.1",
               "date-fns": "^3.6.0",
               "recharts": "^2.12.0",
               "react-intersection-observer": "^9.10.0",
