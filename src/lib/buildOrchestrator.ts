@@ -8,17 +8,17 @@ import { generateContextFiles } from "./contextGenerator";
 import { generateLayoutFiles } from "./layoutGenerator";
 import { generateSupabaseEntityFiles } from "./supabaseEntityGenerator";
 import { synthesizeAppFromIR } from "./compiler/appSynthesizer";
+import { generateAuthContext } from "./templates/scaffoldTemplates";
 
 /**
  * Orchestrates the entire build pipeline:
  *
  * 1. IR Planner → IR
  * 2. Generate deterministic scaffolds (pages, layout, contexts, mock API)
- * 3. Generate Supabase adapters (if backend = supabase)
- * 4. Generate App.jsx from IR
- * 5. Return a complete file map for the executor
- *
- * This is the Lovable-level deterministic build pipeline.
+ * 3. Pre-seed hardened AuthContext (router-agnostic, no useNavigate)
+ * 4. Generate Supabase adapters (if backend = supabase)
+ * 5. Generate App.jsx from IR
+ * 6. Return a complete file map for the executor
  */
 export async function orchestrateBuild(options: {
   rawRequirements: string;
@@ -26,14 +26,10 @@ export async function orchestrateBuild(options: {
 }): Promise<Record<string, string>> {
   const { rawRequirements, callLLM } = options;
 
-  // ────────────────────────────────────────────────────────────────
   // 1. PLAN IR
-  // ────────────────────────────────────────────────────────────────
   const ir: IR = await planIRFromRequirements(callLLM, rawRequirements);
 
-  // ────────────────────────────────────────────────────────────────
   // 2. GENERATE FILES FROM IR
-  // ────────────────────────────────────────────────────────────────
   const files: Record<string, string> = {};
 
   // Pages
@@ -42,24 +38,24 @@ export async function orchestrateBuild(options: {
   // Layout
   Object.assign(files, generateLayoutFiles(ir));
 
-  // Contexts
+  // Contexts (entity-level)
   Object.assign(files, generateContextFiles(ir));
 
   // Mock API
   Object.assign(files, generateMockApiFiles(ir));
 
-  // Supabase (optional)
+  // 3. PRE-SEED HARDENED AUTH CONTEXT
+  // Always include the router-agnostic AuthContext template so the LLM
+  // executor never regenerates it with useNavigate.
+  files["/contexts/AuthContext.jsx"] = generateAuthContext();
+
+  // 4. Supabase (optional)
   if (ir.backend?.provider === "supabase") {
     Object.assign(files, generateSupabaseEntityFiles(ir));
   }
 
-  // ────────────────────────────────────────────────────────────────
-  // 3. APP.JSX
-  // ────────────────────────────────────────────────────────────────
+  // 5. APP.JSX
   files["/App.jsx"] = synthesizeAppFromIR(ir);
 
-  // ────────────────────────────────────────────────────────────────
-  // 4. RETURN FILE MAP
-  // ────────────────────────────────────────────────────────────────
   return files;
 }
