@@ -404,8 +404,7 @@ function sanitizeImports(code: string, filePath: string): string {
     if (!hardSyntaxFailure) {
       // Sucrase can be stricter than Sandpack Babel for some valid patterns.
       const hasExport = /export\s/.test(code);
-      const hasReasonableLength = code.trim().length > 50;
-      if (hasExport && hasReasonableLength) {
+      if (hasExport) {
         console.warn(`[SandpackPreview] Sucrase parse warning in ${filePath}, passing through to Sandpack`);
         return code;
       }
