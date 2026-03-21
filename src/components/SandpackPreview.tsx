@@ -912,7 +912,7 @@ function buildSandpackFiles(files: SandpackFileSet | null, projectId: string, su
 
   // Sanitize all CSS files in the workspace to prevent unclosed block errors
   for (const [path, content] of Object.entries(base)) {
-    if (path.endsWith(".css") && path !== "/styles.css") {
+    if (path.endsWith(".css")) {
       base[path] = sanitizeCss(content);
     }
   }
