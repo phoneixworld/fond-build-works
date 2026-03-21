@@ -51,6 +51,194 @@ export function extractIRFromRequirements(raw: string): IRManifest {
   };
 }
 
+// ─── Domain Detection ─────────────────────────────────────────────────────
+
+type DomainType = "hospital" | "school" | "crm" | "ecommerce" | "project_mgmt" | "generic";
+
+function detectDomain(raw: string): DomainType {
+  const text = raw.toLowerCase();
+  const scores: Record<DomainType, number> = {
+    hospital: 0, school: 0, crm: 0, ecommerce: 0, project_mgmt: 0, generic: 0,
+  };
+
+  // Hospital/Healthcare signals
+  const hospitalKeywords = [
+    "hospital", "medical", "patient", "doctor", "nurse", "clinic", "pharmacy",
+    "prescription", "diagnosis", "appointment", "ward", "icu", "opd", "lab",
+    "radiology", "pathology", "healthcare", "health care", "medicore", "telehealth",
+    "insurance claim", "medical staff", "blood bank", "ambulance", "surgery",
+  ];
+  scores.hospital = hospitalKeywords.filter(k => text.includes(k)).length;
+
+  // School/ERP signals
+  const schoolKeywords = [
+    "school", "student", "teacher", "classroom", "grade", "gradebook", "pupil",
+    "parent", "guardian", "syllabus", "homework", "exam", "semester", "school erp",
+    "academic", "enrollment", "curriculum",
+  ];
+  scores.school = schoolKeywords.filter(k => text.includes(k)).length;
+
+  // CRM signals
+  const crmKeywords = ["crm", "lead", "deal", "pipeline", "opportunity", "sales", "prospect", "conversion"];
+  scores.crm = crmKeywords.filter(k => text.includes(k)).length;
+
+  // E-commerce signals
+  const ecomKeywords = ["ecommerce", "e-commerce", "shop", "cart", "checkout", "order", "catalog", "storefront"];
+  scores.ecommerce = ecomKeywords.filter(k => text.includes(k)).length;
+
+  // Project management signals
+  const pmKeywords = ["project management", "task board", "kanban", "sprint", "backlog", "agile", "scrum"];
+  scores.project_mgmt = pmKeywords.filter(k => text.includes(k)).length;
+
+  // Find highest score
+  let best: DomainType = "generic";
+  let bestScore = 0;
+  for (const [domain, score] of Object.entries(scores)) {
+    if (score > bestScore) {
+      bestScore = score;
+      best = domain as DomainType;
+    }
+  }
+
+  return bestScore >= 2 ? best : "generic";
+}
+
+// ─── Domain-Specific Entity Libraries ─────────────────────────────────────
+
+type EntityTemplate = { pattern: RegExp; name: string; fields: Array<{name: string; type: string; required: boolean}> };
+
+const HOSPITAL_ENTITIES: EntityTemplate[] = [
+  { pattern: /\bpatient/i, name: "Patient", fields: [
+    { name: "name", type: "string", required: true }, { name: "age", type: "number", required: true },
+    { name: "gender", type: "string", required: false }, { name: "phone", type: "string", required: false },
+    { name: "blood_group", type: "string", required: false }, { name: "status", type: "string", required: false },
+  ]},
+  { pattern: /\b(doctor|physician|consultant)\b/i, name: "Doctor", fields: [
+    { name: "name", type: "string", required: true }, { name: "specialization", type: "string", required: true },
+    { name: "email", type: "string", required: false }, { name: "department", type: "string", required: false },
+  ]},
+  { pattern: /\b(appointment|consultation)\b/i, name: "Appointment", fields: [
+    { name: "patient_id", type: "string", required: true }, { name: "doctor_id", type: "string", required: true },
+    { name: "date", type: "date", required: true }, { name: "status", type: "string", required: false },
+  ]},
+  { pattern: /\b(prescription|medication|medicine)\b/i, name: "Prescription", fields: [
+    { name: "patient_id", type: "string", required: true }, { name: "doctor_id", type: "string", required: true },
+    { name: "medication", type: "string", required: true }, { name: "dosage", type: "string", required: false },
+  ]},
+  { pattern: /\b(pharmacy|drug|medicine stock)\b/i, name: "Pharmacy", fields: [
+    { name: "name", type: "string", required: true }, { name: "quantity", type: "number", required: true },
+    { name: "price", type: "number", required: false }, { name: "category", type: "string", required: false },
+  ]},
+  { pattern: /\b(billing|invoice|payment)\b/i, name: "Invoice", fields: [
+    { name: "patient_id", type: "string", required: true }, { name: "amount", type: "number", required: true },
+    { name: "status", type: "string", required: true }, { name: "due_date", type: "date", required: false },
+  ]},
+  { pattern: /\b(ward|bed|room)\b/i, name: "Ward", fields: [
+    { name: "name", type: "string", required: true }, { name: "capacity", type: "number", required: true },
+    { name: "occupied", type: "number", required: false }, { name: "type", type: "string", required: false },
+  ]},
+  { pattern: /\b(lab|laboratory|test|pathology|radiology)\b/i, name: "LabTest", fields: [
+    { name: "patient_id", type: "string", required: true }, { name: "test_name", type: "string", required: true },
+    { name: "result", type: "string", required: false }, { name: "status", type: "string", required: false },
+  ]},
+  { pattern: /\b(nurse|nursing)\b/i, name: "Nurse", fields: [
+    { name: "name", type: "string", required: true }, { name: "department", type: "string", required: false },
+    { name: "shift", type: "string", required: false }, { name: "status", type: "string", required: false },
+  ]},
+  { pattern: /\b(staff|employee|roster|shift)\b/i, name: "Staff", fields: [
+    { name: "name", type: "string", required: true }, { name: "role", type: "string", required: true },
+    { name: "department", type: "string", required: false }, { name: "shift", type: "string", required: false },
+  ]},
+  { pattern: /\b(insurance|claim)\b/i, name: "InsuranceClaim", fields: [
+    { name: "patient_id", type: "string", required: true }, { name: "provider", type: "string", required: true },
+    { name: "amount", type: "number", required: true }, { name: "status", type: "string", required: false },
+  ]},
+  { pattern: /\b(blood\s*bank|blood\s*donation|blood)\b/i, name: "BloodBank", fields: [
+    { name: "blood_type", type: "string", required: true }, { name: "units", type: "number", required: true },
+    { name: "donor_name", type: "string", required: false }, { name: "status", type: "string", required: false },
+  ]},
+  { pattern: /\b(attendance|time\s*tracking)\b/i, name: "StaffAttendance", fields: [
+    { name: "staff_id", type: "string", required: true }, { name: "date", type: "date", required: true },
+    { name: "check_in", type: "string", required: false }, { name: "status", type: "string", required: false },
+  ]},
+];
+
+const SCHOOL_ENTITIES: EntityTemplate[] = [
+  { pattern: /\b(student|pupil|learner)s?\b/i, name: "Student", fields: [
+    { name: "name", type: "string", required: true }, { name: "email", type: "string", required: true },
+    { name: "grade", type: "string", required: false }, { name: "status", type: "string", required: false },
+  ]},
+  { pattern: /\b(teacher|instructor|faculty)\b/i, name: "Teacher", fields: [
+    { name: "name", type: "string", required: true }, { name: "email", type: "string", required: true },
+    { name: "subject", type: "string", required: false }, { name: "department", type: "string", required: false },
+  ]},
+  { pattern: /\b(parent|guardian)\b/i, name: "Parent", fields: [
+    { name: "name", type: "string", required: true }, { name: "email", type: "string", required: true },
+    { name: "phone", type: "string", required: false },
+  ]},
+  { pattern: /\b(class|course|subject)\b/i, name: "Class", fields: [
+    { name: "name", type: "string", required: true }, { name: "teacher", type: "string", required: false },
+    { name: "schedule", type: "string", required: false },
+  ]},
+  { pattern: /\b(attendance)\b/i, name: "Attendance", fields: [
+    { name: "student_id", type: "string", required: true }, { name: "date", type: "date", required: true },
+    { name: "status", type: "string", required: true },
+  ]},
+  { pattern: /\b(grade|mark|score|assessment)\b/i, name: "Grade", fields: [
+    { name: "student_id", type: "string", required: true }, { name: "subject", type: "string", required: true },
+    { name: "score", type: "number", required: true },
+  ]},
+  { pattern: /\b(fee|tuition)\b/i, name: "Fee", fields: [
+    { name: "student_id", type: "string", required: true }, { name: "amount", type: "number", required: true },
+    { name: "status", type: "string", required: true }, { name: "due_date", type: "date", required: false },
+  ]},
+];
+
+const GENERIC_ENTITIES: EntityTemplate[] = [
+  { pattern: /\b(contact|lead|customer|client)\b/i, name: "Contact", fields: [
+    { name: "name", type: "string", required: true }, { name: "email", type: "string", required: true },
+    { name: "company", type: "string", required: false }, { name: "status", type: "string", required: false },
+  ]},
+  { pattern: /\b(deal|opportunity|pipeline)\b/i, name: "Deal", fields: [
+    { name: "title", type: "string", required: true }, { name: "value", type: "number", required: true },
+    { name: "stage", type: "string", required: true }, { name: "contact_id", type: "string", required: false },
+  ]},
+  { pattern: /\b(task|ticket|issue)\b/i, name: "Task", fields: [
+    { name: "title", type: "string", required: true }, { name: "description", type: "string", required: false },
+    { name: "status", type: "string", required: true }, { name: "assignee", type: "string", required: false },
+    { name: "priority", type: "string", required: false },
+  ]},
+  { pattern: /\b(project)\b/i, name: "Project", fields: [
+    { name: "name", type: "string", required: true }, { name: "description", type: "string", required: false },
+    { name: "status", type: "string", required: true }, { name: "deadline", type: "date", required: false },
+  ]},
+  { pattern: /\b(product|item|inventory)\b/i, name: "Product", fields: [
+    { name: "name", type: "string", required: true }, { name: "price", type: "number", required: true },
+    { name: "quantity", type: "number", required: true }, { name: "category", type: "string", required: false },
+  ]},
+  { pattern: /\b(order|purchase)\b/i, name: "Order", fields: [
+    { name: "customer", type: "string", required: true }, { name: "total", type: "number", required: true },
+    { name: "status", type: "string", required: true }, { name: "date", type: "date", required: true },
+  ]},
+  { pattern: /\b(employee|worker|team\s*member)\b/i, name: "Employee", fields: [
+    { name: "name", type: "string", required: true }, { name: "email", type: "string", required: true },
+    { name: "role", type: "string", required: false }, { name: "department", type: "string", required: false },
+  ]},
+];
+
+function getEntityLibrary(domain: DomainType): EntityTemplate[] {
+  switch (domain) {
+    case "hospital": return HOSPITAL_ENTITIES;
+    case "school": return SCHOOL_ENTITIES;
+    case "crm": return [...GENERIC_ENTITIES.filter(e => ["Contact", "Deal"].includes(e.name))];
+    case "ecommerce": return [...GENERIC_ENTITIES.filter(e => ["Product", "Order"].includes(e.name))];
+    case "project_mgmt": return [...GENERIC_ENTITIES.filter(e => ["Project", "Task"].includes(e.name))];
+    default: return GENERIC_ENTITIES;
+  }
+}
+
+// ─── Entity Extraction ────────────────────────────────────────────────────
+
 function extractEntities(raw: string): IREntity[] {
   const entities: IREntity[] = [];
   // Match patterns like "- EntityName (field1, field2 [type], ...)"
@@ -75,70 +263,15 @@ function extractEntities(raw: string): IREntity[] {
   }
 
   // ── Semantic entity extraction from natural language ──
-  // If regex found nothing, try to infer entities from domain keywords
+  // If regex found nothing, use domain-specific entity library
   if (entities.length === 0) {
-    const domainEntityPatterns: Array<{ pattern: RegExp; name: string; fields: Array<{name: string; type: string; required: boolean}> }> = [
-      { pattern: /\b(student|pupil|learner)s?\b/i, name: "Student", fields: [
-        { name: "name", type: "string", required: true }, { name: "email", type: "string", required: true },
-        { name: "grade", type: "string", required: false }, { name: "status", type: "string", required: false },
-      ]},
-      { pattern: /\b(teacher|instructor|staff|faculty)\b/i, name: "Teacher", fields: [
-        { name: "name", type: "string", required: true }, { name: "email", type: "string", required: true },
-        { name: "subject", type: "string", required: false }, { name: "department", type: "string", required: false },
-      ]},
-      { pattern: /\b(parent|guardian)\b/i, name: "Parent", fields: [
-        { name: "name", type: "string", required: true }, { name: "email", type: "string", required: true },
-        { name: "phone", type: "string", required: false },
-      ]},
-      { pattern: /\b(class|course|subject)\b/i, name: "Class", fields: [
-        { name: "name", type: "string", required: true }, { name: "teacher", type: "string", required: false },
-        { name: "schedule", type: "string", required: false },
-      ]},
-      { pattern: /\b(attendance)\b/i, name: "Attendance", fields: [
-        { name: "student_id", type: "string", required: true }, { name: "date", type: "date", required: true },
-        { name: "status", type: "string", required: true },
-      ]},
-      { pattern: /\b(grade|mark|score|assessment)\b/i, name: "Grade", fields: [
-        { name: "student_id", type: "string", required: true }, { name: "subject", type: "string", required: true },
-        { name: "score", type: "number", required: true },
-      ]},
-      { pattern: /\b(fee|payment|billing|invoice)\b/i, name: "Fee", fields: [
-        { name: "student_id", type: "string", required: true }, { name: "amount", type: "number", required: true },
-        { name: "status", type: "string", required: true }, { name: "due_date", type: "date", required: false },
-      ]},
-      { pattern: /\b(contact|lead|customer|client)\b/i, name: "Contact", fields: [
-        { name: "name", type: "string", required: true }, { name: "email", type: "string", required: true },
-        { name: "company", type: "string", required: false }, { name: "status", type: "string", required: false },
-      ]},
-      { pattern: /\b(deal|opportunity|pipeline)\b/i, name: "Deal", fields: [
-        { name: "title", type: "string", required: true }, { name: "value", type: "number", required: true },
-        { name: "stage", type: "string", required: true }, { name: "contact_id", type: "string", required: false },
-      ]},
-      { pattern: /\b(task|ticket|issue)\b/i, name: "Task", fields: [
-        { name: "title", type: "string", required: true }, { name: "description", type: "string", required: false },
-        { name: "status", type: "string", required: true }, { name: "assignee", type: "string", required: false },
-        { name: "priority", type: "string", required: false },
-      ]},
-      { pattern: /\b(project)\b/i, name: "Project", fields: [
-        { name: "name", type: "string", required: true }, { name: "description", type: "string", required: false },
-        { name: "status", type: "string", required: true }, { name: "deadline", type: "date", required: false },
-      ]},
-      { pattern: /\b(product|item|inventory)\b/i, name: "Product", fields: [
-        { name: "name", type: "string", required: true }, { name: "price", type: "number", required: true },
-        { name: "quantity", type: "number", required: true }, { name: "category", type: "string", required: false },
-      ]},
-      { pattern: /\b(order|purchase)\b/i, name: "Order", fields: [
-        { name: "customer", type: "string", required: true }, { name: "total", type: "number", required: true },
-        { name: "status", type: "string", required: true }, { name: "date", type: "date", required: true },
-      ]},
-      { pattern: /\b(employee|worker|team\s*member)\b/i, name: "Employee", fields: [
-        { name: "name", type: "string", required: true }, { name: "email", type: "string", required: true },
-        { name: "role", type: "string", required: false }, { name: "department", type: "string", required: false },
-      ]},
-    ];
+    const domain = detectDomain(raw);
+    const library = getEntityLibrary(domain);
+
+    console.log(`[IR] Detected domain: ${domain}, using ${library.length} entity templates`);
 
     const seenNames = new Set<string>();
-    for (const ep of domainEntityPatterns) {
+    for (const ep of library) {
       if (ep.pattern.test(raw) && !seenNames.has(ep.name)) {
         entities.push({ name: ep.name, fields: ep.fields });
         seenNames.add(ep.name);
@@ -183,16 +316,42 @@ function extractRoutes(raw: string): IRRoute[] {
   // ── Semantic route inference from natural language ──
   // If regex found no explicit routes, infer from module/page keywords
   if (routes.length === 0) {
-    const routePatterns: Array<{ pattern: RegExp; path: string; page: string }> = [
+    const domain = detectDomain(raw);
+
+    // Domain-specific route patterns
+    const hospitalRoutes: Array<{ pattern: RegExp; path: string; page: string }> = [
+      { pattern: /\b(dashboard|overview|home)\b/i, path: "/", page: "DashboardPage" },
+      { pattern: /\bpatient/i, path: "/patients", page: "PatientsPage" },
+      { pattern: /\b(appointment|consultation)\b/i, path: "/appointments", page: "AppointmentsPage" },
+      { pattern: /\b(doctor|physician)\b/i, path: "/doctors", page: "DoctorsPage" },
+      { pattern: /\b(staff|employee|roster|shift)\b/i, path: "/staff", page: "StaffPage" },
+      { pattern: /\b(pharmacy|drug|medication)\b/i, path: "/pharmacy", page: "PharmacyPage" },
+      { pattern: /\b(billing|invoice|payment)\b/i, path: "/billing", page: "BillingPage" },
+      { pattern: /\b(lab|laboratory|pathology|radiology)\b/i, path: "/laboratory", page: "LaboratoryPage" },
+      { pattern: /\b(ward|bed|room|admission)\b/i, path: "/wards", page: "WardsPage" },
+      { pattern: /\b(nurse|nursing)\b/i, path: "/nursing", page: "NursingPage" },
+      { pattern: /\b(insurance|claim)\b/i, path: "/insurance", page: "InsurancePage" },
+      { pattern: /\b(blood\s*bank|blood)\b/i, path: "/blood-bank", page: "BloodBankPage" },
+      { pattern: /\breport/i, path: "/reports", page: "ReportsPage" },
+      { pattern: /\bsetting/i, path: "/settings", page: "SettingsPage" },
+    ];
+
+    const schoolRoutes: Array<{ pattern: RegExp; path: string; page: string }> = [
       { pattern: /\b(dashboard|overview|home)\b/i, path: "/", page: "DashboardPage" },
       { pattern: /\bstudent/i, path: "/students", page: "StudentsPage" },
-      { pattern: /\b(teacher|staff|faculty)\b/i, path: "/teachers", page: "TeachersPage" },
+      { pattern: /\b(teacher|instructor|faculty)\b/i, path: "/teachers", page: "TeachersPage" },
       { pattern: /\b(parent|guardian)\b/i, path: "/parents", page: "ParentsPage" },
       { pattern: /\battendance\b/i, path: "/attendance", page: "AttendancePage" },
       { pattern: /\b(grade|gradebook|marks|assessment)\b/i, path: "/grades", page: "GradesPage" },
-      { pattern: /\b(fee|payment|billing)\b/i, path: "/fees", page: "FeesPage" },
+      { pattern: /\b(fee|tuition)\b/i, path: "/fees", page: "FeesPage" },
       { pattern: /\b(timetable|schedule|calendar)\b/i, path: "/timetable", page: "TimetablePage" },
       { pattern: /\b(announcement|notice|notification)\b/i, path: "/announcements", page: "AnnouncementsPage" },
+      { pattern: /\breport/i, path: "/reports", page: "ReportsPage" },
+      { pattern: /\bsetting/i, path: "/settings", page: "SettingsPage" },
+    ];
+
+    const genericRoutes: Array<{ pattern: RegExp; path: string; page: string }> = [
+      { pattern: /\b(dashboard|overview|home)\b/i, path: "/", page: "DashboardPage" },
       { pattern: /\b(contact|lead|customer)\b/i, path: "/contacts", page: "ContactsPage" },
       { pattern: /\b(deal|opportunity|pipeline)\b/i, path: "/deals", page: "DealsPage" },
       { pattern: /\b(task|ticket|issue)\b/i, path: "/tasks", page: "TasksPage" },
@@ -203,6 +362,12 @@ function extractRoutes(raw: string): IRRoute[] {
       { pattern: /\breport/i, path: "/reports", page: "ReportsPage" },
       { pattern: /\bsetting/i, path: "/settings", page: "SettingsPage" },
     ];
+
+    const routePatterns = domain === "hospital" ? hospitalRoutes :
+                          domain === "school" ? schoolRoutes :
+                          genericRoutes;
+
+    console.log(`[IR] Using ${domain} route patterns`);
 
     // Always add dashboard for new apps
     const hasDashboardKeyword = /\b(dashboard|overview|home)\b/i.test(raw);
@@ -275,7 +440,24 @@ export function assembleBuildContext(params: {
   model?: string;
 }): BuildContext {
   const hasExisting = Object.keys(params.existingWorkspace).length > 0;
-  const extractedIR = extractIRFromRequirements(params.rawRequirements);
+  const intent = detectBuildIntent(params.rawRequirements, hasExisting);
+
+  // For fix/extend intents on existing workspaces, DON'T re-extract entities/routes
+  // from raw text — the existing workspace already defines the app structure.
+  // Only extract for new_app or when no IR is provided.
+  const shouldExtractIR = intent === "new_app" || !hasExisting;
+  const extractedIR = shouldExtractIR ? extractIRFromRequirements(params.rawRequirements) : {
+    entities: [] as IREntity[],
+    roles: [] as IRRole[],
+    workflows: [] as any[],
+    routes: [] as IRRoute[],
+    modules: [] as IRModule[],
+    constraints: [] as string[],
+  };
+
+  if (!shouldExtractIR) {
+    console.log(`[IR] Skipping entity extraction for ${intent} intent (existing workspace has ${Object.keys(params.existingWorkspace).length} files)`);
+  }
 
   // Merge provided IR with extracted IR (provided takes precedence)
   const mergedIR: IRManifest = {
@@ -292,7 +474,7 @@ export function assembleBuildContext(params: {
     semanticSummary: params.semanticSummary || "",
     ir: mergedIR,
     existingWorkspace: params.existingWorkspace,
-    buildIntent: detectBuildIntent(params.rawRequirements, hasExisting),
+    buildIntent: intent,
     projectId: params.projectId,
     techStack: params.techStack,
     schemas: params.schemas,
