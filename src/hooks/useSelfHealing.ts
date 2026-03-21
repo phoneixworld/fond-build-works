@@ -220,46 +220,46 @@ export function useSelfHealing(config: SelfHealingConfig) {
     setHealAttempts(attempt);
     setHealingStatus(`Self-healing attempt ${attempt}/${MAX_HEAL_ATTEMPTS}...`);
 
-    // Categorize errors for smarter fix prompts
-    const categorized = previewErrors.slice(0, 8).map(categorizeError);
+    // P1 FIX: Snapshot the errors BEFORE healing so we can verify afterwards
+    const errorSnapshot = [...previewErrors.slice(0, 8)];
+    const categorized = errorSnapshot.map(categorizeError);
 
-    // Extract relevant file context
-    const currentFiles = sandpackFilesRef.current;
-    let fileContext = "";
-    if (currentFiles) {
-      const errorFiles = new Set<string>();
-      
-      // Extract files from categorized errors (includes component inference)
-      for (const err of categorized) {
-        if (err.file) errorFiles.add(err.file.startsWith("/") ? err.file : `/${err.file}`);
-        // Also try component name → file path inference
-        if (err.identifier && !err.file) {
-          const guessedPath = `/components/${err.identifier}.jsx`;
-          if (currentFiles[guessedPath]) errorFiles.add(guessedPath);
-          // Try .tsx variant too
-          const guessedTsx = `/components/${err.identifier}.tsx`;
-          if (currentFiles[guessedTsx]) errorFiles.add(guessedTsx);
+    // Only target files explicitly mentioned in errors — don't let AI wander
+    const errorFiles = new Set<string>();
+    for (const err of categorized) {
+      if (err.file) errorFiles.add(err.file.startsWith("/") ? err.file : `/${err.file}`);
+      if (err.identifier && !err.file) {
+        const currentFiles = sandpackFilesRef.current;
+        if (currentFiles) {
+          for (const ext of [".jsx", ".tsx"]) {
+            const path = `/components/${err.identifier}${ext}`;
+            if (currentFiles[path]) errorFiles.add(path);
+          }
         }
       }
-      
-      // Also extract from raw messages
-      for (const err of previewErrors) {
-        const match = err.match(/\/([\w/.-]+\.\w+)/);
-        if (match) errorFiles.add(`/${match[1]}`);
-        // Extract from "Check the render method of X"
-        const renderMatch = err.match(/Check the render method of [`']?(\w+)/i);
-        if (renderMatch) {
-          const comp = renderMatch[1];
+    }
+    // Extract from raw messages
+    for (const err of errorSnapshot) {
+      const match = err.match(/\/([\w/.-]+\.\w+)/);
+      if (match) errorFiles.add(`/${match[1]}`);
+      const renderMatch = err.match(/Check the render method of [`']?(\w+)/i);
+      if (renderMatch) {
+        const comp = renderMatch[1];
+        const currentFiles = sandpackFilesRef.current;
+        if (currentFiles) {
           for (const ext of [".jsx", ".tsx"]) {
             const path = `/components/${comp}${ext}`;
             if (currentFiles[path]) errorFiles.add(path);
           }
         }
       }
-      
-      // Always include App.jsx
-      errorFiles.add("/App.jsx");
+    }
+    errorFiles.add("/App.jsx");
 
+    // Build file context ONLY from error-referenced files
+    let fileContext = "";
+    const currentFiles = sandpackFilesRef.current;
+    if (currentFiles) {
       for (const filePath of errorFiles) {
         const code = currentFiles[filePath];
         if (code) {
@@ -275,6 +275,18 @@ export function useSelfHealing(config: SelfHealingConfig) {
     Promise.resolve(healSend(healPrompt)).finally(() => {
       setIsHealing(false);
       setHealingStatus("");
+
+      // P1 FIX: Post-heal verification — check if same errors reappear within 5s
+      setTimeout(() => {
+        setPreviewErrors((current) => {
+          const sameErrors = errorSnapshot.filter(e => current.includes(e));
+          if (sameErrors.length > 0 && attempt >= 2) {
+            console.warn(`[SelfHealing] Same errors persist after attempt ${attempt}, stopping auto-heal`);
+            setHealAttempts(MAX_HEAL_ATTEMPTS); // Stop further attempts
+          }
+          return current;
+        });
+      }, 5000);
     });
   }, [isHealing, healAttempts, previewErrors, healSend, sandpackFilesRef, isSendingRef, isLoadingRef]);
 
