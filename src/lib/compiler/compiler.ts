@@ -24,6 +24,7 @@ import { injectMissingProviders } from "./providerInjector";
 import { fixMissingImports, fixProviderOrdering } from "./missingImportFixer";
 import { fixExportMismatches } from "./exportMismatchFixer";
 import { deduplicateFiles } from "./deduplicator";
+import { normalizeGeneratedStructure } from "./structureNormalizer";
 import {
   createTrace, startPass, endPass,
   traceTaskStart, traceTaskEnd, finalizeTrace, printTrace,
