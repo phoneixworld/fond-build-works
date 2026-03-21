@@ -128,6 +128,7 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
   const [isLoading, setIsLoading] = useState(false);
   const [selectedTemplate, setSelectedTemplate] = useState<PageTemplate | null>(null);
   const [compilerTasks, setCompilerTasks] = useState<Array<{ id: string; label: string; status: "pending" | "in_progress" | "done" }>>([]);
+  const planLabelsRef = useRef<string[]>([]);
   const lastVerificationOkRef = useRef<boolean | null>(null);
 
   const messagesRef = useRef<Msg[]>([]);
@@ -999,33 +1000,34 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
           else if (phase === "repairing") setPipelineStep("retrying");
           else if (phase === "complete") setPipelineStep("complete");
         },
+        onPlanReady: (tasks) => {
+          // Store all task labels upfront so pipeline card shows real names
+          planLabelsRef.current = tasks.map(t => t.label);
+          setCompilerTasks(tasks.map((t, i) => ({
+            id: `task-${i}`,
+            label: t.label,
+            status: "pending" as const,
+          })));
+        },
         onTaskStart: (task, index, total) => {
           resetBuildSafetyTimeout();
           setCurrentTaskIndex(index);
           setTotalPlanTasks(total);
           setBuildStep(`🔨 Task ${index + 1}/${total}: ${task.label}`);
 
-          // Update compilerTasks for pipeline card
-          setCompilerTasks(prev => {
-            // On first task, replace planning placeholder with real tasks
-            if (prev.length <= 1 || prev[0]?.id === "planning") {
-              return Array.from({ length: total }, (_, i) => ({
-                id: `task-${i}`,
-                label: i === index ? task.label : `Task ${i + 1}`,
-                status: (i < index ? "done" : i === index ? "in_progress" : "pending") as "done" | "in_progress" | "pending",
-              }));
-            }
-            // Update existing task list
-            return prev.map((t, i) => ({
-              ...t,
-              label: i === index ? task.label : t.label,
-              status: (i < index ? "done" : i === index ? "in_progress" : t.status) as "done" | "in_progress" | "pending",
-            }));
-          });
+          // Update task status in pipeline card
+          setCompilerTasks(prev => prev.map((t, i) => ({
+            ...t,
+            label: i === index ? task.label : t.label,
+            status: (i < index ? "done" : i === index ? "in_progress" : t.status) as "done" | "in_progress" | "pending",
+          })));
 
+          // Build progress message with real labels
+          const labels = planLabelsRef.current;
           const progressMsg = `📋 **Building** (${total} tasks)\n\n${Array.from({ length: total }, (_, i) => {
             const status = i < index ? "✅" : i === index ? "🔨" : "⏳";
-            return `${status} ${i + 1}. Task ${i + 1}`;
+            const label = labels[i] || task.label;
+            return `${status} ${i + 1}. ${label}`;
           }).join("\n")}`;
           setMessages((prev) => {
             const last = prev[prev.length - 1];

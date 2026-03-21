@@ -54,6 +54,7 @@ export interface CompileOptions {
 
 export interface CompileCallbacks {
   onPhase: (phase: string, detail: string) => void;
+  onPlanReady?: (tasks: CompilerTask[]) => void;
   onTaskStart: (task: CompilerTask, index: number, total: number) => void;
   onTaskDelta: (task: CompilerTask, chunk: string) => void;
   onTaskDone: (task: CompilerTask, files: Record<string, string>) => void;
@@ -148,6 +149,10 @@ export async function compile(
 
   cloudLog.info(`Task graph: ${taskGraph.tasks.length} tasks across ${taskGraph.passes.length} passes`, "compiler");
   console.log(`[Compiler] Task graph: ${taskGraph.tasks.length} tasks, ${taskGraph.passes.length} passes`);
+  
+  // Notify UI with all task labels upfront
+  callbacks.onPlanReady?.(taskGraph.tasks);
+  
   for (let i = 0; i < taskGraph.passes.length; i++) {
     const passTaskLabels = taskGraph.passes[i].map(id =>
       taskGraph.tasks.find(t => t.id === id)?.label || id
