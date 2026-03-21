@@ -443,52 +443,32 @@ CRITICAL: Import reusable components — do NOT inline them. Use domain-specific
       tasks.push(dashboardTask);
       pageTaskIds.push(dashboardTask.id);
 
-      const batch1Routes = otherRoutes.slice(0, 3);
-      const batch1Produces = batch1Routes.map(r => `/pages/${r.page.replace(/Page$/, "")}/${r.page}.jsx`);
-      if (batch1Routes.length > 0) {
-        const domainPagesTask1 = createTask({
-          label: "domain:pages-1",
-          type: "frontend",
-          description: `Generate ${batch1Routes.length} domain pages for: "${ctx.rawRequirements.slice(0, 1200)}"
+      // Generate one task per domain page to avoid oversized model outputs and truncation.
+      for (const route of otherRoutes) {
+        const pageDir = route.page.replace(/Page$/, "");
+        const pagePath = `/pages/${pageDir}/${route.page}.jsx`;
 
-Generate these pages:
-${batch1Routes.map(r => `- /pages/${r.page.replace(/Page$/, "")}/${r.page}.jsx (route: ${r.path})`).join("\n")}
+        const domainPageTask = createTask({
+          label: `page:${pageDir}`,
+          type: "frontend",
+          description: `Generate a complete domain page for route ${route.path}: ${route.page}.
+
+Create this file:
+- ${pagePath}
 
 RULES:
-- Each page MUST import from /components/ (StatCard, DataTable, StatusBadge, PageHeader, SearchFilterBar)
-- Each page must have useState with realistic hardcoded data (5-10 rows)
-- Include search, filter, add button, data table, status badges, row actions
-- Each page must have an "Add New" modal using a simple form
-- Pages must export default`,
-          produces: batch1Produces,
+- Import reusable components from /components/ (StatCard, DataTable, StatusBadge, PageHeader, SearchFilterBar) where applicable.
+- Include realistic sample data with useState (5-10 rows) when rendering tables.
+- Add search/filter UI and primary page actions when relevant.
+- Keep the page fully functional with sensible defaults; do NOT leave placeholders.
+- Export default.` ,
+          produces: [pagePath],
           dependsOn: [infraTask.id, authTaskId, layoutTask.id, componentsTask.id],
           priority: 4,
         });
-        tasks.push(domainPagesTask1);
-        pageTaskIds.push(domainPagesTask1.id);
-      }
 
-      const batch2Routes = otherRoutes.slice(3, 6);
-      const batch2Produces = batch2Routes.map(r => `/pages/${r.page.replace(/Page$/, "")}/${r.page}.jsx`);
-      if (batch2Routes.length > 0) {
-        const domainPagesTask2 = createTask({
-          label: "domain:pages-2",
-          type: "frontend",
-          description: `Generate ${batch2Routes.length} MORE domain pages for: "${ctx.rawRequirements.slice(0, 1200)}"
-
-Generate these pages:
-${batch2Routes.map(r => `- /pages/${r.page.replace(/Page$/, "")}/${r.page}.jsx (route: ${r.path})`).join("\n")}
-
-RULES:
-- Import from /components/ (reuse StatCard, DataTable, StatusBadge, PageHeader, SearchFilterBar)
-- Include realistic sample data, search, filters, CRUD actions
-- Each page must be complete and functional — no placeholders`,
-          produces: batch2Produces,
-          dependsOn: [infraTask.id, authTaskId, layoutTask.id, componentsTask.id],
-          priority: 4,
-        });
-        tasks.push(domainPagesTask2);
-        pageTaskIds.push(domainPagesTask2.id);
+        tasks.push(domainPageTask);
+        pageTaskIds.push(domainPageTask.id);
       }
 
       const hasSettings = routes.some(r => r.page === "SettingsPage");
