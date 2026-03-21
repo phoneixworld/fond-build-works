@@ -115,7 +115,9 @@ export function resolveTargetFiles(
     if (/\broute\b|\brouting\b/i.test(lower) && /App\.jsx/i.test(path)) score += 30;
 
     // 5. Content-based matching: search for specific identifiers mentioned
-    const identifiers = extractMentionedIdentifiers(lower);
+    // Use original instruction text (not lowercase) so PascalCase component names
+    // from runtime errors (e.g. "Button") can be detected.
+    const identifiers = extractMentionedIdentifiers(instruction);
     for (const id of identifiers) {
       if (content.includes(id)) score += 15;
     }

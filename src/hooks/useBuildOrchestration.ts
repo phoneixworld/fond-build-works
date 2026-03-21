@@ -1398,6 +1398,17 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
       normalizedText.includes("runtime") ||
       normalizedText.includes("problem")
     );
+    const explicitRebuildRequest = /\b(rebuild|from scratch|start over|regenerate app|new app|new project)\b/i.test(normalizedText);
+
+    // Hard override: generic runtime fix prompts should stay in edit-mode.
+    // This prevents server FSM from incorrectly routing "fix preview error" into full rebuilds.
+    if (looksLikeRuntimeFixRequest && !explicitRebuildRequest) {
+      console.log("[SmartSend] Runtime fix request → edit pipeline");
+      setCurrentAgent("edit");
+      setPipelineStep("resolving");
+      sendEditMessage(finalText, images);
+      return;
+    }
 
     let convResult: { action: string; reason: string } | null = null;
 
