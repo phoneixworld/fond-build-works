@@ -95,6 +95,9 @@ const ALLOWED_PACKAGES = new Set([
 function isAllowedPkg(pkg: string): boolean {
   if (pkg.startsWith(".") || pkg.startsWith("/")) return true;
   const base = pkg.startsWith("@") ? pkg.split("/").slice(0, 2).join("/") : pkg.split("/")[0];
+  // Allow all Radix UI packages used by shadcn-compatible component files
+  // (e.g. @radix-ui/react-popover, @radix-ui/react-tooltip, etc.)
+  if (base.startsWith("@radix-ui/")) return true;
   return ALLOWED_PACKAGES.has(base);
 }
 
