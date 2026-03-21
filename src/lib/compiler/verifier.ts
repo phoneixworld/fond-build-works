@@ -339,10 +339,12 @@ function checkRoutes(workspace: Workspace): {
 
   // Extract route paths from App.jsx
   const routeRegex = /path=["']([^"']+)["']/g;
+  const definedRoutes = new Set<string>();
   let match;
   while ((match = routeRegex.exec(appFile)) !== null) {
     const routePath = match[1];
     if (routePath === "*") continue;
+    definedRoutes.add(routePath);
 
     // Extract component name from element={<ComponentName />}
     const routeArea = appFile.substring(Math.max(0, match.index - 200), match.index + match[0].length + 200);
@@ -373,6 +375,35 @@ function checkRoutes(workspace: Workspace): {
             });
           }
         }
+      }
+    }
+  }
+
+  // ─── Nav-Route Mismatch Check ───────────────────────────────────────
+  // Find sidebar/navbar NavLink paths and verify they have matching Route entries
+  for (const sidebarPath of ["/layout/Sidebar.jsx", "/layout/Sidebar.tsx", "/components/Sidebar.jsx", "/layout/Navigation.jsx"]) {
+    const sidebarContent = workspace.getFile(sidebarPath);
+    if (!sidebarContent) continue;
+
+    const navLinkPaths = new Set<string>();
+    const navLinkRegex = /(?:to|path|href)[:=]\s*["']([^"']+)["']/g;
+    let navMatch;
+    while ((navMatch = navLinkRegex.exec(sidebarContent)) !== null) {
+      const navPath = navMatch[1];
+      if (navPath === "/" || navPath === "*" || navPath.startsWith("http")) continue;
+      navLinkPaths.add(navPath);
+    }
+
+    for (const navPath of navLinkPaths) {
+      if (!definedRoutes.has(navPath)) {
+        missing++;
+        issues.push({
+          category: "missing_route" as const,
+          severity: "error",
+          file: sidebarPath,
+          message: `Navigation link to '${navPath}' in ${sidebarPath} has no matching <Route> in App.jsx — clicking it shows a blank page`,
+          suggestedFix: `Add <Route path="${navPath}" element={<PageComponent />} /> to App.jsx and create the page component`,
+        });
       }
     }
   }

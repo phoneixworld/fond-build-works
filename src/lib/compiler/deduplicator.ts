@@ -161,6 +161,23 @@ function deduplicateContent(content: string): string | null {
   const result = mergeDuplicateImports(content);
   if (result !== content) return result;
 
+  // Strategy 8: Remove conflicting named + default exports of same symbol
+  // e.g., `export { Button };` + `export default Button;` → keep only default
+  const defaultExportMatch = content.match(/export\s+default\s+(?:function\s+)?(\w+)/);
+  if (defaultExportMatch) {
+    const symbol = defaultExportMatch[1];
+    // Check for `export { Symbol }` or `export { Symbol, ... }` that re-exports the same name
+    const namedExportRegex = new RegExp(`^export\\s*\\{[^}]*\\b${symbol}\\b[^}]*\\}\\s*;?\\s*$`, "m");
+    if (namedExportRegex.test(content)) {
+      // Remove the named export line that conflicts
+      const cleaned = content.replace(namedExportRegex, "").replace(/\n{3,}/g, "\n\n");
+      if (cleaned !== content) {
+        console.log(`[Deduplicator] 🔧 Removed conflicting named export of '${symbol}' (kept default export)`);
+        return cleaned;
+      }
+    }
+  }
+
   return null;
 }
 
