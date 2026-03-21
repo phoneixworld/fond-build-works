@@ -496,12 +496,24 @@ FIX CHECKLIST:
     const transformedStream = new ReadableStream({
       async start(controller) {
         let buffer = "";
+        let closed = false;
+        const safeClose = () => {
+          if (!closed) {
+            closed = true;
+            try { controller.close(); } catch { /* already closed */ }
+          }
+        };
+        const safeEnqueue = (chunk: Uint8Array) => {
+          if (!closed) {
+            try { controller.enqueue(chunk); } catch { /* stream closed */ }
+          }
+        };
         try {
-          while (true) {
+          while (!closed) {
             const { done, value } = await reader.read();
             if (done) {
-              controller.enqueue(encoder.encode("data: [DONE]\n\n"));
-              controller.close();
+              safeEnqueue(encoder.encode("data: [DONE]\n\n"));
+              safeClose();
               break;
             }
             
@@ -510,13 +522,9 @@ FIX CHECKLIST:
             buffer = lines.pop() || "";
             
             for (const line of lines) {
+              if (closed) break;
               const trimmed = line.trim();
-              if (!trimmed || trimmed.startsWith(":")) continue;
-              
-              if (trimmed.startsWith("event: ")) {
-                // Anthropic sends event types — we only care about content_block_delta
-                continue;
-              }
+              if (!trimmed || trimmed.startsWith(":") || trimmed.startsWith("event: ")) continue;
               
               if (trimmed.startsWith("data: ")) {
                 const jsonStr = trimmed.slice(6);
@@ -524,20 +532,20 @@ FIX CHECKLIST:
                   const event = JSON.parse(jsonStr);
                   
                   if (event.type === "content_block_delta" && event.delta?.text) {
-                    // Convert to OpenAI-compatible format
                     const openaiChunk = {
                       choices: [{ delta: { content: event.delta.text }, index: 0 }],
                     };
-                    controller.enqueue(encoder.encode(`data: ${JSON.stringify(openaiChunk)}\n\n`));
+                    safeEnqueue(encoder.encode(`data: ${JSON.stringify(openaiChunk)}\n\n`));
                   } else if (event.type === "message_stop") {
-                    controller.enqueue(encoder.encode("data: [DONE]\n\n"));
+                    safeEnqueue(encoder.encode("data: [DONE]\n\n"));
+                    safeClose();
                   } else if (event.type === "error") {
                     console.error("[build-agent] Anthropic stream error:", event.error);
                     const errChunk = { choices: [{ delta: { content: `\n\n[ERROR: ${event.error?.message || "Stream error"}]` }, index: 0 }] };
-                    controller.enqueue(encoder.encode(`data: ${JSON.stringify(errChunk)}\n\n`));
-                    controller.enqueue(encoder.encode("data: [DONE]\n\n"));
+                    safeEnqueue(encoder.encode(`data: ${JSON.stringify(errChunk)}\n\n`));
+                    safeEnqueue(encoder.encode("data: [DONE]\n\n"));
+                    safeClose();
                   }
-                  // Ignore: content_block_start, content_block_stop, message_start, message_delta, ping
                 } catch {
                   // Non-JSON data line, skip
                 }
@@ -546,7 +554,7 @@ FIX CHECKLIST:
           }
         } catch (err) {
           console.error("[build-agent] Stream transform error:", err);
-          controller.error(err);
+          if (!closed) { try { controller.error(err); } catch { /* */ } }
         }
       },
     });
