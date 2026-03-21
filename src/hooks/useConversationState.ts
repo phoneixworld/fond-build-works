@@ -201,6 +201,19 @@ export function useConversationState() {
 
   // ─── ADD PHASE: Server-persisted with optimistic UI ───────────────
   const addPhase = useCallback(async (text: string, hasImages: boolean, irState?: any, imageUrls?: string[]): Promise<RequirementPhase> => {
+    // Guard: reject error messages from being stored as requirement phases
+    const ERROR_MSG_PATTERNS = /\b(element type is invalid|expected a string|unclosed block|unclosed bracket|is not a function|is not defined|cannot read prop|unexpected token|syntax error|render method|check the render|you likely forgot to export|mixed up default and named imports|something went wrong|module not found|cannot find module)\b/i;
+    if (ERROR_MSG_PATTERNS.test(text) && !hasImages) {
+      console.warn("[ConvState] Rejected error message from requirements:", text.slice(0, 80));
+      return {
+        id: -1,
+        summary: "",
+        rawText: "",
+        hasImages: false,
+        timestamp: Date.now(),
+      };
+    }
+
     const localPhase: RequirementPhase = {
       id: phases.length + 1,
       summary: text.slice(0, 200).replace(/\n/g, " "),
