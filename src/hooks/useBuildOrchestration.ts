@@ -1076,7 +1076,7 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
         },
         onTaskError: (task, error) => {
           console.error(`[Compiler] Task '${task.label}' failed:`, error);
-          setCompilerTasks(prev => prev.map(t => t.label === task.label ? { ...t, status: "done" as const } : t));
+          setCompilerTasks(prev => prev.map(t => t.label === task.label ? { ...t, status: "done" as const, label: `❌ ${task.label}` } : t));
         },
         onVerification: (result) => {
           resetBuildSafetyTimeout();
