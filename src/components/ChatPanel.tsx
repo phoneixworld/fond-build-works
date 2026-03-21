@@ -594,6 +594,15 @@ const ChatPanel = forwardRef<ChatPanelHandle, { initialPrompt?: string; onVersio
         onDragLeave={() => setIsDragOver(false)}
         onDrop={handleDrop}
       >
+        {/* Mode indicator */}
+        <ChatModeIndicator
+          currentAgent={currentAgent}
+          isLoading={isLoading}
+          isAnalyzing={isAnalyzing}
+          pipelineStep={pipelineStep}
+          messageCount={messages.length}
+        />
+      >
         {/* Drag overlay */}
         <AnimatePresence>
           {isDragOver && (
