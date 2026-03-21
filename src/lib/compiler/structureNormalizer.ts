@@ -8,6 +8,7 @@ export function normalizeGeneratedStructure(workspace: Workspace): number {
   fixed += normalizeUtilityModules(workspace);
   fixed += normalizeHookDefaultImports(workspace);
   fixed += normalizeToastWiring(workspace);
+  fixed += normalizeContextReferences(workspace);
   return fixed;
 }
 
