@@ -5,22 +5,26 @@ import { useIntentClassification } from "@/hooks/useIntentClassification";
 import { useBuildOrchestration } from "@/hooks/useBuildOrchestration";
 import { useConversationState } from "@/hooks/useConversationState";
 import { Version } from "@/components/VersionHistory";
-import { User, Sparkles, Zap, ArrowDown } from "lucide-react";
+import { Zap, ArrowDown } from "lucide-react";
 import { AI_MODELS, DEFAULT_MODEL, type AIModelId } from "@/lib/aiModels";
-import { generateSmartSuggestions } from "@/lib/smartSuggestions";
 import { useUndoRedo } from "@/hooks/useUndoRedo";
 import { motion, AnimatePresence } from "framer-motion";
 import { usePreview } from "@/contexts/PreviewContext";
 import { useProjects } from "@/contexts/ProjectContext";
 import { useVirtualFS } from "@/contexts/VirtualFSContext";
 import { supabase } from "@/integrations/supabase/client";
-import ChatMessage from "@/components/chat/ChatMessage";
+
+import ChatMessageList from "@/components/chat/ChatMessageList";
 import BuildPipelineCard from "@/components/chat/BuildPipelineCard";
 import BuildCompletionCard from "@/components/chat/BuildCompletionCard";
 import ClarifyingQuestions from "@/components/chat/ClarifyingQuestions";
 import ChatInput from "@/components/chat/ChatInput";
 import ChatWelcomeScreen from "@/components/chat/ChatWelcomeScreen";
 import ChatStatusBanners from "@/components/chat/ChatStatusBanners";
+import ChatModeIndicator from "@/components/chat/ChatModeIndicator";
+import StreamingIndicator from "@/components/chat/StreamingIndicator";
+import ErrorRecoveryBanner from "@/components/chat/ErrorRecoveryBanner";
+import ChatSmartSuggestions from "@/components/chat/ChatSmartSuggestions";
 import {
   type MsgContent,
   getTextContent,
@@ -589,6 +593,14 @@ const ChatPanel = forwardRef<ChatPanelHandle, { initialPrompt?: string; onVersio
         onDragLeave={() => setIsDragOver(false)}
         onDrop={handleDrop}
       >
+        {/* Mode indicator */}
+        <ChatModeIndicator
+          currentAgent={currentAgent}
+          isLoading={isLoading}
+          isAnalyzing={isAnalyzing}
+          pipelineStep={pipelineStep}
+          messageCount={messages.length}
+        />
         {/* Drag overlay */}
         <AnimatePresence>
           {isDragOver && (
@@ -628,68 +640,18 @@ const ChatPanel = forwardRef<ChatPanelHandle, { initialPrompt?: string; onVersio
             </div>
           )}
 
-          <AnimatePresence initial={false}>
-            {messages.map((msg, i) => {
-              const isUser = msg.role === "user";
-              const isEditing = editingIndex === i;
-
-              if (isEditing) {
-                return (
-                  <motion.div
-                    key={i}
-                    initial={{ opacity: 0, y: 8 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    className="flex gap-3"
-                  >
-                    <div className="w-7 h-7 rounded-lg bg-primary/15 ring-1 ring-primary/20 flex items-center justify-center shrink-0 mt-0.5">
-                      <User className="w-3.5 h-3.5 text-primary" />
-                    </div>
-                    <div className="flex-1 min-w-0 space-y-2">
-                      <textarea
-                        value={editText}
-                        onChange={(e) => setEditText(e.target.value)}
-                        className="w-full bg-secondary rounded-xl px-3 py-2 text-[13px] text-foreground outline-none ring-1 ring-primary/30 resize-none leading-[1.7]"
-                        rows={Math.min(editText.split("\n").length + 1, 6)}
-                        autoFocus
-                        onKeyDown={(e) => {
-                          if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSubmitEdit(); }
-                          if (e.key === "Escape") handleCancelEdit();
-                        }}
-                      />
-                      <div className="flex gap-2">
-                        <button
-                          onClick={handleSubmitEdit}
-                          className="px-3 py-1.5 rounded-lg text-[11px] font-semibold bg-primary text-primary-foreground hover:bg-primary/90 transition-colors"
-                        >
-                          Save & Regenerate
-                        </button>
-                        <button
-                          onClick={handleCancelEdit}
-                          className="px-3 py-1.5 rounded-lg text-[11px] font-medium text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors"
-                        >
-                          Cancel
-                        </button>
-                      </div>
-                    </div>
-                  </motion.div>
-                );
-              }
-
-              return (
-                <ChatMessage
-                  key={i}
-                  content={msg.content}
-                  role={msg.role}
-                  timestamp={msg.timestamp}
-                  isLoading={isLoading}
-                  onEdit={isUser ? () => handleEditMessage(i) : undefined}
-                  onRegenerate={!isUser ? () => handleRegenerate(i) : undefined}
-                  showActions={!isLoading}
-                  onSuggestionClick={!isUser ? (text) => handleSmartSend(text) : undefined}
-                />
-              );
-            })}
-          </AnimatePresence>
+          <ChatMessageList
+            messages={messages}
+            isLoading={isLoading}
+            onSmartSend={handleSmartSend}
+            onEditMessage={handleEditMessage}
+            onRegenerate={handleRegenerate}
+            editingIndex={editingIndex}
+            editText={editText}
+            onEditTextChange={setEditText}
+            onSubmitEdit={handleSubmitEdit}
+            onCancelEdit={handleCancelEdit}
+          />
 
           {/* Build Pipeline Progress Card */}
           {(buildStreamContent.length > 0 || currentAgent) && (isLoading || pipelineStep === "complete") && (
@@ -768,41 +730,13 @@ const ChatPanel = forwardRef<ChatPanelHandle, { initialPrompt?: string; onVersio
             )}
           </AnimatePresence>
 
-          {/* Analyzing prompt indicator */}
+          {/* Streaming/analyzing indicator */}
           <AnimatePresence>
-          {isAnalyzing && (
-              <motion.div
-                initial={{ opacity: 0, y: 6 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0 }}
-                className="flex gap-3 items-start"
-              >
-                <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-primary to-accent flex items-center justify-center shrink-0 shadow-md shadow-primary/20">
-                  <Sparkles className="w-3.5 h-3.5 text-primary-foreground" />
-                </div>
-                <div className="flex flex-col gap-1.5 pt-0.5">
-                  <span className="text-xs font-semibold text-foreground/80">Phoneix is thinking...</span>
-                  <div className="flex items-center gap-1.5">
-                    <motion.span
-                      animate={{ scale: [1, 1.3, 1], opacity: [0.4, 1, 0.4] }}
-                      transition={{ duration: 1.2, repeat: Infinity, delay: 0 }}
-                      className="w-1.5 h-1.5 rounded-full bg-primary"
-                    />
-                    <motion.span
-                      animate={{ scale: [1, 1.3, 1], opacity: [0.4, 1, 0.4] }}
-                      transition={{ duration: 1.2, repeat: Infinity, delay: 0.2 }}
-                      className="w-1.5 h-1.5 rounded-full bg-primary"
-                    />
-                    <motion.span
-                      animate={{ scale: [1, 1.3, 1], opacity: [0.4, 1, 0.4] }}
-                      transition={{ duration: 1.2, repeat: Infinity, delay: 0.4 }}
-                      className="w-1.5 h-1.5 rounded-full bg-primary"
-                    />
-                    <span className="text-[10px] text-muted-foreground/60 ml-1">Analyzing your request</span>
-                  </div>
-                </div>
-              </motion.div>
-            )}
+            <StreamingIndicator
+              isStreaming={isAnalyzing || (isLoading && currentAgent === "chat")}
+              streamContent={buildStreamContent}
+              agentLabel="Phoneix"
+            />
           </AnimatePresence>
         </div>
 
@@ -821,11 +755,21 @@ const ChatPanel = forwardRef<ChatPanelHandle, { initialPrompt?: string; onVersio
           )}
         </AnimatePresence>
 
-        {/* Status banners (healing, errors, template chip, attached images) */}
+        {/* Error recovery banner (improved) */}
+        <ErrorRecoveryBanner
+          errors={previewErrors}
+          healAttempts={healAttempts}
+          maxHealAttempts={MAX_HEAL_ATTEMPTS}
+          onAutoFix={handleAutoFix}
+          onResetAndFix={() => { setHealAttempts(0); handleAutoFix(); }}
+          isLoading={isLoading}
+        />
+
+        {/* Status banners (healing, template chip, attached images) */}
         <ChatStatusBanners
           isHealing={isHealing}
           healingStatus={healingStatus}
-          previewErrors={previewErrors}
+          previewErrors={[]}
           isLoading={isLoading}
           healAttempts={healAttempts}
           maxHealAttempts={MAX_HEAL_ATTEMPTS}
@@ -838,31 +782,14 @@ const ChatPanel = forwardRef<ChatPanelHandle, { initialPrompt?: string; onVersio
         />
 
         {/* Smart context-aware suggestions */}
-        {!isLoading && followUpQuestions.length === 0 && !input && (
-          <div className="px-3 pt-2 pb-1">
-            <div className="flex flex-wrap gap-1.5">
-              {(() => {
-                const codeForAnalysis = currentPreviewHtml ||
-                  (currentSandpackFiles ? Object.values(currentSandpackFiles).join("\n") : "");
-                const chatMsgs = messages.map(m => ({
-                  role: m.role,
-                  content: typeof m.content === "string" ? m.content : ""
-                }));
-                const suggestions = generateSmartSuggestions(codeForAnalysis, chatMsgs, 4);
-                return suggestions.map((s) => (
-                  <button
-                    key={s.label}
-                    onClick={() => handleSmartSend(s.prompt)}
-                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-medium border border-border/60 text-muted-foreground hover:text-foreground hover:border-primary/30 hover:bg-primary/5 transition-all group"
-                  >
-                    <span className="text-xs group-hover:scale-110 transition-transform">{s.icon}</span>
-                    {s.label}
-                  </button>
-                ));
-              })()}
-            </div>
-          </div>
-        )}
+        <ChatSmartSuggestions
+          codeForAnalysis={currentPreviewHtml || (currentSandpackFiles ? Object.values(currentSandpackFiles).join("\n") : "")}
+          messages={messages.map(m => ({ role: m.role, content: typeof m.content === "string" ? m.content : "" }))}
+          onSend={handleSmartSend}
+          isLoading={isLoading}
+          hasFollowUp={followUpQuestions.length > 0}
+          hasInput={!!input}
+        />
 
         <ChatInput
           input={input}
