@@ -306,6 +306,37 @@ export async function executeTask(
   return extracted && Object.keys(extracted).length > 0 ? extracted : {};
 }
 
+// ─── Path Sanitizer ───────────────────────────────────────────────────────
+
+/**
+ * Sanitizes AI-generated file paths:
+ * - Removes spaces from directory and file names
+ * - PascalCases multi-word segments (e.g., "Project View" → "ProjectView")
+ * - Preserves extensions
+ */
+function sanitizeFilePath(rawPath: string): string {
+  const parts = rawPath.split("/").filter(Boolean);
+  const sanitized = parts.map((segment, i) => {
+    // Preserve extension on last segment
+    const extMatch = segment.match(/^(.+)(\.\w+)$/);
+    const name = extMatch ? extMatch[1] : segment;
+    const ext = extMatch ? extMatch[2] : "";
+
+    // If segment has spaces or special chars, PascalCase it
+    if (/[^a-zA-Z0-9._-]/.test(name) || /\s/.test(name)) {
+      const pascal = name
+        .replace(/[^a-zA-Z0-9]+/g, " ")
+        .split(" ")
+        .filter(Boolean)
+        .map(w => w.charAt(0).toUpperCase() + w.slice(1))
+        .join("");
+      return pascal + ext;
+    }
+    return segment;
+  });
+  return "/" + sanitized.join("/");
+}
+
 // ─── Output Parser ────────────────────────────────────────────────────────
 
 function extractFilesFromOutput(text: string): Record<string, string> | null {
@@ -313,7 +344,7 @@ function extractFilesFromOutput(text: string): Record<string, string> | null {
   const headerRegex = /^-{3}\s+(.+?)\s*$/;
 
   const parseHeader = (header: string): { type: "deps" | "file"; path?: string } | null => {
-    const cleaned = header.replace(/\s*-{0,3}\s*$/, "").trim();
+    const cleaned = header.replace(/\s*-{0,3}\s*$/, "").replace(/\s*\(truncated\)\s*$/i, "").trim();
 
     if (/^\/?dependencies\b/i.test(cleaned)) {
       return { type: "deps" };
@@ -326,6 +357,9 @@ function extractFilesFromOutput(text: string): Record<string, string> | null {
     path = path.replace(/^src\//i, "");
     if (!path.startsWith("/")) path = `/${path}`;
     path = path.replace(/^\/src\//, "/");
+
+    // Sanitize: remove spaces from path segments and PascalCase filenames
+    path = sanitizeFilePath(path);
 
     return { type: "file", path };
   };
