@@ -186,7 +186,7 @@ serve(async (req) => {
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "claude-haiku-3-5-20241022",
+        model: "claude-3-5-haiku-20241022",
         system: anthropicSystem,
         messages: anthropicMessages,
         stream: true,
