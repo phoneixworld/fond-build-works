@@ -105,6 +105,9 @@ When CURRENT CODE is provided below:
 - **CRITICAL — COMPLETE FILES ONLY**: Every file you output MUST be syntactically complete with all braces/brackets closed, all functions finished, and a default export. NEVER output a file that ends mid-function or mid-JSX. If you are running out of space, output FEWER files but make each one 100% complete rather than outputting many truncated files.
 - **AuthContext rules**: AuthContext MUST NOT use useNavigate or any react-router-dom hooks. It must work OUTSIDE a Router. Use window.__PROJECT_ID__, window.__SUPABASE_URL__, window.__SUPABASE_KEY__ globals. Handle failed "me" calls gracefully (clear token, set user to null, set loading to false). NEVER throw from AuthContext.
 - **Toast component**: Build a simple self-contained Toast using useState + useEffect + createContext. Do NOT use window events, CustomEvent, or dispatchEvent. Keep it simple: ToastProvider wraps the app, useToast() returns { addToast }, ToastContainer renders the toasts.
+- **cn utility — CRITICAL**: If you create /lib/utils.js or /components/ui/utils.js with a \`cn\` helper, it MUST be a classname merger function, NOT a React component. Correct: \`export function cn(...inputs) { return inputs.filter(Boolean).join(" "); }\`. NEVER make cn return JSX or render a <div>.
+- **Export rules — CRITICAL**: NEVER use both \`export { X }\` AND \`export default X\` for the same symbol. Pick ONE: either \`export default X\` (preferred for components) or \`export { X }\`. Using both causes "already exported" runtime errors.
+- **Nav-Route consistency — CRITICAL**: Every path listed in Sidebar/Navigation NavLink items MUST have a matching \`<Route path="..." />\` in App.jsx. Do NOT add sidebar items for pages that don't exist yet. If the sidebar has 9 items, App.jsx must have 9 corresponding routes with real page components.
 
 ## REQUIREMENTS TRANSLATION
 1. Extract EVERY noun/feature → each = at least 1 component file
