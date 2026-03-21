@@ -12,6 +12,10 @@ import { DESIGN_THEMES, type AIModelId } from "@/lib/aiModels";
 import { supabase } from "@/integrations/supabase/client";
 import { type MsgContent, getTextContent, parseReactFiles } from "@/lib/codeParser";
 import type { PageTemplate } from "@/lib/pageTemplates";
+import { Workspace } from "@/lib/compiler/workspace";
+import { fixMissingImports } from "@/lib/compiler/missingImportFixer";
+import { fixExportMismatches } from "@/lib/compiler/exportMismatchFixer";
+import { normalizeGeneratedStructure } from "@/lib/compiler/structureNormalizer";
 
 type Msg = { role: "user" | "assistant"; content: MsgContent; timestamp?: number };
 
