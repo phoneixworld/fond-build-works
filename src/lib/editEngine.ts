@@ -369,7 +369,7 @@ export async function executeEdit(
   }
 
   // 4. Parse modified files from response
-  const parseResult = parseEditOutput(fullText);
+  const parseResult = parseEditOutput(fullText, targetFiles);
 
   if (!parseResult || Object.keys(parseResult.files).length === 0) {
     callbacks.onError("Could not parse the edit result. The AI may have returned an unexpected format.");
@@ -378,8 +378,8 @@ export async function executeEdit(
 
   // 5. Extract explanation (any text before the code fence)
   const fenceStart = fullText.indexOf("```");
-  const explanation = fenceStart > 0 
-    ? fullText.slice(0, fenceStart).trim() 
+  const explanation = fenceStart > 0
+    ? fullText.slice(0, fenceStart).trim()
     : "Files updated successfully.";
 
   callbacks.onComplete({
@@ -394,42 +394,73 @@ export async function executeEdit(
 
 /**
  * Parse the AI's edit response to extract modified files.
- * Expects the same --- separator format used by the build agent.
+ * Tolerates fenced and unfenced output, with or without --- separators.
  */
-function parseEditOutput(text: string): { files: Record<string, string>; deps: Record<string, string> } | null {
+function parseEditOutput(
+  text: string,
+  targetFiles: string[] = []
+): { files: Record<string, string>; deps: Record<string, string> } | null {
   const files: Record<string, string> = {};
   const deps: Record<string, string> = {};
   const separatorRegex = /^-{3}\s+(\/?\w[\w/.-]*\.(?:jsx?|tsx?|css))\s*-{0,3}\s*$/;
-  const depsSeparatorRegex = /^-{3}\s+\/?dependencies\s*-{0,3}\s*$/;
+  const depsSeparatorRegex = /^-{3}\s+\/?dependencies\s*-{0,3}\s*$/i;
 
-  // Find code fence
-  const fencePatterns = ["```jsx", "```react", "```react-preview", "```jsx-preview", "```javascript"];
+  const normalizePath = (path: string) => {
+    let normalized = path.startsWith("/") ? path : `/${path}`;
+    normalized = normalized.replace(/^\/src\//, "/");
+    return normalized;
+  };
+
+  const getCodeStartIndex = (raw: string): number => {
+    const lines = raw.split("\n");
+    let offset = 0;
+    for (const line of lines) {
+      const trimmed = line.trim();
+      const looksLikeCode =
+        /^(import|export|const|let|var|function|class)\b/.test(trimmed) ||
+        /^<[A-Za-z]/.test(trimmed);
+      if (looksLikeCode) return offset;
+      offset += line.length + 1;
+    }
+    return -1;
+  };
+
+  let block = text;
+
+  // 1) Prefer fenced code if present
+  const fencePatterns = ["```react-preview", "```jsx-preview", "```tsx", "```typescript", "```jsx", "```react", "```javascript"];
   let fenceStart = -1;
   for (const pattern of fencePatterns) {
     fenceStart = text.indexOf(pattern);
     if (fenceStart !== -1) break;
   }
-  if (fenceStart === -1) return null;
 
-  const codeStart = text.indexOf("\n", fenceStart) + 1;
-  
-  // Find closing fence
-  let fenceEnd = -1;
-  let searchFrom = codeStart;
-  while (searchFrom < text.length) {
-    const candidate = text.indexOf("\n```", searchFrom);
-    if (candidate === -1) break;
-    const afterFence = candidate + 4;
-    if (afterFence >= text.length || /[\s\n\r]/.test(text[afterFence])) {
-      fenceEnd = candidate;
-      break;
+  if (fenceStart !== -1) {
+    const codeStart = text.indexOf("\n", fenceStart) + 1;
+    let fenceEnd = -1;
+    let searchFrom = codeStart;
+    while (searchFrom < text.length) {
+      const candidate = text.indexOf("\n```", searchFrom);
+      if (candidate === -1) break;
+      const afterFence = candidate + 4;
+      if (afterFence >= text.length || /[\s\n\r]/.test(text[afterFence])) {
+        fenceEnd = candidate;
+        break;
+      }
+      searchFrom = candidate + 4;
     }
-    searchFrom = candidate + 4;
+    block = fenceEnd === -1 ? text.slice(codeStart) : text.slice(codeStart, fenceEnd);
+  } else {
+    // 2) No fence: if separators exist, parse from first separator; otherwise from first likely code line
+    const firstSeparator = text.search(/^-{3}\s+/m);
+    if (firstSeparator >= 0) {
+      block = text.slice(firstSeparator);
+    } else {
+      const codeStart = getCodeStartIndex(text);
+      if (codeStart >= 0) block = text.slice(codeStart);
+    }
   }
 
-  const block = fenceEnd === -1 ? text.slice(codeStart) : text.slice(codeStart, fenceEnd);
-
-  // Parse file sections
   const lines = block.split("\n");
   let currentFile: string | null = null;
   let currentLines: string[] = [];
@@ -440,13 +471,18 @@ function parseEditOutput(text: string): { files: Record<string, string>; deps: R
     if (currentFile) {
       const code = currentLines.join("\n").trim();
       if (code.length > 0) {
-        let fname = currentFile.startsWith("/") ? currentFile : `/${currentFile}`;
-        fname = fname.replace(/^\/src\//, "/");
-        files[fname] = code;
+        files[normalizePath(currentFile)] = code;
       }
     }
     if (inDeps) {
-      try { Object.assign(deps, JSON.parse(depsLines.join("\n").trim())); } catch {}
+      try {
+        Object.assign(deps, JSON.parse(depsLines.join("\n").trim()));
+      } catch {
+        for (const line of depsLines) {
+          const dep = line.match(/["']([^"']+)["']\s*:\s*["']([^"']+)["']/);
+          if (dep) deps[dep[1]] = dep[2];
+        }
+      }
       inDeps = false;
       depsLines = [];
     }
@@ -457,7 +493,6 @@ function parseEditOutput(text: string): { files: Record<string, string>; deps: R
   for (const line of lines) {
     const trimmed = line.trim();
 
-    // Check for dependencies boundary FIRST (before file separator)
     if (depsSeparatorRegex.test(trimmed)) {
       flush();
       inDeps = true;
@@ -479,14 +514,25 @@ function parseEditOutput(text: string): { files: Record<string, string>; deps: R
   }
   flush();
 
-  // If no separators found but there's code, it's probably a single file edit
-  if (Object.keys(files).length === 0 && block.trim().length > 20) {
-    return null;
+  // 3) Fallback: no --- separators, treat as single-file update to first target file
+  if (Object.keys(files).length === 0) {
+    const fallbackCode = block
+      .replace(/^\s*```[a-z-]*\s*/i, "")
+      .replace(/\n```\s*$/i, "")
+      .trim();
+
+    const looksLikeCode =
+      /(?:^|\n)\s*(?:import|export|const|let|var|function|class)\b/.test(fallbackCode) ||
+      /<[A-Za-z][^>]*>/.test(fallbackCode);
+
+    if (looksLikeCode && fallbackCode.length > 20) {
+      const fallbackTarget = targetFiles[0] || "/App.jsx";
+      files[normalizePath(fallbackTarget)] = fallbackCode;
+    }
   }
 
   return Object.keys(files).length > 0 ? { files, deps } : null;
 }
-
 // ─── Intent Detection ────────────────────────────────────────────────────────
 
 /**
