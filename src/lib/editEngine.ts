@@ -65,6 +65,18 @@ export function resolveTargetFiles(
   const files = Object.keys(workspace);
   const scored: Array<{ path: string; score: number }> = [];
 
+  // 0. If user explicitly references file paths, honor those first.
+  const explicitPaths = extractExplicitFilePaths(instruction, files);
+  if (explicitPaths.length > 0) return explicitPaths;
+
+  // 0.5. Generic "fix preview/runtime error" requests should target likely-broken files,
+  // not arbitrary page files. This avoids expensive, low-signal edit prompts.
+  const genericRuntimeFix = isGenericRuntimeFixInstruction(lower);
+  if (genericRuntimeFix) {
+    const likelyBroken = detectLikelyBrokenFiles(workspace);
+    if (likelyBroken.length > 0) return likelyBroken.slice(0, 3);
+  }
+
   for (const path of files) {
     let score = 0;
     const fileName = path.split("/").pop()?.replace(/\.\w+$/, "") || "";
@@ -128,6 +140,11 @@ export function resolveTargetFiles(
 
   // Return top matches (usually 1-3 files)
   if (scored.length === 0) {
+    if (genericRuntimeFix) {
+      const appEntry = files.find(f => /\/App\.(jsx?|tsx?)$/i.test(f));
+      const uiFiles = files.filter(f => /\/components\/ui\/.+\.(jsx?|tsx?)$/i.test(f)).slice(0, 2);
+      return [appEntry, ...uiFiles].filter(Boolean) as string[];
+    }
     // Fallback: if user mentions "all pages" or generic edit, target main pages
     return files.filter(f => /\/pages\//.test(f)).slice(0, 3);
   }
@@ -139,6 +156,72 @@ export function resolveTargetFiles(
 
   // Cap at 5 files max for a single edit
   return results.slice(0, 5);
+}
+
+function isGenericRuntimeFixInstruction(lowerInstruction: string): boolean {
+  return /\b(fix|resolve|repair)\b/.test(lowerInstruction)
+    && /\b(error|preview|runtime|crash|broken|issue|same error|something went wrong)\b/.test(lowerInstruction)
+    && !/\/[\w/.-]+\.(?:jsx?|tsx?|css)/i.test(lowerInstruction);
+}
+
+function extractExplicitFilePaths(instruction: string, files: string[]): string[] {
+  const matches = instruction.match(/\/[\w/.-]+\.(?:jsx?|tsx?|css)/g) || [];
+  if (matches.length === 0) return [];
+
+  const normalizedWorkspace = new Map<string, string>();
+  for (const f of files) {
+    normalizedWorkspace.set(f, f);
+    normalizedWorkspace.set(f.replace(/^\//, ""), f);
+    normalizedWorkspace.set(f.replace(/^\/(?:src\/)?/, ""), f);
+  }
+
+  const picked = new Set<string>();
+  for (const m of matches) {
+    const normalized = m.startsWith("/") ? m : `/${m}`;
+    const hit = normalizedWorkspace.get(normalized)
+      || normalizedWorkspace.get(normalized.replace(/^\//, ""))
+      || normalizedWorkspace.get(normalized.replace(/^\/(?:src\/)?/, ""));
+    if (hit) picked.add(hit);
+  }
+
+  return [...picked].slice(0, 5);
+}
+
+function detectLikelyBrokenFiles(workspace: Record<string, string>): string[] {
+  const scored: Array<{ path: string; score: number }> = [];
+
+  for (const [path, code] of Object.entries(workspace)) {
+    if (!/\.(jsx?|tsx?)$/i.test(path)) continue;
+
+    let score = 0;
+    const base = path.split("/").pop()?.replace(/\.[^.]+$/, "") || "";
+
+    // Duplicate export shape: export { X }; export default X;
+    if (/export\s*\{\s*([A-Za-z_$][\w$]*)\s*\}\s*;?[\s\S]*export\s+default\s+\1\b/m.test(code)) {
+      score += 120;
+    }
+    if (/export\s+default\s+([A-Za-z_$][\w$]*)\s*;?[\s\S]*export\s*\{\s*\1\s*\}\s*;/m.test(code)) {
+      score += 120;
+    }
+
+    // Self import (e.g. /lib/utils.js imports ./utils)
+    if (base && new RegExp(`from\\s+['\"](?:\\./|(?:\\.\\./)+)[^'\"]*${base}(?:\\.[jt]sx?)?['\"]`).test(code)) {
+      score += 90;
+    }
+
+    // Known bad cn utility shape (component instead of className function)
+    if (/\/lib\/utils\.(jsx?|tsx?)$/i.test(path) && /export\s+const\s+cn\s*=\s*\(\s*\{\s*children\b/.test(code)) {
+      score += 100;
+    }
+
+    // UI files are high impact for preview crashes when malformed
+    if (/\/components\/ui\//i.test(path)) score += 10;
+
+    if (score > 0) scored.push({ path, score });
+  }
+
+  scored.sort((a, b) => b.score - a.score);
+  return scored.map(s => s.path);
 }
 
 /** Extract meaningful keywords from a file path and its content */
