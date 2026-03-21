@@ -316,16 +316,42 @@ function extractRoutes(raw: string): IRRoute[] {
   // ── Semantic route inference from natural language ──
   // If regex found no explicit routes, infer from module/page keywords
   if (routes.length === 0) {
-    const routePatterns: Array<{ pattern: RegExp; path: string; page: string }> = [
+    const domain = detectDomain(raw);
+
+    // Domain-specific route patterns
+    const hospitalRoutes: Array<{ pattern: RegExp; path: string; page: string }> = [
+      { pattern: /\b(dashboard|overview|home)\b/i, path: "/", page: "DashboardPage" },
+      { pattern: /\bpatient/i, path: "/patients", page: "PatientsPage" },
+      { pattern: /\b(appointment|consultation)\b/i, path: "/appointments", page: "AppointmentsPage" },
+      { pattern: /\b(doctor|physician)\b/i, path: "/doctors", page: "DoctorsPage" },
+      { pattern: /\b(staff|employee|roster|shift)\b/i, path: "/staff", page: "StaffPage" },
+      { pattern: /\b(pharmacy|drug|medication)\b/i, path: "/pharmacy", page: "PharmacyPage" },
+      { pattern: /\b(billing|invoice|payment)\b/i, path: "/billing", page: "BillingPage" },
+      { pattern: /\b(lab|laboratory|pathology|radiology)\b/i, path: "/laboratory", page: "LaboratoryPage" },
+      { pattern: /\b(ward|bed|room|admission)\b/i, path: "/wards", page: "WardsPage" },
+      { pattern: /\b(nurse|nursing)\b/i, path: "/nursing", page: "NursingPage" },
+      { pattern: /\b(insurance|claim)\b/i, path: "/insurance", page: "InsurancePage" },
+      { pattern: /\b(blood\s*bank|blood)\b/i, path: "/blood-bank", page: "BloodBankPage" },
+      { pattern: /\breport/i, path: "/reports", page: "ReportsPage" },
+      { pattern: /\bsetting/i, path: "/settings", page: "SettingsPage" },
+    ];
+
+    const schoolRoutes: Array<{ pattern: RegExp; path: string; page: string }> = [
       { pattern: /\b(dashboard|overview|home)\b/i, path: "/", page: "DashboardPage" },
       { pattern: /\bstudent/i, path: "/students", page: "StudentsPage" },
-      { pattern: /\b(teacher|staff|faculty)\b/i, path: "/teachers", page: "TeachersPage" },
+      { pattern: /\b(teacher|instructor|faculty)\b/i, path: "/teachers", page: "TeachersPage" },
       { pattern: /\b(parent|guardian)\b/i, path: "/parents", page: "ParentsPage" },
       { pattern: /\battendance\b/i, path: "/attendance", page: "AttendancePage" },
       { pattern: /\b(grade|gradebook|marks|assessment)\b/i, path: "/grades", page: "GradesPage" },
-      { pattern: /\b(fee|payment|billing)\b/i, path: "/fees", page: "FeesPage" },
+      { pattern: /\b(fee|tuition)\b/i, path: "/fees", page: "FeesPage" },
       { pattern: /\b(timetable|schedule|calendar)\b/i, path: "/timetable", page: "TimetablePage" },
       { pattern: /\b(announcement|notice|notification)\b/i, path: "/announcements", page: "AnnouncementsPage" },
+      { pattern: /\breport/i, path: "/reports", page: "ReportsPage" },
+      { pattern: /\bsetting/i, path: "/settings", page: "SettingsPage" },
+    ];
+
+    const genericRoutes: Array<{ pattern: RegExp; path: string; page: string }> = [
+      { pattern: /\b(dashboard|overview|home)\b/i, path: "/", page: "DashboardPage" },
       { pattern: /\b(contact|lead|customer)\b/i, path: "/contacts", page: "ContactsPage" },
       { pattern: /\b(deal|opportunity|pipeline)\b/i, path: "/deals", page: "DealsPage" },
       { pattern: /\b(task|ticket|issue)\b/i, path: "/tasks", page: "TasksPage" },
@@ -336,6 +362,12 @@ function extractRoutes(raw: string): IRRoute[] {
       { pattern: /\breport/i, path: "/reports", page: "ReportsPage" },
       { pattern: /\bsetting/i, path: "/settings", page: "SettingsPage" },
     ];
+
+    const routePatterns = domain === "hospital" ? hospitalRoutes :
+                          domain === "school" ? schoolRoutes :
+                          genericRoutes;
+
+    console.log(`[IR] Using ${domain} route patterns`);
 
     // Always add dashboard for new apps
     const hasDashboardKeyword = /\b(dashboard|overview|home)\b/i.test(raw);
