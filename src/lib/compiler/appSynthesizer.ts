@@ -23,7 +23,7 @@ export function synthesizeAppJsx(workspace: Workspace, routes?: any[]): string {
 
     imports.push(`import ${pageName} from ".${importPath}";`);
 
-    const routePath = routes.find((r) => r.page === pageName)?.path || "/";
+    const routePath = routes?.find((r: any) => r.page === pageName)?.path || "/";
     routeElements.push(`        <Route path="${routePath}" element={<${pageName} />} />`);
   }
 
