@@ -446,6 +446,31 @@ export async function compile(
 
   trace.repairRounds = repairRound;
 
+  // ── Phase 5.5: Post-Build Agents (invisible) ──────────────────────
+  // Testing Agent runs smoke tests; Governance Agent validates safety.
+
+  let orchestratorResult: OrchestratorResult | null = null;
+  try {
+    orchestratorResult = runPostBuildAgents(
+      pipelineCtx,
+      workspace.toRecord(),
+      agentCallbacks
+    );
+
+    // Apply governance auto-fixes back to workspace
+    if (orchestratorResult.workspace) {
+      for (const [path, content] of Object.entries(orchestratorResult.workspace)) {
+        if (workspace.hasFile(path) && workspace.getFile(path) !== content) {
+          workspace.updateFile(path, content);
+        }
+      }
+    }
+
+    cloudLog.info(`[Orchestrator] Post-build: ${orchestratorResult.summary}`, "compiler");
+  } catch (err: any) {
+    console.warn("[Compiler] Post-build agents failed (non-fatal):", err.message);
+  }
+
   // ── Phase 6: Completion ────────────────────────────────────────────
 
   callbacks.onPhase("complete", "Build complete.");
