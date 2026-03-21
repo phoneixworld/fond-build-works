@@ -352,7 +352,7 @@ FIX CHECKLIST:
         "google/gemini-2.5-pro": "claude-sonnet-4-20250514",
         "google/gemini-3-flash-preview": "claude-sonnet-4-20250514",
         "google/gemini-2.5-flash": "claude-sonnet-4-20250514",
-        "google/gemini-2.5-flash-lite": "claude-haiku-3-5-20241022",
+        "google/gemini-2.5-flash-lite": "claude-3-5-haiku-20241022",
         "openai/gpt-5": "claude-sonnet-4-20250514",
         "openai/gpt-5-mini": "claude-sonnet-4-20250514",
       };
@@ -374,7 +374,7 @@ FIX CHECKLIST:
       selectedModel = "claude-sonnet-4-20250514";
       routeReason = `Low complexity (${complexity}/100) → Sonnet 4`;
     } else {
-      selectedModel = "claude-haiku-3-5-20241022";
+      selectedModel = "claude-3-5-haiku-20241022";
       routeReason = `Trivial (${complexity}/100) → Haiku 3.5`;
     }
     
