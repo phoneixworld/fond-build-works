@@ -490,7 +490,9 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
 
       const isFirstMessage = messagesRef.current.filter(m => m.role === "user").length <= 1;
       const hasPersistedHistory = (currentProject.chat_history ?? []).length > 0;
-      const shouldIncludeCurrentCode = !isFirstMessage || hasPersistedHistory;
+      // Build agent should NOT use Sandpack as source of truth.
+      // Only include current code if explicitly editing.
+      const shouldIncludeCurrentCode = false;
 
       let currentCodeSummary = "";
       const safeSandpackFiles = sandpackFilesRef.current;
