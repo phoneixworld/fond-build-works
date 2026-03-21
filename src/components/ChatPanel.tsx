@@ -731,41 +731,13 @@ const ChatPanel = forwardRef<ChatPanelHandle, { initialPrompt?: string; onVersio
             )}
           </AnimatePresence>
 
-          {/* Analyzing prompt indicator */}
+          {/* Streaming/analyzing indicator */}
           <AnimatePresence>
-          {isAnalyzing && (
-              <motion.div
-                initial={{ opacity: 0, y: 6 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0 }}
-                className="flex gap-3 items-start"
-              >
-                <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-primary to-accent flex items-center justify-center shrink-0 shadow-md shadow-primary/20">
-                  <Sparkles className="w-3.5 h-3.5 text-primary-foreground" />
-                </div>
-                <div className="flex flex-col gap-1.5 pt-0.5">
-                  <span className="text-xs font-semibold text-foreground/80">Phoneix is thinking...</span>
-                  <div className="flex items-center gap-1.5">
-                    <motion.span
-                      animate={{ scale: [1, 1.3, 1], opacity: [0.4, 1, 0.4] }}
-                      transition={{ duration: 1.2, repeat: Infinity, delay: 0 }}
-                      className="w-1.5 h-1.5 rounded-full bg-primary"
-                    />
-                    <motion.span
-                      animate={{ scale: [1, 1.3, 1], opacity: [0.4, 1, 0.4] }}
-                      transition={{ duration: 1.2, repeat: Infinity, delay: 0.2 }}
-                      className="w-1.5 h-1.5 rounded-full bg-primary"
-                    />
-                    <motion.span
-                      animate={{ scale: [1, 1.3, 1], opacity: [0.4, 1, 0.4] }}
-                      transition={{ duration: 1.2, repeat: Infinity, delay: 0.4 }}
-                      className="w-1.5 h-1.5 rounded-full bg-primary"
-                    />
-                    <span className="text-[10px] text-muted-foreground/60 ml-1">Analyzing your request</span>
-                  </div>
-                </div>
-              </motion.div>
-            )}
+            <StreamingIndicator
+              isStreaming={isAnalyzing || (isLoading && currentAgent === "chat")}
+              streamContent={buildStreamContent}
+              agentLabel="Phoneix"
+            />
           </AnimatePresence>
         </div>
 
