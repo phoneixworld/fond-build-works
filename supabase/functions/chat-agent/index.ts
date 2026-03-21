@@ -152,8 +152,8 @@ serve(async (req) => {
 
   try {
     const { messages, project_id, tech_stack, knowledge, workspace_files, recent_errors } = await req.json();
-    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-    if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY is not configured");
+    const ANTHROPIC_API_KEY = Deno.env.get("ANTHROPIC_API_KEY");
+    if (!ANTHROPIC_API_KEY) throw new Error("ANTHROPIC_API_KEY is not configured");
 
     const systemPrompt = buildChatSystemPrompt(
       project_id || "unknown",
@@ -163,18 +163,32 @@ serve(async (req) => {
       recent_errors,
     );
 
-    const systemMessage = { role: "system", content: systemPrompt };
-    const prunedMessages = pruneConversationContext([systemMessage, ...messages]);
+    const prunedMessages = pruneConversationContext([{ role: "system", content: systemPrompt }, ...messages]);
+    
+    // Separate system from messages for Anthropic
+    const anthropicMessages = prunedMessages
+      .filter((m: any) => m.role !== "system")
+      .map((m: any) => ({
+        role: m.role === "assistant" ? "assistant" : "user",
+        content: typeof m.content === "string" ? m.content : JSON.stringify(m.content),
+      }));
+    
+    const anthropicSystem = prunedMessages
+      .filter((m: any) => m.role === "system")
+      .map((m: any) => m.content)
+      .join("\n\n");
 
-    const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+    const response = await fetch("https://api.anthropic.com/v1/messages", {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${LOVABLE_API_KEY}`,
+        "x-api-key": ANTHROPIC_API_KEY,
+        "anthropic-version": "2023-06-01",
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "google/gemini-2.5-flash",
-        messages: prunedMessages,
+        model: "claude-haiku-3-5-20241022",
+        system: anthropicSystem,
+        messages: anthropicMessages,
         stream: true,
         temperature: 0.6,
         max_tokens: 2000,
@@ -187,19 +201,52 @@ serve(async (req) => {
           status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
-      if (response.status === 402) {
-        return new Response(JSON.stringify({ error: "Usage limit reached." }), {
-          status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
       const t = await response.text();
       console.error("chat-agent error:", response.status, t);
-      return new Response(JSON.stringify({ error: "AI error" }), {
-        status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      return new Response(JSON.stringify({ error: `Anthropic error: ${t.slice(0, 200)}` }), {
+        status: response.status, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    return new Response(response.body, {
+    // Transform Anthropic SSE → OpenAI-compatible SSE
+    const reader = response.body!.getReader();
+    const encoder = new TextEncoder();
+    const decoder = new TextDecoder();
+
+    const transformedStream = new ReadableStream({
+      async start(controller) {
+        let buffer = "";
+        try {
+          while (true) {
+            const { done, value } = await reader.read();
+            if (done) {
+              controller.enqueue(encoder.encode("data: [DONE]\n\n"));
+              controller.close();
+              break;
+            }
+            buffer += decoder.decode(value, { stream: true });
+            const lines = buffer.split("\n");
+            buffer = lines.pop() || "";
+            for (const line of lines) {
+              const trimmed = line.trim();
+              if (!trimmed || trimmed.startsWith(":") || trimmed.startsWith("event: ")) continue;
+              if (trimmed.startsWith("data: ")) {
+                try {
+                  const event = JSON.parse(trimmed.slice(6));
+                  if (event.type === "content_block_delta" && event.delta?.text) {
+                    controller.enqueue(encoder.encode(`data: ${JSON.stringify({ choices: [{ delta: { content: event.delta.text }, index: 0 }] })}\n\n`));
+                  } else if (event.type === "message_stop") {
+                    controller.enqueue(encoder.encode("data: [DONE]\n\n"));
+                  }
+                } catch {}
+              }
+            }
+          }
+        } catch (err) { controller.error(err); }
+      },
+    });
+
+    return new Response(transformedStream, {
       headers: { ...corsHeaders, "Content-Type": "text/event-stream" },
     });
   } catch (e) {
