@@ -15,12 +15,17 @@ import { useProjects } from "@/contexts/ProjectContext";
 import { useVirtualFS } from "@/contexts/VirtualFSContext";
 import { supabase } from "@/integrations/supabase/client";
 import ChatMessage from "@/components/chat/ChatMessage";
+import ChatMessageList from "@/components/chat/ChatMessageList";
 import BuildPipelineCard from "@/components/chat/BuildPipelineCard";
 import BuildCompletionCard from "@/components/chat/BuildCompletionCard";
 import ClarifyingQuestions from "@/components/chat/ClarifyingQuestions";
 import ChatInput from "@/components/chat/ChatInput";
 import ChatWelcomeScreen from "@/components/chat/ChatWelcomeScreen";
 import ChatStatusBanners from "@/components/chat/ChatStatusBanners";
+import ChatModeIndicator from "@/components/chat/ChatModeIndicator";
+import StreamingIndicator from "@/components/chat/StreamingIndicator";
+import ErrorRecoveryBanner from "@/components/chat/ErrorRecoveryBanner";
+import ChatSmartSuggestions from "@/components/chat/ChatSmartSuggestions";
 import {
   type MsgContent,
   getTextContent,
