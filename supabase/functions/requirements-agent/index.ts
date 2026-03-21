@@ -52,26 +52,26 @@ Analyze the user's prompt and generate a complete domain model with:
 - Think about what pages the app needs
 ${existingSchemas?.length ? `\n## EXISTING SCHEMAS (don't duplicate):\n${JSON.stringify(existingSchemas)}` : ""}`;
 
-    const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+    const response = await fetch("https://api.anthropic.com/v1/messages", {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${LOVABLE_API_KEY}`,
+        "x-api-key": ANTHROPIC_API_KEY,
+        "anthropic-version": "2023-06-01",
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "google/gemini-2.5-pro",
+        model: "claude-sonnet-4-20250514",
+        max_tokens: 4096,
         temperature: 0.2,
+        system: systemPrompt,
         messages: [
-          { role: "system", content: systemPrompt },
           { role: "user", content: prompt },
         ],
         tools: [
           {
-            type: "function",
-            function: {
-              name: "create_domain_model",
-              description: "Create a structured domain model for the application",
-              parameters: {
+            name: "create_domain_model",
+            description: "Create a structured domain model for the application",
+            input_schema: {
                 type: "object",
                 properties: {
                   templateName: { type: "string", description: "Name of the application type" },
@@ -155,12 +155,10 @@ ${existingSchemas?.length ? `\n## EXISTING SCHEMAS (don't duplicate):\n${JSON.st
                   },
                 },
                 required: ["templateName", "requiresAuth", "entities", "apiEndpoints", "suggestedPages", "suggestedNavItems"],
-                additionalProperties: false,
-              },
             },
           },
         ],
-        tool_choice: { type: "function", function: { name: "create_domain_model" } },
+        tool_choice: { type: "tool", name: "create_domain_model" },
       }),
     });
 
@@ -176,11 +174,10 @@ ${existingSchemas?.length ? `\n## EXISTING SCHEMAS (don't duplicate):\n${JSON.st
     }
 
     const data = await response.json();
-    const toolCall = data.choices?.[0]?.message?.tool_calls?.[0];
+    const toolUseBlock = data.content?.find((b: any) => b.type === "tool_use" && b.name === "create_domain_model");
 
-    if (toolCall?.function?.arguments) {
-      const domainModel = JSON.parse(toolCall.function.arguments);
-      // Add templateId based on whether we had a pre-matched template
+    if (toolUseBlock?.input) {
+      const domainModel = toolUseBlock.input;
       domainModel.templateId = matchedTemplate?.templateId || "custom";
       return new Response(JSON.stringify(domainModel), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
