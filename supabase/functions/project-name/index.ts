@@ -45,7 +45,7 @@ Rules:
     }
 
     const data = await response.json();
-    const content = data.choices?.[0]?.message?.content?.trim() || "";
+    const content = data.content?.[0]?.text?.trim() || "";
     
     try {
       // Try to parse the AI response as JSON

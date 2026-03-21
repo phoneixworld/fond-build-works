@@ -174,11 +174,10 @@ ${existingSchemas?.length ? `\n## EXISTING SCHEMAS (don't duplicate):\n${JSON.st
     }
 
     const data = await response.json();
-    const toolCall = data.choices?.[0]?.message?.tool_calls?.[0];
+    const toolUseBlock = data.content?.find((b: any) => b.type === "tool_use" && b.name === "create_domain_model");
 
-    if (toolCall?.function?.arguments) {
-      const domainModel = JSON.parse(toolCall.function.arguments);
-      // Add templateId based on whether we had a pre-matched template
+    if (toolUseBlock?.input) {
+      const domainModel = toolUseBlock.input;
       domainModel.templateId = matchedTemplate?.templateId || "custom";
       return new Response(JSON.stringify(domainModel), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
