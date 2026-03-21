@@ -8,6 +8,7 @@ export function normalizeGeneratedStructure(workspace: Workspace): number {
   fixed += normalizeUtilityModules(workspace);
   fixed += normalizeHookDefaultImports(workspace);
   fixed += normalizeToastWiring(workspace);
+  fixed += normalizeContextReferences(workspace);
   return fixed;
 }
 
@@ -318,4 +319,111 @@ function toImportSpecifier(fromFile: string, toFile: string): string {
 
 function escapeRegex(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+/**
+ * Detect useContext(X) calls where X is not imported/defined in the file,
+ * then attempt to resolve to an actual context exported elsewhere in the workspace.
+ */
+function normalizeContextReferences(workspace: Workspace): number {
+  let fixed = 0;
+
+  // 1. Build a map of all exported contexts: contextName -> filePath
+  const contextMap = new Map<string, string>();
+  for (const filePath of workspace.listFiles()) {
+    if (!CODE_FILE_RE.test(filePath)) continue;
+    const content = workspace.getFile(filePath) || "";
+    // Match: export const FooContext = React.createContext / createContext
+    const exportedContexts = content.matchAll(
+      /export\s+(?:const|let|var)\s+(\w+Context)\s*=\s*(?:React\.)?createContext/g
+    );
+    for (const m of exportedContexts) {
+      contextMap.set(m[1], filePath);
+    }
+    // Also match non-exported contexts in App files (commonly exported implicitly)
+    if (/\/App\.(jsx?|tsx?)$/.test(filePath)) {
+      const appContexts = content.matchAll(
+        /(?:const|let|var)\s+(\w+Context)\s*=\s*(?:React\.)?createContext/g
+      );
+      for (const m of appContexts) {
+        if (!contextMap.has(m[1])) {
+          contextMap.set(m[1], filePath);
+        }
+      }
+    }
+  }
+
+  if (contextMap.size === 0) return 0;
+
+  // 2. Scan files for useContext(X) where X ends with "Context" but is not imported/defined
+  for (const filePath of workspace.listFiles()) {
+    if (!CODE_FILE_RE.test(filePath)) continue;
+    const content = workspace.getFile(filePath) || "";
+    const contextUsages = [...content.matchAll(/useContext\(\s*(\w+Context)\s*\)/g)];
+    if (contextUsages.length === 0) continue;
+
+    let updated = content;
+    for (const usage of contextUsages) {
+      const usedName = usage[1];
+      // Check if it's already imported or locally defined
+      const isImported = new RegExp(
+        `import\\s+.*\\b${usedName}\\b.*from\\s+["']`
+      ).test(updated);
+      const isLocallyDefined = new RegExp(
+        `(?:const|let|var)\\s+${usedName}\\s*=`
+      ).test(updated);
+
+      if (isImported || isLocallyDefined) continue;
+
+      // Try to find the actual context in the workspace
+      if (contextMap.has(usedName)) {
+        // Context exists but isn't imported – add the import
+        const contextFile = contextMap.get(usedName)!;
+        const importSpec = toImportSpecifier(filePath, contextFile);
+        const importLine = `import { ${usedName} } from "${importSpec}";\n`;
+        // Add import after the last existing import or at top
+        const lastImportIdx = updated.lastIndexOf("\nimport ");
+        if (lastImportIdx >= 0) {
+          const endOfLine = updated.indexOf("\n", lastImportIdx + 1);
+          updated = updated.slice(0, endOfLine + 1) + importLine + updated.slice(endOfLine + 1);
+        } else {
+          updated = importLine + updated;
+        }
+        console.log(`[StructureNormalizer] Added missing import for ${usedName} in ${filePath}`);
+      } else {
+        // Context doesn't exist anywhere – find closest match
+        const allContextNames = [...contextMap.keys()];
+        // Try simple heuristic: if file uses AppContext but workspace has CartContext from App, use that
+        const fromApp = allContextNames.find(n => contextMap.get(n)?.match(/\/App\./));
+        const replacement = fromApp || allContextNames[0];
+        if (replacement) {
+          updated = updated.replace(
+            new RegExp(`useContext\\(\\s*${escapeRegex(usedName)}\\s*\\)`, "g"),
+            `useContext(${replacement})`
+          );
+          // Ensure import exists
+          if (!new RegExp(`import\\s+.*\\b${replacement}\\b.*from\\s+["']`).test(updated)) {
+            const contextFile = contextMap.get(replacement)!;
+            const importSpec = toImportSpecifier(filePath, contextFile);
+            const importLine = `import { ${replacement} } from "${importSpec}";\n`;
+            const lastImportIdx = updated.lastIndexOf("\nimport ");
+            if (lastImportIdx >= 0) {
+              const endOfLine = updated.indexOf("\n", lastImportIdx + 1);
+              updated = updated.slice(0, endOfLine + 1) + importLine + updated.slice(endOfLine + 1);
+            } else {
+              updated = importLine + updated;
+            }
+          }
+          console.log(`[StructureNormalizer] Replaced undefined ${usedName} with ${replacement} in ${filePath}`);
+        }
+      }
+    }
+
+    if (updated !== content) {
+      workspace.updateFile(filePath, updated);
+      fixed++;
+    }
+  }
+
+  return fixed;
 }
