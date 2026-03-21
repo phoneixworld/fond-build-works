@@ -165,6 +165,20 @@ function detectSchemasFromIR(ctx: PipelineContext): DetectedSchema[] {
   }));
 }
 
+/**
+ * Denylist of words that should NEVER become database tables.
+ * These commonly appear in error messages, status reports, and diagnostic text.
+ */
+const ENTITY_DENYLIST = new Set([
+  // Diagnostic noise
+  "blank", "missing", "these", "error", "stack", "route", "warning",
+  "broken", "crash", "issue", "fix", "bug", "fail", "failed", "undefined",
+  "null", "invalid", "unknown", "empty", "stub", "placeholder", "todo",
+  // Generic non-entity words
+  "complete", "comprehensive", "build", "check", "done", "step", "next",
+  "more", "implement", "state", "dynamic", "basic", "dedicated", "go",
+]);
+
 function inferSchemasFromText(text: string): DetectedSchema[] {
   const schemas: DetectedSchema[] = [];
   const entityPatterns = [
@@ -186,13 +200,15 @@ function inferSchemasFromText(text: string): DetectedSchema[] {
     let match;
     while ((match = pattern.exec(text)) !== null) {
       const entity = match[1].toLowerCase().replace(/s$/, "");
-      if (!skipWords.has(entity) && entity.length > 2) {
+      if (!skipWords.has(entity) && !ENTITY_DENYLIST.has(entity) && entity.length > 2) {
         detected.add(entity);
       }
     }
   }
 
   for (const entity of detected) {
+    // Final guard: reject if entity name is in the denylist
+    if (ENTITY_DENYLIST.has(entity)) continue;
     schemas.push({
       collection: entity,
       fields: inferFieldsForEntity(entity),

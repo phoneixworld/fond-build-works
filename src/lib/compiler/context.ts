@@ -431,6 +431,117 @@ function inferModules(entities: IREntity[], routes: IRRoute[]): IRModule[] {
   return modules;
 }
 
+// ─── Domain Preset Routes ─────────────────────────────────────────────────
+
+/**
+ * Return canonical routes for a detected domain, regardless of keyword matches.
+ * A "School LMS" should ALWAYS get students, courses, etc. even if the prompt
+ * only says "Build a comprehensive School LMS system".
+ */
+function getDomainPresetRoutes(domain: DomainType): Array<{ path: string; page: string }> {
+  switch (domain) {
+    case "school":
+      return [
+        { path: "/", page: "DashboardPage" },
+        { path: "/courses", page: "CoursesPage" },
+        { path: "/students", page: "StudentsPage" },
+        { path: "/teachers", page: "TeachersPage" },
+        { path: "/schedule", page: "SchedulePage" },
+        { path: "/attendance", page: "AttendancePage" },
+        { path: "/grades", page: "GradesPage" },
+        { path: "/settings", page: "SettingsPage" },
+      ];
+    case "hospital":
+      return [
+        { path: "/", page: "DashboardPage" },
+        { path: "/patients", page: "PatientsPage" },
+        { path: "/doctors", page: "DoctorsPage" },
+        { path: "/appointments", page: "AppointmentsPage" },
+        { path: "/pharmacy", page: "PharmacyPage" },
+        { path: "/billing", page: "BillingPage" },
+        { path: "/settings", page: "SettingsPage" },
+      ];
+    case "crm":
+      return [
+        { path: "/", page: "DashboardPage" },
+        { path: "/contacts", page: "ContactsPage" },
+        { path: "/deals", page: "DealsPage" },
+        { path: "/reports", page: "ReportsPage" },
+        { path: "/settings", page: "SettingsPage" },
+      ];
+    case "ecommerce":
+      return [
+        { path: "/", page: "DashboardPage" },
+        { path: "/products", page: "ProductsPage" },
+        { path: "/orders", page: "OrdersPage" },
+        { path: "/customers", page: "CustomersPage" },
+        { path: "/settings", page: "SettingsPage" },
+      ];
+    case "project_mgmt":
+      return [
+        { path: "/", page: "DashboardPage" },
+        { path: "/projects", page: "ProjectsPage" },
+        { path: "/tasks", page: "TasksPage" },
+        { path: "/team", page: "TeamPage" },
+        { path: "/settings", page: "SettingsPage" },
+      ];
+    default:
+      return [];
+  }
+}
+
+// ─── Diagnostic Text Filtering ────────────────────────────────────────────
+
+/**
+ * Strip system diagnostic text (error reports, status messages, build logs)
+ * from raw requirements before IR extraction to prevent pollution.
+ */
+function sanitizeRequirementsText(raw: string): string {
+  const lines = raw.split("\n");
+  const filtered = lines.filter(line => {
+    const l = line.trim();
+    // Skip lines that are clearly error/diagnostic output
+    if (/^❌\s/.test(l)) return false;
+    if (/^⚠️\s/.test(l)) return false;
+    if (/^✅\s/.test(l)) return false;
+    if (/^\*\*(?:Known issues|Verification|Runtime|Next steps|Errors?)\*\*:/i.test(l)) return false;
+    if (/^-\s+\/\w+.*?:.*?(?:error|warning|missing|broken|blank|crash)/i.test(l)) return false;
+    if (/\b(?:Element type is invalid|SyntaxError|TypeError|ReferenceError|Cannot read propert)/i.test(l)) return false;
+    if (/\b(?:auto-repair ran|errors? remain|governance:|build partial)/i.test(l)) return false;
+    if (/Navigation link to .* has no matching.*Route/i.test(l)) return false;
+    if (/exported both as named export and default export/i.test(l)) return false;
+    return true;
+  });
+  return filtered.join("\n").trim();
+}
+
+// ─── Workspace-based IR Seeding ───────────────────────────────────────────
+
+/**
+ * For extend/fix intents, seed IR routes from existing workspace files.
+ * Scans /pages/ for *Page.(jsx|tsx) and maps to routes.
+ */
+function seedIRFromWorkspace(workspace: Record<string, string>): { routes: IRRoute[]; entities: IREntity[] } {
+  const routes: IRRoute[] = [];
+  const seenPages = new Set<string>();
+
+  for (const filePath of Object.keys(workspace)) {
+    const pageMatch = filePath.match(/\/pages\/(?:(\w+)\/)?(\w+Page)\.(jsx?|tsx?)$/);
+    if (!pageMatch) continue;
+    const pageName = pageMatch[2];
+    if (seenPages.has(pageName)) continue;
+    seenPages.add(pageName);
+
+    const normalized = pageName.replace(/Page$/, "").toLowerCase();
+    const isAuth = /^(login|signup|signin|register|auth|forgot|reset)$/i.test(normalized);
+    const path = normalized === "dashboard" || normalized === "index" ? "/" : `/${normalized}`;
+
+    routes.push({ path, page: pageName, auth: !isAuth });
+  }
+
+  return { routes, entities: [] };
+}
+
 // ─── Context Assembly ─────────────────────────────────────────────────────
 
 export function assembleBuildContext(params: {
@@ -448,35 +559,42 @@ export function assembleBuildContext(params: {
   const hasExisting = Object.keys(params.existingWorkspace).length > 0;
   const intent = detectBuildIntent(params.rawRequirements, hasExisting);
 
-  // For fix/extend intents on existing workspaces, DON'T re-extract entities/routes
-  // from raw text — the existing workspace already defines the app structure.
-  // Only extract for new_app or when no IR is provided.
-  const shouldExtractIR = intent === "new_app" || !hasExisting;
-  const extractedIR = shouldExtractIR ? extractIRFromRequirements(params.rawRequirements) : {
-    entities: [] as IREntity[],
-    roles: [] as IRRole[],
-    workflows: [] as any[],
-    routes: [] as IRRoute[],
-    modules: [] as IRModule[],
-    constraints: [] as string[],
-  };
+  // Sanitize raw requirements to strip diagnostic/error text
+  const sanitizedRequirements = sanitizeRequirementsText(params.rawRequirements);
 
-  if (!shouldExtractIR) {
-    console.log(`[IR] Skipping entity extraction for ${intent} intent (existing workspace has ${Object.keys(params.existingWorkspace).length} files)`);
+  // ALWAYS extract IR — for extend/fix, merge with workspace-seeded IR
+  const extractedIR = extractIRFromRequirements(sanitizedRequirements);
+
+  // For extend/fix, also seed IR from existing workspace files
+  let workspaceIR: { routes: IRRoute[]; entities: IREntity[] } = { routes: [], entities: [] };
+  if (hasExisting && intent !== "new_app") {
+    workspaceIR = seedIRFromWorkspace(params.existingWorkspace);
+    console.log(`[IR] Seeded ${workspaceIR.routes.length} routes from existing workspace for ${intent} intent`);
   }
 
-  // Merge provided IR with extracted IR (provided takes precedence)
+  // Merge: provided IR > workspace-seeded IR > extracted IR
   const mergedIR: IRManifest = {
-    entities: params.ir?.entities?.length ? params.ir.entities : extractedIR.entities,
+    entities: params.ir?.entities?.length ? params.ir.entities :
+              workspaceIR.entities.length ? workspaceIR.entities :
+              extractedIR.entities,
     roles: params.ir?.roles?.length ? params.ir.roles : extractedIR.roles,
     workflows: params.ir?.workflows?.length ? params.ir.workflows : extractedIR.workflows,
-    routes: params.ir?.routes?.length ? params.ir.routes : extractedIR.routes,
+    routes: params.ir?.routes?.length ? params.ir.routes :
+            workspaceIR.routes.length ? dedupeRoutes([...workspaceIR.routes, ...extractedIR.routes]) :
+            extractedIR.routes,
     modules: params.ir?.modules?.length ? params.ir.modules : extractedIR.modules,
     constraints: [...new Set([...(params.ir?.constraints || []), ...extractedIR.constraints])],
   };
 
+  // Fail-safe: ir.routes must never be empty for a non-trivial app
+  if (mergedIR.routes.length === 0 && sanitizedRequirements.length > 10) {
+    console.warn("[IR] Routes are empty for non-trivial app — injecting dashboard fallback");
+    mergedIR.routes.push({ path: "/", page: "DashboardPage", auth: true });
+    mergedIR.routes.push({ path: "/settings", page: "SettingsPage", auth: true });
+  }
+
   return {
-    rawRequirements: params.rawRequirements,
+    rawRequirements: sanitizedRequirements,
     semanticSummary: params.semanticSummary || "",
     ir: mergedIR,
     existingWorkspace: params.existingWorkspace,
@@ -488,4 +606,13 @@ export function assembleBuildContext(params: {
     designTheme: params.designTheme,
     model: params.model,
   };
+}
+
+function dedupeRoutes(routes: IRRoute[]): IRRoute[] {
+  const seen = new Set<string>();
+  return routes.filter(r => {
+    if (seen.has(r.path)) return false;
+    seen.add(r.path);
+    return true;
+  });
 }
