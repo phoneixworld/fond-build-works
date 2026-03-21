@@ -16,7 +16,10 @@ export function scaffoldPagesFromIR(ir: IR): Record<string, string> {
   const files: Record<string, string> = {};
 
   for (const page of ir.pages) {
-    const filePath = `/pages/${page.name}.jsx`;
+    // Sanitize: "News & Events" → "NewsEvents.jsx"
+    const safeName = page.name.replace(/[^a-zA-Z0-9]+/g, " ").split(" ").filter(Boolean)
+      .map(w => w.charAt(0).toUpperCase() + w.slice(1)).join("") || page.name;
+    const filePath = `/pages/${safeName}.jsx`;
     files[filePath] = scaffoldPage(page, ir);
   }
 

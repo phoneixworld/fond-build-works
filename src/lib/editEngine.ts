@@ -409,7 +409,14 @@ function parseEditOutput(
   const normalizePath = (path: string) => {
     let normalized = path.startsWith("/") ? path : `/${path}`;
     normalized = normalized.replace(/^\/src\//, "/");
-    return normalized;
+    // Sanitize filename: "News & Events.jsx" → "NewsEvents.jsx"
+    const dir = normalized.slice(0, normalized.lastIndexOf("/") + 1);
+    const file = normalized.slice(normalized.lastIndexOf("/") + 1);
+    const ext = file.match(/\.(jsx?|tsx?|css)$/)?.[0] || "";
+    const base = file.replace(/\.(jsx?|tsx?|css)$/, "");
+    const safeName = base.replace(/[^a-zA-Z0-9]+/g, " ").split(" ").filter(Boolean)
+      .map((w: string) => w.charAt(0).toUpperCase() + w.slice(1)).join("") || base;
+    return `${dir}${safeName}${ext}`;
   };
 
   const getCodeStartIndex = (raw: string): number => {

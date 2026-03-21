@@ -17,9 +17,9 @@ export function synthesizeAppJsx(ws: Workspace, routes?: Array<{ path: string; c
     const content = ws.getFile(file) || "";
     const name = file.replace(/^\/pages\//, "").replace(/\.jsx$/, "").replace(/\//g, "_").replace(/.*\//, "");
     const rawComponentName = file.match(/\/([^/]+)\.jsx$/)?.[1] || name;
-    // Sanitize: "Create Event" → "CreateEvent" (valid JS identifier)
-    const componentName = rawComponentName.split(/[^a-zA-Z0-9]+/).filter(Boolean)
-      .map(p => p.charAt(0).toUpperCase() + p.slice(1)).join("") || rawComponentName;
+    // Sanitize to valid PascalCase JS identifier
+    const componentName = rawComponentName.replace(/[^a-zA-Z0-9]+/g, " ").split(" ").filter(Boolean)
+      .map((p: string) => p.charAt(0).toUpperCase() + p.slice(1)).join("") || rawComponentName;
 
     const hasDefault = /export\s+default/.test(content);
     const namedMatch = content.match(/export\s+(?:function|const|class)\s+(\w+)/);
