@@ -20,6 +20,8 @@ interface SelfHealingConfig {
   isSendingRef: React.RefObject<boolean>;
   isLoadingRef: React.RefObject<boolean>;
   sendMessage: (text: string) => Promise<void> | void;
+  /** Surgical edit path — used for self-healing instead of full rebuild */
+  sendEditMessage?: (text: string) => Promise<void> | void;
 }
 
 /** Categorize errors for better fix prompts */
