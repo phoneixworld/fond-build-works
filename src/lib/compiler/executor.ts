@@ -310,10 +310,36 @@ export async function executeTask(
 
 function extractFilesFromOutput(text: string): Record<string, string> | null {
   const files: Record<string, string> = {};
-  const separatorRegex = /^-{3}\s+(\/?\w[\w/.-]*\.(?:jsx?|tsx?|css))\s*-{0,3}\s*$/;
-  const depsSeparator = /^-{3}\s+\/?dependencies\s*$/i;
+  const headerRegex = /^-{3}\s+(.+?)\s*$/;
 
-  const fencePatterns = ["```react-preview", "```jsx-preview", "```react", "```jsx"];
+  const parseHeader = (header: string): { type: "deps" | "file"; path?: string } | null => {
+    const cleaned = header.replace(/\s*-{0,3}\s*$/, "").trim();
+
+    if (/^\/?dependencies\b/i.test(cleaned)) {
+      return { type: "deps" };
+    }
+
+    const pathMatch = cleaned.match(/\/?.+?\.(?:jsx?|tsx?|css|js|ts)\b/i);
+    if (!pathMatch) return null;
+
+    let path = pathMatch[0].trim();
+    path = path.replace(/^src\//i, "");
+    if (!path.startsWith("/")) path = `/${path}`;
+    path = path.replace(/^\/src\//, "/");
+
+    return { type: "file", path };
+  };
+
+  const fencePatterns = [
+    "```react-preview",
+    "```jsx-preview",
+    "```tsx",
+    "```typescript",
+    "```react",
+    "```jsx",
+    "```javascript",
+  ];
+
   let fenceStart = -1;
   for (const pattern of fencePatterns) {
     fenceStart = text.indexOf(pattern);
@@ -334,8 +360,8 @@ function extractFilesFromOutput(text: string): Record<string, string> | null {
     }
     searchFrom = candidate + 4;
   }
-  const block = fenceEnd === -1 ? text.slice(codeStart) : text.slice(codeStart, fenceEnd);
 
+  const block = fenceEnd === -1 ? text.slice(codeStart) : text.slice(codeStart, fenceEnd);
   const lines = block.split("\n");
   let currentFile: string | null = null;
   let currentLines: string[] = [];
@@ -345,9 +371,7 @@ function extractFilesFromOutput(text: string): Record<string, string> | null {
     if (currentFile && !inDepsSection) {
       const code = currentLines.join("\n").trim();
       if (code.length > 0) {
-        let fname = currentFile.startsWith("/") ? currentFile : `/${currentFile}`;
-        fname = fname.replace(/^\/src\//, "/");
-        files[fname] = code;
+        files[currentFile] = code;
       }
     }
     currentFile = null;
@@ -356,24 +380,35 @@ function extractFilesFromOutput(text: string): Record<string, string> | null {
   }
 
   for (const line of lines) {
-    if (depsSeparator.test(line.trim())) {
-      flush();
-      inDepsSection = true;
-      continue;
+    const trimmed = line.trim();
+    const headerMatch = trimmed.match(headerRegex);
+
+    if (headerMatch) {
+      const parsed = parseHeader(headerMatch[1]);
+      if (parsed?.type === "deps") {
+        flush();
+        inDepsSection = true;
+        continue;
+      }
+      if (parsed?.type === "file" && parsed.path) {
+        flush();
+        currentFile = parsed.path;
+        continue;
+      }
     }
 
-    const match = line.trim().match(separatorRegex);
-    if (match) {
-      flush();
-      currentFile = match[1];
-      continue;
+    if (currentFile && !inDepsSection) {
+      currentLines.push(line);
     }
-
-    if (currentFile && !inDepsSection) currentLines.push(line);
   }
   flush();
 
   if (Object.keys(files).length === 0 && block.trim().length > 20) {
+    const hasSectionMarkers = /^\s*-{3}\s+/m.test(block);
+    if (hasSectionMarkers) {
+      console.warn("[Executor] File-section markers detected but no valid files parsed; skipping unsafe fallback");
+      return null;
+    }
     files["/App.jsx"] = block.trim();
   }
 

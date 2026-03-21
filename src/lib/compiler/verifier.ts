@@ -595,16 +595,12 @@ function checkExportValidity(workspace: Workspace): { issues: VerificationIssue[
       }
     }
 
-    // Check for conflict: same symbol in both `export { X }` and `export default X`
-    if (defaultExportName && namedExports.has(defaultExportName)) {
-      issues.push({
-        category: "undefined_export",
-        severity: "error",
-        file: path,
-        message: `'${defaultExportName}' is exported both as named export and default export — this causes "already exported" errors`,
-        suggestedFix: `Remove "export { ${defaultExportName} }" and keep only "export default ${defaultExportName}"`,
-      });
-    }
+    // Note: named + default export of the same identifier is valid ESM.
+    // Example: `export function Button(){}` + `export default Button`.
+    // Do not report this as an error; actual duplicate-export syntax failures
+    // are already caught by the syntax parser and runtime sanitizer.
+    void defaultExportName;
+    void namedExports;
   }
   return { issues };
 }

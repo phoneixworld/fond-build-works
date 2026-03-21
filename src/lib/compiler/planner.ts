@@ -99,6 +99,55 @@ function nextId(): string {
   return `task-${++taskCounter}`;
 }
 
+function toPascalCase(raw: string, fallback = "Item"): string {
+  const cleaned = (raw || "")
+    .replace(/[^a-zA-Z0-9]+/g, " ")
+    .split(" ")
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join("");
+
+  return cleaned || fallback;
+}
+
+function normalizeRoutePath(raw: string): string {
+  if (!raw || raw === "/") return "/";
+  const normalized = raw
+    .replace(/^\/+/, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9/]+/g, "-")
+    .replace(/-+/g, "-")
+    .replace(/\/-/g, "/")
+    .replace(/-\//g, "/")
+    .replace(/^[-/]+|[-/]+$/g, "");
+  return `/${normalized || "home"}`;
+}
+
+function normalizeManifestForTasks(ir: IRManifest): IRManifest {
+  return {
+    ...ir,
+    entities: ir.entities.map((entity) => {
+      const safeName = toPascalCase(entity.name, "Entity");
+      return {
+        ...entity,
+        name: safeName,
+        relationships: entity.relationships?.map((rel) => ({
+          ...rel,
+          target: toPascalCase(rel.target, "Entity"),
+        })),
+      };
+    }),
+    routes: ir.routes.map((route) => {
+      const basePage = toPascalCase((route.page || "").replace(/Page$/i, ""), "Page");
+      return {
+        ...route,
+        page: `${basePage}Page`,
+        path: normalizeRoutePath(route.path || `/${basePage}`),
+      };
+    }),
+  };
+}
+
 // ─── Task Graph Generation ────────────────────────────────────────────────
 
 export function planTaskGraph(ctx: BuildContext, structuredIR?: IR): TaskGraph {
@@ -107,9 +156,10 @@ export function planTaskGraph(ctx: BuildContext, structuredIR?: IR): TaskGraph {
   const { buildIntent } = ctx;
 
   // ── Merge structured IR into legacy IR format if available ─────────
-  const ir = structuredIR
+  const mergedIR = structuredIR
     ? mergeStructuredIR(ctx.ir, structuredIR)
     : ctx.ir;
+  const ir = normalizeManifestForTasks(mergedIR);
 
   // ── Detect app type from requirements ──────────────────────────────
   const appType = detectAppType(ctx.rawRequirements, ir);
