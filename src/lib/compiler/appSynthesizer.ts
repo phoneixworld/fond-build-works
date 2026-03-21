@@ -10,9 +10,9 @@
  * - Correct AppLayout wrapping
  */
 
-import type { Workspace } from "./compiler/workspace";
+import type { Workspace } from "./workspace";
 
-export function synthesizeAppJsx(workspace: Workspace, routes: any[]) {
+export function synthesizeAppJsx(workspace: Workspace, routes?: any[]): string {
   const pageFiles = workspace.listFiles().filter((f) => f.startsWith("/pages/") && f.endsWith(".jsx"));
 
   const imports = [];
@@ -24,7 +24,7 @@ export function synthesizeAppJsx(workspace: Workspace, routes: any[]) {
 
     imports.push(`import ${pageName} from ".${importPath}";`);
 
-    const route = routes.find((r) => r.page === pageName);
+    const route = routes?.find((r: any) => r.page === pageName);
     if (!route) continue;
 
     if (route.path === "/") {
@@ -70,5 +70,5 @@ ${nestedRoutes.join("\n")}
 }
 `;
 
-  return { "/App.jsx": appJsx.trim() };
+  return appJsx.trim();
 }
