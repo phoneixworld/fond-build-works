@@ -229,15 +229,32 @@ export function useSelfHealing(config: SelfHealingConfig) {
     if (currentFiles) {
       const errorFiles = new Set<string>();
       
-      // Extract files from errors
+      // Extract files from categorized errors (includes component inference)
       for (const err of categorized) {
         if (err.file) errorFiles.add(err.file.startsWith("/") ? err.file : `/${err.file}`);
+        // Also try component name → file path inference
+        if (err.identifier && !err.file) {
+          const guessedPath = `/components/${err.identifier}.jsx`;
+          if (currentFiles[guessedPath]) errorFiles.add(guessedPath);
+          // Try .tsx variant too
+          const guessedTsx = `/components/${err.identifier}.tsx`;
+          if (currentFiles[guessedTsx]) errorFiles.add(guessedTsx);
+        }
       }
       
       // Also extract from raw messages
       for (const err of previewErrors) {
         const match = err.match(/\/([\w/.-]+\.\w+)/);
         if (match) errorFiles.add(`/${match[1]}`);
+        // Extract from "Check the render method of X"
+        const renderMatch = err.match(/Check the render method of [`']?(\w+)/i);
+        if (renderMatch) {
+          const comp = renderMatch[1];
+          for (const ext of [".jsx", ".tsx"]) {
+            const path = `/components/${comp}${ext}`;
+            if (currentFiles[path]) errorFiles.add(path);
+          }
+        }
       }
       
       // Always include App.jsx
