@@ -1,8 +1,8 @@
 /**
- * Build Compiler v1.0 — Execution Engine
- * 
- * Runs tasks through the AI model with full workspace context.
- * Each task sees the accumulated workspace and is told to import, not recreate.
+ * Build Compiler v1.1 — Execution Engine
+ *
+ * Runs tasks through the AI model with scoped workspace context.
+ * Each task sees only the relevant workspace slice and is told to import, not recreate.
  */
 
 import { streamBuildAgent } from "@/lib/agentPipeline";
@@ -12,20 +12,39 @@ import type { Workspace } from "./workspace";
 
 // ─── Task Prompt Builder ──────────────────────────────────────────────────
 
+function getTaskContextMode(task: CompilerTask): "infra" | "components" | "pages" | "routing" | "generic" {
+  if (task.label === "infra") return "infra";
+  if (task.label.startsWith("domain:components")) return "components";
+  if (task.label.startsWith("page:") || task.label.startsWith("domain:pages")) return "pages";
+  if (task.label === "app:routing" || task.label.startsWith("sidebar:")) return "routing";
+  return "generic";
+}
+
 export function buildTaskPrompt(
   task: CompilerTask,
   ctx: BuildContext,
   workspace: Workspace,
   taskIndex: number,
-  totalTasks: number
+  totalTasks: number,
 ): string {
   const existingFiles = workspace.listFiles();
-  const workspaceContext = buildWorkspaceContext(workspace, 24000, task.label);
+  const mode = getTaskContextMode(task);
 
-  // Always include raw requirements so the build-agent understands the domain
+  // Smaller, mode-aware context budget
+  const budget = mode === "infra" ? 8000 : mode === "components" ? 12000 : mode === "routing" ? 16000 : 14000;
+  const workspaceContext = buildWorkspaceContext(workspace, budget, mode);
+
   const requirementsSection = ctx.rawRequirements
-    ? `\n### Application Requirements:\n${ctx.rawRequirements.slice(0, 4000)}\n`
+    ? `\n### Application Requirements (sanitized):\n${ctx.rawRequirements.slice(0, 4000)}\n`
     : "";
+
+  const irEntities =
+    ctx.ir.entities.length > 0
+      ? `- Entities: ${ctx.ir.entities.map((e) => `${e.name}(${e.fields.map((f) => f.name).join(", ")})`).join(", ")}`
+      : "";
+  const irRoles = ctx.ir.roles.length > 0 ? `- Roles: ${ctx.ir.roles.map((r) => r.name).join(", ")}` : "";
+  const irRoutes =
+    ctx.ir.routes.length > 0 ? `- Routes: ${ctx.ir.routes.map((r) => `${r.path} → ${r.page}`).join(", ")}` : "";
 
   return `## BUILD TASK ${taskIndex + 1}/${totalTasks}: ${task.label}
 
@@ -33,232 +52,136 @@ export function buildTaskPrompt(
 ${task.description}
 ${requirementsSection}
 ### Files to create/modify:
-${task.produces.map(f => `- CREATE: ${f}`).join("\n")}
-${task.touches.length > 0 ? task.touches.map(f => `- MODIFY: ${f}`).join("\n") : ""}
+${task.produces.map((f) => `- CREATE or UPDATE: ${f}`).join("\n")}
+${task.touches.length > 0 ? task.touches.map((f) => `- TOUCH: ${f}`).join("\n") : ""}
 
 ### Project context:
 - Tech stack: ${ctx.techStack}
 - Build intent: ${ctx.buildIntent}
-${ctx.ir.entities.length > 0 ? `- Entities: ${ctx.ir.entities.map(e => `${e.name}(${e.fields.map(f => f.name).join(", ")})`).join(", ")}` : ""}
-${ctx.ir.roles.length > 0 ? `- Roles: ${ctx.ir.roles.map(r => r.name).join(", ")}` : ""}
-${ctx.ir.routes.length > 0 ? `- Routes: ${ctx.ir.routes.map(r => `${r.path} → ${r.page}`).join(", ")}` : ""}
-${ctx.tableMappings && Object.keys(ctx.tableMappings).length > 0 ? `\n### Database Tables (REAL Postgres tables — use these exact names):\n${Object.entries(ctx.tableMappings).map(([logical, real]) => `- ${logical} → supabase.from("${real}")`).join("\n")}` : ""}
+${irEntities}
+${irRoles}
+${irRoutes}
+${
+  ctx.tableMappings && Object.keys(ctx.tableMappings).length > 0
+    ? `\n### Database Tables (REAL Postgres tables — use these exact names):\n${Object.entries(ctx.tableMappings)
+        .map(([logical, real]) => `- ${logical} → supabase.from("${real}")`)
+        .join("\n")}`
+    : ""
+}
 
 ### Existing workspace files:
-${existingFiles.length > 0 ? existingFiles.map(f => `- ${f}`).join("\n") : "(empty workspace)"}
+${existingFiles.length > 0 ? existingFiles.map((f) => `- ${f}`).join("\n") : "(empty workspace)"}
 
-${workspaceContext ? `### Current code:\n${workspaceContext}` : ""}
+${workspaceContext ? `### Current code (scoped):\n${workspaceContext}` : ""}
 
 ### RULES:
-1. Generate ONLY the files listed above
-2. Import from existing workspace files — do NOT recreate them
-3. **CRITICAL FILE STRUCTURE**: All files use these directories from root:
-   - /components/ui/ — 22 pre-scaffolded shadcn-compatible UI components:
-     utils.js (cn helper), Button, Card (+ CardHeader/Title/Description/Content/Footer),
-     Input, Label, Badge, Separator, Skeleton, Checkbox,
-     Dialog (+ DialogContent/Header/Title/Description/Footer),
-     Table (+ TableHeader/Body/Footer/Head/Row/Cell/Caption),
-     Textarea, Select (+ SelectTrigger/Value/Content/Item/Group/Label),
-     Tabs (+ TabsList/Trigger/Content), Alert (+ AlertTitle/AlertDescription),
-     Avatar (+ AvatarImage/AvatarFallback), Progress, Switch,
-     Tooltip (+ TooltipProvider/Trigger/Content), ScrollArea,
-     DropdownMenu (+ Trigger/Content/Item/Separator/Label),
-     Sheet (+ SheetTrigger/Content/Header/Title/Description/Close),
-     Popover (+ PopoverTrigger/Content), Accordion (+ Item/Trigger/Content),
-     Modal, DataTable, Toast (showToast), Spinner
-   - /components/ — reusable DOMAIN components (StatCard, StatusBadge, PageHeader, SearchFilterBar, ActivityFeed, QuickActions, NotificationBell, ChartCard, FormModal)
-   - /contexts/ — React contexts (AuthContext, etc.)
-   - /pages/ModuleName/ — page components in named directories (e.g. /pages/Dashboard/Dashboard.jsx, /pages/Students/Students.jsx)
-   - /hooks/ — custom hooks
-   - /services/ — API services
-   - /styles/ — CSS files
-   - /layout/ — layout wrappers (AppLayout.jsx, Sidebar.jsx)
+1. Generate ONLY the files listed above (in produces/touches).
+2. If a file already exists, MODIFY it in-place — preserve existing imports, exports, and structure.
+3. Import from existing workspace files — do NOT recreate them.
+4. NEVER write to /components/ui/** — those are pre-scaffolded UI primitives.
+5. **CRITICAL FILE STRUCTURE**:
+   - /components/ui/ — pre-scaffolded shadcn-compatible UI components (do not modify).
+   - /components/ — reusable DOMAIN components (StatCard, StatusBadge, PageHeader, SearchFilterBar, ActivityFeed, QuickActions, NotificationBell, ChartCard, FormModal).
+   - /contexts/ — React contexts (AuthContext, etc.).
+   - /pages/ModuleName/ — page components in named directories (e.g. /pages/Dashboard/DashboardPage.jsx).
+   - /hooks/ — custom hooks.
+   - /services/ — API services.
+   - /styles/ — CSS files.
+   - /layout/ — layout wrappers (AppLayout.jsx, Sidebar.jsx).
    When importing, always use correct relative paths from the file's location.
    Import cn from "./ui/utils" in component files, or from "../ui/utils" from page files.
-4. **COMPONENT DECOMPOSITION (CRITICAL)**: Pages must NOT be monolithic. Every page MUST import and use components from /components/ui/:
-   - Use Table + TableHeader/TableBody/TableRow/TableHead/TableCell for data lists (NOT raw <table> tags)
-   - Use Tabs + TabsList/TabsTrigger/TabsContent for multi-section views
-   - Use Dialog for modals, Sheet for slide-out panels, Select for dropdowns
-   - Use Card + CardHeader/CardContent for sections, Badge for statuses, Avatar for users
-   - Use Button for all actions, Input/Label/Textarea for forms, Checkbox/Switch for toggles
-   - Use Progress for progress bars, Skeleton for loading states, Separator for dividers
-   - If a domain component doesn't exist yet, create it in /components/ using /components/ui/ primitives
-4. **DATA ACCESS (CRITICAL)**: Use Supabase client directly for ALL data operations:
+6. **COMPONENT DECOMPOSITION (CRITICAL)**: Pages must NOT be monolithic. Every page MUST import and use components from /components/ui/:
+   - Use Table + TableHeader/TableBody/TableRow/TableHead/TableCell for data lists (NOT raw <table> tags).
+   - Use Tabs + TabsList/TabsTrigger/TabsContent for multi-section views.
+   - Use Dialog for modals, Sheet for slide-out panels, Select for dropdowns.
+   - Use Card + CardHeader/CardContent for sections, Badge for statuses, Avatar for users.
+   - Use Button for all actions, Input/Label/Textarea for forms, Checkbox/Switch for toggles.
+   - Use Progress for progress bars, Skeleton for loading states, Separator for dividers.
+   - If a domain component doesn't exist yet, create it in /components/ using /components/ui/ primitives.
+7. **DATA ACCESS (CRITICAL)**: Use Supabase client directly for ALL data operations:
    - Create a /services/supabase.js file that exports a configured client:
-     \`\`\`
      import { createClient } from "@supabase/supabase-js";
      const supabaseUrl = window.__SUPABASE_URL__ || "https://oyjwexbyxggotuuxxisq.supabase.co";
      const supabaseKey = window.__SUPABASE_KEY__ || "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im95andleGJ5eGdnb3R1dXh4aXNxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzI5MDk5NDcsImV4cCI6MjA4ODQ4NTk0N30.JQKI55nRaQtQjokXR-Lbol6-59HmwhAS7PzE9_Wx78I";
      export const supabase = createClient(supabaseUrl, supabaseKey);
      export const PROJECT_ID = window.__PROJECT_ID__;
-     \`\`\`
-   - For CRUD operations use supabase.from("TABLE_NAME").select/insert/update/delete
-   - The table names will be provided by the system as "pd_XXXX_tablename" format
-   - Always filter by project_id in queries: .eq("project_id", PROJECT_ID)
-   - Import { supabase, PROJECT_ID } from "../services/supabase.js" (adjust path as needed)
-   - For listing: supabase.from("pd_xxx_contacts").select("*").eq("project_id", PROJECT_ID).order("created_at", { ascending: false })
-   - For creating: supabase.from("pd_xxx_contacts").insert({ ...data, project_id: PROJECT_ID }).select().single()
-   - For updating: supabase.from("pd_xxx_contacts").update(data).eq("id", id).eq("project_id", PROJECT_ID)
-   - For deleting: supabase.from("pd_xxx_contacts").delete().eq("id", id).eq("project_id", PROJECT_ID)
-5. For auth, use the AuthContext pattern. Import path depends on file location.
-   - AuthContext MUST read window.__PROJECT_ID__, window.__SUPABASE_URL__, window.__SUPABASE_KEY__ for API calls
-   - AuthContext MUST call project-auth edge function for signup/login/me actions
-   - On app load, AuthContext checks localStorage for a saved token and calls "me" to restore the session
-   - **CRITICAL**: If the "me" call fails (expired/invalid token), AuthContext MUST clear the token from localStorage, set user to null, and set loading to false — do NOT throw or crash
-   - AuthContext must expose: { user, token, loading, login, signup, logout }
-   - The login/signup functions must save the token to localStorage on success and return the result (do NOT navigate inside AuthContext)
-   - The logout function must clear localStorage and set user to null (do NOT navigate inside AuthContext)
-   - **CRITICAL**: AuthContext must NOT import or call useNavigate(). Navigation must be handled by the consuming components. AuthContext must be usable OUTSIDE a Router.
-   - While loading is true, show a loading spinner — never render routes until loading is false
-   - Protected routes must redirect to /login when user is null (not crash or go blank)
-   - **CRITICAL ROLE SAFETY**: If you add allowedRoles checks, include "user" in the allowed list unless explicit role requirements were provided.
-6. Output complete, working code — no placeholders, no TODOs, no stubs
-7. Every component must have a default export
-8. Use Tailwind CSS with design tokens (var(--color-*)) for all styling
-9. **CRITICAL PROVIDER ORDERING in App.jsx**: ToastProvider (outermost) → AuthProvider → HashRouter → Routes.
-10. Protected pages must check useAuth().user and redirect to /login if null
-11. **CRITICAL**: Every file MUST import ALL identifiers it uses.
-12. **CRITICAL**: Every function called in a component MUST be defined in that component, imported, or destructured from a hook/context.
-13. When using useEffect, ensure ALL dependencies referenced inside the effect are either defined above or listed in the dependency array.
-
-### UI QUALITY REQUIREMENTS (CRITICAL — follow these for EVERY page):
-- **NO placeholder text**: Never generate "Loading content...", "Coming soon", or "TODO". Every page must render real, functional UI.
-- **Realistic sample data**: Use useState with hardcoded arrays of 5-10 realistic rows (real names, dates, numbers). Example: \`const [students] = useState([{ id: 1, name: "Sarah Johnson", grade: "10th", gpa: 3.8 }, ...])\`
-- **Rich dashboard pages**: Dashboard pages MUST include:
-  - 4 stat cards using "stat-card" class with "stat-value", "stat-label", "stat-trend stat-trend-up"
-  - At least one data table with 5+ rows using "table" class + "badge" classes for status
-  - At least one simple chart or visual (can be a CSS bar chart if recharts is unavailable)
-- **Data tables**: Use "table" class with thead/tbody, alternating row colors, "badge" status cells, action buttons
-- **Forms**: Include proper labels, "input" class fields, validation states, "btn btn-primary" submit buttons
-- **Navigation**: Sidebar must highlight the active route, show icons (from lucide-react), and have a professional look
-- **Status badges**: Use "badge badge-success", "badge-warning", "badge-danger" for statuses
-- **Loading states**: Use "skeleton" class for shimmer loading, "spinner" for inline spinners
-- **Empty states**: Use "empty-state" class pattern with "empty-state-icon", "empty-state-title", "empty-state-text", and a CTA button
-- **Modals/Dialogs**: Use "modal-overlay" → "modal" with "modal-header", "modal-body", "modal-actions"
-- **Toast feedback**: Use "toast" classes for CRUD operation feedback
-- **Tabs**: Use "tab-list" + "tab" / "tab tab-active" for multi-section pages
-- **Avatars**: Use "avatar avatar-md" in user lists, comments, team views, "avatar-group" for stacks
-- **Animations**: Add "stagger" class on list parents for entrance animations, "animate-fade-in" on page loads
-- **Glass cards**: Use "card-glass" for hero overlays or premium feature sections
-- **Layout polish**: Consistent spacing (p-6), rounded corners (rounded-xl), "surface-elevated" for elevated panels
-- **Color tokens**: Use CSS variables: var(--color-primary), var(--color-bg), var(--color-text), var(--color-border), var(--color-success), var(--color-warning), var(--color-danger)`;
-
+   - For CRUD operations use supabase.from("TABLE_NAME").select/insert/update/delete.
+   - Always filter by project_id in queries: .eq("project_id", PROJECT_ID).
+8. For auth, use the AuthContext pattern. AuthContext must NOT import or call useNavigate().
+9. Output complete, working code — no placeholders, no TODOs, no stubs.
+10. Every file MUST import ALL identifiers it uses.
+11. Every function called in a component MUST be defined in that component, imported, or destructured from a hook/context.
+12. When using useEffect, ensure ALL dependencies referenced inside the effect are either defined above or listed in the dependency array.
+`;
 }
 
 // ─── Workspace Context Builder ────────────────────────────────────────────
 
-/**
- * Task-aware context profiles.
- * Different tasks need different files — routing needs pages + sidebar,
- * page tasks need components + layout, etc.
- */
-function getTaskContextProfile(taskLabel: string): {
-  mustInclude: RegExp[];
-  preferInclude: RegExp[];
-  indexOnly: RegExp[];
-} {
-  if (taskLabel === "app:routing") {
-    return {
-      mustInclude: [/\/App\.(jsx?|tsx?)$/, /\/layout\//, /\/contexts\/AuthContext/],
-      preferInclude: [/\/pages\/.*Page\.(jsx?|tsx?)$/],
-      indexOnly: [/\/components\//],
-    };
-  }
-  if (taskLabel.startsWith("page:") || taskLabel.startsWith("domain:pages")) {
-    return {
-      mustInclude: [/\/layout\//, /\/contexts\/AuthContext/, /\/components\/StatCard/, /\/components\/PageHeader/, /\/components\/StatusBadge/, /\/components\/SearchFilterBar/],
-      preferInclude: [/\/components\/(?!ui\/)/, /\/hooks\//],
-      indexOnly: [/\/components\/ui\//],
-    };
-  }
-  if (taskLabel === "domain:layout") {
-    return {
-      mustInclude: [/\/App\.(jsx?|tsx?)$/, /\/contexts\/AuthContext/],
-      preferInclude: [/\/pages\/.*Page\.(jsx?|tsx?)$/],
-      indexOnly: [/\/components\//],
-    };
-  }
-  // Default: original behavior
-  return {
-    mustInclude: [/\/App\.(jsx?|tsx?)$/, /\/contexts\/AuthContext/],
-    preferInclude: [],
-    indexOnly: [],
-  };
-}
-
-function buildWorkspaceContext(workspace: Workspace, budgetChars: number, taskLabel?: string): string {
+function buildWorkspaceContext(
+  workspace: Workspace,
+  budgetChars: number,
+  mode: "infra" | "components" | "pages" | "routing" | "generic",
+): string {
   const files = workspace.listFiles();
   if (files.length === 0) return "";
 
-  const profile = taskLabel ? getTaskContextProfile(taskLabel) : getTaskContextProfile("");
+  const PRIORITY_FILES = [
+    "/App.jsx",
+    "/App.tsx",
+    "/contexts/AuthContext.jsx",
+    "/layout/AppLayout.jsx",
+    "/layout/Sidebar.jsx",
+  ];
 
-  // Classify files
-  const mustFiles: string[] = [];
-  const preferFiles: string[] = [];
-  const indexFiles: string[] = [];
-  const otherFiles: string[] = [];
+  const isRelevant = (path: string) => {
+    if (mode === "infra") {
+      return path.startsWith("/styles/") || path.startsWith("/components/ui/");
+    }
+    if (mode === "components") {
+      return path.startsWith("/components/") && !path.startsWith("/components/ui/");
+    }
+    if (mode === "pages") {
+      return path.startsWith("/pages/") || path.startsWith("/components/");
+    }
+    if (mode === "routing") {
+      return path === "/App.jsx" || path === "/App.tsx" || path.startsWith("/layout/") || path.startsWith("/pages/");
+    }
+    return true;
+  };
 
-  for (const f of files) {
-    if (profile.mustInclude.some(r => r.test(f))) mustFiles.push(f);
-    else if (profile.preferInclude.some(r => r.test(f))) preferFiles.push(f);
-    else if (profile.indexOnly.some(r => r.test(f))) indexFiles.push(f);
-    else otherFiles.push(f);
-  }
+  const prioritized = files.filter((f) => PRIORITY_FILES.some((p) => f.endsWith(p)) && isRelevant(f));
+  const others = files.filter((f) => !PRIORITY_FILES.some((p) => f.endsWith(p)) && isRelevant(f));
 
   let result = "";
   let remaining = budgetChars;
 
-  // Tier 1: Must-include files — full content
-  for (const path of mustFiles) {
-    const content = workspace.getFile(path)!;
-    const block = `--- ${path}\n${content}\n\n`;
+  const pushBlock = (path: string, content: string, truncated: boolean) => {
+    if (remaining <= 0) return;
+    const header = truncated ? `--- ${path} (truncated)\n` : `--- ${path}\n`;
+    const block = `${header}${content}\n\n`;
     if (block.length <= remaining) {
       result += block;
       remaining -= block.length;
-    }
-  }
-
-  // Tier 2: Preferred files — full content if budget allows
-  for (const path of preferFiles) {
-    if (remaining <= 200) break;
-    const content = workspace.getFile(path)!;
-    const block = `--- ${path}\n${content}\n\n`;
-    if (block.length <= remaining) {
-      result += block;
-      remaining -= block.length;
-    } else if (remaining > 500) {
+    } else if (!truncated && remaining > 500) {
       const snippet = content.slice(0, Math.max(200, remaining - 100));
       result += `--- ${path} (truncated)\n${snippet}\n...[truncated]\n\n`;
       remaining = 0;
     }
+  };
+
+  for (const path of prioritized) {
+    const content = workspace.getFile(path) || "";
+    pushBlock(path, content, false);
   }
 
-  // Tier 3: Index-only files — just signatures (export names + file path)
-  if (indexFiles.length > 0 && remaining > 200) {
-    result += "### Available components (index only):\n";
-    for (const path of indexFiles) {
-      if (remaining <= 50) break;
-      const content = workspace.getFile(path) || "";
-      const exports = content.match(/export\s+(?:default\s+)?(?:function|const|class)\s+(\w+)/g) || [];
-      const line = `- ${path}: ${exports.map(e => e.replace(/export\s+(default\s+)?(?:function|const|class)\s+/, "")).join(", ") || "default"}\n`;
-      result += line;
-      remaining -= line.length;
-    }
-    result += "\n";
-  }
-
-  // Tier 4: Other files — fill remaining budget
-  for (const path of otherFiles) {
+  for (const path of others) {
     if (remaining <= 0) break;
-    const content = workspace.getFile(path)!;
-    const block = `--- ${path}\n${content}\n\n`;
-
-    if (block.length <= remaining) {
-      result += block;
-      remaining -= block.length;
+    const content = workspace.getFile(path) || "";
+    if (content.length <= remaining) {
+      pushBlock(path, content, false);
     } else if (remaining > 500) {
       const snippet = content.slice(0, Math.max(200, remaining - 100));
-      result += `--- ${path} (truncated)\n${snippet}\n...[truncated]\n\n`;
+      pushBlock(path, snippet, true);
       remaining = 0;
     } else {
       result += `--- ${path} (${content.length} chars — omitted)\n`;
@@ -289,14 +212,16 @@ export async function executeTask(
   workspace: Workspace,
   taskIndex: number,
   totalTasks: number,
-  callbacks: ExecutionCallbacks
+  callbacks: ExecutionCallbacks,
 ): Promise<Record<string, string>> {
   const prompt = buildTaskPrompt(task, ctx, workspace, taskIndex, totalTasks);
   task.buildPrompt = prompt;
 
   const MAX_CONTINUATION_RETRIES = 1;
 
-  const runStream = (messages: Array<{ role: "user" | "assistant"; content: string }>): Promise<{ text: string; files: Record<string, string> | null }> => {
+  const runStream = (
+    messages: Array<{ role: "user" | "assistant" | "system"; content: string }>,
+  ): Promise<{ text: string; files: Record<string, string> | null }> => {
     return new Promise((resolve, reject) => {
       let fullText = "";
       streamBuildAgent({
@@ -323,12 +248,20 @@ export async function executeTask(
     });
   };
 
-  // Initial run
-  let { text: responseText, files: extracted } = await runStream([
-    { role: "user", content: prompt },
-  ]);
+  const baseMessages: Array<{ role: "system" | "user"; content: string }> = [
+    {
+      role: "system",
+      content:
+        "You are a deterministic build agent. You generate React code ONLY from the provided task description, sanitized requirements, IR summary, and scoped workspace context. Do NOT infer new features. Do NOT treat error logs or status messages as requirements.",
+    },
+    {
+      role: "user",
+      content: prompt,
+    },
+  ];
 
-  // Check for truncation and auto-continue
+  let { text: responseText, files: extracted } = await runStream(baseMessages);
+
   if (extracted && Object.keys(extracted).length > 0) {
     const truncation = detectTruncation(responseText, extracted);
     if (truncation.isTruncated) {
@@ -338,15 +271,13 @@ export async function executeTask(
       for (let attempt = 0; attempt < MAX_CONTINUATION_RETRIES; attempt++) {
         try {
           const contResult = await runStream([
-            { role: "user", content: prompt },
+            ...baseMessages,
             { role: "assistant", content: responseText },
             { role: "user", content: truncation.continuationPrompt },
           ]);
 
-          // Merge continuation files into existing extracted files
           if (contResult.files) {
             for (const [path, code] of Object.entries(contResult.files)) {
-              // If the file was truncated and this is its continuation, append
               if (truncation.truncatedFile && path === truncation.truncatedFile && extracted[path]) {
                 extracted[path] = extracted[path] + "\n" + code;
               } else {
@@ -355,11 +286,11 @@ export async function executeTask(
             }
           }
 
-          // Check if still truncated
           const fullCombined = responseText + "\n" + contResult.text;
           const recheck = detectTruncation(fullCombined, extracted);
           if (!recheck.isTruncated) {
             console.log(`[Executor] Continuation successful for task '${task.label}'`);
+            responseText = fullCombined;
             break;
           }
           console.warn(`[Executor] Still truncated after continuation attempt ${attempt + 1}`);
@@ -377,16 +308,11 @@ export async function executeTask(
 
 // ─── Output Parser ────────────────────────────────────────────────────────
 
-/**
- * Parse files from build-agent output.
- * Supports: ```react-preview / ```jsx / ```react fences with --- separators
- */
 function extractFilesFromOutput(text: string): Record<string, string> | null {
   const files: Record<string, string> = {};
   const separatorRegex = /^-{3}\s+(\/?\w[\w/.-]*\.(?:jsx?|tsx?|css))\s*-{0,3}\s*$/;
   const depsSeparator = /^-{3}\s+\/?dependencies\s*$/i;
 
-  // Find code fence
   const fencePatterns = ["```react-preview", "```jsx-preview", "```react", "```jsx"];
   let fenceStart = -1;
   for (const pattern of fencePatterns) {
@@ -410,7 +336,6 @@ function extractFilesFromOutput(text: string): Record<string, string> | null {
   }
   const block = fenceEnd === -1 ? text.slice(codeStart) : text.slice(codeStart, fenceEnd);
 
-  // Parse file sections
   const lines = block.split("\n");
   let currentFile: string | null = null;
   let currentLines: string[] = [];
@@ -431,7 +356,6 @@ function extractFilesFromOutput(text: string): Record<string, string> | null {
   }
 
   for (const line of lines) {
-    // Check for dependencies section — stop collecting file content
     if (depsSeparator.test(line.trim())) {
       flush();
       inDepsSection = true;
@@ -449,7 +373,6 @@ function extractFilesFromOutput(text: string): Record<string, string> | null {
   }
   flush();
 
-  // If no separators, treat whole block as App.jsx
   if (Object.keys(files).length === 0 && block.trim().length > 20) {
     files["/App.jsx"] = block.trim();
   }
