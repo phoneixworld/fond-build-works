@@ -65,7 +65,12 @@ function nextId(): string {
 export function planTaskGraph(ctx: BuildContext, structuredIR?: IR): TaskGraph {
   taskCounter = 0;
   const tasks: CompilerTask[] = [];
-  const { ir, buildIntent } = ctx;
+  const { buildIntent } = ctx;
+
+  // ── Merge structured IR into legacy IR format if available ─────────
+  const ir = structuredIR
+    ? mergeStructuredIR(ctx.ir, structuredIR)
+    : ctx.ir;
 
   // ── Detect app type from requirements ──────────────────────────────
   const appType = detectAppType(ctx.rawRequirements, ir);
