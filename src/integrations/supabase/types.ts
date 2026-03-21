@@ -757,6 +757,126 @@ export type Database = {
         }
         Relationships: []
       }
+      pd_5f52b4953199_and: {
+        Row: {
+          created_at: string
+          description: string | null
+          id: string
+          name: string
+          project_id: string
+          status: string | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          name: string
+          project_id?: string
+          status?: string | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          name?: string
+          project_id?: string
+          status?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      pd_5f52b4953199_crm: {
+        Row: {
+          created_at: string
+          description: string | null
+          id: string
+          name: string
+          project_id: string
+          status: string | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          name: string
+          project_id?: string
+          status?: string | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          name?: string
+          project_id?: string
+          status?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      pd_5f52b4953199_distinct: {
+        Row: {
+          created_at: string
+          description: string | null
+          id: string
+          name: string
+          project_id: string
+          status: string | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          name: string
+          project_id?: string
+          status?: string | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          name?: string
+          project_id?: string
+          status?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      pd_5f52b4953199_team: {
+        Row: {
+          created_at: string
+          description: string | null
+          id: string
+          name: string
+          project_id: string
+          status: string | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          name: string
+          project_id?: string
+          status?: string | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          name?: string
+          project_id?: string
+          status?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       pd_b0de245a069e_authentication: {
         Row: {
           created_at: string
