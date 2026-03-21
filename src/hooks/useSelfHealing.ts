@@ -20,6 +20,8 @@ interface SelfHealingConfig {
   isSendingRef: React.RefObject<boolean>;
   isLoadingRef: React.RefObject<boolean>;
   sendMessage: (text: string) => Promise<void> | void;
+  /** Surgical edit path — used for self-healing instead of full rebuild */
+  sendEditMessage?: (text: string) => Promise<void> | void;
 }
 
 /** Categorize errors for better fix prompts */
@@ -147,7 +149,9 @@ function buildSmartFixPrompt(errors: CategorizedError[], fileContext: string, at
 }
 
 export function useSelfHealing(config: SelfHealingConfig) {
-  const { isBuildingValue, isLoading, sandpackFilesRef, isSendingRef, isLoadingRef, sendMessage } = config;
+  const { isBuildingValue, isLoading, sandpackFilesRef, isSendingRef, isLoadingRef, sendMessage, sendEditMessage } = config;
+  // Use edit path for healing (surgical fix) — fall back to sendMessage if not provided
+  const healSend = sendEditMessage || sendMessage;
 
   const [previewErrors, setPreviewErrors] = useState<string[]>([]);
   const [healAttempts, setHealAttempts] = useState(0);
