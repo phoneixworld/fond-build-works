@@ -13,24 +13,28 @@ const DIAGNOSTIC_PREFIXES = [
 
 const DIAGNOSTIC_KEYWORDS = [
   "stack trace",
-  "navigation link shows a blank page",
-  "these pages do not exist",
-  "missing page(s)",
   "runtime error",
+  "missing page",
+  "blank page",
+  "these pages",
+  "do not exist",
   "build failed",
   "compile error",
+  "navigation link",
+  "undefined component",
 ];
 
 const META_PATTERNS = [
   /is the app complete/i,
   /is the application complete/i,
-  /check if complete app is done/i,
+  /check if complete/i,
   /why is this broken/i,
   /what is wrong/i,
   /can you fix/i,
   /please fix/i,
-  /it is not working/i,
   /it's not working/i,
+  /it is not working/i,
+  /fix this/i,
 ];
 
 export function sanitizeRequirements(raw: string): string {
@@ -38,22 +42,18 @@ export function sanitizeRequirements(raw: string): string {
 
   const lines = raw.split("\n");
 
-  const cleanedLines = lines.filter((line) => {
-    const trimmed = line.trim();
-    if (!trimmed) return false;
+  const cleaned = lines.filter((line) => {
+    const t = line.trim();
+    if (!t) return false;
 
-    // Drop obvious diagnostic lines
-    if (DIAGNOSTIC_PREFIXES.some((p) => trimmed.startsWith(p))) return false;
-    if (DIAGNOSTIC_KEYWORDS.some((k) => trimmed.toLowerCase().includes(k))) return false;
+    if (DIAGNOSTIC_PREFIXES.some((p) => t.startsWith(p))) return false;
+    if (DIAGNOSTIC_KEYWORDS.some((k) => t.toLowerCase().includes(k))) return false;
+    if (META_PATTERNS.some((re) => re.test(t))) return false;
 
-    // Drop meta / status questions
-    if (META_PATTERNS.some((re) => re.test(trimmed))) return false;
-
-    // Drop lines that look like error bullets
-    if (/^[-*]\s*(missing|blank|error|issue|bug)/i.test(trimmed)) return false;
+    if (/^[-*]\s*(missing|blank|error|issue|bug)/i.test(t)) return false;
 
     return true;
   });
 
-  return cleanedLines.join("\n").trim();
+  return cleaned.join("\n").trim();
 }
