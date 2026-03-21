@@ -292,8 +292,8 @@ export function useSelfHealing(config: SelfHealingConfig) {
     }
 
     const prompt = buildSmartFixPrompt(categorized, fileContext, 1);
-    sendMessage(prompt);
-  }, [previewErrors, sendMessage, sandpackFilesRef]);
+    healSend(prompt);
+  }, [previewErrors, healSend, sandpackFilesRef]);
 
   const resetHealing = useCallback(() => {
     setHealAttempts(0);
