@@ -185,11 +185,12 @@ Use the classify_intent tool to return your classification.`;
     }
 
     const data = await response.json();
-    const toolCall = data.choices?.[0]?.message?.tool_calls?.[0];
+    // Anthropic tool use: extract from content array
+    const toolUseBlock = data.content?.find((b: any) => b.type === "tool_use" && b.name === "classify_intent");
     
-    if (toolCall?.function?.arguments) {
+    if (toolUseBlock?.input) {
       try {
-        const parsed = JSON.parse(toolCall.function.arguments);
+        const parsed = toolUseBlock.input;
         if (!["chat", "build", "clarify"].includes(parsed.intent)) {
           parsed.intent = "build";
         }
@@ -200,7 +201,7 @@ Use the classify_intent tool to return your classification.`;
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       } catch (e) {
-        console.error("Failed to parse tool call arguments:", e);
+        console.error("Failed to parse tool call:", e);
       }
     }
 
