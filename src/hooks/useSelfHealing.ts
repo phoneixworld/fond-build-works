@@ -149,7 +149,9 @@ function buildSmartFixPrompt(errors: CategorizedError[], fileContext: string, at
 }
 
 export function useSelfHealing(config: SelfHealingConfig) {
-  const { isBuildingValue, isLoading, sandpackFilesRef, isSendingRef, isLoadingRef, sendMessage } = config;
+  const { isBuildingValue, isLoading, sandpackFilesRef, isSendingRef, isLoadingRef, sendMessage, sendEditMessage } = config;
+  // Use edit path for healing (surgical fix) — fall back to sendMessage if not provided
+  const healSend = sendEditMessage || sendMessage;
 
   const [previewErrors, setPreviewErrors] = useState<string[]>([]);
   const [healAttempts, setHealAttempts] = useState(0);
