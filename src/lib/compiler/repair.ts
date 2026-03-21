@@ -10,8 +10,8 @@ import type { VerificationResult, VerificationIssue, RepairAction, RepairActionT
 import type { Workspace } from "./workspace";
 import { fixMissingImports, fixProviderOrdering } from "./missingImportFixer";
 
-export const MAX_REPAIR_ROUNDS = 2;
-export const MAX_REPAIR_ACTIONS_TOTAL = 6; // Cap total AI calls across all rounds
+export const MAX_REPAIR_ROUNDS = 3;
+export const MAX_REPAIR_ACTIONS_TOTAL = 10; // Cap total AI calls across all rounds
 
 // ─── Issue → RepairAction Classification ──────────────────────────────────
 
