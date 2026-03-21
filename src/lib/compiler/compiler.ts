@@ -60,10 +60,18 @@ export interface CompileCallbacks {
   onVerification: (result: VerificationResult) => void;
   onRepairStart: (round: number, actionCount: number) => void;
   onComplete: (result: BuildResult) => void;
+  /** Optional: agent orchestration callbacks */
+  onAgentStart?: (agent: string) => void;
+  onAgentProgress?: (agent: string, message: string) => void;
+  onAgentDone?: (agent: string, result: any) => void;
 }
 
 /**
  * Main entry point: compile requirements into a working application.
+ * Now includes invisible multi-agent orchestration:
+ *   Pre-build: workflow → database (schema auto-detection)
+ *   Compiler: context → plan → execute → verify → repair
+ *   Post-build: testing → governance (safety gate)
  */
 export async function compile(
   options: CompileOptions,
