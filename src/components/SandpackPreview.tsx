@@ -675,6 +675,25 @@ const DEFAULT_INDEX_HTML = `<!DOCTYPE html>
 </html>`;
 
 /**
+ * Sanitize CSS by ensuring all braces are balanced.
+ * Appends closing braces if needed to prevent "Unclosed block" errors.
+ */
+function sanitizeCss(css: string): string {
+  // Strip comments to count braces accurately
+  const stripped = css.replace(/\/\*[\s\S]*?\*\//g, "");
+  let depth = 0;
+  for (const ch of stripped) {
+    if (ch === "{") depth++;
+    else if (ch === "}") depth--;
+  }
+  if (depth > 0) {
+    // Append missing closing braces
+    css += "\n" + "}".repeat(depth) + " /* auto-closed */";
+  }
+  return css;
+}
+
+/**
  * Auto-repair broken relative imports by resolving against actual file set.
  * Runs as a last-resort pass before Sandpack compiles.
  */
@@ -857,7 +876,15 @@ function buildSandpackFiles(files: SandpackFileSet | null, projectId: string, su
   if (globalsCssPath && files) {
     const globalsCss = files[globalsCssPath] || files[globalsCssPath.slice(1)];
     if (globalsCss) {
-      base["/styles.css"] = DEFAULT_STYLES + "\n\n/* === User globals.css merged === */\n" + globalsCss;
+      const sanitized = sanitizeCss(globalsCss);
+      base["/styles.css"] = DEFAULT_STYLES + "\n\n/* === User globals.css merged === */\n" + sanitized;
+    }
+  }
+
+  // Sanitize all CSS files in the workspace to prevent unclosed block errors
+  for (const [path, content] of Object.entries(base)) {
+    if (path.endsWith(".css") && path !== "/styles.css") {
+      base[path] = sanitizeCss(content);
     }
   }
 
