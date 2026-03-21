@@ -10,6 +10,7 @@
 
 import type { IR } from "@/lib/ir";
 import { scaffoldPagesFromIR } from "@/lib/pageScaffolder";
+import { scaffoldEntitiesFromIR } from "@/lib/entityScaffolder";
 import { synthesizeAppFromIR } from "./appSynthesizer";
 import type {
   BuildContext, BuildResult, BuildStatus,
