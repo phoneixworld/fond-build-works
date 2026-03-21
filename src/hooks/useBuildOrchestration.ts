@@ -1295,6 +1295,10 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
               if (exportsFixed > 0) {
                 console.log(`[EditMode] 🔧 Fixed ${exportsFixed} export mismatch(es)`);
               }
+              const structureFixed = normalizeGeneratedStructure(repairWorkspace);
+              if (structureFixed > 0) {
+                console.log(`[EditMode] 🧱 Applied ${structureFixed} structural normalization fix(es)`);
+              }
               // Extract repaired files back
               const repairedFiles: Record<string, string> = {};
               for (const f of repairWorkspace.listFiles()) {
