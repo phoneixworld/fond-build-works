@@ -12,6 +12,10 @@ import { DESIGN_THEMES, type AIModelId } from "@/lib/aiModels";
 import { supabase } from "@/integrations/supabase/client";
 import { type MsgContent, getTextContent, parseReactFiles } from "@/lib/codeParser";
 import type { PageTemplate } from "@/lib/pageTemplates";
+import { Workspace } from "@/lib/compiler/workspace";
+import { fixMissingImports } from "@/lib/compiler/missingImportFixer";
+import { fixExportMismatches } from "@/lib/compiler/exportMismatchFixer";
+import { normalizeGeneratedStructure } from "@/lib/compiler/structureNormalizer";
 
 type Msg = { role: "user" | "assistant"; content: MsgContent; timestamp?: number };
 
@@ -90,28 +94,36 @@ export function useInstantBuild(config: InstantBuildConfig) {
     const projectName = currentProject.name || "My App";
     const { files: templateFiles, deps } = hydrateTemplate(instantTemplate, projectName, promptDesc || "Build applications at the speed of thought");
 
-    // Inject shared UI component library + design tokens (matches Lovable's file count)
-    const { getSharedUIComponents, getGlobalStyles, getUseApiHook } = await import("@/lib/templates/scaffoldTemplates");
+    // Inject shared UI + domain component library + design tokens
+    const { getSharedUIComponents, getDomainComponents, getGlobalStyles, getUseApiHook } = await import("@/lib/templates/scaffoldTemplates");
     const uiComponents = getSharedUIComponents();
+    const domainComponents = getDomainComponents();
     const files: Record<string, string> = { ...templateFiles };
-    
+
     // Add UI components (don't overwrite template-specific files)
     for (const [path, code] of Object.entries(uiComponents)) {
       if (!files[path]) {
         files[path] = code;
       }
     }
-    
+
+    // Add domain component fallbacks (StatCard, StatusBadge, etc.)
+    for (const [path, code] of Object.entries(domainComponents)) {
+      if (!files[path]) {
+        files[path] = code;
+      }
+    }
+
     // Add globals.css with full design tokens if not already present
     if (!files["/styles/globals.css"] || files["/styles/globals.css"].length < 500) {
       files["/styles/globals.css"] = getGlobalStyles();
     }
-    
+
     // Add useApi hook
     if (!files["/hooks/useApi.js"]) {
       files["/hooks/useApi.js"] = getUseApiHook();
     }
-    
+
     console.log(`[InstantBuild] Enriched template: ${Object.keys(templateFiles).length} → ${Object.keys(files).length} files`);
 
     setSandpackFiles(files);
@@ -195,7 +207,7 @@ ${Object.entries(files).map(([path, code]) => `--- ${path}\n${code}`).join("\n\n
                   let resolved = importPath.startsWith("./") ? currentDir + importPath.substring(1) : importPath;
                   if (importPath.startsWith("../")) {
                     const parts = currentDir.split("/").filter(Boolean);
-                    let relParts = importPath.split("/");
+                    const relParts = importPath.split("/");
                     while (relParts[0] === "..") { parts.pop(); relParts.shift(); }
                     resolved = "/" + parts.concat(relParts).join("/");
                   }
@@ -237,14 +249,25 @@ ${Object.entries(files).map(([path, code]) => `--- ${path}\n${code}`).join("\n\n
           } else {
             // CRITICAL: Merge polished files INTO the enriched template, don't replace.
             // The AI polish pass only returns modified files, so we must preserve
-            // the 27+ UI components, globals.css, hooks, etc. from the original set.
+            // the pre-scaffolded components, globals.css, hooks, etc.
             const mergedFiles = { ...files, ...reactResult.files };
-            console.log(`[InstantBuild] Merged polish: ${Object.keys(reactResult.files).length} polished + ${Object.keys(files).length} base = ${Object.keys(mergedFiles).length} total`);
-            setSandpackFiles(mergedFiles);
-            syncSandpackToVirtualFS(mergedFiles);
+
+            // Deterministic stabilization pass for instant builds (matches compiler pipeline)
+            const repairWorkspace = new Workspace(mergedFiles);
+            const missingImportFixes = fixMissingImports(repairWorkspace);
+            const exportFixes = fixExportMismatches(repairWorkspace);
+            const structureFixes = normalizeGeneratedStructure(repairWorkspace);
+            const stabilizedFiles = repairWorkspace.toRecord();
+
+            console.log(
+              `[InstantBuild] Merged polish: ${Object.keys(reactResult.files).length} polished + ${Object.keys(files).length} base = ${Object.keys(stabilizedFiles).length} total (imports=${missingImportFixes}, exports=${exportFixes}, structure=${structureFixes})`
+            );
+
+            setSandpackFiles(stabilizedFiles);
+            syncSandpackToVirtualFS(stabilizedFiles);
             if (Object.keys(reactResult.deps).length > 0) setSandpackDeps(reactResult.deps);
 
-            const polishedPayload = { files: mergedFiles, deps: { ...deps, ...(reactResult.deps || {}) } };
+            const polishedPayload = { files: stabilizedFiles, deps: { ...deps, ...(reactResult.deps || {}) } };
             supabase
               .from("project_data")
               .upsert(
