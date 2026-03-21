@@ -74,3 +74,6 @@ verify_jwt = false
 
 [functions.android-export]
 verify_jwt = false
+
+[functions.project-db]
+verify_jwt = false

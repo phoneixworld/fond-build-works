@@ -82,7 +82,23 @@ ${workspaceContext ? `### Current code:\n${workspaceContext}` : ""}
    - Use Button for all actions, Input/Label/Textarea for forms, Checkbox/Switch for toggles
    - Use Progress for progress bars, Skeleton for loading states, Separator for dividers
    - If a domain component doesn't exist yet, create it in /components/ using /components/ui/ primitives
-4. Use the project's data API pattern: fetch(\`\${window.__SUPABASE_URL__}/functions/v1/project-api\`, { body: { project_id: window.__PROJECT_ID__, action, collection, data } })
+4. **DATA ACCESS (CRITICAL)**: Use Supabase client directly for ALL data operations:
+   - Create a /services/supabase.js file that exports a configured client:
+     \`\`\`
+     import { createClient } from "@supabase/supabase-js";
+     const supabaseUrl = window.__SUPABASE_URL__ || "https://oyjwexbyxggotuuxxisq.supabase.co";
+     const supabaseKey = window.__SUPABASE_KEY__ || "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im95andleGJ5eGdnb3R1dXh4aXNxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzI5MDk5NDcsImV4cCI6MjA4ODQ4NTk0N30.JQKI55nRaQtQjokXR-Lbol6-59HmwhAS7PzE9_Wx78I";
+     export const supabase = createClient(supabaseUrl, supabaseKey);
+     export const PROJECT_ID = window.__PROJECT_ID__;
+     \`\`\`
+   - For CRUD operations use supabase.from("TABLE_NAME").select/insert/update/delete
+   - The table names will be provided by the system as "pd_XXXX_tablename" format
+   - Always filter by project_id in queries: .eq("project_id", PROJECT_ID)
+   - Import { supabase, PROJECT_ID } from "../services/supabase.js" (adjust path as needed)
+   - For listing: supabase.from("pd_xxx_contacts").select("*").eq("project_id", PROJECT_ID).order("created_at", { ascending: false })
+   - For creating: supabase.from("pd_xxx_contacts").insert({ ...data, project_id: PROJECT_ID }).select().single()
+   - For updating: supabase.from("pd_xxx_contacts").update(data).eq("id", id).eq("project_id", PROJECT_ID)
+   - For deleting: supabase.from("pd_xxx_contacts").delete().eq("id", id).eq("project_id", PROJECT_ID)
 5. For auth, use the AuthContext pattern. Import path depends on file location.
    - AuthContext MUST read window.__PROJECT_ID__, window.__SUPABASE_URL__, window.__SUPABASE_KEY__ for API calls
    - AuthContext MUST call project-auth edge function for signup/login/me actions

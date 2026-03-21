@@ -1439,6 +1439,7 @@ export type Database = {
     }
     Functions: {
       cleanup_expired_cache: { Args: never; Returns: number }
+      exec_ddl: { Args: { ddl_sql: string }; Returns: undefined }
     }
     Enums: {
       [_ in never]: never
