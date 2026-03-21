@@ -55,7 +55,7 @@ const PreviewContext = createContext<PreviewContextType | null>(null);
 
 export const PreviewProvider = ({ children }: { children: ReactNode }) => {
   const [previewHtml, setPreviewHtml] = useState("");
-  const [sandpackFiles, setSandpackFiles] = useState<SandpackFileSet | null>(null);
+  const [sandpackFilesState, setSandpackFilesState] = useState<SandpackFileSet | null>(null);
   const [sandpackDeps, setSandpackDeps] = useState<Record<string, string>>({});
   const [isBuilding, setIsBuilding] = useState(false);
   const [buildStep, setBuildStep] = useState("");
@@ -66,11 +66,39 @@ export const PreviewProvider = ({ children }: { children: ReactNode }) => {
   const [refreshKey, setRefreshKey] = useState(0);
   const [currentPath, setCurrentPath] = useState("/");
 
+  const sanitizeSandpackFiles = useCallback((files: SandpackFileSet | null): SandpackFileSet | null => {
+    if (!files) return null;
+    const sanitized: SandpackFileSet = {};
+
+    for (const [rawPath, rawContent] of Object.entries(files)) {
+      if (typeof rawPath !== "string") continue;
+      const trimmedPath = rawPath.trim();
+      if (!trimmedPath) continue;
+      if (/^(null|undefined)$/i.test(trimmedPath) || /\/(?:null|undefined)$/i.test(trimmedPath)) {
+        console.warn(`[PreviewContext] Dropping invalid sandpack path: ${trimmedPath}`);
+        continue;
+      }
+      if (typeof rawContent !== "string") {
+        console.warn(`[PreviewContext] Dropping non-string sandpack file content for ${trimmedPath}`);
+        continue;
+      }
+
+      const normalizedPath = trimmedPath.startsWith("/") ? trimmedPath : `/${trimmedPath}`;
+      sanitized[normalizedPath] = rawContent;
+    }
+
+    return Object.keys(sanitized).length > 0 ? sanitized : null;
+  }, []);
+
+  const setSandpackFiles = useCallback((files: SandpackFileSet | null) => {
+    setSandpackFilesState(sanitizeSandpackFiles(files));
+  }, [sanitizeSandpackFiles]);
+
   const saveSnapshot = useCallback((label: string) => {
-    if (!sandpackFiles) return;
+    if (!sandpackFilesState) return;
     setSnapshots(prev => {
       const snapshot: BuildSnapshot = {
-        files: { ...sandpackFiles },
+        files: { ...sandpackFilesState },
         deps: { ...sandpackDeps },
         timestamp: Date.now(),
         label,
@@ -79,7 +107,7 @@ export const PreviewProvider = ({ children }: { children: ReactNode }) => {
       // Keep only last N snapshots
       return updated.slice(-MAX_SNAPSHOTS);
     });
-  }, [sandpackFiles, sandpackDeps]);
+  }, [sandpackFilesState, sandpackDeps]);
 
   const restoreSnapshot = useCallback((index: number) => {
     setSnapshots(prev => {
@@ -95,7 +123,7 @@ export const PreviewProvider = ({ children }: { children: ReactNode }) => {
 
   const contextValue = useMemo(() => ({
     previewHtml, setPreviewHtml,
-    sandpackFiles, setSandpackFiles,
+    sandpackFiles: sandpackFilesState, setSandpackFiles,
     sandpackDeps, setSandpackDeps,
     isBuilding, setIsBuilding,
     buildStep, setBuildStep,
@@ -106,7 +134,7 @@ export const PreviewProvider = ({ children }: { children: ReactNode }) => {
     refreshKey, triggerRefresh,
     currentPath, setCurrentPath,
   }), [
-    previewHtml, sandpackFiles, sandpackDeps, isBuilding, buildStep,
+    previewHtml, sandpackFilesState, sandpackDeps, isBuilding, buildStep,
     previewMode, buildMetrics, snapshots, saveSnapshot, restoreSnapshot,
     viewport, refreshKey, triggerRefresh, currentPath,
   ]);
