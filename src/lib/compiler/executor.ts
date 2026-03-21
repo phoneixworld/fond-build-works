@@ -31,7 +31,7 @@ export function buildTaskPrompt(
   const mode = getTaskContextMode(task);
 
   // Smaller, mode-aware context budget
-  const budget = mode === "infra" ? 8000 : mode === "components" ? 12000 : mode === "routing" ? 16000 : 14000;
+  const budget = mode === "infra" ? 7000 : mode === "components" ? 10000 : mode === "routing" ? 12000 : 10000;
   const workspaceContext = buildWorkspaceContext(workspace, budget, mode);
 
   const requirementsSection = ctx.rawRequirements
@@ -217,7 +217,7 @@ export async function executeTask(
   const prompt = buildTaskPrompt(task, ctx, workspace, taskIndex, totalTasks);
   task.buildPrompt = prompt;
 
-  const MAX_CONTINUATION_RETRIES = 1;
+  const MAX_CONTINUATION_RETRIES = 2;
 
   const runStream = (
     messages: Array<{ role: "user" | "assistant" | "system"; content: string }>,
@@ -263,22 +263,23 @@ export async function executeTask(
   let { text: responseText, files: extracted } = await runStream(baseMessages);
 
   if (extracted && Object.keys(extracted).length > 0) {
-    const truncation = detectTruncation(responseText, extracted);
-    if (truncation.isTruncated) {
-      console.warn(`[Executor] Truncation detected in task '${task.label}': ${truncation.reason}`);
+    const initialTruncation = detectTruncation(responseText, extracted);
+    if (initialTruncation.isTruncated) {
+      console.warn(`[Executor] Truncation detected in task '${task.label}': ${initialTruncation.reason}`);
       task.retries = (task.retries || 0) + 1;
 
+      let activeTruncation = initialTruncation;
       for (let attempt = 0; attempt < MAX_CONTINUATION_RETRIES; attempt++) {
         try {
           const contResult = await runStream([
             ...baseMessages,
             { role: "assistant", content: responseText },
-            { role: "user", content: truncation.continuationPrompt },
+            { role: "user", content: activeTruncation.continuationPrompt },
           ]);
 
           if (contResult.files) {
             for (const [path, code] of Object.entries(contResult.files)) {
-              if (truncation.truncatedFile && path === truncation.truncatedFile && extracted[path]) {
+              if (activeTruncation.truncatedFile && path === activeTruncation.truncatedFile && extracted[path]) {
                 extracted[path] = extracted[path] + "\n" + code;
               } else {
                 extracted[path] = code;
@@ -291,14 +292,23 @@ export async function executeTask(
           if (!recheck.isTruncated) {
             console.log(`[Executor] Continuation successful for task '${task.label}'`);
             responseText = fullCombined;
+            activeTruncation = recheck;
             break;
           }
+
           console.warn(`[Executor] Still truncated after continuation attempt ${attempt + 1}`);
           responseText = fullCombined;
+          activeTruncation = recheck;
         } catch (contErr) {
           console.warn(`[Executor] Continuation attempt failed:`, contErr);
           break;
         }
+      }
+
+      const finalTruncation = detectTruncation(responseText, extracted);
+      if (finalTruncation.isTruncated && finalTruncation.truncatedFile && extracted[finalTruncation.truncatedFile]) {
+        console.warn(`[Executor] Dropping unsafe truncated file '${finalTruncation.truncatedFile}' to avoid syntax crash`);
+        delete extracted[finalTruncation.truncatedFile];
       }
     }
   }
