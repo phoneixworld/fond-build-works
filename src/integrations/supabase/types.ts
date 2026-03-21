@@ -1015,6 +1015,50 @@ export type Database = {
           },
         ]
       }
+      project_migrations: {
+        Row: {
+          applied_at: string
+          created_at: string
+          id: string
+          name: string
+          project_id: string
+          sql_down: string
+          sql_up: string
+          status: string
+          version: number
+        }
+        Insert: {
+          applied_at?: string
+          created_at?: string
+          id?: string
+          name?: string
+          project_id: string
+          sql_down?: string
+          sql_up?: string
+          status?: string
+          version?: number
+        }
+        Update: {
+          applied_at?: string
+          created_at?: string
+          id?: string
+          name?: string
+          project_id?: string
+          sql_down?: string
+          sql_up?: string
+          status?: string
+          version?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "project_migrations_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       project_requirements: {
         Row: {
           created_at: string
@@ -1093,6 +1137,47 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "project_schemas_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      project_tables: {
+        Row: {
+          columns: Json
+          created_at: string
+          full_table_name: string
+          has_rls: boolean
+          id: string
+          project_id: string
+          table_name: string
+          updated_at: string
+        }
+        Insert: {
+          columns?: Json
+          created_at?: string
+          full_table_name: string
+          has_rls?: boolean
+          id?: string
+          project_id: string
+          table_name: string
+          updated_at?: string
+        }
+        Update: {
+          columns?: Json
+          created_at?: string
+          full_table_name?: string
+          has_rls?: boolean
+          id?: string
+          project_id?: string
+          table_name?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "project_tables_project_id_fkey"
             columns: ["project_id"]
             isOneToOne: false
             referencedRelation: "projects"
@@ -1354,6 +1439,7 @@ export type Database = {
     }
     Functions: {
       cleanup_expired_cache: { Args: never; Returns: number }
+      exec_ddl: { Args: { ddl_sql: string }; Returns: undefined }
     }
     Enums: {
       [_ in never]: never

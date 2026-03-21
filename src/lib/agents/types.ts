@@ -62,6 +62,8 @@ export interface PipelineContext {
   designTheme?: string;
   model?: string;
   existingWorkspace: Record<string, string>;
+  /** Mapping from logical table name → real Postgres table name (e.g. contacts → pd_abc123_contacts) */
+  tableMappings?: Record<string, string>;
   /** Which agents the workflow agent decided to run */
   agentPlan: AgentName[];
   /** Accumulated results from each agent */
