@@ -10,6 +10,7 @@
  */
 
 import type { BuildContext, CompilerTask, TaskGraph, TaskType } from "./types";
+import type { IR } from "@/lib/ir";
 
 type AppType = "landing" | "dashboard" | "crud";
 
