@@ -13,7 +13,7 @@
 import { transform } from "sucrase";
 
 type MsgContent = string | Array<{ type: "text"; text: string } | { type: "image_url"; image_url: { url: string } }>;
-type Msg = { role: "user" | "assistant"; content: MsgContent };
+type Msg = { role: "user" | "assistant" | "system"; content: MsgContent };
 
 export type AgentIntent = "chat" | "build" | "edit" | "clarify";
 
