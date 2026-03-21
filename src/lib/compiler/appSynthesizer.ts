@@ -16,7 +16,10 @@ export function synthesizeAppJsx(ws: Workspace, routes?: Array<{ path: string; c
   for (const file of pageFiles) {
     const content = ws.getFile(file) || "";
     const name = file.replace(/^\/pages\//, "").replace(/\.jsx$/, "").replace(/\//g, "_").replace(/.*\//, "");
-    const componentName = file.match(/\/([^/]+)\.jsx$/)?.[1] || name;
+    const rawComponentName = file.match(/\/([^/]+)\.jsx$/)?.[1] || name;
+    // Sanitize: "Create Event" → "CreateEvent" (valid JS identifier)
+    const componentName = rawComponentName.split(/[^a-zA-Z0-9]+/).filter(Boolean)
+      .map(p => p.charAt(0).toUpperCase() + p.slice(1)).join("") || rawComponentName;
 
     const hasDefault = /export\s+default/.test(content);
     const namedMatch = content.match(/export\s+(?:function|const|class)\s+(\w+)/);

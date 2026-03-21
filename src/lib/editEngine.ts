@@ -531,6 +531,14 @@ function parseEditOutput(
     }
   }
 
+  // P2 FIX: Validate all parsed files — reject structurally corrupt output
+  for (const [path, code] of Object.entries(files)) {
+    if (!isStructurallyValid(code)) {
+      console.warn(`[EditEngine] Rejecting corrupt file: ${path}`);
+      delete files[path];
+    }
+  }
+
   return Object.keys(files).length > 0 ? { files, deps } : null;
 }
 // ─── Intent Detection ────────────────────────────────────────────────────────

@@ -139,8 +139,10 @@ function extractJson(raw: string): string {
  * Light normalization to keep downstream code simple.
  */
 function normalizeIR(ir: IR): IR {
+  // P0 FIX: Sanitize page names to valid JS identifiers (no spaces, special chars)
   const pages = ir.pages.map((p) => ({
     ...p,
+    name: sanitizeComponentName(p.name),
     path: p.path || inferPathFromName(p.name),
   }));
 
@@ -155,6 +157,26 @@ function normalizeIR(ir: IR): IR {
     navigation,
     backend: ir.backend ?? { provider: "none" },
   };
+}
+
+/**
+ * Convert any page name to a valid PascalCase JS identifier.
+ * "Create Event" → "CreateEvent"
+ * "Admission Detail" → "AdmissionDetail"
+ * "my-cool page!" → "MyCoolPage"
+ */
+function sanitizeComponentName(name: string): string {
+  // Split on non-alphanumeric chars
+  const parts = name.split(/[^a-zA-Z0-9]+/).filter(Boolean);
+  if (parts.length === 0) return "UnnamedPage";
+  
+  // PascalCase each part
+  const pascal = parts.map(p => p.charAt(0).toUpperCase() + p.slice(1)).join("");
+  
+  // Ensure starts with letter
+  if (/^[0-9]/.test(pascal)) return "Page" + pascal;
+  
+  return pascal;
 }
 
 function inferPathFromName(name: string): string {
