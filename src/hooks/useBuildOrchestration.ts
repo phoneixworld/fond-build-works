@@ -347,6 +347,7 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
     currentProject, saveProject, setMessages, setInput, setAttachedImages,
     setBuildStep, setPipelineStep, setCurrentAgent, setPendingBuildPrompt,
     setIsLoading, messagesRef, isSendingRef, isLoadingRef, buildMessageContent,
+    sandpackFilesRef, previewErrors,
   } as ChatAgentConfig);
 
   const { tryInstantBuild } = useInstantBuild({
