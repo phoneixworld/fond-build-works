@@ -52,17 +52,19 @@ Analyze the user's prompt and generate a complete domain model with:
 - Think about what pages the app needs
 ${existingSchemas?.length ? `\n## EXISTING SCHEMAS (don't duplicate):\n${JSON.stringify(existingSchemas)}` : ""}`;
 
-    const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+    const response = await fetch("https://api.anthropic.com/v1/messages", {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${LOVABLE_API_KEY}`,
+        "x-api-key": ANTHROPIC_API_KEY,
+        "anthropic-version": "2023-06-01",
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "google/gemini-2.5-pro",
+        model: "claude-sonnet-4-20250514",
+        max_tokens: 4096,
         temperature: 0.2,
+        system: systemPrompt,
         messages: [
-          { role: "system", content: systemPrompt },
           { role: "user", content: prompt },
         ],
         tools: [
