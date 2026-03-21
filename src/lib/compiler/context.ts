@@ -377,6 +377,17 @@ function extractRoutes(raw: string): IRRoute[] {
         seenPages.add(rp.page);
       }
     }
+
+    // ── Domain preset expansion: inject canonical routes for known domains ──
+    // Even when keywords aren't explicitly mentioned, a "School LMS" needs students, courses, etc.
+    const domainPresets = getDomainPresetRoutes(domain);
+    for (const preset of domainPresets) {
+      if (!seenPages.has(preset.page)) {
+        routes.push({ path: preset.path, page: preset.page, auth: !preset.path.includes("login") });
+        seenPages.add(preset.page);
+        console.log(`[IR] Injected domain preset route: ${preset.path} → ${preset.page}`);
+      }
+    }
   }
 
   return routes;
