@@ -857,7 +857,15 @@ function buildSandpackFiles(files: SandpackFileSet | null, projectId: string, su
   if (globalsCssPath && files) {
     const globalsCss = files[globalsCssPath] || files[globalsCssPath.slice(1)];
     if (globalsCss) {
-      base["/styles.css"] = DEFAULT_STYLES + "\n\n/* === User globals.css merged === */\n" + globalsCss;
+      const sanitized = sanitizeCss(globalsCss);
+      base["/styles.css"] = DEFAULT_STYLES + "\n\n/* === User globals.css merged === */\n" + sanitized;
+    }
+  }
+
+  // Sanitize all CSS files in the workspace to prevent unclosed block errors
+  for (const [path, content] of Object.entries(base)) {
+    if (path.endsWith(".css") && path !== "/styles.css") {
+      base[path] = sanitizeCss(content);
     }
   }
 
