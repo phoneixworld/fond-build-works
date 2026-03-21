@@ -174,7 +174,7 @@ function normalizeToastWiring(workspace: Workspace): number {
     if (updated.includes("<ToastProvider")) {
       const before = updated;
       updated = updated
-        .replace(/^\s*<ToastContainer\s*\/>\s*$/gm, "")
+        .replace(/<ToastContainer\s*\/>/g, "")
         .replace(/<ToastContainer\s*><\/ToastContainer>/g, "");
 
       if (updated !== before) {
