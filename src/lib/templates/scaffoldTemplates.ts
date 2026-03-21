@@ -176,6 +176,7 @@ export default function Sidebar() {
   }
 
   Object.assign(files, getSharedUIComponents());
+  Object.assign(files, getDomainComponents());
   files["/hooks/useApi.js"] = getUseApiHook();
   files["/styles/globals.css"] = getGlobalStyles();
 
