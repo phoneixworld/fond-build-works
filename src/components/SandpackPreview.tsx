@@ -202,6 +202,41 @@ function ensureReactInScope(code: string, filePath: string): string {
   return `import React from "react";\n${code}`;
 }
 
+function resolveRelativePath(fromFile: string, rel: string): string {
+  if (!rel.startsWith(".")) return rel;
+  const fromParts = fromFile.split("/").filter(Boolean);
+  fromParts.pop();
+  for (const seg of rel.split("/")) {
+    if (!seg || seg === ".") continue;
+    if (seg === "..") fromParts.pop();
+    else fromParts.push(seg);
+  }
+  return `/${fromParts.join("/")}`;
+}
+
+function removeSelfImports(code: string, filePath: string): string {
+  const currentBase = filePath.replace(/\.[^.]+$/, "");
+  let removed = false;
+
+  const cleaned = code.replace(
+    /^\s*import\s+[\s\S]*?\s+from\s+['"](\.\.?\/[^'"]+)['"]\s*;?\s*$/gm,
+    (line, relPath: string) => {
+      const resolvedBase = resolveRelativePath(filePath, relPath).replace(/\.[^.]+$/, "");
+      if (resolvedBase === currentBase) {
+        removed = true;
+        return "";
+      }
+      return line;
+    }
+  );
+
+  if (removed) {
+    console.warn(`[SandpackPreview] Removed self-import in ${filePath}`);
+  }
+
+  return cleaned;
+}
+
 function removeDefaultExportConflict(code: string, filePath: string): string {
   const defaultExport = code.match(/\bexport\s+default\s+([A-Za-z_$][\w$]*)\s*;?/);
   const defaultName = defaultExport?.[1];
@@ -250,6 +285,7 @@ function sanitizeImports(code: string, filePath: string): string {
   // Repair common AI concatenation artifacts before parse.
   code = trimLateImportTail(code, filePath);
   code = collapseDuplicateReactImports(code, filePath);
+  code = removeSelfImports(code, filePath);
   code = removeDefaultExportConflict(code, filePath);
   code = ensureReactInScope(code, filePath);
 
@@ -743,13 +779,15 @@ function buildSandpackFiles(files: SandpackFileSet | null, projectId: string, su
     let processed = isCodeFile ? sanitizeImports(code, sandpackPath) : code;
 
     if (isCodeFile && !sandpackPath.includes("styles") && !sandpackPath.includes(".css")) {
-      if (!/export\s+default\b/.test(processed)) {
-        const mainExportMatch = processed.match(/export\s+(?:function|const)\s+([A-Z]\w+)/);
-        if (mainExportMatch) {
-          processed += `\nexport default ${mainExportMatch[1]};\n`;
-          // If a named export for the same symbol exists, remove it to avoid
-          // parser-level duplicate export failures in Sandpack's transform pipeline.
-          processed = removeDefaultExportConflict(processed, sandpackPath);
+      const hasDefaultExport = /export\s+default\b/.test(processed);
+      const hasAnyExplicitExport = /\bexport\s+/.test(processed);
+      // Only auto-add a default export when the file has no exports at all.
+      // This avoids parser failures like:
+      // `export { Button }; export default Button;` (duplicate exported identifier)
+      if (!hasDefaultExport && !hasAnyExplicitExport) {
+        const mainComponentMatch = processed.match(/\b(?:function|const)\s+([A-Z]\w+)/);
+        if (mainComponentMatch) {
+          processed += `\nexport default ${mainComponentMatch[1]};\n`;
         }
       }
     }
