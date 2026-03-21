@@ -165,8 +165,9 @@ export function parseFileSections(block: string): { files: Record<string, string
   let inDeps = false;
   let depsLines: string[] = [];
   
-  const separatorRegex = /^-{3}\s+(\/?\w[\w/.-]*\.(?:jsx?|tsx?|css))\s*-{0,3}\s*$/;
-  const bareFilenameRegex = /^\/?(\w[\w/.-]*\.(?:jsx?|tsx?|css))\s*$/;
+  // Accept filenames with spaces/symbols (e.g. /pages/News & Events.jsx)
+  const separatorRegex = /^-{3}\s+(.+?\.(?:jsx?|tsx?|css))\s*-{0,3}\s*$/;
+  const bareFilenameRegex = /^\/?(.+?\.(?:jsx?|tsx?|css))\s*$/;
   const justDashes = /^-{3}\s*$/;
   
   function flushFile() {
