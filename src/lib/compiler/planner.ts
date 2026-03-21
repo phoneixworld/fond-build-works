@@ -1,11 +1,12 @@
 /**
- * Build Compiler v1.0 — Planner
- * 
+ * Build Compiler v1.1 — Planner
+ *
  * Turns a BuildContext into a TaskGraph (DAG of build tasks).
  * Deterministic: same inputs → same graph.
- * 
+ *
  * v1.1: Richer structure — generates reusable domain components,
  * individual page tasks, and dashboard widget tasks for professional output.
+ * v1.2: Extend/fix builds reuse rich page instructions and avoid hollow tasks.
  */
 
 import type { BuildContext, CompilerTask, TaskGraph, TaskType } from "./types";
@@ -16,9 +17,9 @@ type AppType = "landing" | "dashboard" | "crud";
  * Detect the app type from requirements to generate appropriate components.
  * Landing pages get section components; dashboard/CRUD apps get data components.
  */
-function detectAppType(rawRequirements: string, ir: BuildContext["ir"]): AppType {
+function detectAppType(rawRequirements: string, ir: BuildContext["ir"]: AppType {
   const text = rawRequirements.toLowerCase();
-  
+
   const landingSignals = [
     "landing page", "website", "homepage", "home page", "marketing",
     "portfolio", "hero section", "testimonials", "pricing page",
@@ -28,27 +29,27 @@ function detectAppType(rawRequirements: string, ir: BuildContext["ir"]): AppType
     "restaurant website", "agency website", "personal website",
     "features section", "about us", "contact page",
   ];
-  
+
   const dashboardSignals = [
     "dashboard", "admin panel", "management system", "crm", "erp",
     "inventory", "tracking", "analytics", "reporting", "monitor",
     "crud", "data table", "records", "manage users", "manage orders",
     "employee", "task manager", "project management",
   ];
-  
+
   const landingScore = landingSignals.filter(s => text.includes(s)).length;
   const dashboardScore = dashboardSignals.filter(s => text.includes(s)).length;
-  
+
   // If IR has entities (data models), lean toward dashboard/CRUD
   if (ir.entities.length >= 2 && dashboardScore >= landingScore) return "dashboard";
-  
+
   // Strong landing signals
   if (landingScore > dashboardScore) return "landing";
   if (landingScore > 0 && ir.entities.length === 0) return "landing";
-  
+
   // Default to dashboard for apps with data models
   if (ir.entities.length > 0) return "dashboard";
-  
+
   // Default based on overall tone
   return dashboardScore > 0 ? "dashboard" : "landing";
 }
@@ -74,42 +75,19 @@ export function planTaskGraph(ctx: BuildContext): TaskGraph {
     label: "infra",
     type: "infra",
     description: `Shared UI component library with design tokens and global styles.
-    
+
 Pre-built components are already scaffolded in the workspace — do NOT regenerate them.
-The following 22 shadcn-compatible components are available for import from /components/ui/:
+The following shadcn-compatible components are available for import from /components/ui/:
 - utils.js: cn() class-merge helper — import { cn } from "./ui/utils"
-- Button.jsx: Variants: default, secondary, destructive, ghost, outline, link. Sizes: default, sm, lg, icon
-- Card.jsx: Compound: Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter
-- Input.jsx: Styled text input with focus ring
-- Label.jsx: Form label component
-- Badge.jsx: Status badges (default, secondary, success, warning, destructive, outline)
-- Separator.jsx: Horizontal/vertical separator
-- Skeleton.jsx: Loading placeholder with pulse animation
-- Checkbox.jsx: Accessible checkbox with checked/onCheckedChange
-- Dialog.jsx: Compound: Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter (open/onOpenChange)
-- Table.jsx: Compound: Table, TableHeader, TableBody, TableFooter, TableHead, TableRow, TableCell, TableCaption
-- Textarea.jsx: Multi-line text input
-- Select.jsx: Compound: Select, SelectTrigger, SelectValue, SelectContent, SelectItem, SelectGroup, SelectLabel
-- Tabs.jsx: Compound: Tabs, TabsList, TabsTrigger, TabsContent
-- Alert.jsx: Compound: Alert, AlertTitle, AlertDescription (default, destructive, success, warning)
-- Avatar.jsx: Compound: Avatar, AvatarImage, AvatarFallback
-- Progress.jsx: Progress bar with value/max props
-- Switch.jsx: Toggle switch with checked/onCheckedChange
-- Tooltip.jsx: Compound: TooltipProvider, Tooltip, TooltipTrigger, TooltipContent
-- ScrollArea.jsx: Scrollable container
-- Dropdown.jsx: Compound: DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuLabel
-- Sheet.jsx: Compound: Sheet, SheetTrigger, SheetContent, SheetHeader, SheetTitle, SheetDescription, SheetClose
-- Popover.jsx: Compound: Popover, PopoverTrigger, PopoverContent
-- Accordion.jsx: Compound: Accordion, AccordionItem, AccordionTrigger, AccordionContent
-- Modal.jsx: Simple modal with isOpen/onClose/title
-- DataTable.jsx: Sortable/paginated table with columns/data props
-- Toast.jsx: ToastContainer + showToast(message, type)
-- Spinner.jsx: Loading spinner
+- Button.jsx, Card.jsx (+ CardHeader/Title/Description/Content/Footer), Input.jsx, Label.jsx, Badge.jsx,
+  Separator.jsx, Skeleton.jsx, Checkbox.jsx, Dialog.jsx (+ DialogContent/Header/Title/Description/Footer),
+  Table.jsx (+ TableHeader/Body/Footer/Head/Row/Cell/Caption), Textarea.jsx, Select.jsx (+ Trigger/Value/Content/Item/Group/Label),
+  Tabs.jsx (+ TabsList/Trigger/Content), Alert.jsx (+ AlertTitle/AlertDescription), Avatar.jsx (+ AvatarImage/AvatarFallback),
+  Progress.jsx, Switch.jsx, Tooltip.jsx, ScrollArea.jsx, DropdownMenu.jsx, Sheet.jsx, Popover.jsx, Accordion.jsx,
+  Modal.jsx, DataTable.jsx, Toast.jsx, Spinner.jsx.
 
 Only generate globals.css with design tokens. All UI components are pre-scaffolded.`,
-    produces: [
-      "/styles/globals.css",
-    ],
+    produces: ["/styles/globals.css"],
     priority: 0,
   });
   tasks.push(infraTask);
@@ -121,7 +99,9 @@ Only generate globals.css with design tokens. All UI components are pre-scaffold
     const authTask = createTask({
       label: "auth",
       type: "frontend",
-      description: `Auth system with roles: ${ir.roles.map(r => r.name).join(", ") || "user"}. Must create AuthContext, LoginPage, SignupPage, and ProtectedRoute. Login/Signup routes must stay public (never wrapped in ProtectedRoute).`,
+      description: `Auth system with roles: ${ir.roles.map(r => r.name).join(", ") || "user"}.
+Must create AuthContext, LoginPage, SignupPage, and ProtectedRoute.
+Login/Signup routes must stay public (never wrapped in ProtectedRoute).`,
       produces: [
         "/contexts/AuthContext.jsx",
         "/pages/Auth/LoginPage.jsx",
@@ -158,12 +138,13 @@ Only generate globals.css with design tokens. All UI components are pre-scaffold
 
   const pageTaskIds: string[] = [];
 
-  if (ctx.buildIntent === "new_app") {
+  const isNewApp = ctx.buildIntent === "new_app";
 
+  if (isNewApp) {
+    // ── NEW APP FLOW ────────────────────────────────────────────────
     if (appType === "landing") {
       // ── LANDING PAGE flow: generate section components ──────────────
 
-      // Task A: Navbar + Footer layout
       const layoutTask = createTask({
         label: "domain:layout",
         type: "frontend",
@@ -193,7 +174,6 @@ Create THESE files:
       });
       tasks.push(layoutTask);
 
-      // Task B: Hero + Stats sections
       const heroTask = createTask({
         label: "section:hero",
         type: "frontend",
@@ -201,15 +181,14 @@ Create THESE files:
 
 Create THESE files:
 1. /components/HeroSection.jsx — Full-width hero with:
-   - Badge/chip at top ("Now in Beta", "New Feature", etc.)
-   - Large bold headline (text-5xl to text-7xl)
+   - Badge/chip at top
+   - Large bold headline
    - Subtitle paragraph
-   - Two CTA buttons (primary + secondary)
+   - Two CTA buttons
    - Decorative gradient background or pattern
-   - Animated entrance using CSS transitions or framer-motion
-   
+
 2. /components/StatsSection.jsx — Social proof numbers:
-   - 4 key metrics in a grid (e.g., "10,000+ Users", "99.9% Uptime", etc.)
+   - 4 key metrics in a grid
    - Dark background for contrast
    - Domain-relevant numbers based on the user's requirements
 
@@ -223,28 +202,15 @@ Each component must export default and use lucide-react for icons.`,
       });
       tasks.push(heroTask);
 
-      // Task C: Features + How It Works sections
       const featuresTask = createTask({
         label: "section:features",
         type: "frontend",
         description: `Generate Features and How It Works sections for: "${ctx.rawRequirements.slice(0, 1200)}"
 
 Create THESE files:
-1. /components/FeaturesSection.jsx — 6 feature cards in a 3-column grid:
-   - Each card has an icon, title, description
-   - Hover effects (shadow, translate)
-   - Content must be domain-specific based on the requirements
-   
-2. /components/HowItWorks.jsx — 3-step process section:
-   - Step numbers (01, 02, 03)
-   - Icon, title, description for each step
-   - Connected by visual flow (dotted lines or numbered badges)
-   - Light background for contrast
-
-3. /components/QuickLinks.jsx — Grid of action/resource cards:
-   - 4-6 cards with icon, title, link
-   - Can serve as secondary navigation or resource hub
-   - Relevant to the domain (e.g., docs, API, tutorials)
+1. /components/FeaturesSection.jsx — 6 feature cards in a 3-column grid
+2. /components/HowItWorks.jsx — 3-step process section
+3. /components/QuickLinks.jsx — Grid of action/resource cards
 
 Each component must export default and use lucide-react for icons.`,
         produces: [
@@ -257,39 +223,17 @@ Each component must export default and use lucide-react for icons.`,
       });
       tasks.push(featuresTask);
 
-      // Task D: Testimonials + Pricing + CTA sections
       const socialProofTask = createTask({
         label: "section:social-proof",
         type: "frontend",
-        description: `Generate Testimonials, Pricing, and CTA sections for: "${ctx.rawRequirements.slice(0, 1200)}"
+        description: `Generate Testimonials, Pricing, CTA, News, and Events sections for: "${ctx.rawRequirements.slice(0, 1200)}"
 
 Create THESE files:
-1. /components/TestimonialsSection.jsx — 3 testimonial cards:
-   - Star ratings, quote text, person name + role/company
-   - Profile avatar with initials
-   - Clean card layout
-
-2. /components/PricingSection.jsx — 3-tier pricing table:
-   - Free / Pro / Enterprise tiers
-   - Price, features list, CTA button per tier
-   - Highlighted "popular" tier with ring/shadow
-   - Checkmark icons for features
-
-3. /components/CTASection.jsx — Final call-to-action:
-   - Bold headline + description
-   - Dark/contrasting background
-   - Large CTA button
-   - "No credit card required" or similar reassurance
-
-4. /components/NewsSection.jsx — Latest updates/blog cards:
-   - 3 article cards with title, excerpt, date
-   - Image placeholder or gradient
-   - "Read More" links
-
-5. /components/EventsSection.jsx — Upcoming events/announcements:
-   - 3-4 event cards with date, title, location
-   - Calendar-style date display
-   - Register/RSVP button
+- /components/TestimonialsSection.jsx
+- /components/PricingSection.jsx
+- /components/CTASection.jsx
+- /components/NewsSection.jsx
+- /components/EventsSection.jsx
 
 Each component must export default and use lucide-react for icons.`,
         produces: [
@@ -304,27 +248,16 @@ Each component must export default and use lucide-react for icons.`,
       });
       tasks.push(socialProofTask);
 
-      // Task E: Main landing page that assembles all sections
       const landingPageTask = createTask({
         label: "page:Landing",
         type: "frontend",
         description: `Generate the main landing page that assembles all section components: "${ctx.rawRequirements.slice(0, 800)}"
 
 Create /pages/Index.jsx that imports and renders ALL sections in order:
-1. Navbar (from ../components/Navbar)
-2. HeroSection (from ../components/HeroSection)
-3. StatsSection (from ../components/StatsSection)
-4. FeaturesSection (from ../components/FeaturesSection)
-5. HowItWorks (from ../components/HowItWorks)
-6. QuickLinks (from ../components/QuickLinks)
-7. EventsSection (from ../components/EventsSection)
-8. NewsSection (from ../components/NewsSection)
-9. TestimonialsSection (from ../components/TestimonialsSection)
-10. PricingSection (from ../components/PricingSection)
-11. CTASection (from ../components/CTASection)
-12. Footer (from ../components/Footer)
+Navbar, HeroSection, StatsSection, FeaturesSection, HowItWorks, QuickLinks,
+EventsSection, NewsSection, TestimonialsSection, PricingSection, CTASection, Footer.
 
-The page must use a min-h-screen wrapper with smooth scroll enabled.
+Use a min-h-screen wrapper with smooth scroll enabled.
 Do NOT put any section content inline — import everything.`,
         produces: ["/pages/Index.jsx"],
         dependsOn: [infraTask.id, layoutTask.id, heroTask.id, featuresTask.id, socialProofTask.id],
@@ -332,11 +265,9 @@ Do NOT put any section content inline — import everything.`,
       });
       tasks.push(landingPageTask);
       pageTaskIds.push(landingPageTask.id, layoutTask.id, heroTask.id, featuresTask.id, socialProofTask.id);
-
     } else {
-      // ── DASHBOARD/CRUD flow (existing logic) ──────────────────────
+      // ── DASHBOARD/CRUD flow ────────────────────────────────────────
 
-      // Task A: Layout shell (sidebar + app wrapper)
       const layoutTask = createTask({
         label: "domain:layout",
         type: "frontend",
@@ -349,7 +280,6 @@ Create TWO files:
    - Navigation links with icons (from lucide-react) for each module
    - Active state highlighting using useLocation() from react-router-dom
    - User info section at the bottom with logout button
-   - Smooth hover transitions and proper spacing
    - Collapsible on mobile with hamburger toggle
 
 Use NavLink from react-router-dom for active state detection.`,
@@ -362,7 +292,6 @@ Use NavLink from react-router-dom for active state detection.`,
       });
       tasks.push(layoutTask);
 
-      // Task B: Reusable domain components
       const componentsTask = createTask({
         label: "domain:components",
         type: "frontend",
@@ -394,13 +323,10 @@ Each component must accept props, include realistic defaults, use lucide-react i
       });
       tasks.push(componentsTask);
 
-      // ── Generate page tasks from routes (or infer them) ──────────────
-
       const routes = ir.routes.length > 0 ? ir.routes : [];
       const dashboardRoute = routes.find(r => r.page === "DashboardPage" || r.path === "/");
       const otherRoutes = routes.filter(r => r.page !== "LoginPage" && r !== dashboardRoute);
 
-      // Task C: Dashboard page (always created for new apps)
       const dashPageName = dashboardRoute?.page || "DashboardPage";
       const dashboardTask = createTask({
         label: "page:Dashboard",
@@ -422,9 +348,8 @@ CRITICAL: Import reusable components — do NOT inline them. Use domain-specific
       tasks.push(dashboardTask);
       pageTaskIds.push(dashboardTask.id);
 
-      // Task D: First batch of domain pages (up to 3)
       const batch1Routes = otherRoutes.slice(0, 3);
-      const batch1Produces = batch1Routes.map(r => `/pages/${r.page.replace(/Page$/, '')}/${r.page}.jsx`);
+      const batch1Produces = batch1Routes.map(r => `/pages/${r.page.replace(/Page$/, "")}/${r.page}.jsx`);
       if (batch1Routes.length > 0) {
         const domainPagesTask1 = createTask({
           label: "domain:pages-1",
@@ -432,7 +357,7 @@ CRITICAL: Import reusable components — do NOT inline them. Use domain-specific
           description: `Generate ${batch1Routes.length} domain pages for: "${ctx.rawRequirements.slice(0, 1200)}"
 
 Generate these pages:
-${batch1Routes.map(r => `- /pages/${r.page.replace(/Page$/, '')}/${r.page}.jsx (route: ${r.path})`).join("\n")}
+${batch1Routes.map(r => `- /pages/${r.page.replace(/Page$/, "")}/${r.page}.jsx (route: ${r.path})`).join("\n")}
 
 RULES:
 - Each page MUST import from /components/ (StatCard, DataTable, StatusBadge, PageHeader, SearchFilterBar)
@@ -448,9 +373,8 @@ RULES:
         pageTaskIds.push(domainPagesTask1.id);
       }
 
-      // Task E: Second batch of domain pages (remaining)
       const batch2Routes = otherRoutes.slice(3, 6);
-      const batch2Produces = batch2Routes.map(r => `/pages/${r.page.replace(/Page$/, '')}/${r.page}.jsx`);
+      const batch2Produces = batch2Routes.map(r => `/pages/${r.page.replace(/Page$/, "")}/${r.page}.jsx`);
       if (batch2Routes.length > 0) {
         const domainPagesTask2 = createTask({
           label: "domain:pages-2",
@@ -458,7 +382,7 @@ RULES:
           description: `Generate ${batch2Routes.length} MORE domain pages for: "${ctx.rawRequirements.slice(0, 1200)}"
 
 Generate these pages:
-${batch2Routes.map(r => `- /pages/${r.page.replace(/Page$/, '')}/${r.page}.jsx (route: ${r.path})`).join("\n")}
+${batch2Routes.map(r => `- /pages/${r.page.replace(/Page$/, "")}/${r.page}.jsx (route: ${r.path})`).join("\n")}
 
 RULES:
 - Import from /components/ (reuse StatCard, DataTable, StatusBadge, PageHeader, SearchFilterBar)
@@ -472,7 +396,6 @@ RULES:
         pageTaskIds.push(domainPagesTask2.id);
       }
 
-      // Task F: Settings page
       const hasSettings = routes.some(r => r.page === "SettingsPage");
       if (!hasSettings) {
         const settingsTask = createTask({
@@ -496,35 +419,36 @@ Import PageHeader from ../../components/PageHeader.`,
       pageTaskIds.push(layoutTask.id);
     }
   } else {
-    // Non-new_app builds (extend/fix/refactor) with rich task descriptions
-    for (const route of ir.routes) {
+    // ── EXTEND / FIX / REFACTOR FLOW ─────────────────────────────────
+    // Reuse rich page semantics instead of hollow "Page component for X" tasks.
+
+    const routes = ir.routes.length > 0 ? ir.routes : [];
+
+    for (const route of routes) {
       if (route.page === "LoginPage" && authTaskId) continue;
 
       const deps = [...modelTaskIds];
       if (authTaskId && route.auth) deps.push(authTaskId);
-      if (deps.length === 0) { deps.push(infraTask.id); if (authTaskId) deps.push(authTaskId); }
+      if (deps.length === 0) {
+        deps.push(infraTask.id);
+        if (authTaskId) deps.push(authTaskId);
+      }
 
-      const moduleName = route.page.replace(/Page$/, "");
+      const pageDir = route.page.replace(/Page$/, "");
+      const pagePath = `/pages/${pageDir}/${route.page}.jsx`;
+
       const pageTask = createTask({
         label: `page:${route.page}`,
         type: "frontend",
-        description: `Generate/update page for "${ctx.rawRequirements.slice(0, 1000)}"
-
-Create /pages/${moduleName}/${route.page}.jsx (route: ${route.path})
-
-You are EXTENDING an existing app. Do NOT break existing routes or layouts.
-Reuse existing components from /components/ and /components/ui/.
-Follow the existing layout pattern (import AppLayout or Sidebar if they exist).
+        description: `Update or create the page component for route ${route.path}: ${route.page}.
 
 RULES:
-- Import from /components/ (StatCard, DataTable, StatusBadge, PageHeader, SearchFilterBar)
-- Include useState with realistic hardcoded data (5-10 rows)
-- Include search, filter, add button, data table, status badges, row actions
-- Include an "Add New" modal using Dialog from /components/ui/Dialog
-- Page must export default
-- Use Tailwind CSS with design tokens
-- Import lucide-react icons for visual polish`,
-        produces: [`/pages/${moduleName}/${route.page}.jsx`],
+- If the file already exists, MODIFY it in-place: preserve existing layout, imports, and behavior.
+- Use domain components from /components/ (StatCard, DataTable, StatusBadge, PageHeader, SearchFilterBar, ActivityFeed, QuickActions) where appropriate.
+- Use /components/ui/ primitives (Button, Card, Table, Dialog, Tabs, etc.) for structure.
+- Do NOT recreate AuthContext, layout, or shared components.
+- Keep styling and structure consistent with the rest of the app.`,
+        produces: [pagePath],
         dependsOn: deps,
         priority: 3,
       });
@@ -533,7 +457,31 @@ RULES:
     }
   }
 
-  // ── Pass 5: App entry + routing ───────────────────────────────────
+  // ── Pass 5: Sidebar ↔ Router verification ─────────────────────────
+
+  const sidebarVerifyTask = createTask({
+    label: "sidebar:verify-and-stub",
+    type: "frontend",
+    description: `Verify that /layout/Sidebar.jsx navigation links match the routes in /App.jsx and existing pages.
+
+Responsibilities:
+- Parse /layout/Sidebar.jsx and extract all NavLink/Link paths.
+- Parse /App.jsx and ensure there is a <Route> for each sidebar path.
+- For any sidebar path without a matching route:
+  - Add a <Route> entry in /App.jsx pointing to a stub page.
+  - Generate a simple, fully working stub page under /pages/Module/ModulePage.jsx that:
+    - Imports PageHeader and DataTable from /components/
+    - Renders a basic table with 5-10 rows of realistic sample data
+    - Uses proper layout and styling consistent with the rest of the app.
+- Do NOT remove existing routes or pages.`,
+    produces: ["/App.jsx"],
+    dependsOn: [...pageTaskIds],
+    priority: 5,
+    touches: ["/App.jsx", "/layout/Sidebar.jsx"],
+  });
+  tasks.push(sidebarVerifyTask);
+
+  // ── Pass 6: App entry + routing ───────────────────────────────────
 
   const routesList = ir.routes.length > 0
     ? ir.routes.map(r => `${r.path} → ${r.page}`).join(", ")
@@ -545,18 +493,20 @@ RULES:
 CRITICAL: This is a LANDING PAGE, not a dashboard app.
 - Import the main page from /pages/Index.jsx
 - Use HashRouter with a single route: "/" → Index
-- Include ToastProvider wrapper
+- Include ToastProvider wrapper if it exists
 - Do NOT use AppLayout with sidebar — landing pages don't have sidebars
 - Do NOT include AuthContext unless auth files exist in the workspace
 - Scan workspace for actual generated files and import them correctly.`
     : `App.jsx with routing for: ${routesList}.
 
-CRITICAL: Import page components from their DIRECTORY structure: /pages/ModuleName/ModuleName.jsx.
-Scan the workspace for /pages/**/*.jsx and /layout/AppLayout.jsx files.
-Use AppLayout as a parent route with <Outlet /> for nested page routes.
-Include AuthContext provider, ToastProvider, and ProtectedRoute wrappers.`;
+CRITICAL:
+- Import page components from their DIRECTORY structure: /pages/ModuleName/ModuleNamePage.jsx.
+- Scan the workspace for /pages/**/*.jsx and /layout/AppLayout.jsx files.
+- Use AppLayout as a parent route with <Outlet /> for nested page routes.
+- Include AuthContext provider, ToastProvider, and ProtectedRoute wrappers if they exist.
+- Do NOT regenerate pages or layout here — only wire up routing.`;
 
-  const appDeps = [...pageTaskIds];
+  const appDeps = [...pageTaskIds, sidebarVerifyTask.id];
   if (authTaskId) appDeps.push(authTaskId);
 
   const appTask = createTask({
@@ -566,13 +516,11 @@ Include AuthContext provider, ToastProvider, and ProtectedRoute wrappers.`;
     produces: ["/App.jsx"],
     dependsOn: appDeps,
     touches: ["/App.jsx"],
-    priority: 5,
+    priority: 6,
   });
   tasks.push(appTask);
 
   console.log(`[Planner] App type: ${appType}, tasks: ${tasks.length}, passes: ${buildPasses(tasks).length}`);
-
-  // ── Build passes ──────────────────────────────────────────────────
 
   const passes = buildPasses(tasks);
 
