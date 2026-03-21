@@ -8,6 +8,7 @@
  * This replaces the ad-hoc buildEngine pipeline with a deterministic compiler.
  */
 
+import type { IR } from "@/lib/ir";
 import type {
   BuildContext, BuildResult, BuildStatus,
   CompilerTask, TaskGraph, VerificationResult, RuntimeVerification,
