@@ -254,7 +254,7 @@ function sanitizeImports(code: string, filePath: string): string {
     const message = String(e?.message || e || "");
 
     // Hard parse failures are unsafe to pass through to Sandpack.
-    const hardSyntaxFailure = /has already been declared|Identifier\s+['"`].+['"`]\s+has already been declared|Unexpected token|Unterminated|Unexpected end of input/i.test(message);
+    const hardSyntaxFailure = /has already been declared|has already been exported|Identifier\s+['"`].+['"`]\s+has already been declared|Unexpected token|Unterminated|Unexpected end of input/i.test(message);
 
     if (!hardSyntaxFailure) {
       // Sucrase can be stricter than Sandpack Babel for some valid patterns.
