@@ -94,161 +94,60 @@ export function useInstantBuild(config: InstantBuildConfig) {
     const projectName = currentProject.name || "My App";
     const { files: templateFiles, deps } = hydrateTemplate(instantTemplate, projectName, promptDesc || "Build applications at the speed of thought");
 
-    // Inject shared UI component library + design tokens (matches Lovable's file count)
-    const { getSharedUIComponents, getGlobalStyles, getUseApiHook } = await import("@/lib/templates/scaffoldTemplates");
+    // Inject shared UI + domain components + design tokens
+    const { getSharedUIComponents, getDomainComponents, getGlobalStyles, getUseApiHook } = await import("@/lib/templates/scaffoldTemplates");
     const uiComponents = getSharedUIComponents();
+    const domainComponents = getDomainComponents();
     const files: Record<string, string> = { ...templateFiles };
-    
+
     // Add UI components (don't overwrite template-specific files)
     for (const [path, code] of Object.entries(uiComponents)) {
-      if (!files[path]) {
-        files[path] = code;
-      }
+      if (!files[path]) files[path] = code;
     }
-    
+
+    // Add domain component fallbacks (StatCard, StatusBadge, etc.)
+    for (const [path, code] of Object.entries(domainComponents)) {
+      if (!files[path]) files[path] = code;
+    }
+
     // Add globals.css with full design tokens if not already present
     if (!files["/styles/globals.css"] || files["/styles/globals.css"].length < 500) {
       files["/styles/globals.css"] = getGlobalStyles();
     }
-    
+
     // Add useApi hook
     if (!files["/hooks/useApi.js"]) {
       files["/hooks/useApi.js"] = getUseApiHook();
     }
-    
+
     console.log(`[InstantBuild] Enriched template: ${Object.keys(templateFiles).length} → ${Object.keys(files).length} files`);
 
     setSandpackFiles(files);
     syncSandpackToVirtualFS(files);
     if (Object.keys(deps).length > 0) setSandpackDeps(deps);
     setPreviewMode("sandpack");
-
-    const fileCount = Object.keys(files).length;
-    const instantMsg = `⚡ **Instant Preview** — ${fileCount} files rendered in under 1 second!\n\nYour ${templateName} is ready. I'm now polishing the content based on your prompt...`;
-    setMessages((prev) => {
-      const last = prev[prev.length - 1];
-      if (last?.role === "assistant") {
-        return prev.map((m, i) => (i === prev.length - 1 ? { ...m, content: instantMsg } : m));
-      }
-      return [...prev, { role: "assistant", content: instantMsg, timestamp: Date.now() }];
-    });
-
-    // Persist instant template
-    const payload = { files, deps };
-    supabase
-      .from("project_data")
-      .upsert(
-        { project_id: buildProjectId, collection: "sandpack_state", data: payload as any },
-        { onConflict: "project_id,collection" }
-      )
-      .then(({ error }) => {
-        if (error) console.warn("[InstantBuild] Persist failed:", error);
-      });
-
-    // Polish with AI
-    setBuildStep("🎨 AI is customizing your content...");
-    setPipelineStep("generating");
-
-    const themeInfo = DESIGN_THEMES.find(t => t.id === selectedTheme);
-    const polishContext = `## INSTANT TEMPLATE LOADED
-The user already sees a live preview of a ${templateName} template. Your job is to CUSTOMIZE the existing template files with the user's specific content, branding, and requirements.
-
-## USER REQUEST
-"${userText}"
-
-## CURRENT FILES (already rendered)
-${Object.entries(files).map(([path, code]) => `--- ${path}\n${code}`).join("\n\n")}
-
-## INSTRUCTIONS
-1. Keep the EXACT same file structure and component architecture
-2. Customize ALL placeholder text to match the user's specific request
-3. Adjust colors, content, and details to fit their brand/idea
-4. Output ALL files (even unchanged ones) in \`\`\`react-preview format
-5. Do NOT add new files unless necessary — focus on content customization`;
-
-    await streamBuildAgent({
-      messages: [{ role: "user" as const, content: polishContext }],
-      projectId: buildProjectId,
-      techStack: currentProject.tech_stack || "react-cdn",
-      schemas,
-      model: "google/gemini-3-flash-preview",
-      designTheme: themeInfo?.prompt,
-      templateContext: templateCtx || undefined,
-      irContext: irContext || undefined,
-      onDelta: upsert,
-      onDone: async (responseText) => {
-        const reactResult = parseReactFiles(responseText);
-        if (reactResult.files && Object.keys(reactResult.files).length > 0) {
-          let hasErrors = false;
-          try {
-            const { transform } = await import("sucrase");
-            for (const [fPath, fCode] of Object.entries(reactResult.files)) {
-              if (fPath.match(/\.(jsx?|tsx?)$/)) {
-                try {
-                  transform(fCode, { transforms: ["jsx", "imports"], filePath: fPath });
-                } catch {
-                  hasErrors = true;
-                  break;
-                }
-                // Auto-create stubs for missing imports
-                const importPathRegex = /import\s+(?:[\w{},\s*]+\s+from\s+)?["'](\.[^"']+)["']/g;
-                let m;
-                while ((m = importPathRegex.exec(fCode)) !== null) {
-                  const importPath = m[1];
-                  const currentDir = fPath.substring(0, fPath.lastIndexOf("/")) || "";
-                  let resolved = importPath.startsWith("./") ? currentDir + importPath.substring(1) : importPath;
-                  if (importPath.startsWith("../")) {
-                    const parts = currentDir.split("/").filter(Boolean);
-                    let relParts = importPath.split("/");
-                    while (relParts[0] === "..") { parts.pop(); relParts.shift(); }
-                    resolved = "/" + parts.concat(relParts).join("/");
-                  }
-                  if (!resolved.startsWith("/")) resolved = "/" + resolved;
-                  const exts = ["", ".jsx", ".js", ".tsx", ".ts"];
-                  const found = exts.some(ext => reactResult.files![resolved + ext] !== undefined);
-                  const indexFound = exts.some(ext => reactResult.files![resolved + "/index" + ext] !== undefined);
-                  if (!found && !indexFound) {
-                    const segments = resolved.split("/");
-                    const compName = segments[segments.length - 1].replace(/\.\w+$/, "");
-                    const stubPath = resolved.match(/\.\w+$/) ? resolved : resolved + ".jsx";
-                    // Don't overwrite shared UI components that exist in the scaffold template
-                    const sharedUIFiles = ["/components/ui/Toast.jsx", "/components/ui/Toast.js", "/components/ui/Spinner.jsx", "/components/ui/DataTable.jsx"];
-                    if (sharedUIFiles.some(f => stubPath === f || stubPath.endsWith(f))) {
-                      // Import the real component from scaffold templates instead of stubbing
-                      const { getSharedUIComponents } = await import("@/lib/templates/scaffoldTemplates");
-                      const shared = getSharedUIComponents();
-                      if (shared[stubPath]) {
-                        reactResult.files![stubPath] = shared[stubPath];
-                        console.log("[InstantBuild] Restored shared UI component:", stubPath);
-                      }
-                    } else if (/^[A-Z]/.test(compName)) {
-                      reactResult.files![stubPath] = `import React from "react";\n\nexport default function ${compName}({ children }) {\n  return <div className="p-4">{children || "${compName}"}</div>;\n}\n`;
-                      console.log("[InstantBuild] Auto-created stub:", stubPath);
-                    } else {
-                      reactResult.files![stubPath] = `export default {};\n`;
-                      console.log("[InstantBuild] Auto-created stub:", stubPath);
-                    }
-                  }
-                }
-              }
-            }
-          } catch {
-            // Sucrase import failed, skip validation
-          }
-
-          if (hasErrors) {
-            console.warn("[InstantBuild] Polish pass produced broken code, keeping instant template");
-          } else {
+...
             // CRITICAL: Merge polished files INTO the enriched template, don't replace.
             // The AI polish pass only returns modified files, so we must preserve
-            // the 27+ UI components, globals.css, hooks, etc. from the original set.
+            // the pre-scaffolded components, globals.css, hooks, etc.
             const mergedFiles = { ...files, ...reactResult.files };
-            console.log(`[InstantBuild] Merged polish: ${Object.keys(reactResult.files).length} polished + ${Object.keys(files).length} base = ${Object.keys(mergedFiles).length} total`);
-            setSandpackFiles(mergedFiles);
-            syncSandpackToVirtualFS(mergedFiles);
+
+            // Deterministic stabilization pass for instant builds (matches compiler pipeline)
+            const repairWorkspace = new Workspace(mergedFiles);
+            const missingImportFixes = fixMissingImports(repairWorkspace);
+            const exportFixes = fixExportMismatches(repairWorkspace);
+            const structureFixes = normalizeGeneratedStructure(repairWorkspace);
+            const stabilizedFiles = repairWorkspace.toRecord();
+
+            console.log(
+              `[InstantBuild] Merged polish: ${Object.keys(reactResult.files).length} polished + ${Object.keys(files).length} base = ${Object.keys(stabilizedFiles).length} total (imports=${missingImportFixes}, exports=${exportFixes}, structure=${structureFixes})`
+            );
+
+            setSandpackFiles(stabilizedFiles);
+            syncSandpackToVirtualFS(stabilizedFiles);
             if (Object.keys(reactResult.deps).length > 0) setSandpackDeps(reactResult.deps);
 
-            const polishedPayload = { files: mergedFiles, deps: { ...deps, ...(reactResult.deps || {}) } };
+            const polishedPayload = { files: stabilizedFiles, deps: { ...deps, ...(reactResult.deps || {}) } };
             supabase
               .from("project_data")
               .upsert(
