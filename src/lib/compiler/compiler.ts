@@ -50,6 +50,8 @@ export interface CompileOptions {
   techStack: string;
   semanticSummary?: string;
   ir?: any;
+  /** Structured IR from the new type system — if provided, skips AI extraction */
+  structuredIR?: IR;
   schemas?: any[];
   knowledge?: string[];
   designTheme?: string;
