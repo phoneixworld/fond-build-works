@@ -645,7 +645,7 @@ export default function use${entityName}(projectId) {
 `;
 }
 
-function generateAuthContext(): string {
+export function generateAuthContext(): string {
   return `import React, { createContext, useContext, useState, useCallback, useEffect } from "react";
 // IMPORTANT: Do NOT import useNavigate here. AuthContext must remain router-agnostic.
 // Navigation after login/logout should be handled by consuming components, not this context.
