@@ -234,6 +234,32 @@ export async function compile(
     console.log(`[Compiler] 🎨 Pre-scaffolded ${scaffoldedCount} UI + domain components into workspace`);
   }
 
+  // ── Phase 2.5: Deterministic IR page scaffolding ─────────────────────
+  // Seed the workspace with page files and App.jsx generated from structured IR
+  // BEFORE any model code is streamed. The model refines these instead of inventing them.
+  if (structuredIR && structuredIR.pages.length > 0) {
+    const irPages = scaffoldPagesFromIR(structuredIR);
+    let irScaffoldCount = 0;
+    for (const [path, content] of Object.entries(irPages)) {
+      if (!workspace.hasFile(path)) {
+        workspace.addFile(path, content);
+        irScaffoldCount++;
+      }
+    }
+
+    // Seed App.jsx from IR so routing is deterministic
+    if (!workspace.hasFile("/App.jsx")) {
+      const appFromIR = synthesizeAppFromIR(structuredIR);
+      workspace.addFile("/App.jsx", appFromIR);
+      irScaffoldCount++;
+    }
+
+    if (irScaffoldCount > 0) {
+      cloudLog.info(`IR scaffolder: seeded ${irScaffoldCount} page files + App.jsx from structured IR`, "compiler");
+      console.log(`[Compiler] 📄 IR scaffolder: seeded ${irScaffoldCount} files from structured IR`);
+    }
+  }
+
   const sortedTasks = topologicalSort(taskGraph.tasks);
 
   const executionCallbacks: ExecutionCallbacks = {
