@@ -376,7 +376,8 @@ function sanitizeImports(code: string, filePath: string): string {
   // Strip file separator lines (leftover from AI output formatting)
   code = code.split("\n").filter(line => {
     const t = line.trim();
-    if (/^-{3}\s+\/?\w[\w/.-]*\.\w+\s*-{0,3}\s*$/.test(t)) return false;
+    if (/^-{3}\s+\/?.+?\.(?:jsx?|tsx?|css|js|ts)\b(?:\s+\(.*\))?\s*-{0,3}\s*$/i.test(t)) return false;
+    if (/^-{3}\s+\/?dependencies\b/i.test(t)) return false;
     return true;
   }).join("\n");
 
