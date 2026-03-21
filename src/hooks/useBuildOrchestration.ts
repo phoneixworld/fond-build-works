@@ -1047,6 +1047,21 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
             deferredPreviewFilesRef.current = mergedFiles;
             syncSandpackToVirtualFS(mergedFiles);
             console.log(`[Compiler] Buffered task output (${Object.keys(mergedFiles).length} files) — preview will update on build completion`);
+
+            // ─── Incremental persistence: save after each task so interrupted builds are recoverable ───
+            if (currentProject?.id) {
+              const incrementalPayload = { files: mergedFiles, deps: {}, partial: true };
+              supabase
+                .from("project_data")
+                .upsert(
+                  { project_id: currentProject.id, collection: "sandpack_state", data: incrementalPayload as any },
+                  { onConflict: "project_id,collection" }
+                )
+                .then(({ error }) => {
+                  if (error) console.warn("[Compiler] Incremental persist failed:", error);
+                  else console.log(`[Compiler] 💾 Incremental save: ${Object.keys(mergedFiles).length} files`);
+                });
+            }
           }
         },
         onTaskError: (task, error) => {
