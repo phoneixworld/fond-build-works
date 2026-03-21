@@ -212,6 +212,10 @@ function normalizeToastWiring(workspace: Workspace): number {
         "export function ToastContainer({ toasts = [], config, removeToast = () => {} })",
       );
 
+    // Safety net for generated toast components that still map over undefined `toasts`
+    // (e.g. default-exported Toast components not named ToastContainer).
+    updated = updated.replace(/\btoasts\.map\s*\(/g, "(Array.isArray(toasts) ? toasts : []).map(");
+
     if (updated !== original) {
       workspace.updateFile(toastPath, updated);
       fixed++;
