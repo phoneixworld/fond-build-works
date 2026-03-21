@@ -27,12 +27,15 @@ const ALLOWED_PACKAGES = new Set([
   "lucide-react", "framer-motion", "date-fns", "recharts",
   "react-router-dom", "clsx", "tailwind-merge",
   "react-intersection-observer", "zustand", "zod", "axios",
-  "@tanstack/react-query", "react-hook-form", "sonner",
+  "@tanstack/react-query", "@tanstack/react-table",
+  "@supabase/supabase-js",
+  "react-hook-form", "sonner",
 ]);
 
 export function isAllowedImport(pkg: string): boolean {
   if (pkg.startsWith(".") || pkg.startsWith("/")) return true;
   const base = pkg.startsWith("@") ? pkg.split("/").slice(0, 2).join("/") : pkg.split("/")[0];
+  if (base.startsWith("@radix-ui/")) return true;
   return ALLOWED_PACKAGES.has(base);
 }
 
@@ -401,7 +404,7 @@ export function parseReactFiles(text: string): { chatText: string; files: Record
   }
   
   for (const [pkg, ver] of Object.entries(parsedFiles.deps)) {
-    if (ALLOWED_PACKAGES.has(pkg)) deps[pkg] = ver;
+    if (isAllowedImport(pkg)) deps[pkg] = ver;
   }
 
   return {
