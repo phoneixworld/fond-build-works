@@ -598,6 +598,96 @@ export type Database = {
         }
         Relationships: []
       }
+      pd_1cb7b91ced9c_conversation: {
+        Row: {
+          created_at: string
+          description: string | null
+          id: string
+          name: string
+          project_id: string
+          status: string | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          name: string
+          project_id?: string
+          status?: string | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          name?: string
+          project_id?: string
+          status?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      pd_1cb7b91ced9c_message: {
+        Row: {
+          created_at: string
+          description: string | null
+          id: string
+          name: string
+          project_id: string
+          status: string | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          name: string
+          project_id?: string
+          status?: string | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          name?: string
+          project_id?: string
+          status?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      pd_1cb7b91ced9c_user: {
+        Row: {
+          created_at: string
+          description: string | null
+          id: string
+          name: string
+          project_id: string
+          status: string | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          name: string
+          project_id?: string
+          status?: string | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          name?: string
+          project_id?: string
+          status?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       pd_2677e1ff1304_basic: {
         Row: {
           created_at: string
