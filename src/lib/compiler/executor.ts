@@ -31,7 +31,7 @@ export function buildTaskPrompt(
   const mode = getTaskContextMode(task);
 
   // Smaller, mode-aware context budget
-  const budget = mode === "infra" ? 8000 : mode === "components" ? 12000 : mode === "routing" ? 16000 : 14000;
+  const budget = mode === "infra" ? 7000 : mode === "components" ? 10000 : mode === "routing" ? 12000 : 10000;
   const workspaceContext = buildWorkspaceContext(workspace, budget, mode);
 
   const requirementsSection = ctx.rawRequirements
