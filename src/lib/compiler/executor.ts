@@ -313,7 +313,7 @@ function extractFilesFromOutput(text: string): Record<string, string> | null {
   const headerRegex = /^-{3}\s+(.+?)\s*$/;
 
   const parseHeader = (header: string): { type: "deps" | "file"; path?: string } | null => {
-    const cleaned = header.replace(/\s*-{0,3}\s*$/, "").trim();
+    const cleaned = header.replace(/\s*-{0,3}\s*$/, "").replace(/\s*\(truncated\)\s*$/i, "").trim();
 
     if (/^\/?dependencies\b/i.test(cleaned)) {
       return { type: "deps" };
@@ -326,6 +326,9 @@ function extractFilesFromOutput(text: string): Record<string, string> | null {
     path = path.replace(/^src\//i, "");
     if (!path.startsWith("/")) path = `/${path}`;
     path = path.replace(/^\/src\//, "/");
+
+    // Sanitize: remove spaces from path segments and PascalCase filenames
+    path = sanitizeFilePath(path);
 
     return { type: "file", path };
   };
