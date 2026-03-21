@@ -372,11 +372,13 @@ function normalizeContextReferences(workspace: Workspace): number {
       const isLocallyDefined = new RegExp(
         `(?:const|let|var)\\s+${usedName}\\s*=`
       ).test(updated);
+      const isKnownContext = contextMap.has(usedName);
 
-      if (isImported || isLocallyDefined) continue;
+      if (isLocallyDefined) continue;
+      if (isImported && isKnownContext) continue;
 
       // Try to find the actual context in the workspace
-      if (contextMap.has(usedName)) {
+      if (isKnownContext) {
         // Context exists but isn't imported – add the import
         const contextFile = contextMap.get(usedName)!;
         const importSpec = toImportSpecifier(filePath, contextFile);
