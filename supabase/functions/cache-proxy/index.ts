@@ -95,6 +95,8 @@ serve(async (req) => {
       project_id,
       tech_stack,
       knowledge,
+      workspace_files,
+      recent_errors,
       model,
       stream = true,
       cache_ttl = 3600,
