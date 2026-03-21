@@ -517,18 +517,21 @@ function parseEditOutput(
 
   // 3) Fallback: no --- separators, treat as single-file update to first target file
   if (Object.keys(files).length === 0) {
-    const fallbackCode = block
-      .replace(/^\s*```[a-z-]*\s*/i, "")
-      .replace(/\n```\s*$/i, "")
-      .trim();
+    const hasSectionMarkers = /^\s*-{3}\s+/m.test(block);
+    if (!hasSectionMarkers) {
+      const fallbackCode = block
+        .replace(/^\s*```[a-z-]*\s*/i, "")
+        .replace(/\n```\s*$/i, "")
+        .trim();
 
-    const looksLikeCode =
-      /(?:^|\n)\s*(?:import|export|const|let|var|function|class)\b/.test(fallbackCode) ||
-      /<[A-Za-z][^>]*>/.test(fallbackCode);
+      const looksLikeCode =
+        /(?:^|\n)\s*(?:import|export|const|let|var|function|class)\b/.test(fallbackCode) ||
+        /<[A-Za-z][^>]*>/.test(fallbackCode);
 
-    if (looksLikeCode && fallbackCode.length > 20) {
-      const fallbackTarget = targetFiles[0] || "/App.jsx";
-      files[normalizePath(fallbackTarget)] = fallbackCode;
+      if (looksLikeCode && fallbackCode.length > 20) {
+        const fallbackTarget = targetFiles[0] || "/App.jsx";
+        files[normalizePath(fallbackTarget)] = fallbackCode;
+      }
     }
   }
 
