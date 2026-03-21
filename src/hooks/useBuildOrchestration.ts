@@ -42,6 +42,7 @@ import { repairMissingModules } from "@/lib/compiler/missingModuleGen";
 import { fixMissingImports } from "@/lib/compiler/missingImportFixer";
 import { fixExportMismatches } from "@/lib/compiler/exportMismatchFixer";
 import { deduplicateFiles } from "@/lib/compiler/deduplicator";
+import { normalizeGeneratedStructure } from "@/lib/compiler/structureNormalizer";
 
 type Msg = { role: "user" | "assistant"; content: MsgContent; timestamp?: number };
 
