@@ -653,8 +653,9 @@ const AuthContext = createContext(null);
 
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
-  const [token, setToken] = useState(() => localStorage.getItem("auth_token"));
+  const [token, setToken] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
   const getConfig = () => ({
     apiBase: window.__SUPABASE_URL__ || "",
@@ -665,21 +666,40 @@ export function AuthProvider({ children }) {
   const persistSession = useCallback((nextUser, nextToken) => {
     setUser(nextUser || null);
     setToken(nextToken || null);
+    setError(null);
 
-    if (nextToken) localStorage.setItem("auth_token", nextToken);
-    else localStorage.removeItem("auth_token");
+    try {
+      if (nextToken) localStorage.setItem("auth_token", nextToken);
+      else localStorage.removeItem("auth_token");
 
-    if (nextUser) localStorage.setItem("auth_user", JSON.stringify(nextUser));
-    else localStorage.removeItem("auth_user");
+      if (nextUser) localStorage.setItem("auth_user", JSON.stringify(nextUser));
+      else localStorage.removeItem("auth_user");
+    } catch (e) {
+      // localStorage may be unavailable in some environments
+      console.warn("Failed to persist auth session:", e);
+    }
   }, []);
 
   const clearSession = useCallback(() => {
-    persistSession(null, null);
-  }, [persistSession]);
+    setUser(null);
+    setToken(null);
+    setError(null);
+    try {
+      localStorage.removeItem("auth_token");
+      localStorage.removeItem("auth_user");
+    } catch (e) {
+      console.warn("Failed to clear auth session:", e);
+    }
+  }, []);
 
   const authFetch = useCallback(async (action, body = {}, providedToken) => {
     const { apiBase, apiKey, projectId } = getConfig();
-    if (!apiBase || !projectId) throw new Error("Auth is not configured for this project yet");
+    
+    // Graceful degradation: if auth is not configured, don't crash
+    if (!apiBase || !projectId) {
+      console.warn("Auth is not configured for this project. Running in unauthenticated mode.");
+      return { data: null };
+    }
 
     const payload = { project_id: projectId, action, ...body };
     if (providedToken) {
@@ -687,18 +707,36 @@ export function AuthProvider({ children }) {
       payload.access_token = providedToken;
     }
 
-    const res = await fetch(\`\${apiBase}/functions/v1/project-auth\`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json", "Authorization": \`Bearer \${apiKey}\` },
-      body: JSON.stringify(payload),
-    });
+    try {
+      const res = await fetch(\`\${apiBase}/functions/v1/project-auth\`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "Authorization": \`Bearer \${apiKey}\` },
+        body: JSON.stringify(payload),
+      });
 
-    const json = await res.json();
-    if (!res.ok || json?.error) throw new Error(json?.error || "Authentication request failed");
-    return json;
+      // Handle non-JSON responses gracefully
+      const text = await res.text();
+      let json;
+      try {
+        json = JSON.parse(text);
+      } catch {
+        throw new Error("Server returned invalid response");
+      }
+
+      if (!res.ok || json?.error) throw new Error(json?.error || "Authentication request failed");
+      return json;
+    } catch (e) {
+      // Network errors should not crash the app
+      if (e instanceof TypeError && e.message.includes("fetch")) {
+        console.warn("Network error during auth:", e.message);
+        throw new Error("Network error — please check your connection");
+      }
+      throw e;
+    }
   }, []);
 
   const extractSession = useCallback((json) => {
+    if (!json) return { nextUser: null, nextToken: null };
     const payload = json?.data || json || {};
     const nextUser = payload.user || null;
     const nextToken = payload.token || payload.access_token || json?.token || json?.access_token || null;
@@ -710,9 +748,32 @@ export function AuthProvider({ children }) {
     let cancelled = false;
 
     const restore = async () => {
-      const savedToken = localStorage.getItem("auth_token");
+      let savedToken = null;
+      try {
+        savedToken = localStorage.getItem("auth_token");
+      } catch {
+        // localStorage unavailable
+      }
+      
       if (!savedToken) {
+        // Try to restore user from localStorage cache even without token validation
+        try {
+          const savedUser = localStorage.getItem("auth_user");
+          if (savedUser && !cancelled) {
+            // We have cached user but no token — user needs to re-login
+          }
+        } catch {}
         if (!cancelled) setLoading(false);
+        return;
+      }
+
+      const { apiBase, projectId } = getConfig();
+      if (!apiBase || !projectId) {
+        // Auth not configured — clear stale tokens and continue
+        if (!cancelled) {
+          clearSession();
+          setLoading(false);
+        }
         return;
       }
 
@@ -720,9 +781,17 @@ export function AuthProvider({ children }) {
         const json = await authFetch("me", {}, savedToken);
         const { nextUser } = extractSession(json);
 
-        if (!cancelled && nextUser) persistSession(nextUser, savedToken);
-        else if (!cancelled) clearSession();
-      } catch {
+        if (!cancelled) {
+          if (nextUser) {
+            persistSession(nextUser, savedToken);
+          } else {
+            clearSession();
+          }
+        }
+      } catch (err) {
+        // CRITICAL: Failed session validation must NOT crash the app.
+        // Clear the invalid token and let the user re-login.
+        console.warn("Session restore failed:", err?.message || err);
         if (!cancelled) clearSession();
       } finally {
         if (!cancelled) setLoading(false);
@@ -735,12 +804,18 @@ export function AuthProvider({ children }) {
 
   const login = useCallback(async (email, password) => {
     setLoading(true);
+    setError(null);
     try {
       const json = await authFetch("login", { email, password });
       const { nextUser, nextToken } = extractSession(json);
-      if (!nextUser || !nextToken) throw new Error("Invalid login response");
+      if (!nextUser || !nextToken) throw new Error("Invalid credentials");
       persistSession(nextUser, nextToken);
-      return json;
+      return { success: true, user: nextUser };
+    } catch (err) {
+      const message = err?.message || "Login failed";
+      setError(message);
+      setLoading(false);
+      return { success: false, error: message };
     } finally {
       setLoading(false);
     }
@@ -748,12 +823,18 @@ export function AuthProvider({ children }) {
 
   const signup = useCallback(async (email, password, displayName) => {
     setLoading(true);
+    setError(null);
     try {
       const json = await authFetch("signup", { email, password, display_name: displayName });
       const { nextUser, nextToken } = extractSession(json);
-      if (!nextUser || !nextToken) throw new Error("Invalid signup response");
+      if (!nextUser || !nextToken) throw new Error("Signup failed — please try again");
       persistSession(nextUser, nextToken);
-      return json;
+      return { success: true, user: nextUser };
+    } catch (err) {
+      const message = err?.message || "Signup failed";
+      setError(message);
+      setLoading(false);
+      return { success: false, error: message };
     } finally {
       setLoading(false);
     }
@@ -763,8 +844,18 @@ export function AuthProvider({ children }) {
     clearSession();
   }, [clearSession]);
 
+  // While loading, show a centered spinner — never render routes with null auth state
+  if (loading) {
+    return React.createElement("div", {
+      style: { display: "flex", justifyContent: "center", alignItems: "center", minHeight: "100vh" }
+    }, React.createElement("div", {
+      className: "spinner",
+      style: { width: 32, height: 32, border: "3px solid var(--color-border, #e5e7eb)", borderTopColor: "var(--color-primary, #3b82f6)", borderRadius: "50%", animation: "spin 0.6s linear infinite" }
+    }));
+  }
+
   return (
-    <AuthContext.Provider value={{ user, token, loading, login, signup, logout, isAuthenticated: !!user }}>
+    <AuthContext.Provider value={{ user, token, loading, error, login, signup, logout, isAuthenticated: !!user }}>
       {children}
     </AuthContext.Provider>
   );
@@ -772,7 +863,11 @@ export function AuthProvider({ children }) {
 
 export function useAuth() {
   const ctx = useContext(AuthContext);
-  if (!ctx) throw new Error("useAuth must be used within AuthProvider");
+  if (!ctx) {
+    // Instead of throwing (which crashes the whole app), return a safe default
+    console.warn("useAuth called outside AuthProvider — returning default values");
+    return { user: null, token: null, loading: false, error: null, login: async () => ({ success: false, error: "Not configured" }), signup: async () => ({ success: false, error: "Not configured" }), logout: () => {}, isAuthenticated: false };
+  }
   return ctx;
 }
 
