@@ -990,6 +990,7 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
 
       const compileCallbacks: CompileCallbacks = {
         onPhase: (phase, detail) => {
+          resetBuildSafetyTimeout();
           setBuildStep(detail);
           if (phase === "planning") setPipelineStep("planning");
           else if (phase === "executing") setPipelineStep("generating");
@@ -998,6 +999,7 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
           else if (phase === "complete") setPipelineStep("complete");
         },
         onTaskStart: (task, index, total) => {
+          resetBuildSafetyTimeout();
           setCurrentTaskIndex(index);
           setTotalPlanTasks(total);
           setBuildStep(`🔨 Task ${index + 1}/${total}: ${task.label}`);
@@ -1033,9 +1035,11 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
           });
         },
         onTaskDelta: (task, chunk) => {
+          resetBuildSafetyTimeout();
           setBuildStreamContent(prev => prev + chunk);
         },
         onTaskDone: (task, files) => {
+          resetBuildSafetyTimeout();
           if (lastProjectIdRef.current !== buildProjectId) {
             console.warn(`[Compiler] ⛔ Blocked cross-project file injection`);
             return;
@@ -1075,6 +1079,7 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
           setCompilerTasks(prev => prev.map(t => t.label === task.label ? { ...t, status: "done" as const } : t));
         },
         onVerification: (result) => {
+          resetBuildSafetyTimeout();
           if (result.ok) {
             setBuildStep("✅ All checks passed");
           } else {
@@ -1083,6 +1088,7 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
           }
         },
         onRepairStart: (round, actionCount) => {
+          resetBuildSafetyTimeout();
           setBuildStep(`🔧 Auto-repair round ${round}: fixing ${actionCount} issues...`);
         },
         onComplete: (result: BuildResult) => {
