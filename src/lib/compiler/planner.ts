@@ -496,7 +496,7 @@ Import PageHeader from ../../components/PageHeader.`,
       pageTaskIds.push(layoutTask.id);
     }
   } else {
-    // Non-new_app builds (extend/fix/refactor) with structured routes
+    // Non-new_app builds (extend/fix/refactor) with rich task descriptions
     for (const route of ir.routes) {
       if (route.page === "LoginPage" && authTaskId) continue;
 
@@ -504,11 +504,27 @@ Import PageHeader from ../../components/PageHeader.`,
       if (authTaskId && route.auth) deps.push(authTaskId);
       if (deps.length === 0) { deps.push(infraTask.id); if (authTaskId) deps.push(authTaskId); }
 
+      const moduleName = route.page.replace(/Page$/, "");
       const pageTask = createTask({
         label: `page:${route.page}`,
         type: "frontend",
-        description: `Page component for ${route.path}: ${route.page}`,
-        produces: [`/pages/${route.page}.jsx`],
+        description: `Generate/update page for "${ctx.rawRequirements.slice(0, 1000)}"
+
+Create /pages/${moduleName}/${route.page}.jsx (route: ${route.path})
+
+You are EXTENDING an existing app. Do NOT break existing routes or layouts.
+Reuse existing components from /components/ and /components/ui/.
+Follow the existing layout pattern (import AppLayout or Sidebar if they exist).
+
+RULES:
+- Import from /components/ (StatCard, DataTable, StatusBadge, PageHeader, SearchFilterBar)
+- Include useState with realistic hardcoded data (5-10 rows)
+- Include search, filter, add button, data table, status badges, row actions
+- Include an "Add New" modal using Dialog from /components/ui/Dialog
+- Page must export default
+- Use Tailwind CSS with design tokens
+- Import lucide-react icons for visual polish`,
+        produces: [`/pages/${moduleName}/${route.page}.jsx`],
         dependsOn: deps,
         priority: 3,
       });

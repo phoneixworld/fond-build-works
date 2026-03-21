@@ -20,7 +20,7 @@ export function buildTaskPrompt(
   totalTasks: number
 ): string {
   const existingFiles = workspace.listFiles();
-  const workspaceContext = buildWorkspaceContext(workspace, 24000);
+  const workspaceContext = buildWorkspaceContext(workspace, 24000, task.label);
 
   // Always include raw requirements so the build-agent understands the domain
   const requirementsSection = ctx.rawRequirements
@@ -147,19 +147,69 @@ ${workspaceContext ? `### Current code:\n${workspaceContext}` : ""}
 
 // ─── Workspace Context Builder ────────────────────────────────────────────
 
-function buildWorkspaceContext(workspace: Workspace, budgetChars: number): string {
+/**
+ * Task-aware context profiles.
+ * Different tasks need different files — routing needs pages + sidebar,
+ * page tasks need components + layout, etc.
+ */
+function getTaskContextProfile(taskLabel: string): {
+  mustInclude: RegExp[];
+  preferInclude: RegExp[];
+  indexOnly: RegExp[];
+} {
+  if (taskLabel === "app:routing") {
+    return {
+      mustInclude: [/\/App\.(jsx?|tsx?)$/, /\/layout\//, /\/contexts\/AuthContext/],
+      preferInclude: [/\/pages\/.*Page\.(jsx?|tsx?)$/],
+      indexOnly: [/\/components\//],
+    };
+  }
+  if (taskLabel.startsWith("page:") || taskLabel.startsWith("domain:pages")) {
+    return {
+      mustInclude: [/\/layout\//, /\/contexts\/AuthContext/, /\/components\/StatCard/, /\/components\/PageHeader/, /\/components\/StatusBadge/, /\/components\/SearchFilterBar/],
+      preferInclude: [/\/components\/(?!ui\/)/, /\/hooks\//],
+      indexOnly: [/\/components\/ui\//],
+    };
+  }
+  if (taskLabel === "domain:layout") {
+    return {
+      mustInclude: [/\/App\.(jsx?|tsx?)$/, /\/contexts\/AuthContext/],
+      preferInclude: [/\/pages\/.*Page\.(jsx?|tsx?)$/],
+      indexOnly: [/\/components\//],
+    };
+  }
+  // Default: original behavior
+  return {
+    mustInclude: [/\/App\.(jsx?|tsx?)$/, /\/contexts\/AuthContext/],
+    preferInclude: [],
+    indexOnly: [],
+  };
+}
+
+function buildWorkspaceContext(workspace: Workspace, budgetChars: number, taskLabel?: string): string {
   const files = workspace.listFiles();
   if (files.length === 0) return "";
 
-  const PRIORITY_FILES = ["/App.jsx", "/App.tsx", "/contexts/AuthContext.jsx"];
-  const prioritized = files.filter(f => PRIORITY_FILES.some(p => f.endsWith(p)));
-  const others = files.filter(f => !PRIORITY_FILES.some(p => f.endsWith(p)));
+  const profile = taskLabel ? getTaskContextProfile(taskLabel) : getTaskContextProfile("");
+
+  // Classify files
+  const mustFiles: string[] = [];
+  const preferFiles: string[] = [];
+  const indexFiles: string[] = [];
+  const otherFiles: string[] = [];
+
+  for (const f of files) {
+    if (profile.mustInclude.some(r => r.test(f))) mustFiles.push(f);
+    else if (profile.preferInclude.some(r => r.test(f))) preferFiles.push(f);
+    else if (profile.indexOnly.some(r => r.test(f))) indexFiles.push(f);
+    else otherFiles.push(f);
+  }
 
   let result = "";
   let remaining = budgetChars;
 
-  // Priority files first (full content)
-  for (const path of prioritized) {
+  // Tier 1: Must-include files — full content
+  for (const path of mustFiles) {
     const content = workspace.getFile(path)!;
     const block = `--- ${path}\n${content}\n\n`;
     if (block.length <= remaining) {
@@ -168,8 +218,37 @@ function buildWorkspaceContext(workspace: Workspace, budgetChars: number): strin
     }
   }
 
-  // Other files (truncate if needed)
-  for (const path of others) {
+  // Tier 2: Preferred files — full content if budget allows
+  for (const path of preferFiles) {
+    if (remaining <= 200) break;
+    const content = workspace.getFile(path)!;
+    const block = `--- ${path}\n${content}\n\n`;
+    if (block.length <= remaining) {
+      result += block;
+      remaining -= block.length;
+    } else if (remaining > 500) {
+      const snippet = content.slice(0, Math.max(200, remaining - 100));
+      result += `--- ${path} (truncated)\n${snippet}\n...[truncated]\n\n`;
+      remaining = 0;
+    }
+  }
+
+  // Tier 3: Index-only files — just signatures (export names + file path)
+  if (indexFiles.length > 0 && remaining > 200) {
+    result += "### Available components (index only):\n";
+    for (const path of indexFiles) {
+      if (remaining <= 50) break;
+      const content = workspace.getFile(path) || "";
+      const exports = content.match(/export\s+(?:default\s+)?(?:function|const|class)\s+(\w+)/g) || [];
+      const line = `- ${path}: ${exports.map(e => e.replace(/export\s+(default\s+)?(?:function|const|class)\s+/, "")).join(", ") || "default"}\n`;
+      result += line;
+      remaining -= line.length;
+    }
+    result += "\n";
+  }
+
+  // Tier 4: Other files — fill remaining budget
+  for (const path of otherFiles) {
     if (remaining <= 0) break;
     const content = workspace.getFile(path)!;
     const block = `--- ${path}\n${content}\n\n`;
@@ -178,7 +257,6 @@ function buildWorkspaceContext(workspace: Workspace, budgetChars: number): strin
       result += block;
       remaining -= block.length;
     } else if (remaining > 500) {
-      // Include truncated version
       const snippet = content.slice(0, Math.max(200, remaining - 100));
       result += `--- ${path} (truncated)\n${snippet}\n...[truncated]\n\n`;
       remaining = 0;

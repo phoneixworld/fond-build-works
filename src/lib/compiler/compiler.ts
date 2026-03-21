@@ -36,6 +36,8 @@ import {
   runPreBuildAgents, runPostBuildAgents, createPipelineContext,
   type AgentCallbacks, type OrchestratorResult,
 } from "@/lib/agents";
+import { reconcileSidebarAndRouter } from "./sidebarRouterReconciler";
+import { checkBuildInvariants } from "./buildInvariants";
 
 // ─── Public API ───────────────────────────────────────────────────────────
 
@@ -394,6 +396,16 @@ export async function compile(
     }
   }
 
+  // ── Phase 3.97: Sidebar–Router Reconciliation ────────────────────────
+  
+  callbacks.onPhase("reconciling-sidebar", "Ensuring sidebar navigation matches routes...");
+
+  const reconciliation = reconcileSidebarAndRouter(workspace);
+  if (reconciliation.routesAdded > 0 || reconciliation.stubsGenerated.length > 0) {
+    cloudLog.info(`Sidebar reconciler: added ${reconciliation.routesAdded} route(s), generated ${reconciliation.stubsGenerated.length} stub(s)`, "compiler");
+    console.log(`[Compiler] 🔗 Sidebar reconciler: ${reconciliation.routesAdded} routes added, ${reconciliation.stubsGenerated.length} stubs generated`);
+  }
+
   // ── Phase 3.11: Re-run export mismatch fix on synthesized App.jsx ──
   // The synthesizer may produce default imports for files that only have named exports.
   // Running the fixer again catches these post-synthesis mismatches.
@@ -414,6 +426,17 @@ export async function compile(
 
   cloudLog.info(`Verification: ${verification.ok ? "PASS" : "FAIL"} — ${verification.issues.length} issues`, "compiler");
   console.log(`[Compiler] Verification: ${verification.ok ? "PASS" : "FAIL"} — ${verification.issues.length} issues (${verification.stats.parsedOk} parsed, ${verification.stats.importsBroken} broken imports)`);
+
+  // ── Phase 4.5: Structural Invariant Checks ─────────────────────────
+  
+  const invariants = checkBuildInvariants(workspace, ctx.ir.routes.length, ctx.tableMappings);
+  if (!invariants.passed) {
+    const errors = invariants.violations.filter(v => v.severity === "error");
+    console.warn(`[Compiler] ⚠️ ${errors.length} invariant violation(s):`, errors.map(v => v.message));
+  }
+  for (const v of invariants.violations) {
+    console.log(`[Compiler] [Invariant:${v.invariant}] ${v.severity}: ${v.message}`);
+  }
 
   // ── Phase 5: Auto-Repair ───────────────────────────────────────────
 
