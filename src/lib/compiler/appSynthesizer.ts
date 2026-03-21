@@ -10,9 +10,9 @@
  * - Correct AppLayout wrapping
  */
 
-import type { Workspace } from "./compiler/workspace";
+import type { Workspace } from "./workspace";
 
-export function synthesizeAppJsx(workspace: Workspace, routes: any[]) {
+export function synthesizeAppJsx(workspace: Workspace, routes?: any[]): string {
   const pageFiles = workspace.listFiles().filter((f) => f.startsWith("/pages/") && f.endsWith(".jsx"));
 
   const imports = [];
