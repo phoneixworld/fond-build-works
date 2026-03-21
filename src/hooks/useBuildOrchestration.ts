@@ -16,6 +16,7 @@
 
 import { useState, useRef, useEffect, useCallback } from "react";
 import { streamBuildAgent, validateReactCode, formatRetryContext, MAX_BUILD_RETRIES, type AgentIntent, type PipelineStep } from "@/lib/agentPipeline";
+import { orchestrateBuild } from "@/lib/buildOrchestrator";
 import { runBuildEngine, type EngineConfig, type EngineProgress } from "@/lib/buildEngine";
 import { compile, type CompileOptions, type CompileCallbacks, type BuildResult } from "@/lib/compiler";
 import { matchTemplate, type PageTemplate } from "@/lib/pageTemplates";
