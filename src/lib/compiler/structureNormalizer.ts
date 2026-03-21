@@ -7,6 +7,7 @@ export function normalizeGeneratedStructure(workspace: Workspace): number {
   fixed += normalizeMirroredFiles(workspace);
   fixed += normalizeUtilityModules(workspace);
   fixed += normalizeHookDefaultImports(workspace);
+  fixed += normalizeToastWiring(workspace);
   return fixed;
 }
 

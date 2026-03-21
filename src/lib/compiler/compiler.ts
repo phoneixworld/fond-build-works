@@ -334,6 +334,16 @@ export async function compile(
     console.log(`[Compiler] 🔀 Export mismatch fixer: fixed ${exportMismatchesFixed} default/named mismatch(es)`);
   }
 
+  // ── Phase 3.96: Structural Normalization ─────────────────────────────
+
+  callbacks.onPhase("normalizing-structure", "Normalizing generated file structure and provider wiring...");
+
+  const structureFixes = normalizeGeneratedStructure(workspace);
+  if (structureFixes > 0) {
+    cloudLog.info(`Structure normalizer: applied ${structureFixes} structural fix(es)`, "compiler");
+    console.log(`[Compiler] 🧱 Structure normalizer: applied ${structureFixes} structural fix(es)`);
+  }
+
   // ── Phase 3.10: Ensure App.jsx exists and has valid imports ──────────
 
   const appEntryPoints = ["/App.jsx", "/App.tsx", "/App.js", "/App.ts"];
