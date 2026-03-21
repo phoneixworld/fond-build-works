@@ -214,8 +214,8 @@ function detectLikelyBrokenFiles(workspace: Record<string, string>): string[] {
       score += 100;
     }
 
-    // UI files are high impact for preview crashes when malformed
-    if (/\/components\/ui\//i.test(path)) score += 10;
+    // UI files are high impact when already suspicious
+    if (score > 0 && /\/components\/ui\//i.test(path)) score += 10;
 
     if (score > 0) scored.push({ path, score });
   }
