@@ -75,4 +75,20 @@ export default function App(){
     expect(app).toContain('import { ToastProvider } from "./components/ui/Toast";');
     expect(app).not.toContain("<ToastContainer />");
   });
+
+  it("replaces malformed StatCard with a safe fallback when JSX references undefined components", () => {
+    const ws = new Workspace({
+      "/components/StatCard.jsx": `export default function StatCard({ title, value }) {
+  return <div><BadIcon className="w-4 h-4" />{title}:{value}</div>;
+}`,
+    });
+
+    const fixed = normalizeGeneratedStructure(ws);
+    const statCard = ws.getFile("/components/StatCard.jsx") || "";
+
+    expect(fixed).toBeGreaterThan(0);
+    expect(statCard).toContain("export default function StatCard");
+    expect(statCard).toContain("TrendingUp");
+    expect(statCard).not.toContain("BadIcon");
+  });
 });
