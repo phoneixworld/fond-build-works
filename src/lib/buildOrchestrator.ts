@@ -44,10 +44,12 @@ export async function orchestrateBuild(options: {
   // Mock API
   Object.assign(files, generateMockApiFiles(ir));
 
-  // 3. PRE-SEED HARDENED AUTH CONTEXT
-  // Always include the router-agnostic AuthContext template so the LLM
-  // executor never regenerates it with useNavigate.
-  files["/contexts/AuthContext.jsx"] = generateAuthContext();
+  // 3. CONDITIONALLY SEED HARDENED AUTH CONTEXT
+  // Only inject AuthContext if the IR explicitly includes it.
+  const hasAuth = ir.contexts.some((c) => c.name === "AuthContext");
+  if (hasAuth) {
+    files["/contexts/AuthContext.jsx"] = generateAuthContext();
+  }
 
   // 4. Supabase (optional)
   if (ir.backend?.provider === "supabase") {
