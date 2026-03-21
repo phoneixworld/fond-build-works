@@ -518,8 +518,8 @@ function checkRouterHookViolations(workspace: Workspace): { issues: Verification
 
 /**
  * Checks "export { A, B, C }" statements and ensures each identifier
- * is actually defined in the file. Catches AI-generated barrel exports
- * that reference non-existent symbols.
+ * is actually defined in the file. Also detects duplicate named + default
+ * exports of the same symbol (e.g. `export { Button }` AND `export default Button`).
  */
 function checkExportValidity(workspace: Workspace): { issues: VerificationIssue[] } {
   const issues: VerificationIssue[] = [];
@@ -529,26 +529,50 @@ function checkExportValidity(workspace: Workspace): { issues: VerificationIssue[
     const content = workspace.getFile(path)!;
     const lines = content.split("\n");
 
+    // Track all named exports and default exports
+    const namedExports = new Set<string>();
+    let defaultExportName: string | null = null;
+
     for (let i = 0; i < lines.length; i++) {
       const line = lines[i].trim();
-      const match = line.match(/^export\s*\{([^}]+)\}\s*;?\s*$/);
-      if (!match) continue;
 
-      const ids = match[1].split(",").map(s => s.replace(/\s+as\s+\w+/, "").trim()).filter(Boolean);
-      for (const id of ids) {
-        // Check if this identifier is defined somewhere in the file
-        const defRegex = new RegExp(`(?:function|const|let|var|class)\\s+${id}\\b`);
-        if (!defRegex.test(content)) {
-          issues.push({
-            category: "undefined_export",
-            severity: "error",
-            file: path,
-            line: i + 1,
-            message: `Export '${id}' in "export { ... }" is not defined in ${path}`,
-            suggestedFix: `Remove '${id}' from the export statement or define it`,
-          });
+      // Detect `export { X, Y }`
+      const namedMatch = line.match(/^export\s*\{([^}]+)\}\s*;?\s*$/);
+      if (namedMatch) {
+        const ids = namedMatch[1].split(",").map(s => s.replace(/\s+as\s+\w+/, "").trim()).filter(Boolean);
+        for (const id of ids) {
+          // Check if this identifier is defined somewhere in the file
+          const defRegex = new RegExp(`(?:function|const|let|var|class)\\s+${id}\\b`);
+          if (!defRegex.test(content)) {
+            issues.push({
+              category: "undefined_export",
+              severity: "error",
+              file: path,
+              line: i + 1,
+              message: `Export '${id}' in "export { ... }" is not defined in ${path}`,
+              suggestedFix: `Remove '${id}' from the export statement or define it`,
+            });
+          }
+          namedExports.add(id);
         }
       }
+
+      // Detect `export default X` or `export default function X`
+      const defaultMatch = line.match(/^export\s+default\s+(?:function\s+)?(\w+)/);
+      if (defaultMatch) {
+        defaultExportName = defaultMatch[1];
+      }
+    }
+
+    // Check for conflict: same symbol in both `export { X }` and `export default X`
+    if (defaultExportName && namedExports.has(defaultExportName)) {
+      issues.push({
+        category: "undefined_export",
+        severity: "error",
+        file: path,
+        message: `'${defaultExportName}' is exported both as named export and default export — this causes "already exported" errors`,
+        suggestedFix: `Remove "export { ${defaultExportName} }" and keep only "export default ${defaultExportName}"`,
+      });
     }
   }
   return { issues };
