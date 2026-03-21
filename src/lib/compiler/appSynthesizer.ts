@@ -123,7 +123,13 @@ ${providersClose}
 function buildImports(ir: IR): string[] {
   const pageImports = ir.pages.map((p) => `import ${p.name} from "./pages/${p.name}";`);
 
-  const contextImports = ir.contexts.map((c) => `import { ${c.name} } from "./contexts/${c.name}";`);
+  const contextImports = ir.contexts.map((c) => {
+    // AuthContext exports AuthProvider, not AuthContext
+    if (c.name === "AuthContext") {
+      return `import { AuthProvider } from "./contexts/AuthContext";`;
+    }
+    return `import { ${c.name} } from "./contexts/${c.name}";`;
+  });
 
   const toastImport = ir.components.includes("Toast") ? `import { ToastProvider } from "./components/ui/Toast";` : "";
 
@@ -137,7 +143,10 @@ function buildProvidersOpen(ir: IR): string {
   const lines: string[] = [];
 
   if (ir.components.includes("Toast")) lines.push(`<ToastProvider>`);
-  if (ir.contexts.some((c) => c.name === "AuthContext")) lines.push(`  <AuthContext>`);
+
+  const hasAuth = ir.contexts.some((c) => c.name === "AuthContext");
+  if (hasAuth) lines.push(`  <AuthProvider>`);
+
   if (ir.contexts.some((c) => c.name === "AppContext")) lines.push(`    <AppContext>`);
 
   return lines.map((l) => "  " + l).join("\n");
@@ -147,7 +156,10 @@ function buildProvidersClose(ir: IR): string {
   const lines: string[] = [];
 
   if (ir.contexts.some((c) => c.name === "AppContext")) lines.push(`    </AppContext>`);
-  if (ir.contexts.some((c) => c.name === "AuthContext")) lines.push(`  </AuthContext>`);
+
+  const hasAuth = ir.contexts.some((c) => c.name === "AuthContext");
+  if (hasAuth) lines.push(`  </AuthProvider>`);
+
   if (ir.components.includes("Toast")) lines.push(`</ToastProvider>`);
 
   return lines.map((l) => "  " + l).join("\n");

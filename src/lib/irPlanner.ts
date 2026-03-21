@@ -99,8 +99,8 @@ RULES:
    - view/edit/create pages where flows require them.
 6. "navigation" must be a usable sidebar/top-nav for a React Router v6 app.
 7. "components" should list reusable UI primitives and domain components (e.g. "Sidebar", "Navbar", "DataTable", "Form", "Modal").
-8. "contexts" should include at least:
-   - AuthContext (if auth is implied),
+8. "contexts" should include:
+   - AuthContext ONLY if the request implies authentication (login, signup, users, roles, permissions, protected pages). Do NOT include AuthContext for simple CRUD apps, landing pages, or tools without user accounts.
    - AppContext (global app state),
    - domain-specific contexts where useful (e.g. "InventoryContext").
 9. "mockApi" must define list/create/update/delete endpoints for each entity, even if they are mock URLs (e.g. "/mock/contacts").
