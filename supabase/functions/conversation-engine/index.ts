@@ -559,7 +559,19 @@ Deno.serve(async (req) => {
       const BUILD_FULL = /\b(build|create|generate|scaffold|new app|new project|from scratch|entire|whole app|full app|complete app)\b/i;
       const REBUILD_SIGNALS = /\b(regenerate|rebuild|redo|re-generate|re-build|recreate|re-create|start over|redo all|regenerate all)\b/i;
 
-      if (BUILD_SIGNALS.test(lower)) {
+      // ── ERROR MESSAGE DETECTION: Never store error messages as requirements ──
+      const ERROR_MESSAGE_PATTERNS = /\b(element type is invalid|expected a string|unclosed block|unclosed bracket|is not a function|is not defined|cannot read prop|unexpected token|syntax error|render method|check the render|you likely forgot to export|mixed up default and named imports|something went wrong|module not found|cannot find module)\b/i;
+      const isErrorMessage = ERROR_MESSAGE_PATTERNS.test(lower);
+
+      if (isErrorMessage && hasExistingCode) {
+        // Error messages with existing code → always edit, never gather
+        recommendedAction = "edit";
+        reason = "Error message detected — routing to edit (fix existing code, NOT a requirement)";
+      } else if (isErrorMessage && !hasExistingCode) {
+        // Error messages without existing code → chat (explain the error)
+        recommendedAction = "chat";
+        reason = "Error message detected without existing code — routing to chat";
+      } else if (BUILD_SIGNALS.test(lower)) {
         recommendedAction = "build";
         reason = "User explicitly requested build";
       } else if (REBUILD_SIGNALS.test(lower)) {
@@ -617,6 +629,19 @@ Deno.serve(async (req) => {
     if (action === "add_requirement") {
       let text = (message || "").trim();
       const imageUrls: string[] = body.imageUrls || [];
+
+      // ── GUARD: Reject error messages from being stored as requirements ──
+      const ERROR_MSG_PATTERNS = /\b(element type is invalid|expected a string|unclosed block|unclosed bracket|is not a function|is not defined|cannot read prop|unexpected token|syntax error|render method|check the render|you likely forgot to export|mixed up default and named imports|something went wrong|module not found|cannot find module)\b/i;
+      if (ERROR_MSG_PATTERNS.test(text.toLowerCase()) && imageUrls.length === 0) {
+        console.log(`[conversation-engine] Rejected error message from requirements: "${text.slice(0, 80)}..."`);
+        return json({
+          rejected: true,
+          reason: "Error messages cannot be stored as requirements",
+          parsed: { entities: [], actions: [], constraints: [], uiComponents: [], workflows: [], roles: [], integrations: [] },
+          normalized: {},
+          irMappings: {},
+        });
+      }
 
       // ── Step 1: Extract text from images via AI vision (Checklist #1: server-side, deterministic) ──
       if ((hasImages || imageUrls.length > 0) && imageUrls.length > 0) {
