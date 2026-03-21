@@ -132,6 +132,8 @@ export async function streamThroughCacheProxy({
   projectId,
   techStack,
   knowledge,
+  workspaceFiles,
+  recentErrors,
   onCacheHit,
   onDelta,
   onDone,
@@ -141,6 +143,8 @@ export async function streamThroughCacheProxy({
   projectId: string;
   techStack?: string;
   knowledge?: string[];
+  workspaceFiles?: string[];
+  recentErrors?: string[];
   onCacheHit?: (result: CacheHitResult) => void;
   onDelta: (text: string) => void;
   onDone: (fullText: string) => void;
@@ -192,6 +196,8 @@ export async function streamThroughCacheProxy({
         project_id: projectId,
         tech_stack: techStack,
         knowledge,
+        workspace_files: workspaceFiles,
+        recent_errors: recentErrors,
         stream: true,
       }),
     });

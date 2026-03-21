@@ -95,6 +95,8 @@ serve(async (req) => {
       project_id,
       tech_stack,
       knowledge,
+      workspace_files,
+      recent_errors,
       model,
       stream = true,
       cache_ttl = 3600,
@@ -192,42 +194,24 @@ serve(async (req) => {
       }
     }
 
-    // ─── Cache Miss → Forward to AI Gateway ─────────────────────────
-    const systemPrompt = `You are Phoneix — a senior engineering lead inside a web app builder IDE. You are the CHAT agent: purely conversational.
-
-## RESPONSE FORMAT
-- Use clean markdown: headers (##), bold (**text**), bullet lists (-)
-- Structure responses with clear sections
-- Keep it concise: 2-4 sentences per point
-- Use emoji sparingly for section headers
-
-## HARD RULES
-1. NEVER output raw HTML, CSS, JavaScript, or JSX code in your response
-2. NEVER include <!DOCTYPE>, <html>, <script>, <style> tags
-3. NEVER output full code files — only describe what you'll build
-4. If suggesting features, use this format:
-   🎨 **Feature Name** — Brief description
-5. When user wants something built, summarize and end with: "Ready to build this — say **go ahead**."
-
-## CONTEXT
-- Tech stack: ${tech_stack || "react"}
-${knowledge?.length ? `\n## PROJECT KNOWLEDGE\n${knowledge.join("\n")}` : ""}`;
-
-    const aiMessages = [
-      { role: "system", content: systemPrompt },
-      ...messages,
-    ];
-
-    const aiResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+    // ─── Cache Miss → Forward to chat-agent edge function ─────────────
+    // FIX #1: Instead of using an inline system prompt, forward to chat-agent
+    // which has the full prompt with workspace context and error info.
+    const chatAgentUrl = `${SUPABASE_URL}/functions/v1/chat-agent`;
+    
+    const aiResponse = await fetch(chatAgentUrl, {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${LOVABLE_API_KEY}`,
         "Content-Type": "application/json",
+        Authorization: `Bearer ${Deno.env.get("SUPABASE_ANON_KEY")}`,
       },
       body: JSON.stringify({
-        model: model || "google/gemini-3-flash-preview",
-        messages: aiMessages,
-        stream,
+        messages,
+        project_id,
+        tech_stack: tech_stack || "react",
+        knowledge,
+        workspace_files,
+        recent_errors,
       }),
     });
 

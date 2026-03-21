@@ -2,10 +2,8 @@
  * useChatAgent — Chat-only agent flow (no code generation).
  * Extracted from useBuildOrchestration to reduce monolith complexity.
  *
- * Now uses enterprise-grade 3-layer semantic cache:
- * L1: In-memory TF-IDF corpus (<1ms)
- * L2: DB-backed cache via cache-proxy (5-20ms)
- * L3: AI gateway call (200-2000ms, cached on response)
+ * FIX #1: Now sends workspace file list + recent preview errors to chat-agent
+ * so Phoenix can actually diagnose issues instead of bluffing.
  */
 
 import { useCallback } from "react";
@@ -32,6 +30,9 @@ export interface ChatAgentConfig {
   isSendingRef: React.MutableRefObject<boolean>;
   isLoadingRef: React.MutableRefObject<boolean>;
   buildMessageContent: (text: string, images: string[]) => MsgContent;
+  // FIX #1: Workspace context for chat-agent
+  sandpackFilesRef: React.RefObject<Record<string, string> | null>;
+  previewErrors: string[];
 }
 
 export function useChatAgent(config: ChatAgentConfig) {
@@ -40,6 +41,7 @@ export function useChatAgent(config: ChatAgentConfig) {
     setMessages, setInput, setAttachedImages, setBuildStep,
     setPipelineStep, setCurrentAgent, setPendingBuildPrompt, setIsLoading,
     messagesRef, isSendingRef, isLoadingRef, buildMessageContent,
+    sandpackFilesRef, previewErrors,
   } = config;
 
   const sendChatMessage = useCallback(async (text: string, images: string[] = []) => {
@@ -73,6 +75,17 @@ export function useChatAgent(config: ChatAgentConfig) {
     } catch {}
 
     const userText = typeof text === "string" ? text : "";
+
+    // FIX #1: Collect workspace file list for chat-agent context
+    const workspaceFiles: string[] = [];
+    if (sandpackFilesRef.current) {
+      for (const path of Object.keys(sandpackFilesRef.current)) {
+        workspaceFiles.push(path);
+      }
+    }
+
+    // FIX #1: Collect recent preview errors for chat-agent context
+    const recentErrors = previewErrors.slice(-10);
 
     // Helper to finalize
     const finalize = (responseText: string, isCached: boolean, cacheInfo?: CacheHitResult) => {
@@ -109,12 +122,14 @@ export function useChatAgent(config: ChatAgentConfig) {
       });
     };
 
-    // Stream through the 3-layer cache proxy
+    // Stream through the 3-layer cache proxy — now with workspace context
     await streamThroughCacheProxy({
       messages: apiMessages,
       projectId: currentProject.id,
       techStack: currentProject.tech_stack || "react-cdn",
       knowledge,
+      workspaceFiles: workspaceFiles.length > 0 ? workspaceFiles : undefined,
+      recentErrors: recentErrors.length > 0 ? recentErrors : undefined,
       onCacheHit: (result) => {
         console.log(`[ChatAgent] Cache hit: ${result.layer} ${result.matchType} (${(result.similarity * 100).toFixed(1)}%)`);
         setBuildStep(`⚡ ${result.layer} cache hit`);
@@ -135,7 +150,6 @@ export function useChatAgent(config: ChatAgentConfig) {
       },
       onDone: (finalText) => {
         if (fullChatResponse) {
-          // Only finalize if we got streaming data (cache hits finalize in onCacheHit)
           finalize(finalText, false);
         }
       },
@@ -148,7 +162,7 @@ export function useChatAgent(config: ChatAgentConfig) {
         isSendingRef.current = false;
       },
     });
-  }, [currentProject, saveProject, setBuildStep, buildMessageContent, setInput, setAttachedImages, setMessages]);
+  }, [currentProject, saveProject, setBuildStep, buildMessageContent, setInput, setAttachedImages, setMessages, sandpackFilesRef, previewErrors]);
 
   return { sendChatMessage };
 }

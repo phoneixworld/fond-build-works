@@ -5,7 +5,7 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
-function pruneConversationContext(messages: any[], maxTokens: number = 8000): any[] {
+function pruneConversationContext(messages: any[], maxTokens: number = 12000): any[] {
   const systemMsg = messages.find(m => m.role === "system");
   const userMessages = messages.filter(m => m.role !== "system");
   
@@ -39,7 +39,13 @@ function pruneConversationContext(messages: any[], maxTokens: number = 8000): an
   return [systemMsg, ...selectedOlder, ...recentMessages].filter(Boolean);
 }
 
-function buildChatSystemPrompt(projectId: string, techStack: string, knowledge?: string[]): string {
+function buildChatSystemPrompt(
+  projectId: string,
+  techStack: string,
+  knowledge?: string[],
+  workspaceFiles?: string[],
+  recentErrors?: string[],
+): string {
   let prompt = `You are Phoneix — a senior engineering lead inside a web app builder IDE. You are the CHAT agent: purely conversational, NEVER generate code.
 
 ## PERSONALITY
@@ -60,7 +66,7 @@ When users report errors, bugs, or issues:
 - NEVER say you "can't see" the preview, errors, or runtime state
 - NEVER ask users to "describe the error" — you are part of the IDE and have project context
 - When user ASKS for error details (e.g. "what's the error", "show me the logs", "what went wrong", "give me details", "what happened"):
-  → SHOW them the actual error information: file names, error types, specific messages, and root causes
+  → SHOW them the actual error information from the WORKSPACE ERRORS section below
   → Be specific and technical — list each broken file with its error
   → Do NOT offer to fix unless they ask for a fix
 - When user wants a FIX (e.g. "fix this", "make it work"):
@@ -120,6 +126,16 @@ End with: "Which would you like me to build?"
 - Project: ${projectId} | Stack: ${techStack}
 - Full-stack builder: React + Tailwind + data persistence + auth + custom APIs + Sandpack preview`;
 
+  // ── FIX #1: Inject real workspace file list so chat agent can see the project ──
+  if (workspaceFiles && workspaceFiles.length > 0) {
+    prompt += `\n\n## CURRENT WORKSPACE FILES (${workspaceFiles.length} files)\n${workspaceFiles.join("\n")}`;
+  }
+
+  // ── FIX #1: Inject recent errors so chat agent can diagnose issues ──
+  if (recentErrors && recentErrors.length > 0) {
+    prompt += `\n\n## WORKSPACE ERRORS (most recent)\n${recentErrors.join("\n")}`;
+  }
+
   if (knowledge && knowledge.length > 0) {
     prompt += `\n\n## PROJECT KNOWLEDGE\n${knowledge.join('\n')}`;
   }
@@ -131,14 +147,16 @@ serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
-    const { messages, project_id, tech_stack, knowledge } = await req.json();
+    const { messages, project_id, tech_stack, knowledge, workspace_files, recent_errors } = await req.json();
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY is not configured");
 
     const systemPrompt = buildChatSystemPrompt(
       project_id || "unknown",
       tech_stack || "react-cdn",
-      knowledge
+      knowledge,
+      workspace_files,
+      recent_errors,
     );
 
     const systemMessage = { role: "system", content: systemPrompt };
