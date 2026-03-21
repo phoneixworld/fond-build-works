@@ -6,6 +6,7 @@
  */
 
 import type { BuildContext, BuildIntent, IRManifest, IREntity, IRRole, IRRoute, IRModule } from "./types";
+import { sanitizeRequirements } from "../conversationSanitizer";
 
 // ─── Intent Detection ─────────────────────────────────────────────────────
 
@@ -559,8 +560,8 @@ export function assembleBuildContext(params: {
   const hasExisting = Object.keys(params.existingWorkspace).length > 0;
   const intent = detectBuildIntent(params.rawRequirements, hasExisting);
 
-  // Sanitize raw requirements to strip diagnostic/error text
-  const sanitizedRequirements = sanitizeRequirementsText(params.rawRequirements);
+  // Two-layer sanitization: conversation-level + build-level
+  const sanitizedRequirements = sanitizeRequirements(sanitizeRequirementsText(params.rawRequirements));
 
   // ALWAYS extract IR — for extend/fix, merge with workspace-seeded IR
   const extractedIR = extractIRFromRequirements(sanitizedRequirements);
