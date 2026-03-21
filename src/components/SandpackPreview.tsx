@@ -107,6 +107,11 @@ function isAllowedPkg(pkg: string): boolean {
  * Generate a safe stub component when code is broken.
  */
 function makeSafeStub(filePath: string): string {
+  // Preserve utility files — don't turn them into React components
+  if (/\/utils\.(js|ts|jsx|tsx)$/.test(filePath)) {
+    return `export function cn(...classes) { return classes.filter(Boolean).join(" "); }\n`;
+  }
+
   const name = filePath.replace(/.*\//, '').replace(/\.\w+$/, '').replace(/[^a-zA-Z0-9]/g, '') || 'BrokenModule';
   const safeName = name.charAt(0).toUpperCase() + name.slice(1);
   return `import React from "react";
