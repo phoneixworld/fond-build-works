@@ -103,87 +103,73 @@ Questions: [
   ]}
 ]
 
-Use the classify_intent tool to return your classification.`
+Use the classify_intent tool to return your classification.`;
+
+    // Anthropic tool definition
+    const tools = [{
+      name: "classify_intent",
+      description: "Classify the user's intent and provide analysis",
+      input_schema: {
+        type: "object",
+        properties: {
+          intent: { type: "string", enum: ["chat", "build", "clarify"], description: "The classified intent" },
+          confidence: { type: "number", description: "Confidence score between 0 and 1" },
+          reasoning: { type: "string", description: "One sentence explaining why this intent was chosen" },
+          analysis: {
+            type: "object",
+            properties: {
+              needsBackend: { type: "boolean", description: "Whether the request needs backend/database" },
+              needsAuth: { type: "boolean", description: "Whether the request needs authentication" },
+              complexity: { type: "string", enum: ["simple", "medium", "complex"], description: "Complexity level" },
+            },
+            required: ["needsBackend", "needsAuth", "complexity"],
           },
-          { role: "user", content: prompt }
-        ],
-        tools: [
-          {
-            type: "function",
-            function: {
-              name: "classify_intent",
-              description: "Classify the user's intent and provide analysis",
-              parameters: {
-                type: "object",
-                properties: {
-                  intent: {
-                    type: "string",
-                    enum: ["chat", "build", "clarify"],
-                    description: "The classified intent"
-                  },
-                  confidence: {
-                    type: "number",
-                    minimum: 0,
-                    maximum: 1,
-                    description: "Confidence score between 0 and 1"
-                  },
-                  reasoning: {
-                    type: "string",
-                    description: "One sentence explaining why this intent was chosen"
-                  },
-                  analysis: {
+          questions: {
+            type: "array",
+            description: "Clarifying questions (only for clarify intent). Generate 2-4 contextual questions.",
+            items: {
+              type: "object",
+              properties: {
+                id: { type: "string" },
+                header: { type: "string" },
+                text: { type: "string" },
+                multiSelect: { type: "boolean" },
+                options: {
+                  type: "array",
+                  items: {
                     type: "object",
                     properties: {
-                      needsBackend: {
-                        type: "boolean",
-                        description: "Whether the request needs backend/database"
-                      },
-                      needsAuth: {
-                        type: "boolean",
-                        description: "Whether the request needs authentication"
-                      },
-                      complexity: {
-                        type: "string",
-                        enum: ["simple", "medium", "complex"],
-                        description: "Complexity level of the request"
-                      }
+                      label: { type: "string" },
+                      value: { type: "string" },
+                      description: { type: "string" },
                     },
-                    required: ["needsBackend", "needsAuth", "complexity"]
+                    required: ["label", "value", "description"],
                   },
-                  questions: {
-                    type: "array",
-                    description: "Clarifying questions (only for clarify intent). Generate 2-4 contextual questions.",
-                    items: {
-                      type: "object",
-                      properties: {
-                        id: { type: "string", description: "Unique slug like 'focus', 'pages', 'style'" },
-                        header: { type: "string", description: "Short tab label: 1-3 words like 'Focus Area', 'Pages', 'Style'" },
-                        text: { type: "string", description: "The full question text" },
-                        multiSelect: { type: "boolean", description: "true if user can pick multiple options" },
-                        options: {
-                          type: "array",
-                          items: {
-                            type: "object",
-                            properties: {
-                              label: { type: "string" },
-                              value: { type: "string" },
-                              description: { type: "string" }
-                            },
-                            required: ["label", "value", "description"]
-                          }
-                        }
-                      },
-                      required: ["id", "header", "text", "multiSelect", "options"]
-                    }
-                  }
                 },
-                required: ["intent", "confidence", "reasoning", "analysis"],
-                additionalProperties: false
-              }
-            }
-          }
-        ],
-        tool_choice: { type: "function", function: { name: "classify_intent" } }
+              },
+              required: ["id", "header", "text", "multiSelect", "options"],
+            },
+          },
+        },
+        required: ["intent", "confidence", "reasoning", "analysis"],
+      },
+    }];
+
+    const response = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: {
+        "x-api-key": ANTHROPIC_API_KEY,
+        "anthropic-version": "2023-06-01",
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model: "claude-haiku-3-5-20241022",
+        max_tokens: 2000,
+        temperature: 0.1,
+        system: systemContent,
+        messages: [{ role: "user", content: prompt }],
+        tools,
+        tool_choice: { type: "tool", name: "classify_intent" },
       }),
     });
 
