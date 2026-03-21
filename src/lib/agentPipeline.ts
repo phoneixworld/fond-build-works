@@ -213,9 +213,18 @@ export async function streamBuildAgent({
   }
 
   if (!resp || !resp.ok || !resp.body) {
-    if (resp?.status === 429) { onError("Rate limited. Try again shortly."); return; }
-    if (resp?.status === 402) { onError("Usage limit reached."); return; }
-    onError("Failed to connect to build agent.");
+    if (resp?.status === 429) { onError("Rate limited (429). Try again shortly."); return; }
+    if (resp?.status === 402) {
+      // Parse error body for details
+      let detail = "Usage limit reached";
+      try { const j = await resp.json(); detail = j.error || detail; } catch {}
+      onError(`AI usage limit reached (402): ${detail}. Check your AI gateway credits.`);
+      return;
+    }
+    // Try to extract error details from response
+    let errorMsg = "Failed to connect to build agent.";
+    try { const j = await resp.json(); errorMsg = j.error || errorMsg; } catch {}
+    onError(errorMsg);
     return;
   }
 
