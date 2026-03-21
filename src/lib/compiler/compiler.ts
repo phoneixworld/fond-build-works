@@ -493,12 +493,28 @@ export async function compile(
 
   cloudLog.info(`Build ${status}: ${doneTasks}/${totalTasks} tasks, ${workspace.fileCount()} files`, "compiler");
 
-  // Build summary — only claims static verification, never end-to-end
+  // Build summary — includes agent results
+  const agentSummaryParts: string[] = [];
+  if (orchestratorResult) {
+    const testResults = orchestratorResult.testResults || [];
+    const violations = orchestratorResult.violations || [];
+    const testsPassed = testResults.filter(t => t.passed).length;
+    const testsFailed = testResults.filter(t => !t.passed).length;
+    if (testResults.length > 0) {
+      agentSummaryParts.push(`Smoke tests: ${testsPassed}/${testResults.length} passed`);
+    }
+    if (violations.length > 0) {
+      const govErrors = violations.filter(v => v.severity === "error").length;
+      agentSummaryParts.push(`Governance: ${govErrors} errors, ${violations.length - govErrors} warnings`);
+    }
+  }
+
   const summary = [
     `Build ${status}: ${doneTasks}/${totalTasks} tasks completed`,
     `${workspace.fileCount()} files in workspace (${(workspace.totalSize() / 1024).toFixed(1)}KB)`,
     verification.ok ? "Static checks passed ✅" : `${errorCount} errors, ${verification.issues.length - errorCount} warnings`,
     repairRound > 0 ? buildRepairSummary(repairRound, totalRepairActions, verification.issues) : "",
+    ...agentSummaryParts,
   ].filter(Boolean).join("\n");
 
   const knownIssues = verification.issues
