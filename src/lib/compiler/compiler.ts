@@ -31,6 +31,10 @@ import {
 import { cloudLog } from "@/lib/cloudLogBus";
 import { synthesizeAppJsx } from "./appSynthesizer";
 import { getSharedUIComponents, getGlobalStyles } from "@/lib/templates/scaffoldTemplates";
+import {
+  runPreBuildAgents, runPostBuildAgents, createPipelineContext,
+  type AgentCallbacks, type OrchestratorResult,
+} from "@/lib/agents";
 
 // ─── Public API ───────────────────────────────────────────────────────────
 
@@ -56,10 +60,18 @@ export interface CompileCallbacks {
   onVerification: (result: VerificationResult) => void;
   onRepairStart: (round: number, actionCount: number) => void;
   onComplete: (result: BuildResult) => void;
+  /** Optional: agent orchestration callbacks */
+  onAgentStart?: (agent: string) => void;
+  onAgentProgress?: (agent: string, message: string) => void;
+  onAgentDone?: (agent: string, result: any) => void;
 }
 
 /**
  * Main entry point: compile requirements into a working application.
+ * Now includes invisible multi-agent orchestration:
+ *   Pre-build: workflow → database (schema auto-detection)
+ *   Compiler: context → plan → execute → verify → repair
+ *   Post-build: testing → governance (safety gate)
  */
 export async function compile(
   options: CompileOptions,
@@ -85,6 +97,43 @@ export async function compile(
 
   cloudLog.info(`Build started: intent=${ctx.buildIntent}, ${ctx.ir.entities.length} entities, ${ctx.ir.routes.length} routes`, "compiler");
   console.log(`[Compiler] Context assembled: intent=${ctx.buildIntent}, entities=${ctx.ir.entities.length}, routes=${ctx.ir.routes.length}, modules=${ctx.ir.modules.length}`);
+
+  // ── Phase 1.5: Pre-Build Agents (invisible) ─────────────────────────
+
+  const agentCallbacks: AgentCallbacks = {
+    onAgentStart: (agent) => {
+      callbacks.onAgentStart?.(agent);
+      callbacks.onPhase("agents", `Agent: ${agent}...`);
+    },
+    onAgentProgress: (agent, message) => {
+      callbacks.onAgentProgress?.(agent, message);
+    },
+    onAgentDone: (agent, result) => {
+      callbacks.onAgentDone?.(agent, result);
+      cloudLog.info(`[Agent:${agent}] ${result.summary}`, "orchestrator");
+    },
+  };
+
+  const pipelineCtx = createPipelineContext({
+    projectId: options.projectId,
+    techStack: options.techStack,
+    rawRequirements: options.rawRequirements,
+    ir: options.ir,
+    schemas: options.schemas,
+    knowledge: options.knowledge,
+    designTheme: options.designTheme,
+    model: options.model,
+    existingWorkspace: options.existingWorkspace,
+  });
+
+  try {
+    const enrichedCtx = await runPreBuildAgents(pipelineCtx, agentCallbacks);
+    if (enrichedCtx.schemas && enrichedCtx.schemas.length > 0) {
+      ctx.schemas = enrichedCtx.schemas;
+    }
+  } catch (err: any) {
+    console.warn("[Compiler] Pre-build agents failed (non-fatal):", err.message);
+  }
 
   // ── Phase 2: Planning ──────────────────────────────────────────────
 
@@ -397,6 +446,31 @@ export async function compile(
 
   trace.repairRounds = repairRound;
 
+  // ── Phase 5.5: Post-Build Agents (invisible) ──────────────────────
+  // Testing Agent runs smoke tests; Governance Agent validates safety.
+
+  let orchestratorResult: OrchestratorResult | null = null;
+  try {
+    orchestratorResult = runPostBuildAgents(
+      pipelineCtx,
+      workspace.toRecord(),
+      agentCallbacks
+    );
+
+    // Apply governance auto-fixes back to workspace
+    if (orchestratorResult.workspace) {
+      for (const [path, content] of Object.entries(orchestratorResult.workspace)) {
+        if (workspace.hasFile(path) && workspace.getFile(path) !== content) {
+          workspace.updateFile(path, content);
+        }
+      }
+    }
+
+    cloudLog.info(`[Orchestrator] Post-build: ${orchestratorResult.summary}`, "compiler");
+  } catch (err: any) {
+    console.warn("[Compiler] Post-build agents failed (non-fatal):", err.message);
+  }
+
   // ── Phase 6: Completion ────────────────────────────────────────────
 
   callbacks.onPhase("complete", "Build complete.");
@@ -419,12 +493,28 @@ export async function compile(
 
   cloudLog.info(`Build ${status}: ${doneTasks}/${totalTasks} tasks, ${workspace.fileCount()} files`, "compiler");
 
-  // Build summary — only claims static verification, never end-to-end
+  // Build summary — includes agent results
+  const agentSummaryParts: string[] = [];
+  if (orchestratorResult) {
+    const testResults = orchestratorResult.testResults || [];
+    const violations = orchestratorResult.violations || [];
+    const testsPassed = testResults.filter(t => t.passed).length;
+    const testsFailed = testResults.filter(t => !t.passed).length;
+    if (testResults.length > 0) {
+      agentSummaryParts.push(`Smoke tests: ${testsPassed}/${testResults.length} passed`);
+    }
+    if (violations.length > 0) {
+      const govErrors = violations.filter(v => v.severity === "error").length;
+      agentSummaryParts.push(`Governance: ${govErrors} errors, ${violations.length - govErrors} warnings`);
+    }
+  }
+
   const summary = [
     `Build ${status}: ${doneTasks}/${totalTasks} tasks completed`,
     `${workspace.fileCount()} files in workspace (${(workspace.totalSize() / 1024).toFixed(1)}KB)`,
     verification.ok ? "Static checks passed ✅" : `${errorCount} errors, ${verification.issues.length - errorCount} warnings`,
     repairRound > 0 ? buildRepairSummary(repairRound, totalRepairActions, verification.issues) : "",
+    ...agentSummaryParts,
   ].filter(Boolean).join("\n");
 
   const knownIssues = verification.issues
