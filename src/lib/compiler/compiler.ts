@@ -36,6 +36,8 @@ import {
   runPreBuildAgents, runPostBuildAgents, createPipelineContext,
   type AgentCallbacks, type OrchestratorResult,
 } from "@/lib/agents";
+import { reconcileSidebarAndRouter } from "./sidebarRouterReconciler";
+import { checkBuildInvariants } from "./buildInvariants";
 
 // ─── Public API ───────────────────────────────────────────────────────────
 
