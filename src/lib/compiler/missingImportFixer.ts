@@ -105,6 +105,9 @@ export function fixMissingImports(workspace: Workspace): number {
   for (const filePath of workspace.listFiles()) {
     if (!/\.(jsx?|tsx?)$/.test(filePath)) continue;
 
+    // Skip utility definition files — they define the symbols, not consume them
+    if (/\/utils\.(js|ts|jsx|tsx)$/.test(filePath)) continue;
+
     let content = workspace.getFile(filePath)!;
     let modified = false;
 
