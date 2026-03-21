@@ -335,6 +335,7 @@ function sanitizeImports(code: string, filePath: string): string {
   code = collapseDuplicateReactImports(code, filePath);
   code = removeSelfImports(code, filePath);
   code = removeDefaultExportConflict(code, filePath);
+  code = removeDuplicateNamedExports(code, filePath);
   code = ensureReactInScope(code, filePath);
 
   // ── Rename local declarations that collide with imported identifiers ──
