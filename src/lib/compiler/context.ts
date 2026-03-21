@@ -557,45 +557,38 @@ export function assembleBuildContext(params: {
   designTheme?: string;
   model?: string;
 }): BuildContext {
+
   const hasExisting = Object.keys(params.existingWorkspace).length > 0;
+
+  // ALWAYS extract IR unless explicitly refactoring
   const intent = detectBuildIntent(params.rawRequirements, hasExisting);
+  const shouldExtractIR = intent !== "refactor";
 
-  // Two-layer sanitization: conversation-level + build-level
-  const sanitizedRequirements = sanitizeRequirements(sanitizeRequirementsText(params.rawRequirements));
+  // SANITIZE REQUIREMENTS FIRST
+  const sanitized = sanitizeRequirements(params.rawRequirements);
 
-  // ALWAYS extract IR — for extend/fix, merge with workspace-seeded IR
-  const extractedIR = extractIRFromRequirements(sanitizedRequirements);
+  const extractedIR = shouldExtractIR
+    ? extractIRFromRequirements(sanitized)
+    : {
+        entities: [],
+        roles: [],
+        workflows: [],
+        routes: [],
+        modules: [],
+        constraints: [],
+      };
 
-  // For extend/fix, also seed IR from existing workspace files
-  let workspaceIR: { routes: IRRoute[]; entities: IREntity[] } = { routes: [], entities: [] };
-  if (hasExisting && intent !== "new_app") {
-    workspaceIR = seedIRFromWorkspace(params.existingWorkspace);
-    console.log(`[IR] Seeded ${workspaceIR.routes.length} routes from existing workspace for ${intent} intent`);
-  }
-
-  // Merge: provided IR > workspace-seeded IR > extracted IR
   const mergedIR: IRManifest = {
-    entities: params.ir?.entities?.length ? params.ir.entities :
-              workspaceIR.entities.length ? workspaceIR.entities :
-              extractedIR.entities,
+    entities: params.ir?.entities?.length ? params.ir.entities : extractedIR.entities,
     roles: params.ir?.roles?.length ? params.ir.roles : extractedIR.roles,
     workflows: params.ir?.workflows?.length ? params.ir.workflows : extractedIR.workflows,
-    routes: params.ir?.routes?.length ? params.ir.routes :
-            workspaceIR.routes.length ? dedupeRoutes([...workspaceIR.routes, ...extractedIR.routes]) :
-            extractedIR.routes,
+    routes: params.ir?.routes?.length ? params.ir.routes : extractedIR.routes,
     modules: params.ir?.modules?.length ? params.ir.modules : extractedIR.modules,
     constraints: [...new Set([...(params.ir?.constraints || []), ...extractedIR.constraints])],
   };
 
-  // Fail-safe: ir.routes must never be empty for a non-trivial app
-  if (mergedIR.routes.length === 0 && sanitizedRequirements.length > 10) {
-    console.warn("[IR] Routes are empty for non-trivial app — injecting dashboard fallback");
-    mergedIR.routes.push({ path: "/", page: "DashboardPage", auth: true });
-    mergedIR.routes.push({ path: "/settings", page: "SettingsPage", auth: true });
-  }
-
   return {
-    rawRequirements: sanitizedRequirements,
+    rawRequirements: sanitized,
     semanticSummary: params.semanticSummary || "",
     ir: mergedIR,
     existingWorkspace: params.existingWorkspace,
