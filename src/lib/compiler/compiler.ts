@@ -333,6 +333,29 @@ export async function compile(
 
         cloudLog.error(`Task '${task.label}' failed: ${err.message}`, "compiler");
         console.error(`[Compiler] ❌ Task '${task.label}' failed:`, err.message);
+
+        // ── FAIL-FAST on credit/billing errors ──
+        // Don't waste remaining tasks if the AI gateway is rejecting requests
+        const isCreditError = /usage limit|credit|402|rate limit|429/i.test(err.message);
+        if (isCreditError) {
+          cloudLog.error(`[Compiler] ⛔ Aborting build — AI gateway credit/rate limit hit`, "compiler");
+          console.error(`[Compiler] ⛔ Aborting remaining tasks — credit/rate limit error`);
+          // Mark all remaining tasks as skipped
+          for (const remainingId of passTaskIds.slice(passTaskIds.indexOf(taskId) + 1)) {
+            const rt = taskGraph.tasks.find(t => t.id === remainingId);
+            if (rt) { rt.status = "failed"; rt.error = "Skipped — AI usage limit reached"; }
+          }
+          for (let futurePass = passIdx + 1; futurePass < taskGraph.passes.length; futurePass++) {
+            for (const futureId of taskGraph.passes[futurePass]) {
+              const ft = taskGraph.tasks.find(t => t.id === futureId);
+              if (ft) { ft.status = "failed"; ft.error = "Skipped — AI usage limit reached"; }
+            }
+          }
+          endPass(passTiming);
+          // Jump to verification with whatever we have so far
+          callbacks.onPhase("verifying", "Build aborted — AI usage limit reached. Verifying partial output...");
+          throw new Error("AI_USAGE_LIMIT_REACHED");
+        }
       }
     }
 
