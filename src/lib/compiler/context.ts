@@ -440,7 +440,24 @@ export function assembleBuildContext(params: {
   model?: string;
 }): BuildContext {
   const hasExisting = Object.keys(params.existingWorkspace).length > 0;
-  const extractedIR = extractIRFromRequirements(params.rawRequirements);
+  const intent = detectBuildIntent(params.rawRequirements, hasExisting);
+
+  // For fix/extend intents on existing workspaces, DON'T re-extract entities/routes
+  // from raw text — the existing workspace already defines the app structure.
+  // Only extract for new_app or when no IR is provided.
+  const shouldExtractIR = intent === "new_app" || !hasExisting;
+  const extractedIR = shouldExtractIR ? extractIRFromRequirements(params.rawRequirements) : {
+    entities: [] as IREntity[],
+    roles: [] as IRRole[],
+    workflows: [] as any[],
+    routes: [] as IRRoute[],
+    modules: [] as IRModule[],
+    constraints: [] as string[],
+  };
+
+  if (!shouldExtractIR) {
+    console.log(`[IR] Skipping entity extraction for ${intent} intent (existing workspace has ${Object.keys(params.existingWorkspace).length} files)`);
+  }
 
   // Merge provided IR with extracted IR (provided takes precedence)
   const mergedIR: IRManifest = {
@@ -457,7 +474,7 @@ export function assembleBuildContext(params: {
     semanticSummary: params.semanticSummary || "",
     ir: mergedIR,
     existingWorkspace: params.existingWorkspace,
-    buildIntent: detectBuildIntent(params.rawRequirements, hasExisting),
+    buildIntent: intent,
     projectId: params.projectId,
     techStack: params.techStack,
     schemas: params.schemas,
