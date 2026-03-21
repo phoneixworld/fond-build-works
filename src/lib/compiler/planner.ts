@@ -17,7 +17,7 @@ type AppType = "landing" | "dashboard" | "crud";
  * Detect the app type from requirements to generate appropriate components.
  * Landing pages get section components; dashboard/CRUD apps get data components.
  */
-function detectAppType(rawRequirements: string, ir: BuildContext["ir"]: AppType {
+function detectAppType(rawRequirements: string, ir: BuildContext["ir"]): AppType {
   const text = rawRequirements.toLowerCase();
 
   const landingSignals = [
