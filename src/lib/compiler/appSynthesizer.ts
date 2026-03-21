@@ -9,7 +9,7 @@
  * - No invalid paths
  */
 
-import type { Workspace } from "./compiler/workspace";
+import type { Workspace } from "./workspace";
 
 export function synthesizeAppJsx(workspace: Workspace, routes: any[]) {
   const pageFiles = workspace.listFiles().filter((f) => f.startsWith("/pages/") && f.endsWith(".jsx"));
