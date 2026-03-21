@@ -48,5 +48,5 @@ ${routeElements.join("\n")}
 }
 `;
 
-  return { "/App.jsx": appJsx.trim() };
+  return appJsx.trim();
 }
