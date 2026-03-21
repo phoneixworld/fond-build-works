@@ -61,7 +61,6 @@ function detectDomain(raw: string): DomainType {
     hospital: 0, school: 0, crm: 0, ecommerce: 0, project_mgmt: 0, generic: 0,
   };
 
-  // Hospital/Healthcare signals
   const hospitalKeywords = [
     "hospital", "medical", "patient", "doctor", "nurse", "clinic", "pharmacy",
     "prescription", "diagnosis", "appointment", "ward", "icu", "opd", "lab",
@@ -70,27 +69,22 @@ function detectDomain(raw: string): DomainType {
   ];
   scores.hospital = hospitalKeywords.filter(k => text.includes(k)).length;
 
-  // School/ERP signals
   const schoolKeywords = [
     "school", "student", "teacher", "classroom", "grade", "gradebook", "pupil",
     "parent", "guardian", "syllabus", "homework", "exam", "semester", "school erp",
-    "academic", "enrollment", "curriculum",
+    "academic", "enrollment", "curriculum", "lms", "learning management",
   ];
   scores.school = schoolKeywords.filter(k => text.includes(k)).length;
 
-  // CRM signals
   const crmKeywords = ["crm", "lead", "deal", "pipeline", "opportunity", "sales", "prospect", "conversion"];
   scores.crm = crmKeywords.filter(k => text.includes(k)).length;
 
-  // E-commerce signals
   const ecomKeywords = ["ecommerce", "e-commerce", "shop", "cart", "checkout", "order", "catalog", "storefront"];
   scores.ecommerce = ecomKeywords.filter(k => text.includes(k)).length;
 
-  // Project management signals
   const pmKeywords = ["project management", "task board", "kanban", "sprint", "backlog", "agile", "scrum"];
   scores.project_mgmt = pmKeywords.filter(k => text.includes(k)).length;
 
-  // Find highest score
   let best: DomainType = "generic";
   let bestScore = 0;
   for (const [domain, score] of Object.entries(scores)) {
@@ -100,7 +94,8 @@ function detectDomain(raw: string): DomainType {
     }
   }
 
-  return bestScore >= 2 ? best : "generic";
+  // Lower threshold: even 1 strong signal (e.g. "school" or "lms") should trigger domain detection
+  return bestScore >= 1 ? best : "generic";
 }
 
 // ─── Domain-Specific Entity Libraries ─────────────────────────────────────
