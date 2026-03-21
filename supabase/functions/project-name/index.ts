@@ -13,25 +13,24 @@ serve(async (req) => {
     const ANTHROPIC_API_KEY = Deno.env.get("ANTHROPIC_API_KEY");
     if (!ANTHROPIC_API_KEY) throw new Error("ANTHROPIC_API_KEY not configured");
 
-    const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+    const response = await fetch("https://api.anthropic.com/v1/messages", {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${LOVABLE_API_KEY}`,
+        "x-api-key": ANTHROPIC_API_KEY,
+        "anthropic-version": "2023-06-01",
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "google/gemini-2.5-flash-lite",
-        messages: [
-          {
-            role: "system",
-            content: `You generate short, catchy project names from user descriptions.
+        model: "claude-haiku-3-5-20241022",
+        max_tokens: 200,
+        system: `You generate short, catchy project names from user descriptions.
 Rules:
 - Return ONLY a JSON object: {"name": "...", "emoji": "..."}
 - Name: 2-4 words, Title Case, max 30 chars. Be creative but descriptive.
 - Emoji: single emoji that represents the project theme.
 - Examples: {"name": "Task Flow Pro", "emoji": "✅"}, {"name": "Recipe Vault", "emoji": "🍳"}, {"name": "Budget Tracker", "emoji": "💰"}
-- No quotes around the JSON, no markdown, no explanation.`
-          },
+- No quotes around the JSON, no markdown, no explanation.`,
+        messages: [
           { role: "user", content: prompt }
         ],
       }),
