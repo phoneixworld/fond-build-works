@@ -54,6 +54,7 @@ export interface CompileOptions {
 
 export interface CompileCallbacks {
   onPhase: (phase: string, detail: string) => void;
+  onPlanReady?: (tasks: CompilerTask[]) => void;
   onTaskStart: (task: CompilerTask, index: number, total: number) => void;
   onTaskDelta: (task: CompilerTask, chunk: string) => void;
   onTaskDone: (task: CompilerTask, files: Record<string, string>) => void;
