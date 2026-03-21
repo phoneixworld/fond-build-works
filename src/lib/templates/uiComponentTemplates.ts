@@ -1073,7 +1073,7 @@ export default function DataTable({ columns, data, onRowClick, pageSize = 10, em
 
 // ─── Phoenix-specific: Toast ─────────────────────────────────────────────────
 
-export const TOAST_COMPONENT = `import React, { useState, useEffect } from "react";
+export const TOAST_COMPONENT = `import React, { createContext, useContext, useState, useEffect, useCallback } from "react";
 import { CheckCircle, AlertCircle, Info, X } from "lucide-react";
 
 let toastHandler = null;
@@ -1082,34 +1082,54 @@ export function showToast(message, type = "success") {
   if (toastHandler) toastHandler({ message, type, id: Date.now() });
 }
 
-export default function ToastContainer() {
+const ToastContext = createContext({ addToast: () => {} });
+
+export function useToast() {
+  return useContext(ToastContext);
+}
+
+export function ToastProvider({ children }) {
   const [toasts, setToasts] = useState([]);
 
+  const addToast = useCallback((toast) => {
+    const t = typeof toast === "string" ? { message: toast, type: "success", id: Date.now() } : { ...toast, id: toast.id || Date.now() };
+    setToasts((prev) => [...prev, t]);
+    setTimeout(() => setToasts((prev) => prev.filter((x) => x.id !== t.id)), 4000);
+  }, []);
+
   useEffect(() => {
-    toastHandler = (t) => {
-      setToasts((prev) => [...prev, t]);
-      setTimeout(() => setToasts((prev) => prev.filter((x) => x.id !== t.id)), 4000);
-    };
+    toastHandler = (t) => addToast(t);
     return () => { toastHandler = null; };
+  }, [addToast]);
+
+  const removeToast = useCallback((id) => {
+    setToasts((prev) => prev.filter((x) => x.id !== id));
   }, []);
 
   const icons = { success: CheckCircle, error: AlertCircle, info: Info };
   const colors = { success: "bg-emerald-500", error: "bg-red-500", info: "bg-blue-500" };
 
   return (
-    <div className="fixed bottom-4 right-4 z-50 flex flex-col gap-2">
-      {toasts.map((toast) => {
-        const IconComp = icons[toast.type] || icons.info;
-        return (
-          <div key={toast.id} className={"flex items-center gap-3 px-4 py-3 rounded-xl text-white text-sm shadow-lg animate-slideInRight " + (colors[toast.type] || colors.success)}>
-            <IconComp className="w-4 h-4 flex-shrink-0" />
-            <span className="flex-1">{toast.message}</span>
-            <button onClick={() => setToasts((prev) => prev.filter((x) => x.id !== toast.id))} className="p-0.5 hover:bg-white/20 rounded"><X className="w-3 h-3" /></button>
-          </div>
-        );
-      })}
-    </div>
+    <ToastContext.Provider value={{ addToast }}>
+      {children}
+      <div className="fixed bottom-4 right-4 z-50 flex flex-col gap-2">
+        {toasts.map((toast) => {
+          const IconComp = icons[toast.type] || icons.info;
+          return (
+            <div key={toast.id} className={"flex items-center gap-3 px-4 py-3 rounded-xl text-white text-sm shadow-lg animate-slideInRight " + (colors[toast.type] || colors.success)}>
+              <IconComp className="w-4 h-4 flex-shrink-0" />
+              <span className="flex-1">{toast.message}</span>
+              <button onClick={() => removeToast(toast.id)} className="p-0.5 hover:bg-white/20 rounded"><X className="w-3 h-3" /></button>
+            </div>
+          );
+        })}
+      </div>
+    </ToastContext.Provider>
   );
+}
+
+export default function ToastContainer() {
+  return <ToastProvider>{null}</ToastProvider>;
 }
 `;
 

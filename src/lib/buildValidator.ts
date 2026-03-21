@@ -178,7 +178,14 @@ export function autoCreateStubFiles(
     const componentName = lastSegment.replace(/\.\w+$/, "");
     const filePath = resolved.match(/\.\w+$/) ? resolved : resolved + ".jsx";
 
-    if (allFiles[filePath]) continue;
+    // Allow shared UI files (Toast, Spinner, DataTable) to be replaced even if they exist
+    // because the build agent often generates broken versions
+    const isSharedUI = [
+      "/components/ui/Toast.jsx", "/components/ui/Toast.js",
+      "/components/ui/Spinner.jsx", "/components/ui/Spinner.js",
+      "/components/ui/DataTable.jsx", "/components/ui/DataTable.js",
+    ].some(f => filePath === f || filePath.endsWith(f));
+    if (allFiles[filePath] && !isSharedUI) continue;
 
     // CRITICAL: Check shared UI components BEFORE PascalCase generic stub.
     // Toast, Spinner, DataTable must get real implementations, not empty stubs.
