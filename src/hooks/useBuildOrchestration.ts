@@ -203,8 +203,16 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
         continue;
       }
 
+      // Strip leaked file separator headers from file content
+      const cleanedContent = rawContent.split("\n").filter(line => {
+        const t = line.trim();
+        if (/^-{3}\s+\/?.+?\.(?:jsx?|tsx?|css|js|ts)\b/i.test(t)) return false;
+        if (/^-{3}\s+\/?dependencies\b/i.test(t)) return false;
+        return true;
+      }).join("\n");
+
       const normalizedPath = normalizeVirtualPath(trimmedPath);
-      sanitized[normalizedPath] = rawContent;
+      sanitized[normalizedPath] = cleanedContent;
     }
 
     return sanitized;
