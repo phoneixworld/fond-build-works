@@ -98,6 +98,43 @@ export async function compile(
   cloudLog.info(`Build started: intent=${ctx.buildIntent}, ${ctx.ir.entities.length} entities, ${ctx.ir.routes.length} routes`, "compiler");
   console.log(`[Compiler] Context assembled: intent=${ctx.buildIntent}, entities=${ctx.ir.entities.length}, routes=${ctx.ir.routes.length}, modules=${ctx.ir.modules.length}`);
 
+  // ── Phase 1.5: Pre-Build Agents (invisible) ─────────────────────────
+
+  const agentCallbacks: AgentCallbacks = {
+    onAgentStart: (agent) => {
+      callbacks.onAgentStart?.(agent);
+      callbacks.onPhase("agents", `Agent: ${agent}...`);
+    },
+    onAgentProgress: (agent, message) => {
+      callbacks.onAgentProgress?.(agent, message);
+    },
+    onAgentDone: (agent, result) => {
+      callbacks.onAgentDone?.(agent, result);
+      cloudLog.info(`[Agent:${agent}] ${result.summary}`, "orchestrator");
+    },
+  };
+
+  const pipelineCtx = createPipelineContext({
+    projectId: options.projectId,
+    techStack: options.techStack,
+    rawRequirements: options.rawRequirements,
+    ir: options.ir,
+    schemas: options.schemas,
+    knowledge: options.knowledge,
+    designTheme: options.designTheme,
+    model: options.model,
+    existingWorkspace: options.existingWorkspace,
+  });
+
+  try {
+    const enrichedCtx = await runPreBuildAgents(pipelineCtx, agentCallbacks);
+    if (enrichedCtx.schemas && enrichedCtx.schemas.length > 0) {
+      ctx.schemas = enrichedCtx.schemas;
+    }
+  } catch (err: any) {
+    console.warn("[Compiler] Pre-build agents failed (non-fatal):", err.message);
+  }
+
   // ── Phase 2: Planning ──────────────────────────────────────────────
 
   callbacks.onPhase("planning", "Building task graph...");
