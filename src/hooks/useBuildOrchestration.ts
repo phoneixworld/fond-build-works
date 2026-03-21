@@ -1644,63 +1644,29 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
       }
     }
 
-    // ── Step 2: Fallback classification (ONLY when server returned "continue" or failed) ──
-    // Uses local classifier first, then server intent classifier for ambiguous cases
+    // ── Step 2: Fallback when server returned "continue" or failed ──
+    // FIX #2: Simplified — no more dual client/server classification race.
+    // Only use conversation-engine as fallback classifier via a simple heuristic.
+    const hasExistingCodeFallback = !!(sandpackFilesRef.current && Object.keys(sandpackFilesRef.current).length > 0);
+    
     if (finalText.length > 15) {
-      const localIntent = fastClassifyLocal(finalText);
-
-      if (localIntent === "chat") {
-        if (looksLikeRuntimeFixRequest) {
-          console.log("[SmartSend] Local chat intent overridden → edit for runtime fix request");
-          setCurrentAgent("edit");
-          setPipelineStep("resolving");
-          sendEditMessage(finalText, images);
-          return;
-        }
-
+      // Simple heuristic: questions → chat, everything else → build/edit
+      const isQuestion = /^(what|how|why|can you|could you|should|is it|tell me|explain|help me|describe|when|where|who)\b/i.test(finalText.trim());
+      const isConversational = /^(thanks|thank you|got it|i see|okay|cool|great|nice|awesome|perfect)\b/i.test(finalText.trim());
+      
+      if (isQuestion || isConversational) {
         setCurrentAgent("chat");
         setPipelineStep("chatting");
         sendChatMessage(finalText, images);
         return;
       }
-
-      if (localIntent === "edit") {
+      
+      // If existing code, route to edit
+      if (hasExistingCodeFallback) {
         setCurrentAgent("edit");
         setPipelineStep("resolving");
         sendEditMessage(finalText, images);
         return;
-      }
-
-      if (localIntent !== "build") {
-        // Server classification for truly ambiguous cases
-        const classification = await classifyUserIntent(finalText);
-        if (isSmartSendStale()) {
-          console.warn("[SmartSend] Project switched during intent classification, aborting");
-          return;
-        }
-        if (classification?.intent === "clarify") return;
-
-        if (classification?.intent === "chat") {
-          if (looksLikeRuntimeFixRequest) {
-            console.log("[SmartSend] Server chat intent overridden → edit for runtime fix request");
-            setCurrentAgent("edit");
-            setPipelineStep("resolving");
-            sendEditMessage(finalText, images);
-            return;
-          }
-
-          setCurrentAgent("chat");
-          setPipelineStep("chatting");
-          sendChatMessage(finalText, images);
-          return;
-        }
-
-        if (classification?.intent === "edit") {
-          setCurrentAgent("edit");
-          setPipelineStep("resolving");
-          sendEditMessage(finalText, images);
-          return;
-        }
       }
     }
 
