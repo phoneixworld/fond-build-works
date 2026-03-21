@@ -1512,8 +1512,19 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
           return;
         }
         
+        // Filter out error messages, frustrated replies, and non-requirement content from chat history
+        const ERROR_NOISE = /\b(element type is invalid|unclosed block|unclosed bracket|is not a function|is not defined|something went wrong|syntax error|check the render|you likely forgot|mixed up default|module not found|cannot find module|auto-fix|auto fix|✅ Fixed|⚠️ Found|⚠️ Build)\b/i;
+        const FRUSTRATION_NOISE = /^(stupid|idiot|bloody|damn|hell|wtf|omg|ugh|why|????|\.{3,}|\?{2,}|!{2,})$/i;
         const chatContext = messages
-          .filter(m => typeof m.content === "string" && m.content.length > 30)
+          .filter(m => {
+            const text = typeof m.content === "string" ? m.content : "";
+            if (text.length < 30) return false;
+            if (ERROR_NOISE.test(text)) return false;
+            if (FRUSTRATION_NOISE.test(text.trim())) return false;
+            // Skip assistant status messages
+            if (m.role === "assistant" && /^(✅|⚠️|🔧|🔄|Building|Processing)/.test(text.trim())) return false;
+            return true;
+          })
           .map(m => `**${m.role === "user" ? "User" : "Assistant"}:**\n${m.content}`)
           .join("\n\n");
         

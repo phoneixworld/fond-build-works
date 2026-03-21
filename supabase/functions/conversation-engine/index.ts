@@ -630,6 +630,19 @@ Deno.serve(async (req) => {
       let text = (message || "").trim();
       const imageUrls: string[] = body.imageUrls || [];
 
+      // ── GUARD: Reject error messages from being stored as requirements ──
+      const ERROR_MSG_PATTERNS = /\b(element type is invalid|expected a string|unclosed block|unclosed bracket|is not a function|is not defined|cannot read prop|unexpected token|syntax error|render method|check the render|you likely forgot to export|mixed up default and named imports|something went wrong|module not found|cannot find module)\b/i;
+      if (ERROR_MSG_PATTERNS.test(text.toLowerCase()) && imageUrls.length === 0) {
+        console.log(`[conversation-engine] Rejected error message from requirements: "${text.slice(0, 80)}..."`);
+        return json({
+          rejected: true,
+          reason: "Error messages cannot be stored as requirements",
+          parsed: { entities: [], actions: [], constraints: [], uiComponents: [], workflows: [], roles: [], integrations: [] },
+          normalized: {},
+          irMappings: {},
+        });
+      }
+
       // ── Step 1: Extract text from images via AI vision (Checklist #1: server-side, deterministic) ──
       if ((hasImages || imageUrls.length > 0) && imageUrls.length > 0) {
         try {
