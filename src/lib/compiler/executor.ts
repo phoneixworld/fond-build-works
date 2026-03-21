@@ -42,6 +42,7 @@ ${task.touches.length > 0 ? task.touches.map(f => `- MODIFY: ${f}`).join("\n") :
 ${ctx.ir.entities.length > 0 ? `- Entities: ${ctx.ir.entities.map(e => `${e.name}(${e.fields.map(f => f.name).join(", ")})`).join(", ")}` : ""}
 ${ctx.ir.roles.length > 0 ? `- Roles: ${ctx.ir.roles.map(r => r.name).join(", ")}` : ""}
 ${ctx.ir.routes.length > 0 ? `- Routes: ${ctx.ir.routes.map(r => `${r.path} → ${r.page}`).join(", ")}` : ""}
+${ctx.tableMappings && Object.keys(ctx.tableMappings).length > 0 ? `\n### Database Tables (REAL Postgres tables — use these exact names):\n${Object.entries(ctx.tableMappings).map(([logical, real]) => `- ${logical} → supabase.from("${real}")`).join("\n")}` : ""}
 
 ### Existing workspace files:
 ${existingFiles.length > 0 ? existingFiles.map(f => `- ${f}`).join("\n") : "(empty workspace)"}

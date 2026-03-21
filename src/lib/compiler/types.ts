@@ -30,6 +30,8 @@ export interface BuildContext {
   knowledge?: string[];
   designTheme?: string;
   model?: string;
+  /** Mapping from logical table name → real Postgres table name */
+  tableMappings?: Record<string, string>;
 }
 
 export interface IRManifest {
