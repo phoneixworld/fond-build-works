@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useCallback, useMemo, ReactNode } from "react";
+import { createContext, useContext, useState, useCallback, useMemo, ReactNode, SetStateAction } from "react";
 import type { BuildMetrics } from "@/lib/buildObservability";
 
 export interface SandpackFileSet {
@@ -26,7 +26,7 @@ interface PreviewContextType {
   sandpackFiles: SandpackFileSet | null;
   setSandpackFiles: (files: SandpackFileSet | null) => void;
   sandpackDeps: Record<string, string>;
-  setSandpackDeps: (deps: Record<string, string>) => void;
+  setSandpackDeps: (deps: SetStateAction<Record<string, string>>) => void;
   // Build state
   isBuilding: boolean;
   setIsBuilding: (building: boolean) => void;
@@ -56,7 +56,7 @@ const PreviewContext = createContext<PreviewContextType | null>(null);
 export const PreviewProvider = ({ children }: { children: ReactNode }) => {
   const [previewHtml, setPreviewHtml] = useState("");
   const [sandpackFilesState, setSandpackFilesState] = useState<SandpackFileSet | null>(null);
-  const [sandpackDeps, setSandpackDeps] = useState<Record<string, string>>({});
+  const [sandpackDepsState, setSandpackDepsState] = useState<Record<string, string>>({});
   const [isBuilding, setIsBuilding] = useState(false);
   const [buildStep, setBuildStep] = useState("");
   const [previewMode, setPreviewMode] = useState<"html" | "sandpack" | "esm" | "vite">("html");
@@ -94,12 +94,31 @@ export const PreviewProvider = ({ children }: { children: ReactNode }) => {
     setSandpackFilesState(sanitizeSandpackFiles(files));
   }, [sanitizeSandpackFiles]);
 
+  const sanitizeSandpackDeps = useCallback((deps: Record<string, unknown>): Record<string, string> => {
+    const sanitized: Record<string, string> = {};
+    for (const [name, version] of Object.entries(deps || {})) {
+      if (typeof version !== "string") continue;
+      const cleanedName = name.trim();
+      const cleanedVersion = version.trim();
+      if (!cleanedName || !cleanedVersion) continue;
+      sanitized[cleanedName] = cleanedVersion;
+    }
+    return sanitized;
+  }, []);
+
+  const setSandpackDeps = useCallback((deps: SetStateAction<Record<string, string>>) => {
+    setSandpackDepsState((prev) => {
+      const next = typeof deps === "function" ? deps(prev) : deps;
+      return sanitizeSandpackDeps(next as Record<string, unknown>);
+    });
+  }, [sanitizeSandpackDeps]);
+
   const saveSnapshot = useCallback((label: string) => {
     if (!sandpackFilesState) return;
     setSnapshots(prev => {
       const snapshot: BuildSnapshot = {
         files: { ...sandpackFilesState },
-        deps: { ...sandpackDeps },
+        deps: { ...sandpackDepsState },
         timestamp: Date.now(),
         label,
       };
@@ -107,7 +126,7 @@ export const PreviewProvider = ({ children }: { children: ReactNode }) => {
       // Keep only last N snapshots
       return updated.slice(-MAX_SNAPSHOTS);
     });
-  }, [sandpackFilesState, sandpackDeps]);
+  }, [sandpackFilesState, sandpackDepsState]);
 
   const restoreSnapshot = useCallback((index: number) => {
     setSnapshots(prev => {
@@ -124,7 +143,7 @@ export const PreviewProvider = ({ children }: { children: ReactNode }) => {
   const contextValue = useMemo(() => ({
     previewHtml, setPreviewHtml,
     sandpackFiles: sandpackFilesState, setSandpackFiles,
-    sandpackDeps, setSandpackDeps,
+    sandpackDeps: sandpackDepsState, setSandpackDeps,
     isBuilding, setIsBuilding,
     buildStep, setBuildStep,
     previewMode, setPreviewMode,
@@ -134,7 +153,7 @@ export const PreviewProvider = ({ children }: { children: ReactNode }) => {
     refreshKey, triggerRefresh,
     currentPath, setCurrentPath,
   }), [
-    previewHtml, sandpackFilesState, sandpackDeps, isBuilding, buildStep,
+    previewHtml, sandpackFilesState, sandpackDepsState, isBuilding, buildStep,
     previewMode, buildMetrics, snapshots, saveSnapshot, restoreSnapshot,
     viewport, refreshKey, triggerRefresh, currentPath,
   ]);

@@ -8,6 +8,7 @@ import {
 import { usePreview, SandpackFileSet } from "@/contexts/PreviewContext";
 import { AlertTriangle, RefreshCw } from "lucide-react";
 import { transform } from "sucrase";
+import { DEFAULT_SANDPACK_DEPENDENCIES } from "@/lib/preview/defaultSandpackDependencies";
 
 // ─── Error Boundary ───────────────────────────────────────────────────────────
 interface ErrorBoundaryState {
@@ -86,7 +87,7 @@ class SandpackErrorBoundary extends Component<
 const ALLOWED_PACKAGES = new Set([
   "react", "react-dom", "react/jsx-runtime",
   "lucide-react", "framer-motion", "date-fns", "recharts",
-  "react-router-dom", "clsx", "tailwind-merge",
+  "react-router-dom", "clsx", "tailwind-merge", "class-variance-authority",
   "react-intersection-observer", "zustand", "zod", "axios",
   "@tanstack/react-query", "@tanstack/react-table", "react-hook-form", "sonner",
   "@supabase/supabase-js",
@@ -1013,46 +1014,7 @@ const SandpackPreview = ({ viewport, showConsole = false, initialPath }: Sandpac
   const stableKey = useMemo(() => `sp-${projectId || "default"}-${filesHash}`, [projectId, filesHash]);
 
   const dependencies = useMemo(() => ({
-    "react": "^18.2.0",
-    "react-dom": "^18.2.0",
-    "lucide-react": "^0.400.0",
-    "framer-motion": "^11.0.0",
-    "date-fns": "^3.6.0",
-    "recharts": "^2.12.0",
-    "react-router-dom": "^6.22.0",
-    "clsx": "^2.1.0",
-    "tailwind-merge": "^2.2.0",
-    "class-variance-authority": "^0.7.1",
-    "react-intersection-observer": "^9.10.0",
-    "@tanstack/react-table": "^8.17.0",
-    "@supabase/supabase-js": "^2.38.0",
-    "@radix-ui/react-accordion": "^1.2.11",
-    "@radix-ui/react-alert-dialog": "^1.1.14",
-    "@radix-ui/react-aspect-ratio": "^1.1.7",
-    "@radix-ui/react-avatar": "^1.1.10",
-    "@radix-ui/react-checkbox": "^1.3.2",
-    "@radix-ui/react-collapsible": "^1.1.11",
-    "@radix-ui/react-context-menu": "^2.2.15",
-    "@radix-ui/react-dialog": "^1.1.14",
-    "@radix-ui/react-dropdown-menu": "^2.1.15",
-    "@radix-ui/react-hover-card": "^1.1.14",
-    "@radix-ui/react-label": "^2.1.7",
-    "@radix-ui/react-menubar": "^1.1.15",
-    "@radix-ui/react-navigation-menu": "^1.2.13",
-    "@radix-ui/react-popover": "^1.1.14",
-    "@radix-ui/react-progress": "^1.1.7",
-    "@radix-ui/react-radio-group": "^1.3.7",
-    "@radix-ui/react-scroll-area": "^1.2.9",
-    "@radix-ui/react-select": "^2.2.5",
-    "@radix-ui/react-separator": "^1.1.7",
-    "@radix-ui/react-slider": "^1.3.5",
-    "@radix-ui/react-slot": "^1.2.3",
-    "@radix-ui/react-switch": "^1.2.5",
-    "@radix-ui/react-tabs": "^1.1.12",
-    "@radix-ui/react-toast": "^1.2.14",
-    "@radix-ui/react-toggle": "^1.1.9",
-    "@radix-ui/react-toggle-group": "^1.1.10",
-    "@radix-ui/react-tooltip": "^1.2.7",
+    ...DEFAULT_SANDPACK_DEPENDENCIES,
     ...sandpackDeps,
   }), [sandpackDeps]);
 
