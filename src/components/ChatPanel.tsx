@@ -13,7 +13,7 @@ import { usePreview } from "@/contexts/PreviewContext";
 import { useProjects } from "@/contexts/ProjectContext";
 import { useVirtualFS } from "@/contexts/VirtualFSContext";
 import { supabase } from "@/integrations/supabase/client";
-import ChatMessage from "@/components/chat/ChatMessage";
+
 import ChatMessageList from "@/components/chat/ChatMessageList";
 import BuildPipelineCard from "@/components/chat/BuildPipelineCard";
 import BuildCompletionCard from "@/components/chat/BuildCompletionCard";
