@@ -158,8 +158,7 @@ function calculateMaxTokens(input: CostRouteInput): number {
   if (input.taskType === "chat") return 4000;
   if (input.taskType === "schema" || input.taskType === "backend") return 16000;
   
-  // Build tasks: scale with input size
-  if (input.estimatedTokens > 20000) return 80000;
+  // Build tasks: scale with input size (capped at 64000 for Sonnet 4)
   if (input.estimatedTokens > 10000) return 64000;
   if (input.estimatedTokens > 5000) return 48000;
   return 32000;
