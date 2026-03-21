@@ -1657,6 +1657,18 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
     // Only use conversation-engine as fallback classifier via a simple heuristic.
     const hasExistingCodeFallback = !!(sandpackFilesRef.current && Object.keys(sandpackFilesRef.current).length > 0);
     
+    // FIX: Catch non-actionable short messages (frustration, gibberish, profanity)
+    // These should NEVER trigger a build or edit — route to chat.
+    const NON_ACTIONABLE = /^[\s!?.,:;\-—…'"()*#@&^%$~`]+$|^(fuck|shit|damn|hell|wtf|omg|ugh|lol|ok|okay|no|nah|nope|hmm|huh|meh|bruh|stop|quit|bye|go away|leave|shut up|whatever|forget it|never ?mind|screw|crap|bloody|idiot|stupid|dumb|rubbish|useless|hate|sucks?|annoying|terrible|horrible|awful|worst|lame|pathetic)\b/i;
+    const isNonActionable = finalText.trim().length < 30 && NON_ACTIONABLE.test(finalText.trim());
+    
+    if (isNonActionable) {
+      setCurrentAgent("chat");
+      setPipelineStep("chatting");
+      sendChatMessage(finalText, images);
+      return;
+    }
+
     if (finalText.length > 15) {
       // Simple heuristic: questions → chat, everything else → build/edit
       const isQuestion = /^(what|how|why|can you|could you|should|is it|tell me|explain|help me|describe|when|where|who)\b/i.test(finalText.trim());
@@ -1693,6 +1705,15 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
       setMessages((prev) => [...prev, assistantMsg]);
       const updatedMessages = [...messagesRef.current, userMsg, assistantMsg];
       saveProject({ chat_history: updatedMessages.map(m => ({ role: m.role, content: m.content })) });
+      return;
+    }
+
+    // GATE: Very short messages (< 15 chars) with no clear build keywords should NOT trigger builds
+    const SHORT_BUILD_KEYWORDS = /\b(build|create|make|add|generate|scaffold|app|website|page|dashboard)\b/i;
+    if (finalText.trim().length < 15 && !SHORT_BUILD_KEYWORDS.test(finalText)) {
+      setCurrentAgent("chat");
+      setPipelineStep("chatting");
+      sendChatMessage(finalText, images);
       return;
     }
 
