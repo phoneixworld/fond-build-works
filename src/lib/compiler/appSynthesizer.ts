@@ -1,6 +1,68 @@
-// src/lib/appSynthesizer.ts
+// src/lib/compiler/appSynthesizer.ts
 
-import type { IR } from "./ir";
+import type { IR } from "../ir";
+import type { Workspace } from "./workspace";
+
+/**
+ * Workspace-based entry point used by the compiler and tests.
+ * Scans the workspace for page/context files and synthesizes a valid App.jsx string.
+ */
+export function synthesizeAppJsx(ws: Workspace, routes?: Array<{ path: string; component: string; file: string }>): string {
+  const pageFiles = ws.listFiles().filter(f => f.startsWith("/pages/") && f.endsWith(".jsx"));
+
+  const pageImports: string[] = [];
+  const routeLines: string[] = [];
+
+  for (const file of pageFiles) {
+    const content = ws.getFile(file) || "";
+    const name = file.replace(/^\/pages\//, "").replace(/\.jsx$/, "").replace(/\//g, "_").replace(/.*\//, "");
+    const componentName = file.match(/\/([^/]+)\.jsx$/)?.[1] || name;
+
+    const hasDefault = /export\s+default/.test(content);
+    const namedMatch = content.match(/export\s+(?:function|const|class)\s+(\w+)/);
+
+    if (hasDefault) {
+      pageImports.push(`import ${componentName} from "${file.replace(/\.jsx$/, "")}";`);
+    } else if (namedMatch) {
+      pageImports.push(`import { ${namedMatch[1]} as ${componentName} } from "${file.replace(/\.jsx$/, "")}";`);
+    } else {
+      pageImports.push(`import ${componentName} from "${file.replace(/\.jsx$/, "")}";`);
+    }
+
+    const path = componentName.toLowerCase().includes("dashboard") ? "/" :
+      `/${componentName.replace(/Page$/i, "").replace(/([a-z])([A-Z])/g, "$1-$2").toLowerCase()}`;
+    const isIndex = path === "/";
+    routeLines.push(`        <Route${isIndex ? " index" : ` path="${path.replace(/^\//, "")}"`} element={<${componentName} />} />`);
+  }
+
+  // Context imports
+  const contextFiles = ws.listFiles().filter(f => f.startsWith("/contexts/") && f.endsWith(".jsx"));
+  const contextImports: string[] = [];
+  for (const file of contextFiles) {
+    const content = ws.getFile(file) || "";
+    const providerMatch = content.match(/export\s+(?:function|const)\s+(\w+Provider)/);
+    if (providerMatch) {
+      contextImports.push(`import { ${providerMatch[1]} } from "${file.replace(/\.jsx$/, "")}";`);
+    }
+  }
+
+  return `import React from "react";
+import { HashRouter, Routes, Route, Navigate } from "react-router-dom";
+${pageImports.join("\n")}
+${contextImports.join("\n")}
+
+export default function App() {
+  return (
+    <HashRouter>
+      <Routes>
+${routeLines.join("\n")}
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
+    </HashRouter>
+  );
+}
+`.trim();
+}
 
 /**
  * Generates a complete App.jsx file from the IR.
