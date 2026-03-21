@@ -491,9 +491,10 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
 
       const isFirstMessage = messagesRef.current.filter(m => m.role === "user").length <= 1;
       const hasPersistedHistory = (currentProject.chat_history ?? []).length > 0;
-      // Build agent should NOT use Sandpack as source of truth.
-      // Only include current code if explicitly editing.
-      const shouldIncludeCurrentCode = false;
+      // Include current workspace when iterating on an existing build.
+      // This prevents the compiler from generating a fresh app instead of extending.
+      const liveSandpackFilesForContext = sandpackFilesRef.current;
+      const shouldIncludeCurrentCode = !!(liveSandpackFilesForContext && Object.keys(liveSandpackFilesForContext).length > 0);
 
       let currentCodeSummary = "";
       const safeSandpackFiles = sandpackFilesRef.current;
@@ -873,6 +874,21 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
       // buildProjectId already captured at top of sendMessage
       const liveSandpackFiles = sandpackFilesRef.current;
       const isFirstBuild = !liveSandpackFiles || Object.keys(liveSandpackFiles).length === 0;
+
+      // ── ITERATIVE BUILD GUARD ──
+      // If workspace already has files, this is an iteration, not a fresh build.
+      // Route to edit pipeline instead of regenerating from scratch.
+      if (!isFirstBuild && !text.startsWith("🔧 AUTO-FIX") && !text.includes("# APPLICATION REQUIREMENTS")) {
+        console.log(`[BuildOrch] Workspace has ${Object.keys(liveSandpackFiles!).length} files — routing to edit pipeline instead of rebuild`);
+        setCurrentAgent("edit");
+        setPipelineStep("resolving");
+        // Release the sending lock so sendEditMessage can acquire it
+        isSendingRef.current = false;
+        setIsLoading(false);
+        setIsBuilding(false);
+        await sendEditMessage(text, images);
+        return;
+      }
 
       // ─── INSTANT PATH (delegated to useInstantBuild) ───
       const isSimpleBuild = isFirstBuild && !!template;
@@ -1336,12 +1352,12 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
             // broken imports / missing modules introduced by the edit.
             try {
               const repairWorkspace = new Workspace(updatedFiles);
-              // ── Mutation pipeline DISABLED for surgical test ──
-              // repairMissingModules(repairWorkspace);
-              // fixMissingImports(repairWorkspace);
-              // fixExportMismatches(repairWorkspace);
-              // normalizeGeneratedStructure(repairWorkspace);
-              // deduplicateFiles(repairWorkspace);
+              // ── Post-edit repair pipeline (re-enabled) ──
+              repairMissingModules(repairWorkspace);
+              fixMissingImports(repairWorkspace);
+              fixExportMismatches(repairWorkspace);
+              normalizeGeneratedStructure(repairWorkspace);
+              deduplicateFiles(repairWorkspace);
               // Extract repaired files back
               const repairedFiles: Record<string, string> = {};
               for (const f of repairWorkspace.listFiles()) {
