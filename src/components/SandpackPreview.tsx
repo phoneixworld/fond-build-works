@@ -171,6 +171,67 @@ function collapseDuplicateReactImports(code: string, filePath: string): string {
   return collapsed;
 }
 
+function hasLikelyJsx(code: string): boolean {
+  return /<([A-Z][\w.-]*|[a-z][\w:-]*)(\s[^>]*)?>|<\/>|<\s*>|<\//.test(code);
+}
+
+function ensureReactInScope(code: string, filePath: string): string {
+  if (!filePath.match(/\.(jsx?|tsx?)$/)) return code;
+  if (!hasLikelyJsx(code)) return code;
+
+  // Already has React in scope
+  if (
+    /^\s*import\s+React(?:\s*,|\s+from\s+['"]react['"])/m.test(code) ||
+    /^\s*import\s+\*\s+as\s+React\s+from\s+['"]react['"]/m.test(code) ||
+    /\bconst\s+React\s*=\s*require\(\s*['"]react['"]\s*\)/.test(code)
+  ) {
+    return code;
+  }
+
+  // If there is already a named react import, upgrade it to include default React.
+  if (/^\s*import\s+(?:type\s+)?\{[^}]+\}\s+from\s+['"]react['"]/m.test(code)) {
+    const upgraded = code.replace(
+      /^\s*import\s+(?:type\s+)?\{([^}]+)\}\s+from\s+['"]react['"]\s*;?/m,
+      (_m, names) => `import React, {${String(names).trim()}} from "react";`
+    );
+    console.warn(`[SandpackPreview] Added default React import to existing react import in ${filePath}`);
+    return upgraded;
+  }
+
+  console.warn(`[SandpackPreview] Injected missing React import in ${filePath}`);
+  return `import React from "react";\n${code}`;
+}
+
+function removeDefaultExportConflict(code: string, filePath: string): string {
+  const defaultExport = code.match(/\bexport\s+default\s+([A-Za-z_$][\w$]*)\s*;?/);
+  const defaultName = defaultExport?.[1];
+  if (!defaultName) return code;
+
+  let removed = false;
+  const cleaned = code.replace(/^\s*export\s*\{([^}]+)\}\s*;?\s*$/gm, (line, names) => {
+    const entries = String(names)
+      .split(",")
+      .map((p) => p.trim())
+      .filter(Boolean);
+
+    const filtered = entries.filter((entry) => {
+      const normalized = entry.replace(/\s+/g, " ").trim();
+      return !new RegExp(`^${defaultName}(?:\\s+as\\s+[A-Za-z_$][\\w$]*)?$`).test(normalized);
+    });
+
+    if (filtered.length === entries.length) return line;
+    removed = true;
+    if (filtered.length === 0) return "";
+    return `export { ${filtered.join(", ")} };`;
+  });
+
+  if (removed) {
+    console.warn(`[SandpackPreview] Removed named export conflicting with default export in ${filePath}`);
+  }
+
+  return cleaned;
+}
+
 /**
  * Minimal sanitization — strip blocked imports only. No repair, no mutation.
  * Files reaching this point have already been validated upstream by the build engine.
@@ -189,6 +250,8 @@ function sanitizeImports(code: string, filePath: string): string {
   // Repair common AI concatenation artifacts before parse.
   code = trimLateImportTail(code, filePath);
   code = collapseDuplicateReactImports(code, filePath);
+  code = removeDefaultExportConflict(code, filePath);
+  code = ensureReactInScope(code, filePath);
 
   // ── Rename local declarations that collide with imported identifiers ──
   {

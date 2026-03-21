@@ -55,7 +55,13 @@ function categorizeError(error: string): CategorizedError {
   // "X is not defined" or "X is not a function"
   if (/is\s+not\s+(?:defined|a\s+function)/i.test(error)) {
     const idMatch = error.match(/(\w+)\s+is\s+not/);
-    return { type: "runtime", message: error, identifier: idMatch?.[1] };
+    const fileMatch = error.match(/\/([^\s:]+\.\w+)/);
+    const identifier = idMatch?.[1];
+    // In Sandpack classic JSX runtime, missing React import appears as "React is not defined".
+    if (identifier === "React") {
+      return { type: "import", message: error, identifier, file: fileMatch?.[1] };
+    }
+    return { type: "runtime", message: error, identifier, file: fileMatch?.[1] };
   }
 
   // "Cannot read properties of null/undefined"
@@ -100,7 +106,11 @@ function buildSmartFixPrompt(errors: CategorizedError[], fileContext: string, at
     parts.push("**MISSING IMPORTS** (files that can't be found):");
     for (const err of importErrs) {
       parts.push(`- ${err.message}`);
-      if (err.file) parts.push(`  → Create the missing file or fix the import path`);
+      if (err.identifier === "React") {
+        parts.push("  → Add `import React from \"react\";` at the top of JSX files that use JSX");
+      } else if (err.file) {
+        parts.push("  → Create the missing file or fix the import path");
+      }
     }
     parts.push("");
   }
