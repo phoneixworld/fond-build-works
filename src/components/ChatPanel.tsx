@@ -602,7 +602,6 @@ const ChatPanel = forwardRef<ChatPanelHandle, { initialPrompt?: string; onVersio
           pipelineStep={pipelineStep}
           messageCount={messages.length}
         />
-      >
         {/* Drag overlay */}
         <AnimatePresence>
           {isDragOver && (
