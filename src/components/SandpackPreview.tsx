@@ -675,11 +675,12 @@ const DEFAULT_INDEX_HTML = `<!DOCTYPE html>
 </html>`;
 
 /**
- * Sanitize CSS by ensuring braces are balanced while ignoring comments/strings.
- * Appends closing braces if needed to prevent "Unclosed block" errors.
+ * Sanitize CSS by balancing delimiters while ignoring comments/strings.
+ * Prevents parser crashes like "Unclosed block" and "Unclosed bracket".
  */
 function sanitizeCss(css: string): string {
-  let depth = 0;
+  const out: string[] = [];
+  const stack: string[] = [];
   let inComment = false;
   let inSingle = false;
   let inDouble = false;
@@ -689,37 +690,78 @@ function sanitizeCss(css: string): string {
     const next = css[i + 1];
     const prev = css[i - 1];
 
+    // Comment boundaries
     if (!inSingle && !inDouble && !inComment && ch === "/" && next === "*") {
       inComment = true;
+      out.push(ch, next);
       i++;
       continue;
     }
-    if (inComment && ch === "*" && next === "/") {
-      inComment = false;
-      i++;
+    if (inComment) {
+      out.push(ch);
+      if (ch === "*" && next === "/") {
+        out.push(next);
+        inComment = false;
+        i++;
+      }
       continue;
     }
-    if (inComment) continue;
 
+    // String boundaries (ignore escaped quotes)
     if (!inDouble && ch === "'" && prev !== "\\") {
       inSingle = !inSingle;
+      out.push(ch);
       continue;
     }
     if (!inSingle && ch === '"' && prev !== "\\") {
       inDouble = !inDouble;
+      out.push(ch);
       continue;
     }
-    if (inSingle || inDouble) continue;
+    if (inSingle || inDouble) {
+      out.push(ch);
+      continue;
+    }
 
-    if (ch === "{") depth++;
-    else if (ch === "}" && depth > 0) depth--;
+    // Delimiter balancing outside comments/strings
+    if (ch === "{") {
+      stack.push("}");
+      out.push(ch);
+      continue;
+    }
+    if (ch === "[") {
+      stack.push("]");
+      out.push(ch);
+      continue;
+    }
+    if (ch === "(") {
+      stack.push(")");
+      out.push(ch);
+      continue;
+    }
+
+    if (ch === "}" || ch === "]" || ch === ")") {
+      if (stack.length > 0 && stack[stack.length - 1] === ch) {
+        stack.pop();
+        out.push(ch);
+      } else {
+        // Drop stray closing delimiters to keep CSS parseable.
+      }
+      continue;
+    }
+
+    out.push(ch);
   }
 
-  if (depth > 0) {
-    css += "\n" + "}".repeat(depth) + " /* auto-closed */";
+  // Close unterminated structures to avoid parser hard-failures.
+  if (inComment) out.push("*/");
+  if (inSingle) out.push("'");
+  if (inDouble) out.push('"');
+  if (stack.length > 0) {
+    out.push("\n", stack.reverse().join(""), " /* auto-closed */");
   }
 
-  return css;
+  return out.join("");
 }
 
 /**
