@@ -402,7 +402,8 @@ function parseEditOutput(
 ): { files: Record<string, string>; deps: Record<string, string> } | null {
   const files: Record<string, string> = {};
   const deps: Record<string, string> = {};
-  const separatorRegex = /^-{3}\s+(\/?\w[\w/.-]*\.(?:jsx?|tsx?|css))\s*-{0,3}\s*$/;
+  // Accept filenames with spaces/symbols (e.g. /pages/News & Events.jsx)
+  const separatorRegex = /^-{3}\s+(.+?\.(?:jsx?|tsx?|css))\s*-{0,3}\s*$/;
   const depsSeparatorRegex = /^-{3}\s+\/?dependencies\s*-{0,3}\s*$/i;
 
   const normalizePath = (path: string) => {
