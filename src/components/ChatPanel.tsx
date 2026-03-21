@@ -217,6 +217,12 @@ const ChatPanel = forwardRef<ChatPanelHandle, { initialPrompt?: string; onVersio
   useEffect(() => { sendMessageRef.current = sendMessage; }, [sendMessage]);
   useEffect(() => { setPipelineStepRef.current = setPipelineStep; }, [setPipelineStep]);
 
+  // Wire self-healing guard refs to real orchestrator state
+  useEffect(() => { selfHealSendingRef.current = isSendingRef.current; }, [isLoading]);
+  useEffect(() => { selfHealLoadingRef.current = isLoading; }, [isLoading]);
+  // Wire surgical edit path for self-healing (sendMessage is the fallback, but edit is preferred)
+  useEffect(() => { sendEditRef.current = sendMessage; }, [sendMessage]);
+
   const handleClearChat = useCallback(() => {
     orchClearChat();
     conversationState.reset();
