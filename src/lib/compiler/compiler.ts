@@ -131,6 +131,10 @@ export async function compile(
     if (enrichedCtx.schemas && enrichedCtx.schemas.length > 0) {
       ctx.schemas = enrichedCtx.schemas;
     }
+    if (enrichedCtx.tableMappings && Object.keys(enrichedCtx.tableMappings).length > 0) {
+      ctx.tableMappings = enrichedCtx.tableMappings;
+      console.log(`[Compiler] Table mappings injected:`, ctx.tableMappings);
+    }
   } catch (err: any) {
     console.warn("[Compiler] Pre-build agents failed (non-fatal):", err.message);
   }
