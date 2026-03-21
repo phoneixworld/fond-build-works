@@ -143,6 +143,85 @@ function normalizeHookDefaultImports(workspace: Workspace): number {
   return fixed;
 }
 
+function normalizeToastWiring(workspace: Workspace): number {
+  let fixed = 0;
+
+  const appEntryCandidates = ["/App.jsx", "/App.tsx", "/App.js", "/App.ts"];
+
+  for (const appPath of appEntryCandidates) {
+    if (!workspace.hasFile(appPath)) continue;
+
+    const original = workspace.getFile(appPath) || "";
+    let updated = original;
+
+    const toastImportRegex = /import\s+\{\s*([^}]+)\s*\}\s+from\s+["']([^"']*Toast[^"']*)["'];?/g;
+    updated = updated.replace(toastImportRegex, (full, imports: string, fromPath: string) => {
+      const names = imports
+        .split(",")
+        .map((s) => s.trim())
+        .filter(Boolean);
+
+      if (!names.includes("ToastContainer") || !names.includes("ToastProvider")) {
+        return full;
+      }
+
+      const next = names.filter((n) => n !== "ToastContainer");
+      fixed++;
+      console.log(`[StructureNormalizer] Removed unsafe ToastContainer import from ${appPath}`);
+      return `import { ${next.join(", ")} } from "${fromPath}";`;
+    });
+
+    if (updated.includes("<ToastProvider")) {
+      const before = updated;
+      updated = updated
+        .replace(/^\s*<ToastContainer\s*\/>\s*$/gm, "")
+        .replace(/<ToastContainer\s*><\/ToastContainer>/g, "");
+
+      if (updated !== before) {
+        fixed++;
+        console.log(`[StructureNormalizer] Removed standalone <ToastContainer /> from ${appPath}`);
+      }
+    }
+
+    if (updated !== original) {
+      workspace.updateFile(appPath, updated);
+    }
+  }
+
+  for (const toastPath of workspace.listFiles()) {
+    if (!/\/Toast\.(jsx?|tsx?)$/.test(toastPath)) continue;
+
+    const original = workspace.getFile(toastPath) || "";
+    let updated = original;
+
+    updated = updated
+      .replace(
+        /(export\s+function\s+ToastContainer\s*\(\s*\{\s*toasts\s*,\s*removeToast\s*\}\s*\))/g,
+        "export function ToastContainer({ toasts = [], removeToast = () => {} })",
+      )
+      .replace(
+        /(function\s+ToastContainer\s*\(\s*\{\s*toasts\s*,\s*removeToast\s*\}\s*\))/g,
+        "function ToastContainer({ toasts = [], removeToast = () => {} })",
+      )
+      .replace(
+        /(function\s+ToastContainer\s*\(\s*\{\s*toasts\s*,\s*config\s*,\s*removeToast\s*\}\s*\))/g,
+        "function ToastContainer({ toasts = [], config, removeToast = () => {} })",
+      )
+      .replace(
+        /(export\s+function\s+ToastContainer\s*\(\s*\{\s*toasts\s*,\s*config\s*,\s*removeToast\s*\}\s*\))/g,
+        "export function ToastContainer({ toasts = [], config, removeToast = () => {} })",
+      );
+
+    if (updated !== original) {
+      workspace.updateFile(toastPath, updated);
+      fixed++;
+      console.log(`[StructureNormalizer] Added ToastContainer safety defaults in ${toastPath}`);
+    }
+  }
+
+  return fixed;
+}
+
 function rewriteImportsToCanonical(workspace: Workspace, duplicatePath: string, canonicalPath: string): number {
   let rewrites = 0;
 
