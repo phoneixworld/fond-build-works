@@ -72,9 +72,8 @@ const PreviewPanel = () => {
            normalized === '/App.jsx' || normalized === '/App.tsx' ||
            normalized === '/App.js' || normalized === '/App.ts';
   }) : false;
-  
-  // ESM mode has content if we have an App file OR if we have enough files to suggest a build is in progress
-  const hasContent = previewMode === "esm" ? hasAppFile : previewMode === "sandpack" ? !!sandpackFiles : !!previewHtml;
+
+  const suspendLivePreviewDuringBuild = isBuilding;
   
   // Debug: log actual file keys when in ESM mode
   if (previewMode === "esm" && sandpackFiles && !hasAppFile) {
@@ -98,7 +97,7 @@ const PreviewPanel = () => {
       <div className="flex-1 relative overflow-hidden bg-background" style={{ minHeight: 0 }}>
         {/* Building overlay — live pipeline view */}
         <AnimatePresence>
-          {isBuilding && !hasContent && (
+          {suspendLivePreviewDuringBuild && (
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
@@ -216,7 +215,7 @@ const PreviewPanel = () => {
 
         {previewMode === "vite" ? (
           <div className="absolute inset-0" key="vite-container" style={{ display: 'flex', flexDirection: 'column' }}>
-            {isBuilding && (!sandpackFiles || Object.keys(sandpackFiles).length === 0) ? (
+            {suspendLivePreviewDuringBuild ? (
               <EmptyState />
             ) : (
               <VitePreview
@@ -231,7 +230,7 @@ const PreviewPanel = () => {
           </div>
         ) : previewMode === "esm" ? (
           <div className="absolute inset-0" key="esm-container" style={{ display: 'flex', flexDirection: 'column' }}>
-            {isBuilding && (!sandpackFiles || Object.keys(sandpackFiles).length === 0) ? (
+            {suspendLivePreviewDuringBuild ? (
               <EmptyState />
             ) : (
               <ESMPreview
@@ -243,7 +242,7 @@ const PreviewPanel = () => {
           </div>
         ) : previewMode === "sandpack" ? (
           <div className="absolute inset-0" key="sandpack-container" style={{ display: 'flex', flexDirection: 'column' }}>
-            {isBuilding && (!sandpackFiles || Object.keys(sandpackFiles).length === 0) ? (
+            {suspendLivePreviewDuringBuild ? (
               <EmptyState />
             ) : (
               <SandpackPreview
