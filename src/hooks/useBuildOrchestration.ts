@@ -359,13 +359,24 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
   } as InstantBuildConfig);
 
   // Auto-trigger build agent when chat agent confirms a build
+  // FIX #3: If workspace has files, route to edit pipeline instead of full build
   useEffect(() => {
     if (pendingBuildPrompt && !isLoadingRef.current && !isSendingRef.current) {
       const prompt = pendingBuildPrompt;
       setPendingBuildPrompt(null);
-      setCurrentAgent("build");
-      setPipelineStep("planning");
-      sendMessage(prompt);
+
+      const hasExistingCode = !!(sandpackFilesRef.current && Object.keys(sandpackFilesRef.current).length > 0);
+      if (hasExistingCode) {
+        // Simple refinement or confirmed edit — route to edit pipeline
+        console.log("[BuildOrch] BUILD_CONFIRMED with existing code → edit pipeline (not full rebuild)");
+        setCurrentAgent("edit");
+        setPipelineStep("resolving");
+        sendEditMessage(prompt);
+      } else {
+        setCurrentAgent("build");
+        setPipelineStep("planning");
+        sendMessage(prompt);
+      }
     }
   }, [pendingBuildPrompt]);
 
