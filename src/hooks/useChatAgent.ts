@@ -13,7 +13,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { type MsgContent, getTextContent } from "@/lib/codeParser";
 import { streamThroughCacheProxy, type CacheHitResult } from "@/lib/semanticCache";
 
-type Msg = { role: "user" | "assistant"; content: MsgContent; timestamp?: number };
+type MsgMeta = { tokens?: number; durationMs?: number; model?: string };
+type Msg = { role: "user" | "assistant"; content: MsgContent; timestamp?: number; meta?: MsgMeta };
 
 export interface ChatAgentConfig {
   currentProject: any;
