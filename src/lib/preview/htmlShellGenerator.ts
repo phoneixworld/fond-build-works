@@ -334,6 +334,8 @@ ${moduleDefinitions}
             window.dispatchEvent(new PopStateEvent("popstate"));
           }
         }
+        if (e.data && e.data.type === "history-back") { history.back(); }
+        if (e.data && e.data.type === "history-forward") { history.forward(); }
       });
     } catch(e) {
       console.error("[Phoenix Preview]", e);
