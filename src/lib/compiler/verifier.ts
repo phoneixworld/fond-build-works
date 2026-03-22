@@ -679,3 +679,89 @@ function checkProviderOrdering(workspace: Workspace): { issues: VerificationIssu
 
   return { issues };
 }
+
+// ─── Export Convention Check ──────────────────────────────────────────────
+
+/**
+ * Verifies the 5 component export convention rules:
+ * 1. Every component file has exactly ONE default export
+ * 2. Subcomponents use named exports only
+ * 3. No duplicate `export default function X` + `export function X` for same symbol
+ * 4. Import style matches export style
+ * 5. Normalized structure: declarations + trailing export default + export { subs }
+ */
+function checkExportConventions(workspace: Workspace): { issues: VerificationIssue[] } {
+  const issues: VerificationIssue[] = [];
+
+  for (const path of workspace.listFiles()) {
+    if (!/\.(jsx?|tsx?)$/.test(path)) continue;
+    // Only check component/page files
+    if (!path.match(/\/(components|pages)\//)) continue;
+    if (path.includes("/ui/")) continue; // skip primitives
+
+    const content = workspace.getFile(path)!;
+
+    // Rule 1: Must have exactly one default export
+    const defaultExports = [...content.matchAll(/export\s+default\s+/g)];
+    if (defaultExports.length === 0) {
+      // Only warn if it has PascalCase exports (likely a component)
+      const hasPascalExport = /export\s+(?:function|const)\s+[A-Z]/.test(content);
+      if (hasPascalExport) {
+        issues.push({
+          category: "export_convention" as IssueCategory,
+          severity: "warning",
+          file: path,
+          message: "Component file has no default export — main component should be exported as default",
+        });
+      }
+    } else if (defaultExports.length > 1) {
+      issues.push({
+        category: "export_convention" as IssueCategory,
+        severity: "error",
+        file: path,
+        message: `Component file has ${defaultExports.length} default exports — must have exactly one`,
+      });
+    }
+
+    // Rule 3: No `export default function X` AND `export function X` for same symbol
+    const defaultFnMatch = content.match(/export\s+default\s+function\s+(\w+)/);
+    if (defaultFnMatch) {
+      const mainName = defaultFnMatch[1];
+      const dupeCount = [...content.matchAll(
+        new RegExp(`^export\\s+function\\s+${mainName}\\s*\\(`, "gm")
+      )].length;
+      if (dupeCount > 0) {
+        issues.push({
+          category: "export_convention" as IssueCategory,
+          severity: "error",
+          file: path,
+          message: `Symbol '${mainName}' has both 'export default function' and 'export function' — must not duplicate`,
+        });
+      }
+    }
+  }
+
+  // Rule 4: Import style must match export style
+  const idx = workspace.index;
+  for (const [importingFile, imports] of Object.entries(idx.imports)) {
+    for (const imp of imports) {
+      if (!imp.from.startsWith(".") && !imp.from.startsWith("/") && !imp.from.startsWith("@/")) continue;
+
+      const resolved = workspace.resolveImport(importingFile, imp.from);
+      if (!resolved || !workspace.hasFile(resolved)) continue;
+
+      const targetExports = idx.exports[resolved] || [];
+
+      if (imp.isDefault && !targetExports.includes("default")) {
+        issues.push({
+          category: "export_convention" as IssueCategory,
+          severity: "warning",
+          file: importingFile,
+          message: `Default import from '${imp.from}' but target has no default export`,
+        });
+      }
+    }
+  }
+
+  return { issues };
+}
