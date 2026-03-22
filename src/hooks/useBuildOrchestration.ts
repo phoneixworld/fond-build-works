@@ -1524,8 +1524,9 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
       }
 
       if (reply === "unclear") {
-        appendConversationTurn(finalText, images, "Please reply with **yes** to proceed or **no** to cancel.");
-        return;
+        // Not a yes/no — cancel the pending request and process this as a fresh message
+        setPendingExecution(null);
+        // Fall through to normal classification below
       }
 
       if (pendingExecution.needsHighImpactConfirm && !pendingExecution.awaitingHighImpactConfirm) {

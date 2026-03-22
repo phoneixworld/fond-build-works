@@ -47,6 +47,17 @@ export function classifyIntentGate(text: string, hasExistingCode: boolean): Guar
     };
   }
 
+  // Help-seeking phrases anywhere → conversation (even if action verbs present)
+  if (HELP_SEEKING_ANYWHERE.test(lower) || DESIRE_NOT_COMMAND.test(lower)) {
+    return {
+      category: "conversation",
+      routeHint: "chat",
+      requiresConfirmation: false,
+      requiresSecondConfirmation: false,
+      isAmbiguous: false,
+    };
+  }
+
   if (EXPLANATION_PATTERNS.test(lower) || trimmed.startsWith("explain")) {
     return {
       category: "explanation_request",
