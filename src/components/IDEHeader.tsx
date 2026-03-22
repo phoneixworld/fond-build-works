@@ -317,7 +317,7 @@ const IDEHeader = ({
 
             <Tooltip>
               <TooltipTrigger asChild>
-                <button onClick={() => { const iframe = getPreviewIframe(); iframe?.contentWindow?.history.back(); }} className="p-1 text-muted-foreground hover:text-foreground transition-colors rounded-md hover:bg-muted/50">
+                <button onClick={() => { const iframe = getPreviewIframe(); iframe?.contentWindow?.postMessage({ type: "history-back" }, "*"); }} className="p-1 text-muted-foreground hover:text-foreground transition-colors rounded-md hover:bg-muted/50">
                   <ChevronLeft className="w-3.5 h-3.5" />
                 </button>
               </TooltipTrigger>
@@ -325,7 +325,7 @@ const IDEHeader = ({
             </Tooltip>
             <Tooltip>
               <TooltipTrigger asChild>
-                <button onClick={() => { const iframe = getPreviewIframe(); iframe?.contentWindow?.history.forward(); }} className="p-1 text-muted-foreground hover:text-foreground transition-colors rounded-md hover:bg-muted/50">
+                <button onClick={() => { const iframe = getPreviewIframe(); iframe?.contentWindow?.postMessage({ type: "history-forward" }, "*"); }} className="p-1 text-muted-foreground hover:text-foreground transition-colors rounded-md hover:bg-muted/50">
                   <ChevronRight className="w-3.5 h-3.5" />
                 </button>
               </TooltipTrigger>
