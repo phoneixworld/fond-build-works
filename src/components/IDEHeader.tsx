@@ -102,16 +102,23 @@ const IDEHeader = ({
   const [showRouteDropdown, setShowRouteDropdown] = useState(false);
   const urlInputRef = useRef<HTMLInputElement>(null);
 
+  const getPreviewIframe = useCallback((): HTMLIFrameElement | null => {
+    return document.querySelector('.sp-preview-iframe') as HTMLIFrameElement
+      || document.querySelector('iframe[title="Phoenix Vite Preview"]') as HTMLIFrameElement
+      || document.querySelector('iframe[title*="preview" i]') as HTMLIFrameElement
+      || document.querySelector('.preview-panel iframe') as HTMLIFrameElement;
+  }, []);
+
   const handleUrlSubmit = useCallback(() => {
     setIsEditingUrl(false);
     if (urlInput.startsWith("/")) {
       setCurrentPath(urlInput);
-      const sandpackIframe = document.querySelector('.sp-preview-iframe') as HTMLIFrameElement;
-      if (sandpackIframe?.contentWindow) {
-        sandpackIframe.contentWindow.postMessage({ type: "navigate", path: urlInput }, "*");
+      const iframe = getPreviewIframe();
+      if (iframe?.contentWindow) {
+        iframe.contentWindow.postMessage({ type: "navigate", path: urlInput }, "*");
       }
     }
-  }, [urlInput, setCurrentPath]);
+  }, [urlInput, setCurrentPath, getPreviewIframe]);
 
   useEffect(() => {
     if (!isEditingUrl) setUrlInput(currentPath);
@@ -164,11 +171,11 @@ const IDEHeader = ({
     setUrlInput(path);
     setShowRouteDropdown(false);
     setIsEditingUrl(false);
-    const sandpackIframe = document.querySelector('.sp-preview-iframe') as HTMLIFrameElement;
-    if (sandpackIframe?.contentWindow) {
-      sandpackIframe.contentWindow.postMessage({ type: "navigate", path }, "*");
+    const iframe = getPreviewIframe();
+    if (iframe?.contentWindow) {
+      iframe.contentWindow.postMessage({ type: "navigate", path }, "*");
     }
-  }, [setCurrentPath]);
+  }, [setCurrentPath, getPreviewIframe]);
 
   return (
     <header className="h-11 flex items-center shrink-0 z-10 relative bg-ide-panel-header px-1.5">
@@ -310,7 +317,7 @@ const IDEHeader = ({
 
             <Tooltip>
               <TooltipTrigger asChild>
-                <button onClick={() => { const iframe = document.querySelector('.sp-preview-iframe') as HTMLIFrameElement; iframe?.contentWindow?.history.back(); }} className="p-1 text-muted-foreground hover:text-foreground transition-colors rounded-md hover:bg-muted/50">
+                <button onClick={() => { const iframe = getPreviewIframe(); iframe?.contentWindow?.history.back(); }} className="p-1 text-muted-foreground hover:text-foreground transition-colors rounded-md hover:bg-muted/50">
                   <ChevronLeft className="w-3.5 h-3.5" />
                 </button>
               </TooltipTrigger>
@@ -318,7 +325,7 @@ const IDEHeader = ({
             </Tooltip>
             <Tooltip>
               <TooltipTrigger asChild>
-                <button onClick={() => { const iframe = document.querySelector('.sp-preview-iframe') as HTMLIFrameElement; iframe?.contentWindow?.history.forward(); }} className="p-1 text-muted-foreground hover:text-foreground transition-colors rounded-md hover:bg-muted/50">
+                <button onClick={() => { const iframe = getPreviewIframe(); iframe?.contentWindow?.history.forward(); }} className="p-1 text-muted-foreground hover:text-foreground transition-colors rounded-md hover:bg-muted/50">
                   <ChevronRight className="w-3.5 h-3.5" />
                 </button>
               </TooltipTrigger>
