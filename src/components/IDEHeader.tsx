@@ -133,23 +133,27 @@ const IDEHeader = ({
 
   // Extract available routes from sandpackFiles
   // Extract only meaningful page routes from the generated App.jsx
+  // Extract only top-level page routes from the generated app's App.jsx
   const availableRoutes = useMemo(() => {
-    if (!sandpackFiles) return ["/"];
-    const appFile = Object.entries(sandpackFiles).find(([k]) =>
-      /\/?(?:src\/)?App\.(tsx?|jsx?)$/.test(k.replace(/^\/+/, '/'))
-    );
-    if (!appFile) return ["/"];
+    if (!sandpackFiles) return [];
+    // Only look at the generated project's App.jsx (root level, not src/App.tsx which is the builder)
+    const appFile = Object.entries(sandpackFiles).find(([k]) => {
+      const normalized = k.replace(/^\/+/, '/');
+      return normalized === '/App.jsx' || normalized === '/App.tsx';
+    });
+    if (!appFile) return [];
     const content = appFile[1];
-    const routes: string[] = ["/"];
+    const routes: string[] = [];
     const routeRegex = /path=["']([^"'*]+)["']/g;
     let match;
     while ((match = routeRegex.exec(content)) !== null) {
-      const route = match[1];
-      // Skip non-page routes
+      const route = match[1].startsWith("/") ? match[1] : `/${match[1]}`;
       if (routes.includes(route)) continue;
       if (route === "*") continue;
-      if (/^\/?(auth|login|signup|register|callback|reset-password)/i.test(route)) continue;
-      if (route.includes(":")) continue; // dynamic params like /app/:slug
+      // Skip auth/utility routes
+      if (/^\/?(auth|login|signup|register|callback|reset-password|not-found|404)/i.test(route)) continue;
+      // Skip dynamic parameter routes
+      if (route.includes(":")) continue;
       routes.push(route);
     }
     return routes;
