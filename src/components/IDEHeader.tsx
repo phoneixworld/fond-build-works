@@ -350,7 +350,7 @@ const IDEHeader = ({
                 </button>
               )}
               {/* Route dropdown toggle */}
-              {availableRoutes.length > 1 && (
+              {availableRoutes.length > 0 && (
                 <button
                   onClick={() => setShowRouteDropdown(!showRouteDropdown)}
                   className="p-0.5 rounded hover:bg-muted/50 transition-colors shrink-0"
