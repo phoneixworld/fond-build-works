@@ -72,7 +72,7 @@ export const FeesPage = () => <div>Fees</div>;`,
 
     for (const page of ["StudentsPage", "FeesPage"]) {
       const usesDefault = new RegExp(`import\\s+${page}\\s+from`).test(finalApp);
-      const usesNamed = new RegExp(`import\\s+\\{\\s*${page}\\s*\\}\\s+from`).test(finalApp);
+      const usesNamed = new RegExp(`import\\s+\\{[^}]*${page}[^}]*\\}\\s+from`).test(finalApp);
       const fileContent = ws.getFile(`/pages/${page}.jsx`)!;
       const hasDefault = /export\s+default/.test(fileContent);
 
