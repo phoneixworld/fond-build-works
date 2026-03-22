@@ -4,19 +4,17 @@ import type { IR, IRPage } from "./ir";
 
 /**
  * Generates deterministic Shadcn-based page scaffolds from the IR.
- * These files are created BEFORE the model runs, ensuring:
- * - No missing imports
- * - No broken JSX
- * - No empty pages
- * - No inconsistent structure
- *
- * The model can refine these pages later, but the skeleton is always correct.
+ * 
+ * All pages now support Two-Phase Rendering:
+ * - Accept { data, isHydrated } props
+ * - Phase 1: Render with stub data (isHydrated=false)  
+ * - Phase 2: Render with real data (isHydrated=true)
+ * - Subcomponents handle placeholder rendering when !isHydrated
  */
 export function scaffoldPagesFromIR(ir: IR): Record<string, string> {
   const files: Record<string, string> = {};
 
   for (const page of ir.pages) {
-    // Sanitize: "News & Events" → "NewsEvents.jsx"
     const safeName = page.name.replace(/[^a-zA-Z0-9]+/g, " ").split(" ").filter(Boolean)
       .map(w => w.charAt(0).toUpperCase() + w.slice(1)).join("") || page.name;
     const filePath = `/pages/${safeName}.jsx`;
@@ -26,9 +24,6 @@ export function scaffoldPagesFromIR(ir: IR): Record<string, string> {
   return files;
 }
 
-/**
- * Dispatch to the correct scaffold generator.
- */
 function scaffoldPage(page: IRPage, ir: IR): string {
   switch (page.type) {
     case "list":
@@ -65,15 +60,19 @@ import { PageHeader } from "@/components/domain/PageHeader";
 import { SearchFilterBar } from "@/components/domain/SearchFilterBar";
 import { ${hookName} } from "@/contexts/${entity}Context";
 
-export default function ${page.name}() {
-  const { items, loading, createItem } = ${hookName}();
+export default function ${page.name}({ data, isHydrated }) {
+  const { items: contextItems, loading, createItem } = ${hookName}();
+
+  // Two-phase: use prop data in stub phase, context data when hydrated
+  const items = isHydrated ? contextItems : (data?.items || []);
+  const isReady = isHydrated && !loading;
 
   return (
     <div className="flex flex-col gap-6">
       <PageHeader
         title="${title}"
         subtitle="Manage all ${title.toLowerCase()} in the system"
-        actions={<Button onClick={() => createItem()}>Add ${entity}</Button>}
+        actions={<Button onClick={() => createItem()} disabled={!isHydrated}>Add ${entity}</Button>}
       />
 
       <Card className="p-4">
@@ -84,7 +83,11 @@ export default function ${page.name}() {
           onAdd={() => createItem()}
         />
 
-        <DataTable data={items} loading={loading} />
+        <DataTable
+          data={items}
+          loading={!isReady}
+          className={!isHydrated ? "opacity-60 transition-opacity" : "transition-opacity"}
+        />
       </Card>
     </div>
   );
@@ -107,20 +110,21 @@ import { Card } from "@/components/ui/card";
 import { PageHeader } from "@/components/domain/PageHeader";
 import { ${hookName} } from "@/contexts/${entity}Context";
 
-export default function ${page.name}() {
-  const { item, loading } = ${hookName}();
+export default function ${page.name}({ data, isHydrated }) {
+  const { item: contextItem, loading } = ${hookName}();
 
-  if (loading) return <div className="p-4">Loading...</div>;
+  // Two-phase: use prop data in stub phase, context data when hydrated
+  const item = isHydrated ? contextItem : (data?.item || {});
 
   return (
     <div className="flex flex-col gap-6">
       <PageHeader title="${title} Details" />
 
-      <Card className="p-6 space-y-4">
+      <Card className={\`p-6 space-y-4 \${!isHydrated ? "opacity-60" : ""} transition-opacity\`}>
         {Object.entries(item || {}).map(([key, value]) => (
           <div key={key} className="flex justify-between">
             <span className="font-medium">{key}</span>
-            <span>{String(value)}</span>
+            <span>{isHydrated ? String(value) : "—"}</span>
           </div>
         ))}
       </Card>
@@ -149,6 +153,7 @@ function scaffoldFormPage(page: IRPage, ir: IR): string {
             placeholder="Enter ${humanize(name)}"
             value={form.${name} || ""}
             onChange={e => setForm({ ...form, ${name}: e.target.value })}
+            disabled={!isHydrated}
           />
         </div>
       `;
@@ -163,18 +168,21 @@ import { Card } from "@/components/ui/card";
 import { PageHeader } from "@/components/domain/PageHeader";
 import { ${hookName} } from "@/contexts/${entity}Context";
 
-export default function ${page.name}() {
-  const { item, saveItem } = ${hookName}();
+export default function ${page.name}({ data, isHydrated }) {
+  const { item: contextItem, saveItem } = ${hookName}();
+
+  // Two-phase: use prop data in stub phase, context data when hydrated
+  const item = isHydrated ? contextItem : (data?.item || {});
   const [form, setForm] = useState(item || {});
 
   return (
     <div className="flex flex-col gap-6">
       <PageHeader title="${title}" />
 
-      <Card className="p-6 space-y-6">
+      <Card className={\`p-6 space-y-6 \${!isHydrated ? "opacity-60" : ""} transition-opacity\`}>
 ${fields}
 
-        <Button onClick={() => saveItem(form)}>
+        <Button onClick={() => saveItem(form)} disabled={!isHydrated}>
           Save
         </Button>
       </Card>
@@ -196,23 +204,36 @@ import { ActivityFeed } from "@/components/domain/ActivityFeed";
 import { QuickActions } from "@/components/domain/QuickActions";
 import { PageHeader } from "@/components/domain/PageHeader";
 
-export default function ${page.name}() {
+export default function ${page.name}({ data, isHydrated }) {
+  // Two-phase: show placeholder stats in stub phase
+  const stats = isHydrated
+    ? [
+        { label: "Users", value: "1,204", trend: "+12%" },
+        { label: "Sessions", value: "8,932", trend: "+5%" },
+        { label: "Conversions", value: "312", trend: "+3%" },
+        { label: "Revenue", value: "$12,430", trend: "+8%" },
+      ]
+    : (data?.stats || [
+        { label: "—", value: "—", trend: "" },
+        { label: "—", value: "—", trend: "" },
+        { label: "—", value: "—", trend: "" },
+        { label: "—", value: "—", trend: "" },
+      ]);
+
   return (
-    <div className="flex flex-col gap-6">
+    <div className={\`flex flex-col gap-6 \${!isHydrated ? "opacity-60" : ""} transition-opacity\`}>
       <PageHeader
         title="Dashboard"
         subtitle="Overview of your application"
       />
 
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
-        <StatCard label="Users" value="1,204" trend="+12%" />
-        <StatCard label="Sessions" value="8,932" trend="+5%" />
-        <StatCard label="Conversions" value="312" trend="+3%" />
-        <StatCard label="Revenue" value="$12,430" trend="+8%" />
+        {stats.map((s, i) => (
+          <StatCard key={i} label={s.label} value={s.value} trend={s.trend} />
+        ))}
       </div>
 
       <QuickActions />
-
       <ActivityFeed />
     </div>
   );
@@ -228,8 +249,12 @@ function scaffoldBlankPage(page: IRPage): string {
   return `
 import React from "react";
 
-export default function ${page.name}() {
-  return <div className="p-4">${page.name}</div>;
+export default function ${page.name}({ data, isHydrated }) {
+  return (
+    <div className={\`p-4 \${!isHydrated ? "opacity-60" : ""} transition-opacity\`}>
+      ${page.name}
+    </div>
+  );
 }
 `.trim();
 }
