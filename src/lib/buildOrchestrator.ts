@@ -9,16 +9,22 @@ import { generateLayoutFiles } from "./layoutGenerator";
 import { generateSupabaseEntityFiles } from "./supabaseEntityGenerator";
 import { synthesizeAppFromIR } from "./compiler/appSynthesizer";
 import { generateAuthContext } from "./templates/scaffoldTemplates";
+import { generateSkeletonFiles } from "./skeletonGenerator";
+import { generateRouteWrappers } from "./twoPhaseRenderer";
+import { generatePreloadFiles } from "./preloadGenerator";
 
 /**
  * Orchestrates the entire build pipeline:
  *
  * 1. IR Planner → IR
  * 2. Generate deterministic scaffolds (pages, layout, contexts, mock API)
- * 3. Pre-seed hardened AuthContext (router-agnostic, no useNavigate)
- * 4. Generate Supabase adapters (if backend = supabase)
- * 5. Generate App.jsx from IR
- * 6. Return a complete file map for the executor
+ * 3. Generate skeleton components for instant UI
+ * 4. Generate route wrappers for two-phase rendering
+ * 5. Generate preloading + warmers for predictive navigation
+ * 6. Pre-seed hardened AuthContext (router-agnostic, no useNavigate)
+ * 7. Generate Supabase adapters (if backend = supabase)
+ * 8. Generate App.jsx from IR (using route wrappers)
+ * 9. Return a complete file map for the executor
  */
 export async function orchestrateBuild(options: {
   rawRequirements: string;
@@ -44,19 +50,27 @@ export async function orchestrateBuild(options: {
   // Mock API
   Object.assign(files, generateMockApiFiles(ir));
 
-  // 3. CONDITIONALLY SEED HARDENED AUTH CONTEXT
-  // Only inject AuthContext if the IR explicitly includes it.
+  // 3. SKELETON COMPONENTS (instant 0-50ms UI)
+  Object.assign(files, generateSkeletonFiles(ir));
+
+  // 4. ROUTE WRAPPERS (two-phase rendering + loading timeout)
+  Object.assign(files, generateRouteWrappers(ir));
+
+  // 5. PRELOADING + WARMERS (predictive navigation + background warmers)
+  Object.assign(files, generatePreloadFiles(ir));
+
+  // 6. CONDITIONALLY SEED HARDENED AUTH CONTEXT
   const hasAuth = ir.contexts.some((c) => c.name === "AuthContext");
   if (hasAuth) {
     files["/contexts/AuthContext.jsx"] = generateAuthContext();
   }
 
-  // 4. Supabase (optional)
+  // 7. Supabase (optional)
   if (ir.backend?.provider === "supabase") {
     Object.assign(files, generateSupabaseEntityFiles(ir));
   }
 
-  // 5. APP.JSX
+  // 8. APP.JSX (uses route wrappers for optimistic rendering)
   files["/App.jsx"] = synthesizeAppFromIR(ir);
 
   return files;
