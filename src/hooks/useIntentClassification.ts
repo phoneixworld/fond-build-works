@@ -87,6 +87,15 @@ export function useIntentClassification(
     // Long requirement documents (>3000 chars) are always "build"
     if (text.length > 3000) return "build";
 
+    // ── Greetings — always chat, never build ──
+    if (/^(hello|hi|hey|yo|good morning|good evening|good afternoon|what'?s up|how are you|hello there|hey phoenix|sup|hiya|evening|morning|howdy|greetings|hey there|hi there|heya)\b/i.test(t)) return "chat";
+
+    // ── Small talk — always chat ──
+    if (/^(how'?s it going|what are you doing|can you talk|are you there|what'?s new|tell me something|how have you been|what'?s happening)\b/i.test(t)) return "chat";
+
+    // ── Capability questions — always chat ──
+    if (/\b(what can you do|what are your .*(skills|capabilities|features)|how does this work|your core skills)\b/i.test(t)) return "chat";
+
     // ── Chat patterns (check FIRST to avoid false build matches) ──
     // Phased/incremental work signals — user wants to discuss before building
     if (/\b(phase by phase|step by step|i'll give you|ill give you|one at a time|let me explain|first let me|i'll share|ill share|i'll provide|ill provide|wait for my|before you start)\b/i.test(t)) return "chat";
@@ -98,6 +107,8 @@ export function useIntentClassification(
     if (/^(thanks|thank you|got it|i see|okay so|i understand|that makes sense|cool|great|nice|awesome|perfect|no worries)/i.test(t)) return "chat";
     // Asking about something (even without question mark)
     if (/\b(what does|how does|how do|what is|what are|can i|should i|is there|would it|will it)\b/i.test(t)) return "chat";
+    // Ambiguous help-seeking — always chat
+    if (/\b(can you help|i need help|i'?m stuck|this is weird|why is this happening|can you check something)\b/i.test(t)) return "chat";
 
     // ── Edit patterns (check BEFORE build — edits are more specific) ──
     const hasExistingCode = !!(sandpackFiles && Object.keys(sandpackFiles).length > 0) || !!(previewHtml && previewHtml.length > 0);
@@ -107,7 +118,7 @@ export function useIntentClassification(
 
     // ── Build patterns ──
     // Clear build commands (verb-first)
-    if (/^(build|create|make|add|generate|implement|develop|set up|scaffold|wire up)\b/i.test(t)) return "build";
+    if (/^(build|create|make|add|generate|implement|develop|set up|scaffold|wire up|produce|write code for)\b/i.test(t)) return "build";
     // Modification commands (verb-first) — only if no existing code (otherwise it's an edit)
     if (/^(change|update|fix|modify|replace|remove|delete|move|rename|resize|recolor|restyle)\b/i.test(t)) {
       return hasExistingCode ? "edit" : "build";
