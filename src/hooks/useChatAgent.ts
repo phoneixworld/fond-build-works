@@ -146,6 +146,7 @@ export function useChatAgent(config: ChatAgentConfig) {
       },
       onDelta: (chunk) => {
         fullChatResponse += chunk;
+        tokenCount += Math.ceil(chunk.length / 4); // rough token estimate
         const displayText = stripBuildMarker(fullChatResponse);
         setMessages((prev) => {
           const last = prev[prev.length - 1];
