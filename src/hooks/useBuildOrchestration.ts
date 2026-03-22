@@ -44,8 +44,17 @@ import { fixMissingImports } from "@/lib/compiler/missingImportFixer";
 import { fixExportMismatches } from "@/lib/compiler/exportMismatchFixer";
 import { deduplicateFiles } from "@/lib/compiler/deduplicator";
 import { normalizeGeneratedStructure } from "@/lib/compiler/structureNormalizer";
+import { classifyIntentGate, parseConfirmationReply, type GuardRouteHint } from "@/lib/intentGate";
 
 type Msg = { role: "user" | "assistant"; content: MsgContent; timestamp?: number };
+
+type PendingExecutionRequest = {
+  prompt: string;
+  images: string[];
+  routeHint: GuardRouteHint;
+  needsHighImpactConfirm: boolean;
+  awaitingHighImpactConfirm: boolean;
+};
 
 export interface BuildOrchestrationConfig {
   // Project
@@ -129,6 +138,7 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
   const [isLoading, setIsLoading] = useState(false);
   const [selectedTemplate, setSelectedTemplate] = useState<PageTemplate | null>(null);
   const [compilerTasks, setCompilerTasks] = useState<Array<{ id: string; label: string; status: "pending" | "in_progress" | "done" }>>([]);
+  const [pendingExecution, setPendingExecution] = useState<PendingExecutionRequest | null>(null);
   const planLabelsRef = useRef<string[]>([]);
   const lastVerificationOkRef = useRef<boolean | null>(null);
 
@@ -338,6 +348,20 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
     }
     return parts;
   }, []);
+
+  const appendConversationTurn = useCallback((userText: string, images: string[], assistantText: string) => {
+    const content = buildMessageContent(userText, images);
+    const userMsg: Msg = { role: "user", content, timestamp: Date.now() };
+    const assistantMsg: Msg = { role: "assistant", content: assistantText, timestamp: Date.now() };
+
+    setInput("");
+    setAttachedImages([]);
+    setMessages((prev) => {
+      const updated = [...prev, userMsg, assistantMsg];
+      saveProject({ chat_history: updated.map(m => ({ role: m.role, content: m.content })) });
+      return updated;
+    });
+  }, [buildMessageContent, setInput, setAttachedImages, setMessages, saveProject]);
 
   // ─── Shared error handler ───
   const handleOnError = useCallback((err: string) => {
@@ -1482,10 +1506,50 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
     const isSmartSendStale = () => !smartSendProjectId || (lastProjectIdRef.current !== null && lastProjectIdRef.current !== smartSendProjectId);
 
     const hasImages = images.length > 0;
-    // If user sends images with no text, do NOT auto-generate "Replicate this design"
-    // Instead, treat as requirements with images
     const finalText = text || (hasImages ? "" : "");
     if (!finalText && !hasImages) return;
+
+    const hasExistingCode = !!(sandpackFilesRef.current && Object.keys(sandpackFilesRef.current).length > 0);
+
+    // ── Mandatory confirmation flow for generation/refactor/fix/high-impact requests ──
+    if (pendingExecution) {
+      const reply = parseConfirmationReply(finalText);
+
+      if (reply === "cancel") {
+        setPendingExecution(null);
+        setCurrentAgent("chat");
+        setPipelineStep("chatting");
+        appendConversationTurn(finalText, images, "Understood — I cancelled that request and made no code changes.");
+        return;
+      }
+
+      if (reply === "unclear") {
+        appendConversationTurn(finalText, images, "Please reply with **yes** to proceed or **no** to cancel.");
+        return;
+      }
+
+      if (pendingExecution.needsHighImpactConfirm && !pendingExecution.awaitingHighImpactConfirm) {
+        setPendingExecution({ ...pendingExecution, awaitingHighImpactConfirm: true });
+        appendConversationTurn(finalText, images, "This will modify core application files.\nProceed?");
+        return;
+      }
+
+      const approved = pendingExecution;
+      setPendingExecution(null);
+      appendConversationTurn(finalText, images, "Proceeding with the approved change.");
+
+      if (approved.routeHint === "edit") {
+        setCurrentAgent("edit");
+        setPipelineStep("resolving");
+        sendEditMessage(approved.prompt, approved.images);
+        return;
+      }
+
+      setCurrentAgent("build");
+      setPipelineStep("planning");
+      sendMessage(approved.prompt, approved.images);
+      return;
+    }
 
     const isAutoFix = finalText.startsWith("🔧");
 
@@ -1497,9 +1561,42 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
       return;
     }
 
-    // ── Step 1: ALWAYS route through async server conversation analyzer ──
-    // This is the SINGLE authoritative classifier. No sync fallback, no dual-path.
-    const hasExistingCode = !!(sandpackFilesRef.current && Object.keys(sandpackFilesRef.current).length > 0);
+    const guardedIntent = classifyIntentGate(finalText, hasExistingCode);
+
+    // Conversation-first mode + uncertainty guard
+    if (guardedIntent.isAmbiguous) {
+      setCurrentAgent("chat");
+      setPipelineStep("chatting");
+      appendConversationTurn(
+        finalText,
+        images,
+        "I’m not fully sure this is a build/edit request. Do you want me to **generate code**, **refactor**, **fix**, or just discuss?"
+      );
+      return;
+    }
+
+    if (guardedIntent.routeHint === "chat") {
+      setCurrentAgent("chat");
+      setPipelineStep("chatting");
+      sendChatMessage(finalText, images);
+      return;
+    }
+
+    if (guardedIntent.requiresConfirmation) {
+      setCurrentAgent("chat");
+      setPipelineStep("chatting");
+      setPendingExecution({
+        prompt: finalText,
+        images,
+        routeHint: guardedIntent.routeHint,
+        needsHighImpactConfirm: guardedIntent.requiresSecondConfirmation,
+        awaitingHighImpactConfirm: false,
+      });
+      appendConversationTurn(finalText, images, "I can generate this.\nDo you want me to proceed?");
+      return;
+    }
+
+    // ── Step 1: Route through async server conversation analyzer ──
     const normalizedText = finalText.toLowerCase();
     const looksLikeRuntimeFixRequest = hasExistingCode && !hasImages && (
       normalizedText.includes("fix") ||
@@ -1520,8 +1617,6 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
     );
     const explicitRebuildRequest = /\b(rebuild|from scratch|start over|regenerate app|new app|new project)\b/i.test(normalizedText);
 
-    // Hard override: generic runtime fix prompts should stay in edit-mode.
-    // This prevents server FSM from incorrectly routing "fix preview error" into full rebuilds.
     if (looksLikeRuntimeFixRequest && !explicitRebuildRequest) {
       console.log("[SmartSend] Runtime fix request → edit pipeline");
       setCurrentAgent("edit");
@@ -1720,7 +1815,25 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
     setCurrentAgent("build");
     setPipelineStep("planning");
     sendMessage(finalText, images);
-  }, [classifyUserIntent, fastClassifyLocal, sendChatMessage, sendMessage, sendEditMessage, conversationAnalyzeAsync, conversationAddPhase, conversationGetRequirements, conversationStartBuilding, conversationGenerateAck, conversationMode, buildMessageContent, setInput, setAttachedImages, setMessages, saveProject]);
+  }, [
+    currentProject,
+    pendingExecution,
+    appendConversationTurn,
+    sendChatMessage,
+    sendMessage,
+    sendEditMessage,
+    conversationAnalyzeAsync,
+    conversationAddPhase,
+    conversationGetRequirements,
+    conversationStartBuilding,
+    conversationGenerateAck,
+    conversationMode,
+    buildMessageContent,
+    setInput,
+    setAttachedImages,
+    setMessages,
+    saveProject,
+  ]);
 
   const clearChat = useCallback(() => {
     if (!currentProject || isLoading) return;
@@ -1739,6 +1852,7 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
     setCurrentAgent(null);
     setPipelineStep(null);
     setPendingBuildPrompt(null);
+    setPendingExecution(null);
     setCurrentPlan(null);
     setCurrentTaskIndex(0);
     setTotalPlanTasks(0);
