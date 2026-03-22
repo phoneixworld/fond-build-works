@@ -689,7 +689,7 @@ const ActionBar = ({ text, onRegenerate, meta }: { text: string; onRegenerate?: 
 
 // --- Main component ---
 
-const ChatMessage = ({ content, role, timestamp, isLoading, onEdit, onRegenerate, showActions = true, onSuggestionClick }: ChatMessageProps) => {
+const ChatMessage = ({ content, role, timestamp, meta, isLoading, onEdit, onRegenerate, showActions = true, onSuggestionClick }: ChatMessageProps) => {
   const isUser = role === "user";
   const textContent = getTextContent(content);
   const imageUrls = getImageUrls(content);
