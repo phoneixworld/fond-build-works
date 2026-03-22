@@ -1,4 +1,4 @@
-import { Zap, LogOut, ArrowLeft, ChevronDown, Settings, Pencil, ArrowLeftRight, Lock, User, CreditCard, HelpCircle, Monitor, Tablet, Smartphone, Globe, ChevronLeft, ChevronRight, ExternalLink, RefreshCw, Clock, RotateCcw } from "lucide-react";
+import { Zap, LogOut, ArrowLeft, ChevronDown, Settings, Pencil, ArrowLeftRight, Lock, User, CreditCard, HelpCircle, Monitor, Tablet, Smartphone, Globe, ChevronLeft, ChevronRight, ExternalLink, RefreshCw, Clock, RotateCcw, FileText } from "lucide-react";
 import { Version } from "@/components/VersionHistory";
 import { formatDistanceToNow } from "date-fns";
 import {
