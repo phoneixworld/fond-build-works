@@ -47,7 +47,8 @@ import { normalizeGeneratedStructure } from "@/lib/compiler/structureNormalizer"
 import { classifyIntentGate, parseConfirmationReply, type GuardRouteHint } from "@/lib/intentGate";
 import { extractUrlFromMessage, analyzeUrl } from "@/lib/urlAnalyzer";
 
-type Msg = { role: "user" | "assistant"; content: MsgContent; timestamp?: number };
+type MsgMeta = { tokens?: number; durationMs?: number; model?: string };
+type Msg = { role: "user" | "assistant"; content: MsgContent; timestamp?: number; meta?: MsgMeta };
 
 type PendingExecutionRequest = {
   prompt: string;
