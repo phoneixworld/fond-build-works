@@ -314,17 +314,17 @@ const IDEHeader = ({
               <TooltipContent side="bottom" className="text-xs">Forward</TooltipContent>
             </Tooltip>
 
-            <div className="flex items-center gap-1.5 bg-secondary rounded-lg px-2 py-1 min-w-0 flex-1">
+            <div className="flex items-center gap-1.5 bg-secondary rounded-lg px-2 py-1 min-w-0 flex-1 relative">
               <Globe className="w-3 h-3 text-muted-foreground flex-shrink-0" />
               {isEditingUrl ? (
                 <input
                   ref={urlInputRef}
                   value={urlInput}
                   onChange={(e) => setUrlInput(e.target.value)}
-                  onBlur={handleUrlSubmit}
+                  onBlur={() => { handleUrlSubmit(); setShowRouteDropdown(false); }}
                   onKeyDown={(e) => {
                     if (e.key === "Enter") handleUrlSubmit();
-                    if (e.key === "Escape") { setIsEditingUrl(false); setUrlInput(currentPath); }
+                    if (e.key === "Escape") { setIsEditingUrl(false); setUrlInput(currentPath); setShowRouteDropdown(false); }
                   }}
                   className="flex-1 bg-transparent text-xs text-foreground outline-none min-w-0"
                   autoFocus
@@ -337,6 +337,41 @@ const IDEHeader = ({
                 >
                   <span className="text-foreground font-medium">{currentPath}</span>
                 </button>
+              )}
+              {/* Route dropdown toggle */}
+              {availableRoutes.length > 1 && (
+                <button
+                  onClick={() => setShowRouteDropdown(!showRouteDropdown)}
+                  className="p-0.5 rounded hover:bg-muted/50 transition-colors shrink-0"
+                >
+                  <ChevronDown className={`w-3 h-3 text-muted-foreground transition-transform ${showRouteDropdown ? 'rotate-180' : ''}`} />
+                </button>
+              )}
+
+              {/* Route dropdown */}
+              {showRouteDropdown && availableRoutes.length > 1 && (
+                <>
+                  <div className="fixed inset-0 z-40" onClick={() => setShowRouteDropdown(false)} />
+                  <div className="absolute top-full left-0 right-0 mt-1 z-50 rounded-lg border border-border bg-popover shadow-lg overflow-hidden">
+                    <div className="px-2.5 py-1.5 border-b border-border">
+                      <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Pages</span>
+                    </div>
+                    <div className="max-h-48 overflow-y-auto py-0.5">
+                      {availableRoutes.map((route) => (
+                        <button
+                          key={route}
+                          onClick={() => handleRouteSelect(route)}
+                          className={`w-full text-left px-3 py-1.5 text-xs font-mono hover:bg-muted/50 transition-colors flex items-center gap-2 ${
+                            currentPath === route ? 'text-primary bg-primary/5 font-medium' : 'text-foreground'
+                          }`}
+                        >
+                          <FileText className="w-3 h-3 text-muted-foreground shrink-0" />
+                          {route}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </>
               )}
             </div>
 
