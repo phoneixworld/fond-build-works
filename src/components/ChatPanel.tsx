@@ -671,8 +671,8 @@ const ChatPanel = forwardRef<ChatPanelHandle, { initialPrompt?: string; onVersio
             onCancelEdit={handleCancelEdit}
           />
 
-          {/* Build Pipeline Progress Card — only for build/edit agents, never for chat */}
-          {currentAgent !== "chat" && (buildStreamContent.length > 0 || currentAgent) && (isLoading || pipelineStep === "complete") && (
+          {/* Build Pipeline Progress Card — only for build/edit, never chat-only */}
+          {(buildStreamContent.length > 0 || currentAgent) && (isLoading || pipelineStep === "complete") && (
             <BuildPipelineCard
               isBuilding={isLoading}
               streamContent={buildStreamContent}
