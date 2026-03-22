@@ -57,8 +57,8 @@ export function useChatAgent(config: ChatAgentConfig) {
     setMessages((prev) => [...prev, userMsg]);
     setIsLoading(true);
     setBuildStep("Thinking...");
-
-    let fullChatResponse = "";
+    const chatStartTime = Date.now();
+    let tokenCount = 0;
     const currentMessages = messagesRef.current;
     const apiMessages = [...currentMessages, userMsg].map(m => ({
       role: m.role,
