@@ -349,6 +349,20 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
     return parts;
   }, []);
 
+  const appendConversationTurn = useCallback((userText: string, images: string[], assistantText: string) => {
+    const content = buildMessageContent(userText, images);
+    const userMsg: Msg = { role: "user", content, timestamp: Date.now() };
+    const assistantMsg: Msg = { role: "assistant", content: assistantText, timestamp: Date.now() };
+
+    setInput("");
+    setAttachedImages([]);
+    setMessages((prev) => {
+      const updated = [...prev, userMsg, assistantMsg];
+      saveProject({ chat_history: updated.map(m => ({ role: m.role, content: m.content })) });
+      return updated;
+    });
+  }, [buildMessageContent, setInput, setAttachedImages, setMessages, saveProject]);
+
   // ─── Shared error handler ───
   const handleOnError = useCallback((err: string) => {
     setMessages((prev) => [...prev, { role: "assistant" as const, content: `⚠️ ${err}`, timestamp: Date.now() }]);
