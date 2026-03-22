@@ -102,7 +102,7 @@ export default function AttendancePage() { return <div>Attendance</div>; }`,
     const pages = ["LoginPage", "SignupPage", "DashboardPage", "StudentsPage", "FeesPage", "AttendancePage"];
     for (const page of pages) {
       const usesDefault = new RegExp(`import\\s+${page}\\s+from\\s+["']`).test(finalApp);
-      const usesNamed = new RegExp(`import\\s+\\{\\s*${page}\\s*\\}\\s+from\\s+["']`).test(finalApp);
+      const usesNamed = new RegExp(`import\\s+\\{[^}]*${page}[^}]*\\}\\s+from\\s+["']`).test(finalApp);
 
       // Find the actual file
       const pageFile = ws.listFiles().find(f => f.includes(page));

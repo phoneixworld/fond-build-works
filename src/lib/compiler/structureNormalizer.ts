@@ -12,6 +12,7 @@ export function normalizeGeneratedStructure(workspace: Workspace): number {
   fixed += normalizeDomainComponentSafety(workspace);
   fixed += normalizeContextReferences(workspace);
   fixed += normalizeExportDuplication(workspace);
+  fixed += normalizeComponentExportConventions(workspace);
   return fixed;
 }
 
@@ -54,6 +55,150 @@ function normalizeExportDuplication(workspace: Workspace): number {
       console.log(`[StructureNormalizer] Removed '${defaultName}' from named exports in ${path}`);
     }
   }
+  return fixed;
+}
+
+/**
+ * Enforces the 5 component export convention rules:
+ * 
+ * 1. Every component file must have exactly ONE default export (the main component)
+ * 2. Subcomponents must always be named exports
+ * 3. Never generate both `export default function X` and `export function X` for same symbol
+ * 4. Import style must match export style (handled by exportMismatchFixer, but we normalize the source)
+ * 5. Normalize all component files to: function declarations + export default Main; export { SubA, SubB };
+ */
+function normalizeComponentExportConventions(workspace: Workspace): number {
+  let fixed = 0;
+
+  for (const path of workspace.listFiles()) {
+    if (!CODE_FILE_RE.test(path)) continue;
+    // Skip utility files, hooks-only files, pure type files
+    if (path.includes("/lib/") && !path.includes("/components/")) continue;
+    if (path.includes("/hooks/") || path.includes("/contexts/")) continue;
+
+    let content = workspace.getFile(path)!;
+    let changed = false;
+
+    // --- Rule 3: Never have both `export default function X` AND `export function X` ---
+    const exportDefaultFnMatch = content.match(/export\s+default\s+function\s+(\w+)/);
+    if (exportDefaultFnMatch) {
+      const mainName = exportDefaultFnMatch[1];
+      // Check if there's also `export function MainName` (non-default) elsewhere
+      const dupeRegex = new RegExp(
+        `^export\\s+function\\s+${escapeRegex(mainName)}\\s*\\(`,
+        "gm"
+      );
+      const allMatches = [...content.matchAll(dupeRegex)];
+      if (allMatches.length > 1) {
+        // Keep only the first occurrence (the export default one), remove others
+        let count = 0;
+        content = content.replace(dupeRegex, (match) => {
+          count++;
+          if (count === 1) return match; // keep first
+          return match.replace("export function", "function"); // strip export from duplicate
+        });
+        changed = true;
+        console.log(`[ExportConventions] Removed duplicate export function ${mainName} in ${path}`);
+      }
+    }
+
+    // --- Rule 1 & 5: Ensure exactly one default export, normalize structure ---
+    // Count all default exports
+    const defaultExports = [...content.matchAll(/export\s+default\s+/g)];
+    
+    if (defaultExports.length === 0 && path.match(/\/(components|pages)\//)) {
+      // No default export in a component/page file — find the first PascalCase function and make it default
+      const componentFnMatch = content.match(/^export\s+function\s+([A-Z]\w*)\s*\(/m);
+      const componentConstMatch = content.match(/^export\s+const\s+([A-Z]\w*)\s*[:=]/m);
+      const mainComponent = componentFnMatch?.[1] || componentConstMatch?.[1];
+
+      if (mainComponent) {
+        // Convert `export function Main(` → `function Main(`
+        content = content.replace(
+          new RegExp(`^export\\s+function\\s+(${escapeRegex(mainComponent)})\\s*\\(`, "m"),
+          `function ${mainComponent}(`
+        );
+        content = content.replace(
+          new RegExp(`^export\\s+const\\s+(${escapeRegex(mainComponent)})\\s*=`, "m"),
+          `const ${mainComponent} =`
+        );
+
+        // Add export default at the end
+        content = content.trimEnd() + `\n\nexport default ${mainComponent};\n`;
+        changed = true;
+        console.log(`[ExportConventions] Added default export for ${mainComponent} in ${path}`);
+      }
+    } else if (defaultExports.length > 1) {
+      // Multiple default exports — keep only the first
+      let count = 0;
+      content = content.replace(/export\s+default\s+/g, (match) => {
+        count++;
+        if (count === 1) return match;
+        return ""; // strip subsequent defaults
+      });
+      changed = true;
+      console.log(`[ExportConventions] Removed ${defaultExports.length - 1} extra default exports in ${path}`);
+    }
+
+    // --- Rule 5: Convert inline `export function Sub()` to declaration + trailing named export ---
+    // Find the default-exported component name
+    const defaultName = content.match(/export\s+default\s+(?:function\s+)?(\w+)/)?.[1];
+    if (defaultName) {
+      // Find all `export function X` that are NOT the default
+      const inlineExportFns = [...content.matchAll(/^export\s+function\s+([A-Z]\w*)\s*\(/gm)];
+      const subComponents = inlineExportFns
+        .map(m => m[1])
+        .filter(name => name !== defaultName);
+
+      if (subComponents.length > 0) {
+        // Strip `export` from inline subcomponent declarations
+        for (const sub of subComponents) {
+          content = content.replace(
+            new RegExp(`^export\\s+function\\s+(${escapeRegex(sub)})\\s*\\(`, "m"),
+            `function ${sub}(`
+          );
+        }
+
+        // Check if there's already an export { ... } block we can merge into
+        const existingNamedExport = content.match(/^export\s*\{([^}]*)\}\s*;?\s*$/m);
+        if (existingNamedExport) {
+          const existingSymbols = existingNamedExport[1].split(",").map(s => s.trim()).filter(Boolean);
+          const allSymbols = [...new Set([...existingSymbols, ...subComponents])];
+          content = content.replace(
+            /^export\s*\{[^}]*\}\s*;?\s*$/m,
+            `export { ${allSymbols.join(", ")} };`
+          );
+        } else {
+          // Add trailing export block
+          content = content.trimEnd() + `\nexport { ${subComponents.join(", ")} };\n`;
+        }
+        changed = true;
+        console.log(`[ExportConventions] Normalized ${subComponents.length} subcomponent exports in ${path}`);
+      }
+    }
+
+    // --- Rule 5: Convert `export default function X()` to `function X()` + `export default X;` ---
+    const inlineDefaultMatch = content.match(/^export\s+default\s+function\s+(\w+)\s*\(/m);
+    if (inlineDefaultMatch) {
+      const fnName = inlineDefaultMatch[1];
+      content = content.replace(
+        /^export\s+default\s+function\s+(\w+)\s*\(/m,
+        `function ${fnName}(`
+      );
+      // Add trailing export default
+      content = content.trimEnd() + `\n\nexport default ${fnName};\n`;
+      changed = true;
+      console.log(`[ExportConventions] Normalized inline default export to trailing for ${fnName} in ${path}`);
+    }
+
+    if (changed) {
+      // Clean up any triple+ newlines
+      content = content.replace(/\n{3,}/g, "\n\n");
+      workspace.updateFile(path, content);
+      fixed++;
+    }
+  }
+
   return fixed;
 }
 

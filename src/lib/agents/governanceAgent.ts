@@ -41,6 +41,9 @@ export function runGovernanceAgent(ctx: PipelineContext): AgentResult {
   // Rule 8: No duplicate file content (AI hallucination of repeated code)
   violations.push(...checkDuplicateContent(workspace));
 
+  // Rule 9: Export convention enforcement
+  violations.push(...checkExportConventions(workspace));
+
   const errors = violations.filter(v => v.severity === "error");
   const warnings = violations.filter(v => v.severity === "warning");
 
@@ -308,7 +311,6 @@ function autoFixViolations(violations: GovernanceViolation[], workspace: Record<
       const content = workspace[v.file];
       const exportDefaultIdx = content.indexOf("export default");
       if (exportDefaultIdx > 0) {
-        // Find the end of the export default statement
         const afterExport = content.indexOf("\n", exportDefaultIdx);
         if (afterExport > 0) {
           const afterContent = content.slice(afterExport);
@@ -320,7 +322,94 @@ function autoFixViolations(violations: GovernanceViolation[], workspace: Record<
         }
       }
     }
+
+    if (v.rule === "export-convention-no-default" && workspace[v.file]) {
+      const content = workspace[v.file];
+      // Find first PascalCase function/const and make it default
+      const match = content.match(/(?:export\s+)?(?:function|const)\s+([A-Z]\w*)/);
+      if (match) {
+        let updated = content.replace(
+          new RegExp(`^export\\s+function\\s+${match[1]}\\s*\\(`, "m"),
+          `function ${match[1]}(`
+        );
+        updated = updated.trimEnd() + `\n\nexport default ${match[1]};\n`;
+        workspace[v.file] = updated;
+        fixed++;
+      }
+    }
+
+    if (v.rule === "export-convention-duplicate-symbol" && workspace[v.file]) {
+      const content = workspace[v.file];
+      const symMatch = v.message.match(/Symbol '(\w+)'/);
+      if (symMatch) {
+        const sym = symMatch[1];
+        // Remove non-default `export function Sym` lines (keep `export default function Sym`)
+        let count = 0;
+        workspace[v.file] = content.replace(
+          new RegExp(`^export\\s+function\\s+${sym}\\s*\\(`, "gm"),
+          (m) => { count++; return count > 1 ? m.replace("export function", "function") : m; }
+        );
+        if (count > 1) fixed++;
+      }
+    }
   }
 
   return fixed;
+}
+
+/**
+ * Rule 9: Export convention checks for governance gate
+ */
+function checkExportConventions(workspace: Record<string, string>): GovernanceViolation[] {
+  const violations: GovernanceViolation[] = [];
+
+  for (const [path, content] of Object.entries(workspace)) {
+    if (!path.match(/\.(jsx?|tsx?)$/)) continue;
+    if (!path.match(/\/(components|pages)\//)) continue;
+    if (path.includes("/ui/")) continue;
+
+    // Rule 1: Component file with no default export
+    const defaultExports = [...content.matchAll(/export\s+default\s+/g)];
+    const hasPascalExport = /export\s+(?:function|const)\s+[A-Z]/.test(content);
+    if (defaultExports.length === 0 && hasPascalExport) {
+      violations.push({
+        rule: "export-convention-no-default",
+        severity: "warning",
+        file: path,
+        message: "Component file missing default export — main component should be default",
+        autoFixable: true,
+        fix: "Add export default for main component",
+      });
+    }
+
+    // Rule 1b: Multiple default exports
+    if (defaultExports.length > 1) {
+      violations.push({
+        rule: "export-convention-multi-default",
+        severity: "error",
+        file: path,
+        message: `File has ${defaultExports.length} default exports — must have exactly one`,
+        autoFixable: false,
+      });
+    }
+
+    // Rule 3: Both `export default function X` and `export function X`
+    const defaultFnMatch = content.match(/export\s+default\s+function\s+(\w+)/);
+    if (defaultFnMatch) {
+      const mainName = defaultFnMatch[1];
+      const dupeRegex = new RegExp(`^export\\s+function\\s+${mainName}\\s*\\(`, "gm");
+      if (dupeRegex.test(content)) {
+        violations.push({
+          rule: "export-convention-duplicate-symbol",
+          severity: "error",
+          file: path,
+          message: `Symbol '${mainName}' has both export default function and export function declarations`,
+          autoFixable: true,
+          fix: `Remove duplicate export function ${mainName}`,
+        });
+      }
+    }
+  }
+
+  return violations;
 }
