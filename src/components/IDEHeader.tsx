@@ -132,6 +132,7 @@ const IDEHeader = ({
   const ViewportIcon = VIEWPORTS.find(v => v.id === viewport)!.icon;
 
   // Extract available routes from sandpackFiles
+  // Extract only meaningful page routes from the generated App.jsx
   const availableRoutes = useMemo(() => {
     if (!sandpackFiles) return ["/"];
     const appFile = Object.entries(sandpackFiles).find(([k]) =>
@@ -143,7 +144,13 @@ const IDEHeader = ({
     const routeRegex = /path=["']([^"'*]+)["']/g;
     let match;
     while ((match = routeRegex.exec(content)) !== null) {
-      if (!routes.includes(match[1])) routes.push(match[1]);
+      const route = match[1];
+      // Skip non-page routes
+      if (routes.includes(route)) continue;
+      if (route === "*") continue;
+      if (/^\/?(auth|login|signup|register|callback|reset-password)/i.test(route)) continue;
+      if (route.includes(":")) continue; // dynamic params like /app/:slug
+      routes.push(route);
     }
     return routes;
   }, [sandpackFiles]);
