@@ -23,12 +23,19 @@ export function extractUrlFromMessage(text: string): string | null {
 
   const url = match[0];
 
-  // If the message is just a URL (possibly with "read", "analyze", "check", "look at", etc.)
+  // Check if the message context is about analyzing/reading the URL
   const withoutUrl = trimmed.replace(URL_REGEX, "").trim();
   const isUrlFocused =
     !withoutUrl || // Just a URL
+    withoutUrl.length < 40 || // Short surrounding text — likely about the URL
+    // Direct verb-first commands
     /^(read|analyze|check|look at|open|fetch|scan|review|build from|clone|copy|replicate|build something like|build similar to|make something like)\b/i.test(withoutUrl) ||
-    /\b(read|analyze|check|look at|can you read|can you analyze|can you check|build from this|clone this|replicate this|build something like this|build similar)\s*$/i.test(withoutUrl);
+    // "can you [verb] this" patterns
+    /\b(can you|could you|please|pls)\s+(read|analyze|check|look at|open|fetch|scan|review|build from|clone|copy|replicate)\b/i.test(withoutUrl) ||
+    // Trailing context about the URL
+    /\b(read|analyze|check|look at|build from this|clone this|replicate this|build something like this|build similar|check this|read this|analyze this|look at this|scan this|review this)\s*$/i.test(withoutUrl) ||
+    // "check/read/analyze this [url]" anywhere
+    /\b(check|read|analyze|scan|review|look at|open|fetch)\s+(this|the|that)\b/i.test(withoutUrl);
 
   return isUrlFocused ? url : null;
 }
