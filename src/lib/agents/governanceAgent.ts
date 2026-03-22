@@ -41,6 +41,9 @@ export function runGovernanceAgent(ctx: PipelineContext): AgentResult {
   // Rule 8: No duplicate file content (AI hallucination of repeated code)
   violations.push(...checkDuplicateContent(workspace));
 
+  // Rule 9: Export convention enforcement
+  violations.push(...checkExportConventions(workspace));
+
   const errors = violations.filter(v => v.severity === "error");
   const warnings = violations.filter(v => v.severity === "warning");
 
