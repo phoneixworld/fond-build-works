@@ -9,6 +9,8 @@
  */
 
 import { useState, useCallback, useEffect, useRef } from "react";
+import { buildRepairPrompt } from "@/lib/selfRepairEngine";
+import type { StructuredError } from "@/components/GlobalErrorBoundary";
 
 const MAX_HEAL_ATTEMPTS = 3;
 const HEAL_COOLDOWN_MS = 10000; // Minimum 10s between auto-heal attempts
@@ -198,7 +200,6 @@ export function useSelfHealing(config: SelfHealingConfig) {
         const enriched = `[${errorType}] ${msg}`;
         setPreviewErrors((prev) => {
           if (prev.includes(enriched)) return prev;
-          // Keep only unique errors, max 10
           return [...prev.slice(-9), enriched];
         });
       }
@@ -206,6 +207,20 @@ export function useSelfHealing(config: SelfHealingConfig) {
     window.addEventListener("message", handler);
     return () => window.removeEventListener("message", handler);
   }, []);
+
+  // Listen for Global Error Boundary fix requests
+  useEffect(() => {
+    const handler = (event: MessageEvent) => {
+      if (event.data?.type === "geb-fix-request") {
+        const structured = event.data.error as StructuredError;
+        const currentFiles = sandpackFilesRef.current || {};
+        const prompt = buildRepairPrompt(structured, currentFiles);
+        healSend(prompt);
+      }
+    };
+    window.addEventListener("message", handler);
+    return () => window.removeEventListener("message", handler);
+  }, [healSend, sandpackFilesRef]);
 
   const triggerSelfHeal = useCallback(() => {
     const now = Date.now();
