@@ -814,7 +814,7 @@ const ChatMessage = ({ content, role, timestamp, meta, isLoading, onEdit, onRege
 
             {/* Action bar - thumbs up/down, copy, more */}
             {showActions && !isLoading && textContent.length > 10 && (
-              <ActionBar text={textContent} onRegenerate={onRegenerate} />
+              <ActionBar text={textContent} onRegenerate={onRegenerate} meta={meta} />
             )}
           </div>
         </div>
