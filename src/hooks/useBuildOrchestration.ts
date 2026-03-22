@@ -1852,6 +1852,7 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
     setCurrentAgent(null);
     setPipelineStep(null);
     setPendingBuildPrompt(null);
+    setPendingExecution(null);
     setCurrentPlan(null);
     setCurrentTaskIndex(0);
     setTotalPlanTasks(0);
