@@ -171,11 +171,11 @@ const IDEHeader = ({
     setUrlInput(path);
     setShowRouteDropdown(false);
     setIsEditingUrl(false);
-    const sandpackIframe = document.querySelector('.sp-preview-iframe') as HTMLIFrameElement;
-    if (sandpackIframe?.contentWindow) {
-      sandpackIframe.contentWindow.postMessage({ type: "navigate", path }, "*");
+    const iframe = getPreviewIframe();
+    if (iframe?.contentWindow) {
+      iframe.contentWindow.postMessage({ type: "navigate", path }, "*");
     }
-  }, [setCurrentPath]);
+  }, [setCurrentPath, getPreviewIframe]);
 
   return (
     <header className="h-11 flex items-center shrink-0 z-10 relative bg-ide-panel-header px-1.5">
