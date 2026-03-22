@@ -95,10 +95,11 @@ const IDEHeader = ({
   isLocked,
   getLockOwner,
 }: IDEHeaderProps) => {
-  const { viewport, setViewport, triggerRefresh, isBuilding, currentPath, setCurrentPath } = usePreview();
+  const { viewport, setViewport, triggerRefresh, isBuilding, currentPath, setCurrentPath, sandpackFiles } = usePreview();
 
   const [urlInput, setUrlInput] = useState("/");
   const [isEditingUrl, setIsEditingUrl] = useState(false);
+  const [showRouteDropdown, setShowRouteDropdown] = useState(false);
   const urlInputRef = useRef<HTMLInputElement>(null);
 
   const handleUrlSubmit = useCallback(() => {
