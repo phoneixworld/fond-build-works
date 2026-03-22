@@ -1524,32 +1524,33 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
       }
 
       if (reply === "unclear") {
-        // Not a yes/no — cancel the pending request and process this as a fresh message
+        // Not a yes/no — cancel the pending request and process as a fresh message
         setPendingExecution(null);
         // Fall through to normal classification below
-      }
+      } else {
+        // reply === "confirm"
+        if (pendingExecution.needsHighImpactConfirm && !pendingExecution.awaitingHighImpactConfirm) {
+          setPendingExecution({ ...pendingExecution, awaitingHighImpactConfirm: true });
+          appendConversationTurn(finalText, images, "This will modify core application files.\nProceed?");
+          return;
+        }
 
-      if (pendingExecution.needsHighImpactConfirm && !pendingExecution.awaitingHighImpactConfirm) {
-        setPendingExecution({ ...pendingExecution, awaitingHighImpactConfirm: true });
-        appendConversationTurn(finalText, images, "This will modify core application files.\nProceed?");
+        const approved = pendingExecution;
+        setPendingExecution(null);
+        appendConversationTurn(finalText, images, "Proceeding with the approved change.");
+
+        if (approved.routeHint === "edit") {
+          setCurrentAgent("edit");
+          setPipelineStep("resolving");
+          sendEditMessage(approved.prompt, approved.images);
+          return;
+        }
+
+        setCurrentAgent("build");
+        setPipelineStep("planning");
+        sendMessage(approved.prompt, approved.images);
         return;
       }
-
-      const approved = pendingExecution;
-      setPendingExecution(null);
-      appendConversationTurn(finalText, images, "Proceeding with the approved change.");
-
-      if (approved.routeHint === "edit") {
-        setCurrentAgent("edit");
-        setPipelineStep("resolving");
-        sendEditMessage(approved.prompt, approved.images);
-        return;
-      }
-
-      setCurrentAgent("build");
-      setPipelineStep("planning");
-      sendMessage(approved.prompt, approved.images);
-      return;
     }
 
     const isAutoFix = finalText.startsWith("🔧");
