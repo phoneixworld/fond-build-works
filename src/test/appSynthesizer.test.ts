@@ -33,7 +33,7 @@ export default function DashboardPage() { return <div>Dashboard</div>; }`,
 
     const usesDefaultImport = /import\s+LoginPage\s+from/.test(finalApp);
     const hasDefaultExport = /export\s+default/.test(loginPageFile);
-    const usesNamedImport = /import\s+\{\s*LoginPage\s*\}\s+from/.test(finalApp);
+    const usesNamedImport = /import\s+\{[^}]*LoginPage[^}]*\}\s+from/.test(finalApp);
 
     const isValid = usesNamedImport || (usesDefaultImport && hasDefaultExport);
     expect(isValid).toBe(true);
