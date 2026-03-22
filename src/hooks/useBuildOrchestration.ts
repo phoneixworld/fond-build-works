@@ -44,6 +44,7 @@ import { fixMissingImports } from "@/lib/compiler/missingImportFixer";
 import { fixExportMismatches } from "@/lib/compiler/exportMismatchFixer";
 import { deduplicateFiles } from "@/lib/compiler/deduplicator";
 import { normalizeGeneratedStructure } from "@/lib/compiler/structureNormalizer";
+import { classifyIntentGate, parseConfirmationReply, type GuardRouteHint } from "@/lib/intentGate";
 
 type Msg = { role: "user" | "assistant"; content: MsgContent; timestamp?: number };
 
