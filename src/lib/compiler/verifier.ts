@@ -61,6 +61,10 @@ export function verifyWorkspace(
   const providerOrderResults = checkProviderOrdering(workspace);
   issues.push(...providerOrderResults.issues);
 
+  // 12. Export convention checks
+  const exportConventionResults = checkExportConventions(workspace);
+  issues.push(...exportConventionResults.issues);
+
   // Stats
   const files = workspace.listFiles();
   const jsFiles = files.filter(f => /\.(jsx?|tsx?)$/.test(f));
