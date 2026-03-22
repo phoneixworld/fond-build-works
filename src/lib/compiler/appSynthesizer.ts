@@ -6,9 +6,13 @@ import type { Workspace } from "./workspace";
 /**
  * Workspace-based entry point used by the compiler and tests.
  * Scans the workspace for page/context files and synthesizes a valid App.jsx string.
+ * Now supports route wrappers for two-phase rendering when detected.
  */
 export function synthesizeAppJsx(ws: Workspace, routes?: Array<{ path: string; component: string; file: string }>): string {
   const pageFiles = ws.listFiles().filter(f => f.startsWith("/pages/") && f.endsWith(".jsx"));
+  const routeFiles = ws.listFiles().filter(f => f.startsWith("/routes/") && f.endsWith("Route.jsx"));
+  const hasRouteWrappers = routeFiles.length > 0;
+  const hasWarmers = ws.hasFile("/hooks/useBackgroundWarmers.jsx");
 
   const pageImports: string[] = [];
   const routeLines: string[] = [];
@@ -17,25 +21,31 @@ export function synthesizeAppJsx(ws: Workspace, routes?: Array<{ path: string; c
     const content = ws.getFile(file) || "";
     const name = file.replace(/^\/pages\//, "").replace(/\.jsx$/, "").replace(/\//g, "_").replace(/.*\//, "");
     const rawComponentName = file.match(/\/([^/]+)\.jsx$/)?.[1] || name;
-    // Sanitize to valid PascalCase JS identifier
     const componentName = rawComponentName.replace(/[^a-zA-Z0-9]+/g, " ").split(" ").filter(Boolean)
       .map((p: string) => p.charAt(0).toUpperCase() + p.slice(1)).join("") || rawComponentName;
 
-    const hasDefault = /export\s+default/.test(content);
-    const namedMatch = content.match(/export\s+(?:function|const|class)\s+(\w+)/);
+    // Check if a route wrapper exists for this page
+    const routeWrapperFile = `/routes/${componentName}Route.jsx`;
+    const useWrapper = hasRouteWrappers && ws.hasFile(routeWrapperFile);
+    const importName = useWrapper ? `${componentName}Route` : componentName;
+    const importFile = useWrapper ? routeWrapperFile : file;
+
+    const importContent = useWrapper ? ws.getFile(routeWrapperFile) || "" : content;
+    const hasDefault = /export\s+default/.test(importContent);
+    const namedMatch = importContent.match(/export\s+(?:function|const|class)\s+(\w+)/);
 
     if (hasDefault) {
-      pageImports.push(`import ${componentName} from "${file.replace(/\.jsx$/, "")}";`);
+      pageImports.push(`import ${importName} from "${importFile.replace(/\.jsx$/, "")}";`);
     } else if (namedMatch) {
-      pageImports.push(`import { ${namedMatch[1]} as ${componentName} } from "${file.replace(/\.jsx$/, "")}";`);
+      pageImports.push(`import { ${namedMatch[1]} as ${importName} } from "${importFile.replace(/\.jsx$/, "")}";`);
     } else {
-      pageImports.push(`import ${componentName} from "${file.replace(/\.jsx$/, "")}";`);
+      pageImports.push(`import ${importName} from "${importFile.replace(/\.jsx$/, "")}";`);
     }
 
     const path = componentName.toLowerCase().includes("dashboard") ? "/" :
       `/${componentName.replace(/Page$/i, "").replace(/([a-z])([A-Z])/g, "$1-$2").toLowerCase()}`;
     const isIndex = path === "/";
-    routeLines.push(`        <Route${isIndex ? " index" : ` path="${path.replace(/^\//, "")}"`} element={<${componentName} />} />`);
+    routeLines.push(`        <Route${isIndex ? " index" : ` path="${path.replace(/^\//, "")}"`} element={<${importName} />} />`);
   }
 
   // Context imports
@@ -49,12 +59,19 @@ export function synthesizeAppJsx(ws: Workspace, routes?: Array<{ path: string; c
     }
   }
 
+  // Background warmers import
+  const warmerImport = hasWarmers
+    ? `import { useBackgroundWarmers } from "/hooks/useBackgroundWarmers";`
+    : "";
+  const warmerCall = hasWarmers ? "\n  useBackgroundWarmers();" : "";
+
   return `import React from "react";
 import { HashRouter, Routes, Route, Navigate } from "react-router-dom";
 ${pageImports.join("\n")}
 ${contextImports.join("\n")}
+${warmerImport}
 
-export default function App() {
+export default function App() {${warmerCall}
   return (
     <HashRouter>
       <Routes>
@@ -69,13 +86,10 @@ ${routeLines.join("\n")}
 
 /**
  * Generates a complete App.jsx file from the IR.
- * This is deterministic and replaces any model-generated App.jsx.
- *
- * - React Router v6
- * - Shadcn layout shell
- * - Sidebar navigation
- * - Auth + Toast providers (if present)
- * - Nested routing via <Outlet />
+ * Now integrates:
+ * - Route wrappers for two-phase rendering
+ * - Background warmers for predictive preloading
+ * - Optimistic navigation support
  */
 export function synthesizeAppFromIR(ir: IR): string {
   const imports = buildImports(ir);
@@ -83,19 +97,32 @@ export function synthesizeAppFromIR(ir: IR): string {
   const providersClose = buildProvidersClose(ir);
   const layoutImport = ir.pages.some((p) => p.type !== "custom") ? `import AppLayout from "./layout/AppLayout";` : "";
 
+  // Route wrapper imports (use route wrappers instead of raw pages)
+  const routeImports = ir.pages.map((p) => {
+    const safeName = p.name.replace(/[^a-zA-Z0-9]+/g, " ").split(" ").filter(Boolean)
+      .map(w => w.charAt(0).toUpperCase() + w.slice(1)).join("") || p.name;
+    return `import ${safeName}Route from "./routes/${safeName}Route";`;
+  });
+
   const routeLines = ir.pages.map((p) => {
+    const safeName = p.name.replace(/[^a-zA-Z0-9]+/g, " ").split(" ").filter(Boolean)
+      .map(w => w.charAt(0).toUpperCase() + w.slice(1)).join("") || p.name;
     const path = p.path === "/" ? "" : ` path="${p.path.replace(/^\//, "")}"`;
     const index = p.path === "/" ? " index" : "";
-    return `            <Route${index}${path} element={<${p.name} />} />`;
+    return `            <Route${index}${path} element={<${safeName}Route />} />`;
   });
 
   return `
 import React from "react";
 import { HashRouter, Routes, Route, Navigate } from "react-router-dom";
 ${imports.join("\n")}
+${routeImports.join("\n")}
 ${layoutImport}
+import { useBackgroundWarmers } from "./hooks/useBackgroundWarmers";
 
 export default function App() {
+  useBackgroundWarmers();
+
   return (
 ${providersOpen}
       <HashRouter>
@@ -121,13 +148,10 @@ ${providersClose}
 }
 
 /**
- * Build import statements for all pages + contexts + UI.
+ * Build import statements for contexts + UI (pages are now imported via route wrappers).
  */
 function buildImports(ir: IR): string[] {
-  const pageImports = ir.pages.map((p) => `import ${p.name} from "./pages/${p.name}";`);
-
   const contextImports = ir.contexts.map((c) => {
-    // AuthContext exports AuthProvider, not AuthContext
     if (c.name === "AuthContext") {
       return `import { AuthProvider } from "./contexts/AuthContext";`;
     }
@@ -136,7 +160,7 @@ function buildImports(ir: IR): string[] {
 
   const toastImport = ir.components.includes("Toast") ? `import { ToastProvider } from "./components/ui/Toast";` : "";
 
-  return [...pageImports, ...contextImports, toastImport].filter(Boolean);
+  return [...contextImports, toastImport].filter(Boolean);
 }
 
 /**
