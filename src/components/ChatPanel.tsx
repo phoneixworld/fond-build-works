@@ -552,7 +552,14 @@ const ChatPanel = forwardRef<ChatPanelHandle, { initialPrompt?: string; onVersio
   }, [pendingPrompt, currentProject, handleSmartSend]);
 
   useEffect(() => {
-    scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
+    // Double-tap scroll: immediate + delayed to handle DOM updates
+    const el = scrollRef.current;
+    if (!el) return;
+    el.scrollTo({ top: el.scrollHeight, behavior: "smooth" });
+    const t = setTimeout(() => {
+      el.scrollTo({ top: el.scrollHeight, behavior: "smooth" });
+    }, 100);
+    return () => clearTimeout(t);
   }, [messages]);
 
   const handleEditMessage = useCallback((index: number) => {
