@@ -9,6 +9,8 @@
  */
 
 import { useState, useCallback, useEffect, useRef } from "react";
+import { buildRepairPrompt } from "@/lib/selfRepairEngine";
+import type { StructuredError } from "@/components/GlobalErrorBoundary";
 
 const MAX_HEAL_ATTEMPTS = 3;
 const HEAL_COOLDOWN_MS = 10000; // Minimum 10s between auto-heal attempts
