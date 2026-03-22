@@ -72,9 +72,10 @@ function normalizeComponentExportConventions(workspace: Workspace): number {
 
   for (const path of workspace.listFiles()) {
     if (!CODE_FILE_RE.test(path)) continue;
-    // Skip utility files, hooks-only files, pure type files
+    // Skip utility files, hooks-only files, pure type files, and UI primitives
     if (path.includes("/lib/") && !path.includes("/components/")) continue;
     if (path.includes("/hooks/") || path.includes("/contexts/")) continue;
+    if (path.includes("/components/ui/") || path.includes("/ui/")) continue;
 
     let content = workspace.getFile(path)!;
     let changed = false;
