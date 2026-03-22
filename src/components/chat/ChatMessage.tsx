@@ -15,10 +15,13 @@ import { MermaidDiagram } from "./MermaidDiagram";
 
 type MsgContent = string | Array<{ type: "text"; text: string } | { type: "image_url"; image_url: { url: string } }>;
 
+type MsgMeta = { tokens?: number; durationMs?: number; model?: string };
+
 interface ChatMessageProps {
   content: MsgContent;
   role: "user" | "assistant";
   timestamp?: number;
+  meta?: MsgMeta;
   isLoading?: boolean;
   onEdit?: () => void;
   onRegenerate?: () => void;
