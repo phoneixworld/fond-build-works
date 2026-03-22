@@ -1625,15 +1625,11 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
 
     const guardedIntent = classifyIntentGate(finalText, hasExistingCode);
 
-    // Conversation-first mode + uncertainty guard
+    // Ambiguous messages (no action verb) → route to chat naturally, don't block
     if (guardedIntent.isAmbiguous) {
       setCurrentAgent("chat");
       setPipelineStep("chatting");
-      appendConversationTurn(
-        finalText,
-        images,
-        "I’m not fully sure this is a build/edit request. Do you want me to **generate code**, **refactor**, **fix**, or just discuss?"
-      );
+      sendChatMessage(finalText, images);
       return;
     }
 
