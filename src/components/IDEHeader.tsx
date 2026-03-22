@@ -131,6 +131,34 @@ const IDEHeader = ({
   const isPreview = rightPanel === "preview";
   const ViewportIcon = VIEWPORTS.find(v => v.id === viewport)!.icon;
 
+  // Extract available routes from sandpackFiles
+  const availableRoutes = useMemo(() => {
+    if (!sandpackFiles) return ["/"];
+    const appFile = Object.entries(sandpackFiles).find(([k]) =>
+      /\/?(?:src\/)?App\.(tsx?|jsx?)$/.test(k.replace(/^\/+/, '/'))
+    );
+    if (!appFile) return ["/"];
+    const content = appFile[1];
+    const routes: string[] = ["/"];
+    const routeRegex = /path=["']([^"'*]+)["']/g;
+    let match;
+    while ((match = routeRegex.exec(content)) !== null) {
+      if (!routes.includes(match[1])) routes.push(match[1]);
+    }
+    return routes;
+  }, [sandpackFiles]);
+
+  const handleRouteSelect = useCallback((path: string) => {
+    setCurrentPath(path);
+    setUrlInput(path);
+    setShowRouteDropdown(false);
+    setIsEditingUrl(false);
+    const sandpackIframe = document.querySelector('.sp-preview-iframe') as HTMLIFrameElement;
+    if (sandpackIframe?.contentWindow) {
+      sandpackIframe.contentWindow.postMessage({ type: "navigate", path }, "*");
+    }
+  }, [setCurrentPath]);
+
   return (
     <header className="h-11 flex items-center shrink-0 z-10 relative bg-ide-panel-header px-1.5">
       {/* Left column — aligns with chat panel */}
