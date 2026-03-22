@@ -686,8 +686,8 @@ const ChatPanel = forwardRef<ChatPanelHandle, { initialPrompt?: string; onVersio
             />
           )}
 
-          {/* Build Completion Card — suppress for chat-only interactions and empty builds */}
-          {currentAgent !== "chat" && !isLoading && pipelineStep === "complete" && conversationState.lastBuildResult && conversationState.lastBuildResult.filesChanged.length > 0 && (
+          {/* Build Completion Card — only when a real build produced file changes */}
+          {!isLoading && pipelineStep === "complete" && conversationState.lastBuildResult && conversationState.lastBuildResult.filesChanged.length > 0 && (
             <BuildCompletionCard
               result={conversationState.lastBuildResult}
               phases={conversationState.phases.length > 0 ? conversationState.phases : undefined}
