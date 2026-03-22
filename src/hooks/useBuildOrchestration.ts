@@ -48,6 +48,14 @@ import { classifyIntentGate, parseConfirmationReply, type GuardRouteHint } from 
 
 type Msg = { role: "user" | "assistant"; content: MsgContent; timestamp?: number };
 
+type PendingExecutionRequest = {
+  prompt: string;
+  images: string[];
+  routeHint: GuardRouteHint;
+  needsHighImpactConfirm: boolean;
+  awaitingHighImpactConfirm: boolean;
+};
+
 export interface BuildOrchestrationConfig {
   // Project
   currentProject: any;
