@@ -91,7 +91,7 @@ export function useChatAgent(config: ChatAgentConfig) {
     const finalize = (responseText: string, isCached: boolean, cacheInfo?: CacheHitResult) => {
       setIsLoading(false);
       setBuildStep("");
-      setPipelineStep("complete");
+      setPipelineStep(null); // Chat responses don't produce builds — never set "complete"
       setCurrentAgent(null);
       isSendingRef.current = false;
 

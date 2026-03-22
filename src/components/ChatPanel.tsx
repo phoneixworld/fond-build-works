@@ -671,7 +671,7 @@ const ChatPanel = forwardRef<ChatPanelHandle, { initialPrompt?: string; onVersio
             onCancelEdit={handleCancelEdit}
           />
 
-          {/* Build Pipeline Progress Card */}
+          {/* Build Pipeline Progress Card — only for build/edit, never chat-only */}
           {(buildStreamContent.length > 0 || currentAgent) && (isLoading || pipelineStep === "complete") && (
             <BuildPipelineCard
               isBuilding={isLoading}
@@ -686,8 +686,8 @@ const ChatPanel = forwardRef<ChatPanelHandle, { initialPrompt?: string; onVersio
             />
           )}
 
-          {/* Build Completion Card */}
-          {!isLoading && pipelineStep === "complete" && conversationState.lastBuildResult && (
+          {/* Build Completion Card — only when a real build produced file changes */}
+          {!isLoading && pipelineStep === "complete" && conversationState.lastBuildResult && conversationState.lastBuildResult.filesChanged.length > 0 && (
             <BuildCompletionCard
               result={conversationState.lastBuildResult}
               phases={conversationState.phases.length > 0 ? conversationState.phases : undefined}
