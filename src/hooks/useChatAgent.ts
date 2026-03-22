@@ -91,9 +91,14 @@ export function useChatAgent(config: ChatAgentConfig) {
 
     // Helper to finalize
     const finalize = (responseText: string, isCached: boolean, cacheInfo?: CacheHitResult) => {
+      const durationMs = Date.now() - chatStartTime;
+      // Rough token estimate: ~4 chars per token
+      const estimatedTokens = tokenCount > 0 ? tokenCount : Math.ceil(responseText.length / 4);
+      const meta: MsgMeta = { tokens: estimatedTokens, durationMs, model: "claude-sonnet-4" };
+
       setIsLoading(false);
       setBuildStep("");
-      setPipelineStep(null); // Chat responses don't produce builds — never set "complete"
+      setPipelineStep(null);
       setCurrentAgent(null);
       isSendingRef.current = false;
 
@@ -110,9 +115,9 @@ export function useChatAgent(config: ChatAgentConfig) {
         const withResponse = [...prev];
         const lastIdx = withResponse.length - 1;
         if (lastIdx >= 0 && withResponse[lastIdx].role === "assistant") {
-          withResponse[lastIdx] = { ...withResponse[lastIdx], content: displayText + cacheTag };
+          withResponse[lastIdx] = { ...withResponse[lastIdx], content: displayText + cacheTag, meta };
         } else {
-          withResponse.push({ role: "assistant", content: displayText + cacheTag, timestamp: Date.now() });
+          withResponse.push({ role: "assistant", content: displayText + cacheTag, timestamp: Date.now(), meta });
         }
 
         const persistMessages = withResponse.map(m => ({
