@@ -45,6 +45,7 @@ import { fixExportMismatches } from "@/lib/compiler/exportMismatchFixer";
 import { deduplicateFiles } from "@/lib/compiler/deduplicator";
 import { normalizeGeneratedStructure } from "@/lib/compiler/structureNormalizer";
 import { classifyIntentGate, parseConfirmationReply, type GuardRouteHint } from "@/lib/intentGate";
+import { extractUrlFromMessage, analyzeUrl } from "@/lib/urlAnalyzer";
 
 type Msg = { role: "user" | "assistant"; content: MsgContent; timestamp?: number };
 
@@ -1560,6 +1561,65 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
       setCurrentAgent("build");
       setPipelineStep("planning");
       sendMessage(finalText, images);
+      return;
+    }
+
+    // ── Step 0.5: URL Analysis — detect URLs and run UFM+/WPA+/BSAG pipeline ──
+    const detectedUrl = extractUrlFromMessage(finalText);
+    if (detectedUrl) {
+      const content = buildMessageContent(finalText, images);
+      const userMsg: Msg = { role: "user", content, timestamp: Date.now() };
+      setInput("");
+      setAttachedImages([]);
+      setMessages((prev) => [...prev, userMsg]);
+      setIsLoading(true);
+      setBuildStep("Analyzing URL...");
+      setCurrentAgent("chat");
+      setPipelineStep("chatting");
+
+      try {
+        const result = await analyzeUrl(detectedUrl);
+        setIsLoading(false);
+        setBuildStep("");
+
+        if (result.success && result.confirmationMessage && result.buildPrompt) {
+          // Store the build prompt for when user confirms
+          setPendingExecution({
+            prompt: result.buildPrompt,
+            images: [],
+            routeHint: "build" as GuardRouteHint,
+            needsHighImpactConfirm: false,
+            awaitingHighImpactConfirm: false,
+          });
+
+          setMessages((prev) => [
+            ...prev,
+            { role: "assistant", content: result.confirmationMessage, timestamp: Date.now() },
+          ]);
+
+          const persistMessages = messagesRef.current.map(m => ({
+            role: m.role,
+            content: typeof m.content === "string" ? m.content : getTextContent(m.content),
+          }));
+          saveProject({ chat_history: persistMessages });
+        } else {
+          setMessages((prev) => [
+            ...prev,
+            { role: "assistant", content: result.error || "I couldn't analyze that URL. Please try a different one or describe what you want to build.", timestamp: Date.now() },
+          ]);
+        }
+      } catch (err: any) {
+        setIsLoading(false);
+        setBuildStep("");
+        setMessages((prev) => [
+          ...prev,
+          { role: "assistant", content: `⚠️ Failed to analyze URL: ${err.message || "Unknown error"}`, timestamp: Date.now() },
+        ]);
+      }
+
+      setPipelineStep(null);
+      setCurrentAgent(null);
+      isSendingRef.current = false;
       return;
     }
 
