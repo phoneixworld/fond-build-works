@@ -102,16 +102,23 @@ const IDEHeader = ({
   const [showRouteDropdown, setShowRouteDropdown] = useState(false);
   const urlInputRef = useRef<HTMLInputElement>(null);
 
+  const getPreviewIframe = useCallback((): HTMLIFrameElement | null => {
+    return document.querySelector('.sp-preview-iframe') as HTMLIFrameElement
+      || document.querySelector('iframe[title="Phoenix Vite Preview"]') as HTMLIFrameElement
+      || document.querySelector('iframe[title*="preview" i]') as HTMLIFrameElement
+      || document.querySelector('.preview-panel iframe') as HTMLIFrameElement;
+  }, []);
+
   const handleUrlSubmit = useCallback(() => {
     setIsEditingUrl(false);
     if (urlInput.startsWith("/")) {
       setCurrentPath(urlInput);
-      const sandpackIframe = document.querySelector('.sp-preview-iframe') as HTMLIFrameElement;
-      if (sandpackIframe?.contentWindow) {
-        sandpackIframe.contentWindow.postMessage({ type: "navigate", path: urlInput }, "*");
+      const iframe = getPreviewIframe();
+      if (iframe?.contentWindow) {
+        iframe.contentWindow.postMessage({ type: "navigate", path: urlInput }, "*");
       }
     }
-  }, [urlInput, setCurrentPath]);
+  }, [urlInput, setCurrentPath, getPreviewIframe]);
 
   useEffect(() => {
     if (!isEditingUrl) setUrlInput(currentPath);
