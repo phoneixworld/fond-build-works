@@ -360,7 +360,7 @@ const IDEHeader = ({
               )}
 
               {/* Route dropdown */}
-              {showRouteDropdown && availableRoutes.length > 1 && (
+              {showRouteDropdown && availableRoutes.length > 0 && (
                 <>
                   <div className="fixed inset-0 z-40" onClick={() => setShowRouteDropdown(false)} />
                   <div className="absolute top-full left-0 right-0 mt-1 z-50 rounded-lg border border-border bg-popover shadow-lg overflow-hidden">
