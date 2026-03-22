@@ -87,7 +87,7 @@ export default function App(){
     const statCard = ws.getFile("/components/StatCard.jsx") || "";
 
     expect(fixed).toBeGreaterThan(0);
-    expect(statCard).toContain("export default function StatCard");
+    expect(statCard).toContain("export default StatCard");
     expect(statCard).toContain("TrendingUp");
     expect(statCard).not.toContain("BadIcon");
   });
