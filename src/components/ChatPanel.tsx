@@ -678,14 +678,14 @@ const ChatPanel = forwardRef<ChatPanelHandle, { initialPrompt?: string; onVersio
             onCancelEdit={handleCancelEdit}
           />
 
-          {/* Build Pipeline Progress Card — only for build/edit, never chat-only */}
-          {(buildStreamContent.length > 0 || currentAgent) && (isLoading || pipelineStep === "complete") && (
+          {/* Build Pipeline Progress Card — only for build/edit agents, never chat-only */}
+          {(currentAgent === "build" || currentAgent === "edit") && (buildStreamContent.length > 0 || compilerTasks.length > 0) && (isLoading || pipelineStep === "complete") && (
             <BuildPipelineCard
               isBuilding={isLoading}
               streamContent={buildStreamContent}
               tasks={compilerTasks.length > 0 ? compilerTasks : undefined}
               pipelineStep={pipelineStep}
-              currentAgent={currentAgent === "clarify" ? null : currentAgent as "chat" | "build" | "edit" | null}
+              currentAgent={currentAgent as "build" | "edit" | null}
               onShowPreview={() => {
                 const event = new CustomEvent("switch-panel", { detail: "preview" });
                 window.dispatchEvent(event);
