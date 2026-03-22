@@ -620,6 +620,12 @@ window.addEventListener("message", function(e) {
       window.dispatchEvent(new PopStateEvent("popstate"));
     }
   }
+  if (e.data && e.data.type === "history-back") {
+    history.back();
+  }
+  if (e.data && e.data.type === "history-forward") {
+    history.forward();
+  }
 });
 
 var root = createRoot(document.getElementById("root"));
