@@ -62,6 +62,41 @@ const PreviewPanel = () => {
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const { previewHtml, isBuilding, buildStep, previewMode, sandpackFiles, viewport, refreshKey, currentPath, setCurrentPath } = usePreview();
   const buildStepHistory = useBuildStepHistory(buildStep, isBuilding);
+  const [showRouteDropdown, setShowRouteDropdown] = useState(false);
+  const [urlInput, setUrlInput] = useState(currentPath || "/");
+
+  // Sync URL input when currentPath changes externally
+  useEffect(() => {
+    setUrlInput(currentPath || "/");
+  }, [currentPath]);
+
+  // Extract routes from sandpackFiles (App.jsx route definitions)
+  const availableRoutes = useMemo(() => {
+    if (!sandpackFiles) return ["/"];
+    const appFile = Object.entries(sandpackFiles).find(([k]) =>
+      /\/?(?:src\/)?App\.(tsx?|jsx?)$/.test(k.replace(/^\/+/, '/'))
+    );
+    if (!appFile) return ["/"];
+    const content = appFile[1];
+    const routes: string[] = ["/"];
+    const routeRegex = /path=["']([^"'*]+)["']/g;
+    let match;
+    while ((match = routeRegex.exec(content)) !== null) {
+      if (!routes.includes(match[1])) routes.push(match[1]);
+    }
+    return routes;
+  }, [sandpackFiles]);
+
+  const handleNavigate = (path: string) => {
+    setCurrentPath(path);
+    setUrlInput(path);
+    setShowRouteDropdown(false);
+  };
+
+  const handleUrlSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    handleNavigate(urlInput);
+  };
 
   const currentViewport = VIEWPORTS_MAP[viewport];
   
@@ -93,6 +128,73 @@ const PreviewPanel = () => {
 
   return (
     <div className="flex flex-col bg-[hsl(var(--ide-panel))]" style={{ height: '100%', minHeight: 0 }}>
+      {/* URL Bar with Route Dropdown */}
+      <div className="flex items-center gap-1.5 px-2 py-1.5 border-b border-border bg-[hsl(var(--ide-panel-header))]">
+        <Globe className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
+        
+        <form onSubmit={handleUrlSubmit} className="flex-1 min-w-0">
+          <div className="relative">
+            <input
+              type="text"
+              value={urlInput}
+              onChange={(e) => setUrlInput(e.target.value)}
+              onFocus={() => setShowRouteDropdown(true)}
+              className="w-full h-7 px-2.5 pr-7 rounded-md text-xs font-mono bg-muted/50 border border-border text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring focus:border-ring transition-colors"
+              placeholder="/"
+            />
+            <button
+              type="button"
+              onClick={() => setShowRouteDropdown(!showRouteDropdown)}
+              className="absolute right-1 top-1/2 -translate-y-1/2 p-0.5 rounded hover:bg-muted transition-colors"
+            >
+              <ChevronDown className={`w-3.5 h-3.5 text-muted-foreground transition-transform ${showRouteDropdown ? 'rotate-180' : ''}`} />
+            </button>
+
+            {/* Route Dropdown */}
+            <AnimatePresence>
+              {showRouteDropdown && availableRoutes.length > 1 && (
+                <>
+                  <div className="fixed inset-0 z-40" onClick={() => setShowRouteDropdown(false)} />
+                  <motion.div
+                    initial={{ opacity: 0, y: -4 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -4 }}
+                    transition={{ duration: 0.15 }}
+                    className="absolute top-full left-0 right-0 mt-1 z-50 rounded-lg border border-border bg-popover shadow-lg overflow-hidden"
+                  >
+                    <div className="px-2.5 py-1.5 border-b border-border">
+                      <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Pages</span>
+                    </div>
+                    <div className="max-h-48 overflow-y-auto py-0.5">
+                      {availableRoutes.map((route) => (
+                        <button
+                          key={route}
+                          onClick={() => handleNavigate(route)}
+                          className={`w-full text-left px-3 py-1.5 text-xs font-mono hover:bg-muted/50 transition-colors flex items-center gap-2 ${
+                            currentPath === route ? 'text-primary bg-primary/5 font-medium' : 'text-foreground'
+                          }`}
+                        >
+                          <Globe className="w-3 h-3 text-muted-foreground shrink-0" />
+                          {route}
+                        </button>
+                      ))}
+                    </div>
+                  </motion.div>
+                </>
+              )}
+            </AnimatePresence>
+          </div>
+        </form>
+
+        <button
+          onClick={() => handleNavigate(currentPath || "/")}
+          className="p-1 rounded hover:bg-muted text-muted-foreground hover:text-foreground transition-colors shrink-0"
+          title="Refresh"
+        >
+          <RefreshCw className="w-3.5 h-3.5" />
+        </button>
+      </div>
+
       {/* Preview content */}
       <div className="flex-1 relative overflow-hidden bg-background" style={{ minHeight: 0 }}>
         {/* Building overlay — live pipeline view */}
