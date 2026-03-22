@@ -20,6 +20,8 @@ export interface GuardClassification {
 const EXPLICIT_ACTION_VERBS = /\b(create|generate|build|add|update|fix|refactor|modify|delete)\b/i;
 const GENERATION_VERBS = /\b(create|generate|build|add|update|modify|delete)\b/i;
 const CONVERSATION_FIRST_PATTERNS = /^(can you help me|can you help|how do i|what should i do|why is this happening|explain|can we|could you|would you|help me|what is|what are|how does|why does)\b/i;
+const HELP_SEEKING_ANYWHERE = /\b(can you help|help me|could you help|would you help|i need help|i want help|assist me)\b/i;
+const DESIRE_NOT_COMMAND = /^(i want to|i'd like to|i would like to|i wanna|i wish to|i'm thinking of|i am thinking of|i'm looking to|i am looking to)\b/i;
 const GENERAL_QUESTION_PATTERNS = /^(what|how|why|when|where|who|can|could|would|should|is|are|do|does)\b/i;
 const EXPLANATION_PATTERNS = /\b(explain|why is this happening|why does this happen|what happened|help me understand)\b/i;
 const HIGH_IMPACT_PATTERNS = /\b(app\.(jsx|tsx|js)|app\s*layout|applayout|sidebar|routing|router|route|auth|authentication|authcontext|index\s*file|layout)\b/i;
