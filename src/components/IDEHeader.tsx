@@ -6,7 +6,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import { useState, useCallback, useRef, useEffect } from "react";
+import { useState, useCallback, useRef, useEffect, useMemo } from "react";
 import { TechStackId } from "@/lib/techStacks";
 import PublishExportButtons from "@/components/PublishExportButtons";
 import { usePreview } from "@/contexts/PreviewContext";
