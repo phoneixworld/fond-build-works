@@ -1,7 +1,11 @@
 import React, { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Bot, ChevronDown, ChevronRight, CheckCircle2, Circle, Pencil, RotateCcw, Brain, Sparkles, Wrench, Copy, Check, Lightbulb, History, Bookmark, ArrowRight, ThumbsUp, ThumbsDown, MoreHorizontal, Code2, Eye, EyeOff } from "lucide-react";
+import { Bot, ChevronDown, ChevronRight, CheckCircle2, Circle, Pencil, RotateCcw, Brain, Sparkles, Wrench, Copy, Check, Lightbulb, History, Bookmark, ArrowRight, ThumbsUp, ThumbsDown, MoreHorizontal, Code2, Eye, EyeOff, Clock, Zap, FileText, Flag, BookmarkPlus } from "lucide-react";
 import ReactMarkdown from "react-markdown";
+import {
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem,
+  DropdownMenuTrigger, DropdownMenuSeparator, DropdownMenuLabel,
+} from "@/components/ui/dropdown-menu";
 import {
   Tooltip,
   TooltipContent,
@@ -11,10 +15,13 @@ import { MermaidDiagram } from "./MermaidDiagram";
 
 type MsgContent = string | Array<{ type: "text"; text: string } | { type: "image_url"; image_url: { url: string } }>;
 
+type MsgMeta = { tokens?: number; durationMs?: number; model?: string };
+
 interface ChatMessageProps {
   content: MsgContent;
   role: "user" | "assistant";
   timestamp?: number;
+  meta?: MsgMeta;
   isLoading?: boolean;
   onEdit?: () => void;
   onRegenerate?: () => void;
@@ -547,14 +554,27 @@ const SuggestionButtons = ({ suggestions, onClick }: { suggestions: Suggestion[]
 
 // --- Action bar (thumbs up/down, copy, more) ---
 
-const ActionBar = ({ text, onRegenerate }: { text: string; onRegenerate?: () => void }) => {
+const ActionBar = ({ text, onRegenerate, meta }: { text: string; onRegenerate?: () => void; meta?: MsgMeta }) => {
   const [liked, setLiked] = useState<"up" | "down" | null>(null);
   const [copied, setCopied] = useState(false);
+  const [bookmarked, setBookmarked] = useState(false);
+  const [showRaw, setShowRaw] = useState(false);
 
   const handleCopy = () => {
     navigator.clipboard.writeText(text);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
+  };
+
+  const formatDuration = (ms: number) => {
+    if (ms < 1000) return `${ms}ms`;
+    const s = (ms / 1000).toFixed(1);
+    return `${s}s`;
+  };
+
+  const formatTokens = (t: number) => {
+    if (t >= 1000) return `${(t / 1000).toFixed(1)}k`;
+    return String(t);
   };
 
   return (
@@ -577,18 +597,99 @@ const ActionBar = ({ text, onRegenerate }: { text: string; onRegenerate?: () => 
       >
         {copied ? <Check className="w-4 h-4 text-[hsl(var(--ide-success))]" /> : <Copy className="w-4 h-4" />}
       </button>
-      <button
-        className="p-1.5 rounded-lg text-muted-foreground/40 hover:text-foreground hover:bg-muted/20 transition-all"
-      >
-        <MoreHorizontal className="w-4 h-4" />
-      </button>
+
+      {/* Three-dots menu */}
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <button className="p-1.5 rounded-lg text-muted-foreground/40 hover:text-foreground hover:bg-muted/20 transition-all">
+            <MoreHorizontal className="w-4 h-4" />
+          </button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="start" className="min-w-[220px]">
+          {/* Usage stats section */}
+          {(meta?.tokens || meta?.durationMs || meta?.model) && (
+            <>
+              <DropdownMenuLabel className="text-[10px] uppercase tracking-wider text-muted-foreground">Usage Stats</DropdownMenuLabel>
+              <div className="px-2 py-1.5 space-y-1">
+                {meta.tokens != null && (
+                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                    <Zap className="w-3 h-3 text-amber-400" />
+                    <span>Tokens: <span className="text-foreground font-medium">{formatTokens(meta.tokens)}</span></span>
+                  </div>
+                )}
+                {meta.durationMs != null && (
+                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                    <Clock className="w-3 h-3 text-blue-400" />
+                    <span>Duration: <span className="text-foreground font-medium">{formatDuration(meta.durationMs)}</span></span>
+                  </div>
+                )}
+                {meta.model && (
+                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                    <Sparkles className="w-3 h-3 text-primary" />
+                    <span>Model: <span className="text-foreground font-medium">{meta.model}</span></span>
+                  </div>
+                )}
+              </div>
+              <DropdownMenuSeparator />
+            </>
+          )}
+
+          {/* No stats fallback */}
+          {!meta?.tokens && !meta?.durationMs && !meta?.model && (
+            <>
+              <div className="px-2 py-1.5">
+                <div className="flex items-center gap-2 text-xs text-muted-foreground/60">
+                  <Zap className="w-3 h-3" />
+                  <span>No usage data for this message</span>
+                </div>
+              </div>
+              <DropdownMenuSeparator />
+            </>
+          )}
+
+          {/* Actions */}
+          <DropdownMenuItem onClick={() => setBookmarked(!bookmarked)} className="gap-2 text-xs">
+            <BookmarkPlus className={`w-3.5 h-3.5 ${bookmarked ? "text-primary fill-primary" : ""}`} />
+            {bookmarked ? "Remove Bookmark" : "Bookmark"}
+          </DropdownMenuItem>
+          <DropdownMenuItem onClick={() => setShowRaw(!showRaw)} className="gap-2 text-xs">
+            <Code2 className="w-3.5 h-3.5" />
+            {showRaw ? "Hide Raw" : "View Raw"}
+          </DropdownMenuItem>
+          {onRegenerate && (
+            <DropdownMenuItem onClick={onRegenerate} className="gap-2 text-xs">
+              <RotateCcw className="w-3.5 h-3.5" />
+              Regenerate
+            </DropdownMenuItem>
+          )}
+          <DropdownMenuSeparator />
+          <DropdownMenuItem
+            onClick={() => navigator.clipboard.writeText(text)}
+            className="gap-2 text-xs"
+          >
+            <FileText className="w-3.5 h-3.5" />
+            Copy as Markdown
+          </DropdownMenuItem>
+          <DropdownMenuItem className="gap-2 text-xs text-muted-foreground">
+            <Flag className="w-3.5 h-3.5" />
+            Report Issue
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+
+      {/* Inline bookmark indicator */}
+      {bookmarked && (
+        <span className="ml-1">
+          <BookmarkPlus className="w-3.5 h-3.5 text-primary fill-primary" />
+        </span>
+      )}
     </div>
   );
 };
 
 // --- Main component ---
 
-const ChatMessage = ({ content, role, timestamp, isLoading, onEdit, onRegenerate, showActions = true, onSuggestionClick }: ChatMessageProps) => {
+const ChatMessage = ({ content, role, timestamp, meta, isLoading, onEdit, onRegenerate, showActions = true, onSuggestionClick }: ChatMessageProps) => {
   const isUser = role === "user";
   const textContent = getTextContent(content);
   const imageUrls = getImageUrls(content);
@@ -713,7 +814,7 @@ const ChatMessage = ({ content, role, timestamp, isLoading, onEdit, onRegenerate
 
             {/* Action bar - thumbs up/down, copy, more */}
             {showActions && !isLoading && textContent.length > 10 && (
-              <ActionBar text={textContent} onRegenerate={onRegenerate} />
+              <ActionBar text={textContent} onRegenerate={onRegenerate} meta={meta} />
             )}
           </div>
         </div>

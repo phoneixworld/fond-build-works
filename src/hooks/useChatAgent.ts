@@ -13,7 +13,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { type MsgContent, getTextContent } from "@/lib/codeParser";
 import { streamThroughCacheProxy, type CacheHitResult } from "@/lib/semanticCache";
 
-type Msg = { role: "user" | "assistant"; content: MsgContent; timestamp?: number };
+type MsgMeta = { tokens?: number; durationMs?: number; model?: string };
+type Msg = { role: "user" | "assistant"; content: MsgContent; timestamp?: number; meta?: MsgMeta };
 
 export interface ChatAgentConfig {
   currentProject: any;
@@ -56,7 +57,8 @@ export function useChatAgent(config: ChatAgentConfig) {
     setMessages((prev) => [...prev, userMsg]);
     setIsLoading(true);
     setBuildStep("Thinking...");
-
+    const chatStartTime = Date.now();
+    let tokenCount = 0;
     let fullChatResponse = "";
     const currentMessages = messagesRef.current;
     const apiMessages = [...currentMessages, userMsg].map(m => ({
@@ -89,9 +91,14 @@ export function useChatAgent(config: ChatAgentConfig) {
 
     // Helper to finalize
     const finalize = (responseText: string, isCached: boolean, cacheInfo?: CacheHitResult) => {
+      const durationMs = Date.now() - chatStartTime;
+      // Rough token estimate: ~4 chars per token
+      const estimatedTokens = tokenCount > 0 ? tokenCount : Math.ceil(responseText.length / 4);
+      const meta: MsgMeta = { tokens: estimatedTokens, durationMs, model: "claude-sonnet-4" };
+
       setIsLoading(false);
       setBuildStep("");
-      setPipelineStep(null); // Chat responses don't produce builds — never set "complete"
+      setPipelineStep(null);
       setCurrentAgent(null);
       isSendingRef.current = false;
 
@@ -108,9 +115,9 @@ export function useChatAgent(config: ChatAgentConfig) {
         const withResponse = [...prev];
         const lastIdx = withResponse.length - 1;
         if (lastIdx >= 0 && withResponse[lastIdx].role === "assistant") {
-          withResponse[lastIdx] = { ...withResponse[lastIdx], content: displayText + cacheTag };
+          withResponse[lastIdx] = { ...withResponse[lastIdx], content: displayText + cacheTag, meta };
         } else {
-          withResponse.push({ role: "assistant", content: displayText + cacheTag, timestamp: Date.now() });
+          withResponse.push({ role: "assistant", content: displayText + cacheTag, timestamp: Date.now(), meta });
         }
 
         const persistMessages = withResponse.map(m => ({
@@ -139,6 +146,7 @@ export function useChatAgent(config: ChatAgentConfig) {
       },
       onDelta: (chunk) => {
         fullChatResponse += chunk;
+        tokenCount += Math.ceil(chunk.length / 4); // rough token estimate
         const displayText = stripBuildMarker(fullChatResponse);
         setMessages((prev) => {
           const last = prev[prev.length - 1];

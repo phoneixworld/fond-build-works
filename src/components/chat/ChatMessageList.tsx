@@ -8,7 +8,8 @@ import { User } from "lucide-react";
 import ChatMessage from "./ChatMessage";
 import { type MsgContent, getTextContent } from "@/lib/codeParser";
 
-type Msg = { role: "user" | "assistant"; content: MsgContent; timestamp?: number };
+type MsgMeta = { tokens?: number; durationMs?: number; model?: string };
+type Msg = { role: "user" | "assistant"; content: MsgContent; timestamp?: number; meta?: MsgMeta };
 
 interface ChatMessageListProps {
   messages: Msg[];
@@ -82,6 +83,7 @@ const ChatMessageList = forwardRef<HTMLDivElement, ChatMessageListProps>(({
             content={msg.content}
             role={msg.role}
             timestamp={msg.timestamp}
+            meta={msg.meta}
             isLoading={isLoading}
             onEdit={isUser ? () => onEditMessage(i) : undefined}
             onRegenerate={!isUser ? () => onRegenerate(i) : undefined}

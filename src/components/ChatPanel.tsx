@@ -35,7 +35,8 @@ import {
 } from "@/components/ui/tooltip";
 import { ImagePlus } from "lucide-react";
 
-type Msg = { role: "user" | "assistant"; content: MsgContent; timestamp?: number };
+type MsgMeta = { tokens?: number; durationMs?: number; model?: string };
+type Msg = { role: "user" | "assistant"; content: MsgContent; timestamp?: number; meta?: MsgMeta };
 
 const MAX_IMAGE_SIZE = 4 * 1024 * 1024;
 
