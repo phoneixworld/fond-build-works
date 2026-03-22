@@ -1,5 +1,5 @@
-import { Loader2, CheckCircle2, Sparkles, Cpu, FileCode, Boxes, Globe, ChevronDown, RefreshCw } from "lucide-react";
-import { useRef, useState, useEffect, useMemo } from "react";
+import { Loader2, CheckCircle2, Sparkles, Cpu, FileCode, Boxes } from "lucide-react";
+import { useRef, useState, useEffect } from "react";
 import { usePreview } from "@/contexts/PreviewContext";
 import { motion, AnimatePresence } from "framer-motion";
 import { DIRECT_TOUCH_SCRIPT } from "@/components/DirectTouch";
