@@ -327,6 +327,8 @@ export default function App() {
           window.dispatchEvent(new PopStateEvent("popstate"));
         }
       }
+      if (e.data?.type === "history-back") { history.back(); }
+      if (e.data?.type === "history-forward") { history.forward(); }
     });
   </script>
 
