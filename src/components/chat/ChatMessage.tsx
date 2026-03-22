@@ -1,7 +1,11 @@
 import React, { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Bot, ChevronDown, ChevronRight, CheckCircle2, Circle, Pencil, RotateCcw, Brain, Sparkles, Wrench, Copy, Check, Lightbulb, History, Bookmark, ArrowRight, ThumbsUp, ThumbsDown, MoreHorizontal, Code2, Eye, EyeOff } from "lucide-react";
+import { Bot, ChevronDown, ChevronRight, CheckCircle2, Circle, Pencil, RotateCcw, Brain, Sparkles, Wrench, Copy, Check, Lightbulb, History, Bookmark, ArrowRight, ThumbsUp, ThumbsDown, MoreHorizontal, Code2, Eye, EyeOff, Clock, Zap, FileText, Flag, BookmarkPlus } from "lucide-react";
 import ReactMarkdown from "react-markdown";
+import {
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem,
+  DropdownMenuTrigger, DropdownMenuSeparator, DropdownMenuLabel,
+} from "@/components/ui/dropdown-menu";
 import {
   Tooltip,
   TooltipContent,
