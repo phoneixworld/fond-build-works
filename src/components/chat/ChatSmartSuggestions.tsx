@@ -1,8 +1,8 @@
 /**
  * ChatSmartSuggestions — Context-aware action suggestions shown above the input.
- * Extracted from ChatPanel.tsx.
+ * Uses the v3 Smart Suggestion Engine with PSAL, FCD, ODE, UIP, GDS, EAS, CMS, SRE, SL.
  */
-import { generateSmartSuggestions } from "@/lib/smartSuggestions";
+import { generateSmartSuggestionsV3 } from "@/lib/suggestions";
 
 interface ChatSmartSuggestionsProps {
   codeForAnalysis: string;
@@ -18,7 +18,7 @@ export default function ChatSmartSuggestions({
 }: ChatSmartSuggestionsProps) {
   if (isLoading || hasFollowUp || hasInput) return null;
 
-  const suggestions = generateSmartSuggestions(codeForAnalysis, messages, 4);
+  const suggestions = generateSmartSuggestionsV3(codeForAnalysis, messages, 3);
   if (suggestions.length === 0) return null;
 
   return (
