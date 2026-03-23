@@ -1149,6 +1149,22 @@ Output ONLY valid JSON. No markdown, no explanation.`,
       const targetFiles = body.targetFiles || [];
       const instruction = body.instruction || "";
       const beforeSnapshots = body.beforeSnapshots || {};
+      const normalizedInstruction = instruction.trim().toLowerCase();
+      const isQuestionOnly = QUESTION_ONLY_SIGNALS.test(instruction) || CHAT_SIGNALS.test(normalizedInstruction);
+      const isNegativeDirective = NEGATIVE_BUILD_EDIT_SIGNALS.test(normalizedInstruction);
+      const hasActionableEditVerb = /\b(fix|change|update|modify|refactor|patch|repair|replace|add|remove|delete)\b/i.test(normalizedInstruction);
+
+      if (isNegativeDirective || (isQuestionOnly && !hasActionableEditVerb)) {
+        await logTelemetry(supabase, projectId, "edit_blocked", {
+          agent: "edit-engine",
+          entityType: "edit",
+          beforeState: { files: targetFiles, snapshots: beforeSnapshots },
+          afterState: null,
+          metadata: { instruction, targetFiles, reason: "Non-actionable or chat-only instruction" },
+        }, userId);
+
+        return json({ success: false, blocked: true, reason: "Instruction is chat-only; edit was blocked." }, 400);
+      }
 
       await transitionState(supabase, projectId, "editing", {}, userId, `Edit started: ${instruction.slice(0, 100)}`);
 
