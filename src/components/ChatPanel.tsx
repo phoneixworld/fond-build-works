@@ -622,18 +622,26 @@ const ChatPanel = forwardRef<ChatPanelHandle, { initialPrompt?: string; onVersio
     setTimeout(() => handleSmartSend(userText), 50);
   }, [currentProject, handleSmartSend]);
 
+  const buildMessageWithDocs = (text: string): string => {
+    if (attachedDocuments.length === 0) return text;
+    const docParts = attachedDocuments.map(d => `[Attached document: ${d.name}]\n${d.text}`).join("\n\n");
+    return `${docParts}\n\n${text}`;
+  };
+
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
-      if (input.trim() || attachedImages.length > 0) {
-        handleSmartSend(input.trim(), attachedImages);
+      if (input.trim() || attachedImages.length > 0 || attachedDocuments.length > 0) {
+        handleSmartSend(buildMessageWithDocs(input.trim()), attachedImages);
+        setAttachedDocuments([]);
       }
     }
   };
 
   const handleSendClick = () => {
-    if (input.trim() || attachedImages.length > 0) {
-      handleSmartSend(input.trim(), attachedImages);
+    if (input.trim() || attachedImages.length > 0 || attachedDocuments.length > 0) {
+      handleSmartSend(buildMessageWithDocs(input.trim()), attachedImages);
+      setAttachedDocuments([]);
     }
   };
 
