@@ -656,6 +656,11 @@ const ChatPanel = forwardRef<ChatPanelHandle, { initialPrompt?: string; onVersio
     setTimeout(() => handleSmartSend(userText), 50);
   }, [currentProject, handleSmartSend]);
 
+  const buildDocLabel = (): string => {
+    if (attachedDocuments.length === 0) return "";
+    return attachedDocuments.map(d => `📎 ${d.name}`).join("\n");
+  };
+
   const buildMessageWithDocs = (text: string): string => {
     if (attachedDocuments.length === 0) return text;
     const docParts = attachedDocuments.map(d => `[Attached document: ${d.name}]\n${d.text}`).join("\n\n");
@@ -666,7 +671,10 @@ const ChatPanel = forwardRef<ChatPanelHandle, { initialPrompt?: string; onVersio
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
       if (input.trim() || attachedImages.length > 0 || attachedDocuments.length > 0) {
-        handleSmartSend(buildMessageWithDocs(input.trim()), attachedImages);
+        const displayText = buildDocLabel() ? `${buildDocLabel()}\n${input.trim()}` : input.trim();
+        const aiText = buildMessageWithDocs(input.trim());
+        // Show compact label in chat, send full text to AI
+        handleSmartSend(aiText, attachedImages, displayText);
         setAttachedDocuments([]);
       }
     }
@@ -674,7 +682,9 @@ const ChatPanel = forwardRef<ChatPanelHandle, { initialPrompt?: string; onVersio
 
   const handleSendClick = () => {
     if (input.trim() || attachedImages.length > 0 || attachedDocuments.length > 0) {
-      handleSmartSend(buildMessageWithDocs(input.trim()), attachedImages);
+      const displayText = buildDocLabel() ? `${buildDocLabel()}\n${input.trim()}` : input.trim();
+      const aiText = buildMessageWithDocs(input.trim());
+      handleSmartSend(aiText, attachedImages, displayText);
       setAttachedDocuments([]);
     }
   };
