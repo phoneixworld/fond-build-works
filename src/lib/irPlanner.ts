@@ -26,6 +26,28 @@ export async function planIRFromRequirements(
   llm: IRPlannerLLM,
   rawRequirements: string
 ): Promise<IR> {
+  const trimmed = rawRequirements.trim();
+
+  // ── GUARDRAIL 1: Minimum length ──
+  // Bare confirmations like "go ahead", "ok", "sure" must never reach the LLM
+  if (trimmed.length < 50) {
+    throw new Error(
+      `IRPlanner: requirements too short to plan a build (${trimmed.length} chars). ` +
+      `Received: "${trimmed.slice(0, 40)}". The build pipeline must pass accumulated requirements, not a trigger phrase.`
+    );
+  }
+
+  // ── GUARDRAIL 2: Domain keyword presence ──
+  // Requirements must contain at least some domain-relevant tokens to produce a meaningful IR.
+  // This prevents generic/empty prompts from generating hallucinated scaffold apps.
+  const DOMAIN_KEYWORDS = /\b(dashboard|employee|department|attendance|logbook|university|student|hr|erp|crm|ecommerce|shop|product|invoice|patient|hospital|school|task|project|blog|chat|user|admin|auth|login|signup|form|table|list|report|analytics|calendar|schedule|booking|inventory|order|payment|notification|profile|settings|role|permission|workflow|approval|ticket|support|contact|lead|pipeline|kanban|board|chart|graph|widget|module|page|screen|view)\b/i;
+  if (!DOMAIN_KEYWORDS.test(trimmed)) {
+    throw new Error(
+      `IRPlanner: requirements missing domain context. No recognizable domain keywords found. ` +
+      `The build pipeline must pass structured requirements describing what to build.`
+    );
+  }
+
   const system = buildIRSystemPrompt();
   const user = buildUserPrompt(rawRequirements);
   const raw = await llm({ system, user });

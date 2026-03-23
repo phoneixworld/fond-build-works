@@ -51,8 +51,18 @@ export async function orchestrateBuild(options: {
     console.log(`[BuildOrchestrator] Schema validated: ${validation.tables.length} tables ✅`);
   }
 
-  // 1. PLAN IR
-  const ir: IR = await planIRFromRequirements(callLLM, rawRequirements);
+  // 1. PLAN IR (with guardrails — will throw if requirements are trivial)
+  let ir: IR;
+  try {
+    ir = await planIRFromRequirements(callLLM, rawRequirements);
+  } catch (err: any) {
+    const msg = err?.message || String(err);
+    if (msg.includes("IRPlanner:")) {
+      console.error(`[BuildOrchestrator] IR planning blocked: ${msg}`);
+      throw new Error(`Build aborted — ${msg}`);
+    }
+    throw err;
+  }
 
   // 2. GENERATE FILES FROM IR
   const files: Record<string, string> = {};
