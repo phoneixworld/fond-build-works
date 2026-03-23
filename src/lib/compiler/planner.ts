@@ -458,7 +458,8 @@ Create this file:
 
 RULES:
 - Import reusable components from /components/ (StatCard, DataTable, StatusBadge, PageHeader, SearchFilterBar) where applicable.
-- Include realistic sample data with useState (5-10 rows) when rendering tables.
+- ALL data MUST come from API calls via project-api. NEVER use inline data arrays or SAMPLE_DATA.
+- Include loading skeletons and empty state UI for when data is loading or absent.
 - Add search/filter UI and primary page actions when relevant.
 - Keep the page fully functional with sensible defaults; do NOT leave placeholders.
 - Export default.` ,
