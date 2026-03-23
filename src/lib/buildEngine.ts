@@ -306,6 +306,35 @@ function detectPromptEcho(files: Record<string, string>, userPrompt: string): bo
   return false;
 }
 
+function formatBackendValidationFailure(input: {
+  schemaErrors: string[];
+  forbidden: Array<{ file: string; line: number; pattern: string }>;
+  missing: string[];
+  authErrors: string[];
+}): string {
+  const parts: string[] = ["Backend validation failed after retry."];
+
+  if (input.schemaErrors.length > 0) {
+    parts.push(`Schema issues:\n- ${input.schemaErrors.join("\n- ")}`);
+  }
+
+  if (input.forbidden.length > 0) {
+    const forbidden = input.forbidden.map((v) => `${v.file}:${v.line} (${v.pattern})`).join("\n- ");
+    parts.push(`Forbidden patterns:\n- ${forbidden}`);
+  }
+
+  if (input.missing.length > 0) {
+    parts.push(`Missing artifacts:\n- ${input.missing.join("\n- ")}`);
+  }
+
+  if (input.authErrors.length > 0) {
+    parts.push(`Auth conformance errors:\n- ${input.authErrors.join("\n- ")}`);
+  }
+
+  parts.push("Build blocked. Re-run with a more explicit backend request or fix prompts/templates.");
+  return parts.join("\n\n");
+}
+
 // ─── File Parser (delegates to structured parser) ─────────────────────────
 
 function parseReactFilesFromOutput(text: string): { 
@@ -784,11 +813,14 @@ async function runDirectBuild(
     const MAX_VALIDATION_RETRIES = 1; // One retry to fix violations
 
     while (retryAttempt <= MAX_VALIDATION_RETRIES) {
+      let schemaErrors: string[] = [];
+
       // Schema-first validation
       if (requiresSchemaValidation(finalFiles)) {
         const schemaArtifacts = extractSchemaArtifacts(finalFiles);
         const schemaValidation = validateSchemaArtifacts(schemaArtifacts);
         if (!schemaValidation.valid) {
+          schemaErrors = schemaValidation.errors;
           console.error(`[BuildEngine:direct] SCHEMA VALIDATION FAILED:`, schemaValidation.errors);
         } else {
           console.log(`[BuildEngine:direct] Schema validated: ${schemaValidation.tables.length} tables ✅`);
@@ -804,19 +836,37 @@ async function runDirectBuild(
       const hasForbidden = backendValidation.forbiddenViolations.length > 0;
       const hasMissing = backendValidation.missingRequirements.length > 0;
       const hasAuthIssues = !authValidation.valid;
+      const hasSchemaIssues = schemaErrors.length > 0;
 
-      if (!hasForbidden && !hasMissing && !hasAuthIssues) {
+      if (!hasForbidden && !hasMissing && !hasAuthIssues && !hasSchemaIssues) {
         console.log(`[BuildEngine:direct] ✅ Backend validation passed (score: ${backendValidation.score}/100)`);
         break; // All good
       }
 
       if (retryAttempt >= MAX_VALIDATION_RETRIES) {
-        // Max retries exhausted — log and proceed with degraded output
-        console.warn(`[BuildEngine:direct] ⚠️ Backend validation STILL failing after retry — proceeding with degraded output`);
-        if (hasForbidden) console.warn("[BuildEngine:direct] Forbidden:", backendValidation.forbiddenViolations.map(v => `${v.file}:${v.line} ${v.pattern}`));
-        if (hasMissing) console.warn("[BuildEngine:direct] Missing:", backendValidation.missingRequirements);
-        if (hasAuthIssues) console.warn("[BuildEngine:direct] Auth issues:", authValidation.errors);
-        break;
+        const failMessage = formatBackendValidationFailure({
+          schemaErrors,
+          forbidden: backendValidation.forbiddenViolations,
+          missing: backendValidation.missingRequirements,
+          authErrors: authValidation.errors,
+        });
+        console.error(`[BuildEngine:direct] ❌ ${failMessage}`);
+
+        const valMsNow = valTimer.elapsed();
+        const totalSizeNow = Object.values(finalFiles).reduce((s, c) => s + c.length, 0);
+        completeTask(taskMetrics, {
+          fileCount: Object.keys(finalFiles).length,
+          totalFileSize: totalSizeNow,
+          modelLatencyMs: result.modelMs,
+          validationLatencyMs: valMsNow,
+          mergeLatencyMs: mergeMs,
+          retryCount: retryAttempt,
+          cached: result.cached,
+          status: "failed",
+        });
+        finishBuild();
+        callbacks.onError(failMessage);
+        return;
       }
 
       // ── RETRY: Re-run build agent with validation failure context ──
@@ -827,8 +877,11 @@ async function runDirectBuild(
       const authContext = hasAuthIssues 
         ? `\n\n## AUTH CONFORMANCE FAILURES:\n${authValidation.errors.join("\n")}\n\nFix: Use supabase.auth.* methods, never localStorage for auth.`
         : "";
+      const schemaContext = hasSchemaIssues
+        ? `\n\n## SCHEMA VALIDATION FAILURES:\n${schemaErrors.join("\n")}\n\nFix: ensure valid table/column names, idempotent migrations, and RLS for every table.`
+        : "";
       
-      const retryPrompt = `${prompt}\n\n--- VALIDATION FAILURE (must fix) ---\n${retryContext}${authContext}\n\nRe-generate the code fixing ALL violations above. Use real Supabase client for persistence, proper auth patterns, and include SQL migrations with RLS policies.`;
+      const retryPrompt = `${prompt}\n\n--- VALIDATION FAILURE (must fix) ---\n${retryContext}${authContext}${schemaContext}\n\nRe-generate the code fixing ALL violations above. Use real Supabase client for persistence, proper auth patterns, and include SQL migrations with RLS policies.`;
 
       try {
         const retryResult = await executeSingleTask(retryPrompt, config, existingCode, callbacks.onDelta, 0, undefined, undefined, prompt);
@@ -1114,10 +1167,13 @@ ${existingFileList}
     const MAX_VALIDATION_RETRIES = 1;
 
     while (retryAttempt <= MAX_VALIDATION_RETRIES) {
+      let schemaErrors: string[] = [];
+
       if (requiresSchemaValidation(accumulatedFiles)) {
         const schemaArtifacts = extractSchemaArtifacts(accumulatedFiles);
         const schemaValidation = validateSchemaArtifacts(schemaArtifacts);
         if (!schemaValidation.valid) {
+          schemaErrors = schemaValidation.errors;
           console.error(`[BuildEngine:planned] SCHEMA VALIDATION FAILED:`, schemaValidation.errors);
         } else {
           console.log(`[BuildEngine:planned] Schema validated: ${schemaValidation.tables.length} tables ✅`);
@@ -1130,15 +1186,24 @@ ${existingFileList}
       const hasForbidden = backendValidation.forbiddenViolations.length > 0;
       const hasMissing = backendValidation.missingRequirements.length > 0;
       const hasAuthIssues = !authValidation.valid;
+      const hasSchemaIssues = schemaErrors.length > 0;
 
-      if (!hasForbidden && !hasMissing && !hasAuthIssues) {
+      if (!hasForbidden && !hasMissing && !hasAuthIssues && !hasSchemaIssues) {
         console.log(`[BuildEngine:planned] ✅ Backend validation passed (score: ${backendValidation.score}/100)`);
         break;
       }
 
       if (retryAttempt >= MAX_VALIDATION_RETRIES) {
-        console.warn(`[BuildEngine:planned] ⚠️ Backend validation STILL failing after retry — proceeding with degraded output`);
-        break;
+        const failMessage = formatBackendValidationFailure({
+          schemaErrors,
+          forbidden: backendValidation.forbiddenViolations,
+          missing: backendValidation.missingRequirements,
+          authErrors: authValidation.errors,
+        });
+        console.error(`[BuildEngine:planned] ❌ ${failMessage}`);
+        finishBuild();
+        callbacks.onError(failMessage);
+        return;
       }
 
       // ── RETRY: Run a fix-up task against the accumulated files ──
@@ -1149,8 +1214,11 @@ ${existingFileList}
       const authContext = hasAuthIssues 
         ? `\n\n## AUTH CONFORMANCE FAILURES:\n${authValidation.errors.join("\n")}\n\nFix: Use supabase.auth.* methods, never localStorage for auth.`
         : "";
+      const schemaContext = hasSchemaIssues
+        ? `\n\n## SCHEMA VALIDATION FAILURES:\n${schemaErrors.join("\n")}\n\nFix: ensure valid table/column names, idempotent migrations, and RLS for every table.`
+        : "";
       
-      const fixPrompt = `Fix the following validation failures in the existing code:\n\n${retryContext}${authContext}\n\nRe-generate ONLY the files that need fixing. Use real Supabase client for persistence, proper auth patterns, and include SQL migrations with RLS policies.`;
+      const fixPrompt = `Fix the following validation failures in the existing code:\n\n${retryContext}${authContext}${schemaContext}\n\nRe-generate ONLY the files that need fixing. Use real Supabase client for persistence, proper auth patterns, and include SQL migrations with RLS policies.`;
 
       try {
         const existingCode = buildFullCodeContext(accumulatedFiles);

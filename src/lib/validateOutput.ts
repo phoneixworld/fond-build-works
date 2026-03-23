@@ -88,9 +88,16 @@ export function detectBackendIntent(files: Record<string, string>, userPrompt: s
     "file upload", "upload", "comments", "relations",
     "role", "access control", "rbac", "permission",
     "real-time", "realtime", "notification", "websocket",
+    "crm", "contact", "contacts", "customer", "customers",
+    "lead", "leads", "pipeline", "opportunity", "opportunities",
+    "invoice", "invoices", "orders", "inventory", "kanban",
   ];
 
   if (backendKeywords.some(kw => promptLower.includes(kw))) return true;
+
+  const hasEntityCrudIntent = /(contact|customer|lead|invoice|order|task)s?/.test(promptLower)
+    && /(add|create|edit|update|manage|dashboard|list|track)/.test(promptLower);
+  if (hasEntityCrudIntent) return true;
 
   // Check if generated code references data operations
   const allCode = Object.values(files).join("\n");

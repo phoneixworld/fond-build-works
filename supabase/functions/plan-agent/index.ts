@@ -32,8 +32,8 @@ serve(async (req) => {
 
   try {
     const { prompt, existingFiles, techStack, schemas, knowledge, domainModel } = await req.json();
-    const ANTHROPIC_API_KEY = Deno.env.get("ANTHROPIC_API_KEY");
-    if (!ANTHROPIC_API_KEY) throw new Error("ANTHROPIC_API_KEY not configured");
+    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
+    if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY not configured");
 
     const domainContext = domainModel ? `
 ## DOMAIN MODEL (from Requirements Agent)
@@ -112,7 +112,7 @@ ${schemas?.length ? `DB schemas: ${JSON.stringify(schemas)}` : ""}
 ${knowledge?.length ? `Knowledge:\n${knowledge.join("\n")}` : ""}
 
 ## TASK ORDERING ENFORCEMENT (CRITICAL)
-If the user's intent includes ANY of: auth, CRUD, data, roles, storage, database, users, login, signup, permissions, backend, schema, migration, persist, save, store:
+If the user's intent includes ANY of: auth, CRUD, data, roles, storage, database, users, contacts, CRM, login, signup, permissions, backend, schema, migration, persist, save, store:
 → The plan MUST emit tasks in this EXACT order:
   1. create_or_update_schema (taskType: "schema") — SQL migrations + RLS + schema.json + hooks
   2. create_or_update_migrations (taskType: "schema") — if separate migration tasks needed
