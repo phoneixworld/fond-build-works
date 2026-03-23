@@ -44,13 +44,12 @@ serve(async (req) => {
     let chatText = "";
 
     if (taskType === "schema") {
-      // ── Schema Task: Generate mock data + type stubs ──
+      // ── Schema Task: Generate SQL migrations + RLS + schema.json + hooks ──
       const result = generateSchemaFiles(domainModel, projectId, apiBase);
       generatedFiles = result.files;
       chatText = result.chatText;
     } else if (taskType === "backend") {
-      // ── Backend Task: Generate hooks + contexts ──
-      // Use AI to generate more sophisticated hooks if API key available
+      // ── Backend Task: Generate hooks + contexts using real API ──
       if (LOVABLE_API_KEY) {
         const aiResult = await generateBackendWithAI(task, domainModel, projectId, apiBase, existingFiles);
         generatedFiles = aiResult.files;
