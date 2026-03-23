@@ -386,11 +386,9 @@ FIX CHECKLIST:
     let selectedModel: string;
     let routeReason: string;
     
-    if (model) {
-      // User explicitly chose a model — use it directly (must be gateway-compatible)
-      selectedModel = model;
-      routeReason = `User override: ${selectedModel}`;
-    } else if (retry_context) {
+    // Ignore client model override for builds — server routing is authoritative
+    // Client may send stale/invalid model identifiers that cause failures
+    if (retry_context) {
       selectedModel = "google/gemini-2.5-pro";
       routeReason = `Retry → gemini-2.5-pro (focused fix)`;
     } else if (task_type === "schema" || task_type === "backend") {

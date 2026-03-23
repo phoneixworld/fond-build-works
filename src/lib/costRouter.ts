@@ -124,12 +124,19 @@ export function routeCost(input: CostRouteInput): CostRouteResult {
   let reason: string;
 
   // ── Route based on complexity score ──
+  // New app builds ALWAYS use Pro — short prompts like "Build a HR portal"
+  // score low complexity but need high-quality generation
+  const isNewAppBuild = input.taskType === "build" && !input.hasExistingCode;
+
   if (input.taskType === "chat") {
     model = "google/gemini-2.5-flash";
     reason = `Chat task → Gemini 2.5 Flash (cheapest)`;
   } else if (input.isRetry) {
     model = "google/gemini-2.5-pro";
     reason = `Retry → Gemini 2.5 Pro (focused fix)`;
+  } else if (isNewAppBuild) {
+    model = "google/gemini-2.5-pro";
+    reason = `New app build → Gemini 2.5 Pro (always Pro for fresh builds)`;
   } else if (input.taskType === "schema" || input.taskType === "backend") {
     model = "google/gemini-2.5-pro";
     reason = `${input.taskType} task → Gemini 2.5 Pro`;
