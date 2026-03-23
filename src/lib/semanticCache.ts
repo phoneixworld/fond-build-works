@@ -60,6 +60,23 @@ async function ensureCorpusLoaded(projectId: string): Promise<void> {
   corpusInitialized = true;
 }
 
+// ─── Confirmation Bypass ──────────────────────────────────────────────────
+
+const BARE_CONFIRMATIONS = new Set([
+  "ok", "okay", "sure", "go ahead", "yes", "yep", "yeah", "yea",
+  "proceed", "do it", "go", "build it", "start", "lets go", "let's go",
+  "confirmed", "approve", "approved", "continue", "y", "k",
+]);
+
+/**
+ * Returns true if the prompt is a bare confirmation that should NEVER
+ * be used as a cache key — it carries no domain semantics.
+ */
+function isBareConfirmation(prompt: string): boolean {
+  const normalized = prompt.trim().toLowerCase().replace(/[?.!,]+$/g, "");
+  return BARE_CONFIRMATIONS.has(normalized) || normalized.length < 4;
+}
+
 // ─── Public API ───────────────────────────────────────────────────────────
 
 export interface CacheHitResult {
