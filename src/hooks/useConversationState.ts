@@ -154,6 +154,9 @@ export function useConversationState() {
     const lower = trimmed.toLowerCase();
 
     // Client-side fast path for obvious signals
+    if (META_CHAT_SIGNALS.test(lower)) {
+      return { action: "chat", reason: "Meta conversation question detected" };
+    }
     if (BUILD_NOW_SIGNALS.test(lower)) {
       return { action: "build", reason: "User explicitly requested build" };
     }
