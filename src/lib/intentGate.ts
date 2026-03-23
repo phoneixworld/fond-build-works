@@ -89,22 +89,27 @@ export function classifyIntentGate(text: string, hasExistingCode: boolean): Guar
     return { ...CHAT_RESULT, category: "stop_request" };
   }
 
-  // ── 5. Help-seeking / desire phrases → conversation ──
+  // ── 5. Meta conversation questions (request recall / intent checks) ──
+  if (META_CONVERSATION_PATTERNS.test(lower)) {
+    return { ...CHAT_RESULT, category: "general_question" };
+  }
+
+  // ── 6. Help-seeking / desire phrases → conversation ──
   if (HELP_SEEKING_ANYWHERE.test(lower) || DESIRE_NOT_COMMAND.test(lower)) {
     return CHAT_RESULT;
   }
 
-  // ── 6. Explanation requests ──
+  // ── 7. Explanation requests ──
   if (EXPLANATION_PATTERNS.test(lower) || trimmed.startsWith("explain")) {
     return { ...CHAT_RESULT, category: "explanation_request" };
   }
 
-  // ── 7. General questions (starts with interrogative or ends with ?) ──
+  // ── 8. General questions (starts with interrogative or ends with ?) ──
   if (CONVERSATION_FIRST_PATTERNS.test(lower) || trimmed.endsWith("?") || GENERAL_QUESTION_PATTERNS.test(lower)) {
     return { ...CHAT_RESULT, category: "general_question" };
   }
 
-  // ── 8. Diagnostics phrased as questions with no explicit edit verb → chat ──
+  // ── 9. Diagnostics phrased as questions with no explicit edit verb → chat ──
   if (DIAGNOSTIC_QUESTION_PATTERNS.test(trimmed) && !ACTIONABLE_EDIT_VERBS.test(lower)) {
     return { ...CHAT_RESULT, category: "general_question" };
   }
