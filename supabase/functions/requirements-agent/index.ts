@@ -156,6 +156,7 @@ ${existingSchemas?.length ? `\n## EXISTING SCHEMAS (don't duplicate):\n${JSON.st
                   },
                 },
                 required: ["templateName", "requiresAuth", "entities", "apiEndpoints", "suggestedPages", "suggestedNavItems"],
+              },
             },
           },
         ],
