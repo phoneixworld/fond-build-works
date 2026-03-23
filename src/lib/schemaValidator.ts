@@ -144,6 +144,7 @@ function validateMigrationSql(
 function validateRlsSql(
   sql: string,
   tables: string[],
+  warnings: string[],
   missingRls: string[],
   errors: string[]
 ) {
