@@ -1029,6 +1029,19 @@ ${existingFileList}
     accumulatedFiles = stubBrokenFiles(accumulatedFiles, finalErrors);
   }
 
+  // Backend output validation for planned builds
+  const backendValidation = validateBuildOutput(accumulatedFiles, prompt);
+  if (!backendValidation.valid) {
+    console.warn(`[BuildEngine:planned] Backend validation failed (score: ${backendValidation.score}/100):`,
+      { forbidden: backendValidation.forbiddenViolations.length, missing: backendValidation.missingRequirements.length });
+    if (backendValidation.forbiddenViolations.length > 0) {
+      console.warn("[BuildEngine:planned] Forbidden patterns:", backendValidation.forbiddenViolations.map(v => `${v.file}:${v.line} ${v.pattern}`));
+    }
+    if (backendValidation.missingRequirements.length > 0) {
+      console.warn("[BuildEngine:planned] Missing requirements:", backendValidation.missingRequirements);
+    }
+  }
+
   const lintResult = lintDesignTokens(accumulatedFiles);
   accumulatedFiles = lintResult.files;
   if (lintResult.replacements > 0) {
