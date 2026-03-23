@@ -58,7 +58,7 @@ export function validateSchemaArtifacts(artifacts: SchemaArtifacts): SchemaValid
 
   // 2. Validate RLS SQL
   if (artifacts.rlsSql) {
-    validateRlsSql(artifacts.rlsSql, tables, missingRls, errors);
+    validateRlsSql(artifacts.rlsSql, tables, warnings, missingRls, errors);
   } else if (tables.length > 0) {
     // No RLS at all — every table is missing
     missingRls.push(...tables);
