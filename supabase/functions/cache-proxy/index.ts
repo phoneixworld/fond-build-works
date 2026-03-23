@@ -54,6 +54,27 @@ function fnv1a(str: string): string {
   return hash.toString(36);
 }
 
+function extractUserText(content: any): string {
+  if (typeof content === "string") return content;
+  if (Array.isArray(content)) {
+    return content
+      .filter((part: any) => part?.type === "text" && typeof part?.text === "string")
+      .map((part: any) => part.text)
+      .join(" ");
+  }
+  return "";
+}
+
+const EMAIL_REGEX = /[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i;
+
+function isEmailRegistrationCheckPrompt(prompt: string): boolean {
+  if (!EMAIL_REGEX.test(prompt)) return false;
+  const normalized = prompt.toLowerCase();
+  const hasCheckVerb = /\b(check|verify|confirm|see|is|if|whether|can you check)\b/.test(normalized);
+  const hasRegistrationSignal = /\b(register(?:ed|d)?|exist(?:s)?|signed?\s*up|already\s+registered|already\s+exists?|account)\b/.test(normalized);
+  return hasCheckVerb && hasRegistrationSignal;
+}
+
 // Jaccard + token overlap similarity (fast, no corpus needed)
 function tokenSimilarity(a: string[], b: string[]): number {
   if (a.length === 0 || b.length === 0) return 0;
@@ -105,17 +126,15 @@ serve(async (req) => {
 
     // Extract the latest user message for cache key
     const lastUserMsg = [...messages].reverse().find((m: any) => m.role === "user");
-    const userPrompt = typeof lastUserMsg?.content === "string"
-      ? lastUserMsg.content
-      : Array.isArray(lastUserMsg?.content)
-        ? lastUserMsg.content.filter((c: any) => c.type === "text").map((c: any) => c.text).join(" ")
-        : "";
+    const userPrompt = extractUserText(lastUserMsg?.content);
 
+    const isEmailRegistrationCheck = isEmailRegistrationCheckPrompt(userPrompt);
+    const shouldBypassCache = bypass_cache || isEmailRegistrationCheck;
     const promptTokens = tokenize(userPrompt);
     const exactHash = fnv1a(userPrompt.trim().toLowerCase());
 
     // ─── Cache Check ────────────────────────────────────────────────
-    if (!bypass_cache && project_id && userPrompt.length > 5) {
+    if (!shouldBypassCache && project_id && userPrompt.length > 5) {
       // 1. Exact hash match (fastest)
       const { data: exactMatch } = await supabase
         .from("cache_entries")
@@ -198,7 +217,7 @@ serve(async (req) => {
     // FIX #1: Instead of using an inline system prompt, forward to chat-agent
     // which has the full prompt with workspace context and error info.
     const chatAgentUrl = `${SUPABASE_URL}/functions/v1/chat-agent`;
-    
+
     const aiResponse = await fetch(chatAgentUrl, {
       method: "POST",
       headers: {
@@ -258,7 +277,7 @@ serve(async (req) => {
           }
 
           // Store in cache
-          if (project_id && fullText.length > 10) {
+          if (project_id && fullText.length > 10 && !isEmailRegistrationCheck) {
             const tokensSaved = Math.round(fullText.length / 4);
             await supabase.from("cache_entries").upsert({
               project_id,
@@ -293,7 +312,7 @@ serve(async (req) => {
     const data = await aiResponse.json();
     const responseText = data.choices?.[0]?.message?.content || "";
 
-    if (project_id && responseText.length > 10) {
+    if (project_id && responseText.length > 10 && !isEmailRegistrationCheck) {
       const tokensSaved = Math.round(responseText.length / 4);
       await supabase.from("cache_entries").upsert({
         project_id,
