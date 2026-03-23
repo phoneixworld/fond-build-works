@@ -19,6 +19,7 @@
  */
 
 import { streamBuildAgent, validateReactCode, formatRetryContext, MAX_BUILD_RETRIES } from "@/lib/agentPipeline";
+import { validateBuildOutput, formatValidationRetryContext, detectBackendIntent } from "@/lib/validateOutput";
 import { generatePlan, type BuildPlan, type PlanTask } from "@/lib/planningAgent";
 import { topologicalSort } from "@/lib/taskExecutor";
 import { mergeFiles, buildFullCodeContext, isBackendProtected, type MergeResult } from "@/lib/codeMerger";
