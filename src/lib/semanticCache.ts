@@ -98,6 +98,12 @@ export async function semanticCacheGet(
   prompt: string,
   _context?: string
 ): Promise<CacheHitResult> {
+  // HARD BYPASS: bare confirmations must never hit cache
+  if (isBareConfirmation(prompt)) {
+    console.log(`[SemanticCache] Bypassing cache — bare confirmation: "${prompt}"`);
+    return { hit: false, layer: "none", matchType: "none", similarity: 0 };
+  }
+
   await ensureCorpusLoaded(projectId);
 
   // L1: In-memory TF-IDF similarity search
