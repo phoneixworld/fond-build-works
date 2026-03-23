@@ -53,6 +53,7 @@ const ChatPanel = forwardRef<ChatPanelHandle, { initialPrompt?: string; onVersio
   const [selectedModel, setSelectedModel] = useState<AIModelId>(DEFAULT_MODEL);
   const [selectedTheme, setSelectedTheme] = useState<string>("minimal");
   const [attachedImages, setAttachedImages] = useState<string[]>([]);
+  const [attachedDocuments, setAttachedDocuments] = useState<{ name: string; text: string }[]>([]);
   const [isDragOver, setIsDragOver] = useState(false);
   const [showScrollBtn, setShowScrollBtn] = useState(false);
 
@@ -410,6 +411,7 @@ const ChatPanel = forwardRef<ChatPanelHandle, { initialPrompt?: string; onVersio
       setPreviewMode("html");
       setPreviewErrors([]);
       setAttachedImages([]);
+      setAttachedDocuments([]);
       setVirtualFiles({});
       setHealAttempts(0);
       resetHealing();
@@ -484,6 +486,7 @@ const ChatPanel = forwardRef<ChatPanelHandle, { initialPrompt?: string; onVersio
       setPreviewMode("html");
       setPreviewErrors([]);
       setAttachedImages([]);
+      setAttachedDocuments([]);
       setVirtualFiles({});
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -514,11 +517,32 @@ const ChatPanel = forwardRef<ChatPanelHandle, { initialPrompt?: string; onVersio
     } catch {}
   };
 
+  const DOCUMENT_TYPES = [
+    "application/pdf",
+    "application/msword",
+    "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  ];
+
+  const addDocumentFile = async (file: File) => {
+    if (file.size > 20 * 1024 * 1024) return; // 20MB limit
+    try {
+      const text = await file.text();
+      setAttachedDocuments((prev) => [...prev.slice(0, 2), { name: file.name, text: text.slice(0, 50000) }]);
+    } catch {
+      // Fallback: just attach name so user knows it was picked up
+      setAttachedDocuments((prev) => [...prev.slice(0, 2), { name: file.name, text: `[Binary document: ${file.name}]` }]);
+    }
+  };
+
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files) return;
     for (const file of Array.from(files)) {
-      if (file.type.startsWith("image/")) await addImageFile(file);
+      if (file.type.startsWith("image/")) {
+        await addImageFile(file);
+      } else if (DOCUMENT_TYPES.includes(file.type) || /\.(pdf|docx?|doc)$/i.test(file.name)) {
+        await addDocumentFile(file);
+      }
     }
     e.target.value = "";
   };
@@ -528,7 +552,11 @@ const ChatPanel = forwardRef<ChatPanelHandle, { initialPrompt?: string; onVersio
     setIsDragOver(false);
     const files = e.dataTransfer.files;
     for (const file of Array.from(files)) {
-      if (file.type.startsWith("image/")) await addImageFile(file);
+      if (file.type.startsWith("image/")) {
+        await addImageFile(file);
+      } else if (DOCUMENT_TYPES.includes(file.type) || /\.(pdf|docx?|doc)$/i.test(file.name)) {
+        await addDocumentFile(file);
+      }
     }
   };
 
@@ -596,18 +624,26 @@ const ChatPanel = forwardRef<ChatPanelHandle, { initialPrompt?: string; onVersio
     setTimeout(() => handleSmartSend(userText), 50);
   }, [currentProject, handleSmartSend]);
 
+  const buildMessageWithDocs = (text: string): string => {
+    if (attachedDocuments.length === 0) return text;
+    const docParts = attachedDocuments.map(d => `[Attached document: ${d.name}]\n${d.text}`).join("\n\n");
+    return `${docParts}\n\n${text}`;
+  };
+
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
-      if (input.trim() || attachedImages.length > 0) {
-        handleSmartSend(input.trim(), attachedImages);
+      if (input.trim() || attachedImages.length > 0 || attachedDocuments.length > 0) {
+        handleSmartSend(buildMessageWithDocs(input.trim()), attachedImages);
+        setAttachedDocuments([]);
       }
     }
   };
 
   const handleSendClick = () => {
-    if (input.trim() || attachedImages.length > 0) {
-      handleSmartSend(input.trim(), attachedImages);
+    if (input.trim() || attachedImages.length > 0 || attachedDocuments.length > 0) {
+      handleSmartSend(buildMessageWithDocs(input.trim()), attachedImages);
+      setAttachedDocuments([]);
     }
   };
 
@@ -805,6 +841,8 @@ const ChatPanel = forwardRef<ChatPanelHandle, { initialPrompt?: string; onVersio
           onClearTemplate={() => setSelectedTemplate(null)}
           attachedImages={attachedImages}
           onRemoveImage={removeImage}
+          attachedDocuments={attachedDocuments}
+          onRemoveDocument={(i) => setAttachedDocuments(prev => prev.filter((_, idx) => idx !== i))}
         />
 
         {/* Smart context-aware suggestions */}
