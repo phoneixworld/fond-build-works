@@ -266,7 +266,7 @@ Login/Signup routes must stay public (never wrapped in ProtectedRoute).`,
 Create THESE files:
 1. /components/Navbar.jsx — Sticky top navbar with:
    - Logo/brand name on the left
-   - Navigation links (Features, How It Works, Pricing, Testimonials, Contact)
+   - Navigation links derived from the page sections (DO NOT hardcode generic items like "Features, How It Works, Pricing, Testimonials, Contact" — use section names that match the actual content)
    - Mobile hamburger menu with slide-down
    - Sign In + Get Started CTA buttons
    - Transparent → solid bg on scroll
