@@ -841,6 +841,8 @@ const ChatPanel = forwardRef<ChatPanelHandle, { initialPrompt?: string; onVersio
           onClearTemplate={() => setSelectedTemplate(null)}
           attachedImages={attachedImages}
           onRemoveImage={removeImage}
+          attachedDocuments={attachedDocuments}
+          onRemoveDocument={(i) => setAttachedDocuments(prev => prev.filter((_, idx) => idx !== i))}
         />
 
         {/* Smart context-aware suggestions */}
