@@ -9,6 +9,7 @@ interface AuthContextType {
   signUp: (email: string, password: string, displayName?: string) => Promise<{ error: Error | null; needsEmailConfirmation: boolean }>;
   signIn: (email: string, password: string) => Promise<{ error: Error | null }>;
   signOut: () => Promise<void>;
+  enterDemoMode: () => void;
 }
 
 const AuthContext = createContext<AuthContextType | null>(null);
@@ -57,10 +58,26 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const signOut = async () => {
     await supabase.auth.signOut();
+    setUser(null);
+    setSession(null);
+  };
+
+  const enterDemoMode = () => {
+    const demoUser = {
+      id: "demo-user-001",
+      email: "demo@phoenix.app",
+      user_metadata: { display_name: "Demo User" },
+      app_metadata: {},
+      aud: "authenticated",
+      created_at: new Date().toISOString(),
+    } as unknown as User;
+    setUser(demoUser);
+    setSession({ user: demoUser } as unknown as Session);
+    setLoading(false);
   };
 
   return (
-    <AuthContext.Provider value={{ user, session, loading, signUp, signIn, signOut }}>
+    <AuthContext.Provider value={{ user, session, loading, signUp, signIn, signOut, enterDemoMode }}>
       {children}
     </AuthContext.Provider>
   );
