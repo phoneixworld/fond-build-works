@@ -43,10 +43,9 @@ function detectTasks(content: string, isBuilding: boolean, pipelineStep?: Pipeli
 
   const tasks: TaskItem[] = [];
 
+  // Chat agent should NEVER show build pipeline UI
   if (currentAgent === "chat") {
-    tasks.push({ id: "chat", label: "Chat agent responding", status: isBuilding ? "in_progress" : "done" });
-    if (!isBuilding && len > 0) return tasks.map(t => ({ ...t, status: "done" as const }));
-    return tasks;
+    return [];
   }
 
   if (currentAgent === "edit") {
