@@ -765,47 +765,52 @@ const ChatMessage = ({ content, role, timestamp, meta, isLoading, onEdit, onRege
 
             {/* Sections */}
             <div className="space-y-0">
-              {sections.map((section, i) => {
-                switch (section.type) {
-                  case "thinking":
-                    return <ThinkingSection key={i} content={section.content} />;
-                  case "tasks":
-                    return <TaskCard key={i} tasks={section.tasks || []} />;
-                  case "summary":
-                    return <SummarySection key={i} content={section.content} />;
-                  case "text":
-                  default:
-                    return (
-                      <div
-                        key={i}
-                        className="text-sm text-foreground/90 leading-[1.8] prose prose-invert prose-sm max-w-none
-                          prose-p:my-2
-                          prose-headings:my-3 prose-headings:font-semibold prose-headings:tracking-tight prose-headings:text-foreground
-                          prose-ul:my-2 prose-ul:space-y-1 prose-li:my-0.5
-                          prose-code:font-[JetBrains_Mono] prose-code:text-primary prose-code:bg-primary/8 prose-code:px-1.5 prose-code:py-0.5 prose-code:rounded-md prose-code:text-xs prose-code:font-medium
-                          prose-pre:bg-[hsl(var(--ide-panel))] prose-pre:rounded-xl prose-pre:p-4 prose-pre:border prose-pre:border-border/50 prose-pre:font-[JetBrains_Mono] prose-pre:text-xs prose-pre:leading-relaxed
-                          prose-strong:text-foreground prose-strong:font-semibold
-                          prose-a:text-primary prose-a:no-underline hover:prose-a:underline
-                          prose-blockquote:border-l-2 prose-blockquote:border-primary/30 prose-blockquote:pl-4 prose-blockquote:text-muted-foreground prose-blockquote:italic"
-                      >
-                        <ReactMarkdown
-                          components={{
-                            code(props) {
-                              const { children, className, node, ...rest } = props;
-                              const match = /language-(\w+)/.exec(className || '');
-                              if (match && match[1] === 'mermaid') {
-                                return <MermaidDiagram chart={String(children).replace(/\n$/, '')} />;
-                              }
-                              return <code {...rest} className={className}>{children}</code>;
-                            }
-                          }}
+              {/* Use streaming renderer when actively streaming */}
+              {isStreaming ? (
+                <StreamingMessageRenderer text={textWithoutSuggestions} isStreaming={true} />
+              ) : (
+                sections.map((section, i) => {
+                  switch (section.type) {
+                    case "thinking":
+                      return <ThinkingSection key={i} content={section.content} />;
+                    case "tasks":
+                      return <TaskCard key={i} tasks={section.tasks || []} />;
+                    case "summary":
+                      return <SummarySection key={i} content={section.content} />;
+                    case "text":
+                    default:
+                      return (
+                        <div
+                          key={i}
+                          className="text-sm text-foreground/90 leading-[1.8] prose prose-invert prose-sm max-w-none
+                            prose-p:my-2
+                            prose-headings:my-3 prose-headings:font-semibold prose-headings:tracking-tight prose-headings:text-foreground
+                            prose-ul:my-2 prose-ul:space-y-1 prose-li:my-0.5
+                            prose-code:font-[JetBrains_Mono] prose-code:text-primary prose-code:bg-primary/8 prose-code:px-1.5 prose-code:py-0.5 prose-code:rounded-md prose-code:text-xs prose-code:font-medium
+                            prose-pre:bg-[hsl(var(--ide-panel))] prose-pre:rounded-xl prose-pre:p-4 prose-pre:border prose-pre:border-border/50 prose-pre:font-[JetBrains_Mono] prose-pre:text-xs prose-pre:leading-relaxed
+                            prose-strong:text-foreground prose-strong:font-semibold
+                            prose-a:text-primary prose-a:no-underline hover:prose-a:underline
+                            prose-blockquote:border-l-2 prose-blockquote:border-primary/30 prose-blockquote:pl-4 prose-blockquote:text-muted-foreground prose-blockquote:italic"
                         >
-                          {section.content}
-                        </ReactMarkdown>
-                      </div>
-                    );
-                }
-              })}
+                          <ReactMarkdown
+                            components={{
+                              code(props) {
+                                const { children, className, node, ...rest } = props;
+                                const match = /language-(\w+)/.exec(className || '');
+                                if (match && match[1] === 'mermaid') {
+                                  return <MermaidDiagram chart={String(children).replace(/\n$/, '')} />;
+                                }
+                                return <code {...rest} className={className}>{children}</code>;
+                              }
+                            }}
+                          >
+                            {section.content}
+                          </ReactMarkdown>
+                        </div>
+                      );
+                  }
+                })
+              )}
             </div>
             
             {/* Collapsible code view */}
