@@ -337,8 +337,9 @@ serve(async (req) => {
     });
   } catch (e) {
     console.error("[CacheProxy] Error:", e);
+    const message = e instanceof Error ? e.message : "Cache proxy error";
     return new Response(
-      JSON.stringify({ error: e.message || "Cache proxy error" }),
+      JSON.stringify({ error: message }),
       { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   }
