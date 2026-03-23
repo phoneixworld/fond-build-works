@@ -37,6 +37,7 @@ const HELP_SEEKING_ANYWHERE = /\b(can you help|help me|could you help|would you 
 const DESIRE_NOT_COMMAND = /^(i want to|i'd like to|i would like to|i wanna|i wish to|i'm thinking of|i am thinking of|i'm looking to|i am looking to)\b/i;
 const GENERAL_QUESTION_PATTERNS = /^(what|how|why|when|where|who|can|could|would|should|is|are|do|does)\b/i;
 const EXPLANATION_PATTERNS = /\b(explain|why is this happening|why does this happen|what happened|help me understand|root cause|actual issue)\b/i;
+const META_CONVERSATION_PATTERNS = /\b(what was my request|what did i ask|what am i asking|what did i say|what are you generating|is that all|is this all|did you understand|why are you building|why are you still building|why did you build|i said do not build|i told you not to build|do you know how to build|remember my request|repeat my request|summarize my request)\b/i;
 const HIGH_IMPACT_PATTERNS = /\b(app\.(jsx|tsx|js)|app\s*layout|applayout|sidebar|routing|router|route|auth|authentication|authcontext|index\s*file|layout)\b/i;
 
 const NEGATIVE_BUILD_EDIT_PATTERNS = /\b(do not build|don't build|dont build|stop building|no build|do not edit|don't edit|dont edit|don't change|do not change|just explain|only explain|no fixing|without fixing|root cause only|why did the build agent|why did build agent|where is the issue|what is the issue)\b/i;
