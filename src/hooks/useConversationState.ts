@@ -192,6 +192,7 @@ export function useConversationState() {
   } => {
     const trimmed = text.trim();
     const lower = trimmed.toLowerCase();
+    if (META_CHAT_SIGNALS.test(lower)) return { action: "chat", reason: "Meta conversation question detected" };
     if (BUILD_NOW_SIGNALS.test(lower)) return { action: "build", reason: "Explicit build request" };
     if (mode === "gathering") {
       if (INFO_PROVIDING_SIGNALS.test(lower) || hasImages || trimmed.length > 200) return { action: "gather", reason: "Additional requirements" };
