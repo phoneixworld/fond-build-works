@@ -7,8 +7,12 @@
  */
 
 // Orchestrator
-export { runPreBuildAgents, runPostBuildAgents, createPipelineContext } from "./orchestrator";
+export { runPreBuildAgents, runPostBuildAgents, createPipelineContext, validateSchemaBeforeBuild } from "./orchestrator";
 export type { OrchestratorResult } from "./orchestrator";
+
+// Schema Agent
+export { runSchemaPhase, requiresSchemaFirstGate } from "./schemaAgent";
+export type { SchemaPhaseResult } from "./schemaAgent";
 
 // Types
 export type {

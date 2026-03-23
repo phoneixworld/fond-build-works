@@ -111,6 +111,25 @@ ${existingFiles ? `Existing files: ${existingFiles.join(", ")}` : "New project"}
 ${schemas?.length ? `DB schemas: ${JSON.stringify(schemas)}` : ""}
 ${knowledge?.length ? `Knowledge:\n${knowledge.join("\n")}` : ""}
 
+## TASK ORDERING ENFORCEMENT (CRITICAL)
+If the user's intent includes ANY of: auth, CRUD, data, roles, storage, database, users, login, signup, permissions, backend, schema, migration, persist, save, store:
+→ The plan MUST emit tasks in this EXACT order:
+  1. create_or_update_schema (taskType: "schema") — SQL migrations + RLS + schema.json + hooks
+  2. create_or_update_migrations (taskType: "schema") — if separate migration tasks needed
+  3. create_or_update_rls (taskType: "schema") — if separate RLS tasks needed
+  4. generate_backend (taskType: "backend") — Auth contexts + API integration
+  5. generate_frontend (taskType: "frontend") — UI pages/components
+→ Frontend tasks MUST have dependsOn referencing ALL schema + backend tasks
+→ Backend tasks MUST have dependsOn referencing ALL schema tasks
+→ This is NON-NEGOTIABLE. Frontend code CANNOT run before schema is validated.
+
+## MIGRATION ARTIFACT FORMAT
+Schema tasks MUST output files in this structure:
+- /phoenix/migrations/{timestamp}_{table}.sql — CREATE TABLE + columns
+- /phoenix/migrations/metadata.json — { tables, columns, relations, rls, hash }
+- /migrations/001_schema.sql — Combined schema migration
+- /migrations/002_rls.sql — RLS policies for all tables
+
 Use the create_plan tool to return your structured plan.`;
 
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
