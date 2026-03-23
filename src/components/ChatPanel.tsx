@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect, useCallback, forwardRef, useImperativeHandle } from "react";
+import { extractDocxStructured } from "@/lib/docxExtractor";
 import { useSelfHealing } from "@/hooks/useSelfHealing";
 import { useProjectContextCache } from "@/hooks/useProjectContextCache";
 import { useIntentClassification } from "@/hooks/useIntentClassification";
@@ -523,26 +524,6 @@ const ChatPanel = forwardRef<ChatPanelHandle, { initialPrompt?: string; onVersio
     "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
   ];
 
-  const extractDocxText = async (file: File): Promise<string> => {
-    const JSZip = (await import("jszip")).default;
-    const zip = await JSZip.loadAsync(file);
-    const docXml = await zip.file("word/document.xml")?.async("string");
-    if (!docXml) return "[Could not read document content]";
-    // Strip XML tags to get plain text, preserve paragraph breaks
-    const text = docXml
-      .replace(/<w:p[^>]*>/g, "\n")
-      .replace(/<w:tab\/>/g, "\t")
-      .replace(/<[^>]+>/g, "")
-      .replace(/&amp;/g, "&")
-      .replace(/&lt;/g, "<")
-      .replace(/&gt;/g, ">")
-      .replace(/&quot;/g, '"')
-      .replace(/&apos;/g, "'")
-      .replace(/\n{3,}/g, "\n\n")
-      .trim();
-    return text;
-  };
-
   const addDocumentFile = async (file: File) => {
     if (file.size > 20 * 1024 * 1024) return; // 20MB limit
     try {
@@ -551,7 +532,10 @@ const ChatPanel = forwardRef<ChatPanelHandle, { initialPrompt?: string; onVersio
         file.type === "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
 
       if (isDocx) {
-        text = await extractDocxText(file);
+        const result = await extractDocxStructured(file);
+        // Format as structured context with metadata header
+        const header = `## Document: ${result.title}\n**Sections:** ${result.headings.length} headings | **Length:** ${result.charCount} chars\n\n`;
+        text = header + result.structuredText;
       } else {
         // For PDF and .doc, read as text (best effort) — binary will show fallback
         text = await file.text();
@@ -560,7 +544,7 @@ const ChatPanel = forwardRef<ChatPanelHandle, { initialPrompt?: string; onVersio
           text = `[Binary document: ${file.name} — please convert to .docx for best results]`;
         }
       }
-      setAttachedDocuments((prev) => [...prev.slice(0, 2), { name: file.name, text: text.slice(0, 50000) }]);
+      setAttachedDocuments((prev) => [...prev.slice(0, 2), { name: file.name, text: text.slice(0, 80000) }]);
     } catch {
       setAttachedDocuments((prev) => [...prev.slice(0, 2), { name: file.name, text: `[Could not extract text from: ${file.name}]` }]);
     }
@@ -656,34 +640,59 @@ const ChatPanel = forwardRef<ChatPanelHandle, { initialPrompt?: string; onVersio
     setTimeout(() => handleSmartSend(userText), 50);
   }, [currentProject, handleSmartSend]);
 
-  const cleanDocContentFromMessages = (docNames: string[], userInput: string) => {
-    // After send, replace the verbose doc content in the displayed user message with compact labels
-    setTimeout(() => {
-      setMessages(prev => {
-        const updated = [...prev];
-        for (let i = updated.length - 1; i >= 0; i--) {
-          if (updated[i].role === "user") {
-            const label = docNames.map(n => `📎 ${n}`).join("\n");
-            const cleanDisplay = `${label}\n${userInput}`.trim();
+  /**
+   * Send a message with document attachments.
+   * The display message shows compact labels (📎 filename),
+   * while the pipeline receives the full structured document context.
+   */
+  const sendWithDocuments = useCallback((userInput: string, docs: typeof attachedDocuments, images: string[]) => {
+    const docNames = docs.map(d => d.name);
+    const displayLabel = docNames.map(n => `📎 ${n}`).join("\n");
+    const cleanDisplay = `${displayLabel}\n${userInput}`.trim();
+
+    // Build the full context for the pipeline (not shown in chat)
+    const docContext = docs.map(d =>
+      `=== DOCUMENT: ${d.name} ===\n${d.text}\n=== END DOCUMENT ===`
+    ).join("\n\n");
+    const fullPrompt = `${docContext}\n\n${userInput}`;
+
+    // Add the clean display message FIRST so it's immediately visible
+    const displayMsg: Msg = { role: "user", content: cleanDisplay, timestamp: Date.now() };
+    setMessages(prev => [...prev, displayMsg]);
+
+    // Send the full context to the pipeline — handleSmartSend will add its own
+    // user message, so we need to intercept. We use a special __docContext flag.
+    // Instead, we directly call handleSmartSend with the full prompt,
+    // then immediately fix the last user message to show clean display.
+    handleSmartSend(fullPrompt, images);
+
+    // Immediately fix — no setTimeout race condition
+    setMessages(prev => {
+      const updated = [...prev];
+      // Find the last two user messages — one is our display msg, one from handleSmartSend
+      let fixCount = 0;
+      for (let i = updated.length - 1; i >= 0 && fixCount < 2; i--) {
+        if (updated[i].role === "user") {
+          if (fixCount === 0) {
+            // This is the handleSmartSend message — replace with clean display
             updated[i] = { ...updated[i], content: cleanDisplay };
-            break;
+          } else {
+            // This is our pre-added display message — remove the duplicate
+            updated.splice(i, 1);
           }
+          fixCount++;
         }
-        return updated;
-      });
-    }, 100);
-  };
+      }
+      return updated;
+    });
+  }, [handleSmartSend]);
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
       if (input.trim() || attachedImages.length > 0 || attachedDocuments.length > 0) {
         if (attachedDocuments.length > 0) {
-          const docParts = attachedDocuments.map(d => `[Attached document: ${d.name}]\n${d.text}`).join("\n\n");
-          const docNames = attachedDocuments.map(d => d.name);
-          const userInput = input.trim();
-          handleSmartSend(`${docParts}\n\n${userInput}`, attachedImages);
-          cleanDocContentFromMessages(docNames, userInput);
+          sendWithDocuments(input.trim(), attachedDocuments, attachedImages);
         } else {
           handleSmartSend(input.trim(), attachedImages);
         }
@@ -695,11 +704,7 @@ const ChatPanel = forwardRef<ChatPanelHandle, { initialPrompt?: string; onVersio
   const handleSendClick = () => {
     if (input.trim() || attachedImages.length > 0 || attachedDocuments.length > 0) {
       if (attachedDocuments.length > 0) {
-        const docParts = attachedDocuments.map(d => `[Attached document: ${d.name}]\n${d.text}`).join("\n\n");
-        const docNames = attachedDocuments.map(d => d.name);
-        const userInput = input.trim();
-        handleSmartSend(`${docParts}\n\n${userInput}`, attachedImages);
-        cleanDocContentFromMessages(docNames, userInput);
+        sendWithDocuments(input.trim(), attachedDocuments, attachedImages);
       } else {
         handleSmartSend(input.trim(), attachedImages);
       }
