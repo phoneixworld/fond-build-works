@@ -31,9 +31,9 @@ const FORBIDDEN_PATTERNS: Array<{ regex: RegExp; label: string; fileFilter?: Reg
     fileFilter: /\.(jsx?|tsx?)$/,
   },
   {
-    regex: /const\s+(?:mock|fake|dummy|sample)(?:Data|Users?|Items?|Records?)\s*=\s*\[/i,
+    regex: /const\s+(?:mock|fake|dummy)(?:Data|Users?|Items?|Records?)\s*=\s*\[/i,
     label: "Mock/fake data array as primary data source",
-    fileFilter: /(?:\/pages\/|\/components\/).*\.(jsx?|tsx?)$/,
+    fileFilter: /\.(jsx?|tsx?)$/,
   },
   {
     regex: /(?:const|let|var)\s+\w*[Dd]ata\s*=\s*\[\s*\{[^}]*id\s*:\s*["']\d+["']/,

@@ -220,7 +220,7 @@ describe("Build Output Validation — Bad Output", () => {
   it("detects mock data arrays", () => {
     const result = validateBuildOutput(badFiles, "Add CRUD for tasks");
     const mockViolation = result.forbiddenViolations.find(v =>
-      v.pattern.includes("Mock") || v.pattern.includes("mock")
+      v.pattern.toLowerCase().includes("mock") || v.pattern.toLowerCase().includes("fake")
     );
     expect(mockViolation).toBeDefined();
   });
