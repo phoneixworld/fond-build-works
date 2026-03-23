@@ -1041,6 +1041,18 @@ ${existingFileList}
     accumulatedFiles = stubBrokenFiles(accumulatedFiles, finalErrors);
   }
 
+  // Schema-first validation for planned builds
+  if (requiresSchemaValidation(accumulatedFiles)) {
+    const schemaArtifacts = extractSchemaArtifacts(accumulatedFiles);
+    const schemaValidation = validateSchemaArtifacts(schemaArtifacts);
+    if (!schemaValidation.valid) {
+      console.error(`[BuildEngine:planned] SCHEMA VALIDATION FAILED:`, schemaValidation.errors);
+      console.warn(`[BuildEngine:planned] Missing RLS for:`, schemaValidation.missingRls);
+    } else {
+      console.log(`[BuildEngine:planned] Schema validated: ${schemaValidation.tables.length} tables ✅`);
+    }
+  }
+
   // Backend output validation for planned builds
   const backendValidation = validateBuildOutput(accumulatedFiles, prompt);
   if (!backendValidation.valid) {
