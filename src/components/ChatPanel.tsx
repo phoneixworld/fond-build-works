@@ -524,26 +524,6 @@ const ChatPanel = forwardRef<ChatPanelHandle, { initialPrompt?: string; onVersio
     "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
   ];
 
-  const extractDocxText = async (file: File): Promise<string> => {
-    const JSZip = (await import("jszip")).default;
-    const zip = await JSZip.loadAsync(file);
-    const docXml = await zip.file("word/document.xml")?.async("string");
-    if (!docXml) return "[Could not read document content]";
-    // Strip XML tags to get plain text, preserve paragraph breaks
-    const text = docXml
-      .replace(/<w:p[^>]*>/g, "\n")
-      .replace(/<w:tab\/>/g, "\t")
-      .replace(/<[^>]+>/g, "")
-      .replace(/&amp;/g, "&")
-      .replace(/&lt;/g, "<")
-      .replace(/&gt;/g, ">")
-      .replace(/&quot;/g, '"')
-      .replace(/&apos;/g, "'")
-      .replace(/\n{3,}/g, "\n\n")
-      .trim();
-    return text;
-  };
-
   const addDocumentFile = async (file: File) => {
     if (file.size > 20 * 1024 * 1024) return; // 20MB limit
     try {
@@ -552,7 +532,10 @@ const ChatPanel = forwardRef<ChatPanelHandle, { initialPrompt?: string; onVersio
         file.type === "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
 
       if (isDocx) {
-        text = await extractDocxText(file);
+        const result = await extractDocxStructured(file);
+        // Format as structured context with metadata header
+        const header = `## Document: ${result.title}\n**Sections:** ${result.headings.length} headings | **Length:** ${result.charCount} chars\n\n`;
+        text = header + result.structuredText;
       } else {
         // For PDF and .doc, read as text (best effort) — binary will show fallback
         text = await file.text();
@@ -561,7 +544,7 @@ const ChatPanel = forwardRef<ChatPanelHandle, { initialPrompt?: string; onVersio
           text = `[Binary document: ${file.name} — please convert to .docx for best results]`;
         }
       }
-      setAttachedDocuments((prev) => [...prev.slice(0, 2), { name: file.name, text: text.slice(0, 50000) }]);
+      setAttachedDocuments((prev) => [...prev.slice(0, 2), { name: file.name, text: text.slice(0, 80000) }]);
     } catch {
       setAttachedDocuments((prev) => [...prev.slice(0, 2), { name: file.name, text: `[Could not extract text from: ${file.name}]` }]);
     }
