@@ -771,6 +771,20 @@ async function runDirectBuild(
     console.warn("[BuildEngine:direct] Post-merge validation issues — stubbing:", postMergeErrors);
     finalFiles = stubBrokenFiles(finalFiles, postMergeErrors);
   }
+
+  // Backend output validation — check for forbidden patterns and missing artifacts
+  const backendValidation = validateBuildOutput(finalFiles, prompt);
+  if (!backendValidation.valid) {
+    console.warn(`[BuildEngine:direct] Backend validation failed (score: ${backendValidation.score}/100):`,
+      { forbidden: backendValidation.forbiddenViolations.length, missing: backendValidation.missingRequirements.length });
+    // Log violations but don't block the build — the agent will improve over iterations
+    if (backendValidation.forbiddenViolations.length > 0) {
+      console.warn("[BuildEngine:direct] Forbidden patterns:", backendValidation.forbiddenViolations.map(v => `${v.file}:${v.line} ${v.pattern}`));
+    }
+    if (backendValidation.missingRequirements.length > 0) {
+      console.warn("[BuildEngine:direct] Missing requirements:", backendValidation.missingRequirements);
+    }
+  }
   const valMs = valTimer.elapsed();
 
   const totalSize = Object.values(finalFiles).reduce((s, c) => s + c.length, 0);
