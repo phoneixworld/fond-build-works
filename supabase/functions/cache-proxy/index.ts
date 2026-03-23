@@ -66,6 +66,9 @@ function extractUserText(content: any): string {
 }
 
 const EMAIL_REGEX = /[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i;
+const BARE_CONFIRMATIONS = new Set(["ok", "okay", "sure", "go ahead", "yes", "yep", "yeah", "proceed", "do it", "start", "continue", "approved"]);
+const ACTIONABLE_INTENT = /\b(build|create|generate|scaffold|fix|edit|modify|change|update|refactor|add|remove|delete|implement|rewrite|repair|patch)\b/i;
+const READ_ONLY_QA = /^(what|why|how|when|where|who|can you explain|explain|tell me|help me understand|compare|difference between|is it|are we)\b/i;
 
 function isEmailRegistrationCheckPrompt(prompt: string): boolean {
   if (!EMAIL_REGEX.test(prompt)) return false;
@@ -73,6 +76,34 @@ function isEmailRegistrationCheckPrompt(prompt: string): boolean {
   const hasCheckVerb = /\b(check|verify|confirm|see|is|if|whether|can you check)\b/.test(normalized);
   const hasRegistrationSignal = /\b(register(?:ed|d)?|exist(?:s)?|signed?\s*up|already\s+registered|already\s+exists?|account)\b/.test(normalized);
   return hasCheckVerb && hasRegistrationSignal;
+}
+
+function isBareConfirmation(prompt: string): boolean {
+  const normalized = prompt.trim().toLowerCase().replace(/[?.!,]+$/g, "");
+  return BARE_CONFIRMATIONS.has(normalized) || normalized.length < 4;
+}
+
+function normalizeForHash(text: string): string {
+  return text.toLowerCase().replace(/\s+/g, " ").trim();
+}
+
+function inferCacheIntent(prompt: string, explicitIntent?: string): "read_only_qa" | "actionable" {
+  if (explicitIntent === "read_only_qa" || explicitIntent === "actionable") return explicitIntent;
+  const normalized = prompt.trim().toLowerCase();
+  if (!normalized) return "actionable";
+  if (isBareConfirmation(normalized)) return "actionable";
+  if (ACTIONABLE_INTENT.test(normalized)) return "actionable";
+  if (READ_ONLY_QA.test(normalized) || normalized.endsWith("?")) return "read_only_qa";
+  return "actionable";
+}
+
+function deriveRequirementsSnippet(messages: any[], explicitSnippet?: string): string {
+  if (explicitSnippet && explicitSnippet.trim()) return explicitSnippet.trim().slice(0, 1200);
+  const userTurns = (messages || [])
+    .filter((m: any) => m?.role === "user")
+    .map((m: any) => extractUserText(m?.content || ""))
+    .filter((t: string) => t && !isBareConfirmation(t));
+  return userTurns.join("\n\n").slice(0, 1200);
 }
 
 // Jaccard + token overlap similarity (fast, no corpus needed)
