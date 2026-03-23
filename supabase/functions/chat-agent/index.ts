@@ -283,14 +283,14 @@ serve(async (req) => {
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "google/gemini-3-flash-preview",
+        model: "google/gemini-2.5-pro",
         messages: prunedMessages.map((m: any) => ({
           role: m.role,
           content: typeof m.content === "string" ? m.content : JSON.stringify(m.content),
         })),
         stream: true,
-        temperature: 0.6,
-        max_tokens: 2000,
+        temperature: 0.5,
+        max_tokens: 8000,
       }),
     });
 
