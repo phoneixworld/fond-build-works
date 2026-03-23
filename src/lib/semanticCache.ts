@@ -157,6 +157,9 @@ export async function streamThroughCacheProxy({
   knowledge,
   workspaceFiles,
   recentErrors,
+  bypassCache,
+  cacheIntent,
+  requirementsSnippet,
   onCacheHit,
   onDelta,
   onDone,
@@ -168,6 +171,9 @@ export async function streamThroughCacheProxy({
   knowledge?: string[];
   workspaceFiles?: string[];
   recentErrors?: string[];
+  bypassCache?: boolean;
+  cacheIntent?: "read_only_qa" | "actionable";
+  requirementsSnippet?: string;
   onCacheHit?: (result: CacheHitResult) => void;
   onDelta: (text: string) => void;
   onDone: (fullText: string) => void;
@@ -183,10 +189,11 @@ export async function streamThroughCacheProxy({
       ? lastUserMsg.content.filter((c: any) => c.type === "text").map((c: any) => c.text).join(" ")
       : "";
 
-  // HARD BYPASS: bare confirmations must never hit cache
-  if (isBareConfirmation(userPrompt)) {
-    console.log(`[SemanticCache] Stream bypass — bare confirmation: "${userPrompt}"`);
-    // Fall through to L2/AI call below
+  const shouldBypassCache = !!bypassCache || isBareConfirmation(userPrompt);
+
+  // L1 lookup is only allowed for read-only, non-confirmation prompts
+  if (shouldBypassCache) {
+    console.log(`[SemanticCache] Stream bypass — cache disabled for prompt: "${userPrompt.slice(0, 80)}"`);
   } else if (userPrompt.length > 5) {
     const l1 = corpus.findSimilar(userPrompt);
     if (l1.match) {
@@ -224,6 +231,9 @@ export async function streamThroughCacheProxy({
         knowledge,
         workspace_files: workspaceFiles,
         recent_errors: recentErrors,
+        bypass_cache: shouldBypassCache,
+        cache_intent: cacheIntent || "actionable",
+        requirements_snippet: (requirementsSnippet || "").slice(0, 1200),
         stream: true,
       }),
     });
@@ -257,9 +267,11 @@ export async function streamThroughCacheProxy({
       if (data.cached && data.response) {
         console.log(`[SemanticCache] L2 ${data.match_type} hit (${(data.similarity * 100).toFixed(1)}%)`);
 
-        // Add to L1 corpus for future in-memory hits
-        const id = `l2-${Date.now()}`;
-        corpus.add(id, userPrompt, data.response, data.model, data.tokens_saved);
+        // Add to L1 corpus for future in-memory hits (only if cache is enabled)
+        if (!shouldBypassCache) {
+          const id = `l2-${Date.now()}`;
+          corpus.add(id, userPrompt, data.response, data.model, data.tokens_saved);
+        }
 
         onCacheHit?.({
           hit: true,
@@ -320,8 +332,8 @@ export async function streamThroughCacheProxy({
     console.error("[SemanticCache] Stream error:", e);
   }
 
-  // Add response to L1 corpus
-  if (fullText.length > 10) {
+  // Add response to L1 corpus only when cache is enabled for this turn
+  if (!shouldBypassCache && fullText.length > 10) {
     const id = `stream-${Date.now()}`;
     const tokensSaved = Math.round(fullText.length / 4);
     corpus.add(id, userPrompt, fullText, "google/gemini-3-flash-preview", tokensSaved);

@@ -66,6 +66,9 @@ function extractUserText(content: any): string {
 }
 
 const EMAIL_REGEX = /[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i;
+const BARE_CONFIRMATIONS = new Set(["ok", "okay", "sure", "go ahead", "yes", "yep", "yeah", "proceed", "do it", "start", "continue", "approved"]);
+const ACTIONABLE_INTENT = /\b(build|create|generate|scaffold|fix|edit|modify|change|update|refactor|add|remove|delete|implement|rewrite|repair|patch)\b/i;
+const READ_ONLY_QA = /^(what|why|how|when|where|who|can you explain|explain|tell me|help me understand|compare|difference between|is it|are we)\b/i;
 
 function isEmailRegistrationCheckPrompt(prompt: string): boolean {
   if (!EMAIL_REGEX.test(prompt)) return false;
@@ -73,6 +76,34 @@ function isEmailRegistrationCheckPrompt(prompt: string): boolean {
   const hasCheckVerb = /\b(check|verify|confirm|see|is|if|whether|can you check)\b/.test(normalized);
   const hasRegistrationSignal = /\b(register(?:ed|d)?|exist(?:s)?|signed?\s*up|already\s+registered|already\s+exists?|account)\b/.test(normalized);
   return hasCheckVerb && hasRegistrationSignal;
+}
+
+function isBareConfirmation(prompt: string): boolean {
+  const normalized = prompt.trim().toLowerCase().replace(/[?.!,]+$/g, "");
+  return BARE_CONFIRMATIONS.has(normalized) || normalized.length < 4;
+}
+
+function normalizeForHash(text: string): string {
+  return text.toLowerCase().replace(/\s+/g, " ").trim();
+}
+
+function inferCacheIntent(prompt: string, explicitIntent?: string): "read_only_qa" | "actionable" {
+  if (explicitIntent === "read_only_qa" || explicitIntent === "actionable") return explicitIntent;
+  const normalized = prompt.trim().toLowerCase();
+  if (!normalized) return "actionable";
+  if (isBareConfirmation(normalized)) return "actionable";
+  if (ACTIONABLE_INTENT.test(normalized)) return "actionable";
+  if (READ_ONLY_QA.test(normalized) || normalized.endsWith("?")) return "read_only_qa";
+  return "actionable";
+}
+
+function deriveRequirementsSnippet(messages: any[], explicitSnippet?: string): string {
+  if (explicitSnippet && explicitSnippet.trim()) return explicitSnippet.trim().slice(0, 1200);
+  const userTurns = (messages || [])
+    .filter((m: any) => m?.role === "user")
+    .map((m: any) => extractUserText(m?.content || ""))
+    .filter((t: string) => t && !isBareConfirmation(t));
+  return userTurns.join("\n\n").slice(0, 1200);
 }
 
 // Jaccard + token overlap similarity (fast, no corpus needed)
@@ -122,16 +153,26 @@ serve(async (req) => {
       stream = true,
       cache_ttl = 3600,
       bypass_cache = false,
+      cache_intent,
+      requirements_snippet,
     } = body;
 
     // Extract the latest user message for cache key
     const lastUserMsg = [...messages].reverse().find((m: any) => m.role === "user");
     const userPrompt = extractUserText(lastUserMsg?.content);
+    const requirementsSnippet = deriveRequirementsSnippet(messages, requirements_snippet);
+    const resolvedIntent = inferCacheIntent(userPrompt, cache_intent);
 
     const isEmailRegistrationCheck = isEmailRegistrationCheckPrompt(userPrompt);
-    const shouldBypassCache = bypass_cache || isEmailRegistrationCheck;
-    const promptTokens = tokenize(userPrompt);
-    const exactHash = fnv1a(userPrompt.trim().toLowerCase());
+    const shouldBypassCache =
+      bypass_cache ||
+      isEmailRegistrationCheck ||
+      isBareConfirmation(userPrompt) ||
+      resolvedIntent !== "read_only_qa";
+
+    const semanticSeed = `${project_id || "no_project"}|${resolvedIntent}|${normalizeForHash(requirementsSnippet)}|${normalizeForHash(userPrompt)}`;
+    const promptTokens = tokenize(`${requirementsSnippet} ${userPrompt}`.trim());
+    const exactHash = fnv1a(semanticSeed);
 
     // ─── Cache Check ────────────────────────────────────────────────
     if (!shouldBypassCache && project_id && userPrompt.length > 5) {
@@ -277,12 +318,12 @@ serve(async (req) => {
           }
 
           // Store in cache
-          if (project_id && fullText.length > 10 && !isEmailRegistrationCheck) {
+          if (project_id && fullText.length > 10 && !shouldBypassCache) {
             const tokensSaved = Math.round(fullText.length / 4);
             await supabase.from("cache_entries").upsert({
               project_id,
               cache_type: "semantic",
-              cache_key: `prompt:${exactHash}`,
+              cache_key: `semantic:${exactHash}`,
               prompt_hash: exactHash,
               cache_value: {
                 response: fullText,
@@ -312,12 +353,12 @@ serve(async (req) => {
     const data = await aiResponse.json();
     const responseText = data.choices?.[0]?.message?.content || "";
 
-    if (project_id && responseText.length > 10 && !isEmailRegistrationCheck) {
+    if (project_id && responseText.length > 10 && !shouldBypassCache) {
       const tokensSaved = Math.round(responseText.length / 4);
       await supabase.from("cache_entries").upsert({
         project_id,
         cache_type: "semantic",
-        cache_key: `prompt:${exactHash}`,
+        cache_key: `semantic:${exactHash}`,
         prompt_hash: exactHash,
         cache_value: {
           response: responseText,
