@@ -39,10 +39,10 @@ export interface CostRouteResult {
   costTier: number;
 }
 
-// Anthropic Claude model tiers
+// Lovable AI Gateway model tiers
 const MODELS = {
-  "claude-haiku-3-5-20241022": { costTier: 1, maxContext: 200000, label: "Haiku 3.5" },
-  "claude-sonnet-4-20250514": { costTier: 3, maxContext: 200000, label: "Sonnet 4" },
+  "google/gemini-2.5-flash": { costTier: 1, maxContext: 1000000, label: "Gemini 2.5 Flash" },
+  "google/gemini-2.5-pro": { costTier: 3, maxContext: 1000000, label: "Gemini 2.5 Pro" },
 } as const;
 
 /**
@@ -125,20 +125,20 @@ export function routeCost(input: CostRouteInput): CostRouteResult {
 
   // ── Route based on complexity score ──
   if (input.taskType === "chat") {
-    model = "claude-haiku-3-5-20241022";
-    reason = `Chat task → Haiku 3.5 (cheapest)`;
+    model = "google/gemini-2.5-flash";
+    reason = `Chat task → Gemini 2.5 Flash (cheapest)`;
   } else if (input.isRetry) {
-    model = "claude-sonnet-4-20250514";
-    reason = `Retry → Sonnet 4 (focused fix)`;
+    model = "google/gemini-2.5-pro";
+    reason = `Retry → Gemini 2.5 Pro (focused fix)`;
   } else if (input.taskType === "schema" || input.taskType === "backend") {
-    model = "claude-sonnet-4-20250514";
-    reason = `${input.taskType} task → Sonnet 4`;
+    model = "google/gemini-2.5-pro";
+    reason = `${input.taskType} task → Gemini 2.5 Pro`;
   } else if (complexity >= 20) {
-    model = "claude-sonnet-4-20250514";
-    reason = `Complexity (${complexity}/100) → Sonnet 4`;
+    model = "google/gemini-2.5-pro";
+    reason = `Complexity (${complexity}/100) → Gemini 2.5 Pro`;
   } else {
-    model = "claude-haiku-3-5-20241022";
-    reason = `Trivial (${complexity}/100) → Haiku 3.5`;
+    model = "google/gemini-2.5-flash";
+    reason = `Trivial (${complexity}/100) → Gemini 2.5 Flash`;
   }
 
   const modelInfo = MODELS[model as keyof typeof MODELS];
