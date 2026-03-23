@@ -515,11 +515,32 @@ const ChatPanel = forwardRef<ChatPanelHandle, { initialPrompt?: string; onVersio
     } catch {}
   };
 
+  const DOCUMENT_TYPES = [
+    "application/pdf",
+    "application/msword",
+    "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  ];
+
+  const addDocumentFile = async (file: File) => {
+    if (file.size > 20 * 1024 * 1024) return; // 20MB limit
+    try {
+      const text = await file.text();
+      setAttachedDocuments((prev) => [...prev.slice(0, 2), { name: file.name, text: text.slice(0, 50000) }]);
+    } catch {
+      // Fallback: just attach name so user knows it was picked up
+      setAttachedDocuments((prev) => [...prev.slice(0, 2), { name: file.name, text: `[Binary document: ${file.name}]` }]);
+    }
+  };
+
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files) return;
     for (const file of Array.from(files)) {
-      if (file.type.startsWith("image/")) await addImageFile(file);
+      if (file.type.startsWith("image/")) {
+        await addImageFile(file);
+      } else if (DOCUMENT_TYPES.includes(file.type) || /\.(pdf|docx?|doc)$/i.test(file.name)) {
+        await addDocumentFile(file);
+      }
     }
     e.target.value = "";
   };
@@ -529,7 +550,11 @@ const ChatPanel = forwardRef<ChatPanelHandle, { initialPrompt?: string; onVersio
     setIsDragOver(false);
     const files = e.dataTransfer.files;
     for (const file of Array.from(files)) {
-      if (file.type.startsWith("image/")) await addImageFile(file);
+      if (file.type.startsWith("image/")) {
+        await addImageFile(file);
+      } else if (DOCUMENT_TYPES.includes(file.type) || /\.(pdf|docx?|doc)$/i.test(file.name)) {
+        await addDocumentFile(file);
+      }
     }
   };
 
