@@ -6,12 +6,13 @@
  * so Phoenix can actually diagnose issues instead of bluffing.
  */
 
-import { useCallback } from "react";
+import { useCallback, useRef } from "react";
 import { hasBuildConfirmation, stripBuildMarker } from "@/lib/agentPipeline";
 import type { PipelineStep } from "@/lib/agentPipeline";
 import { supabase } from "@/integrations/supabase/client";
 import { type MsgContent, getTextContent } from "@/lib/codeParser";
 import { streamThroughCacheProxy, type CacheHitResult } from "@/lib/semanticCache";
+import { TokenBuffer } from "@/lib/tokenBuffer";
 
 type MsgMeta = { tokens?: number; durationMs?: number; model?: string };
 type Msg = { role: "user" | "assistant"; content: MsgContent; timestamp?: number; meta?: MsgMeta };
