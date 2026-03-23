@@ -10,34 +10,33 @@ serve(async (req) => {
 
   try {
     const { prompt } = await req.json();
-    const ANTHROPIC_API_KEY = Deno.env.get("ANTHROPIC_API_KEY");
-    if (!ANTHROPIC_API_KEY) throw new Error("ANTHROPIC_API_KEY not configured");
+    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
+    if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY not configured");
 
-    const response = await fetch("https://api.anthropic.com/v1/messages", {
+    const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
       headers: {
-        "x-api-key": ANTHROPIC_API_KEY,
-        "anthropic-version": "2023-06-01",
+        Authorization: `Bearer ${LOVABLE_API_KEY}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "claude-sonnet-4-20250514",
+        model: "google/gemini-2.5-flash-lite",
         max_tokens: 200,
-        system: `You generate short, catchy project names from user descriptions.
+        temperature: 0.7,
+        messages: [
+          { role: "system", content: `You generate short, catchy project names from user descriptions.
 Rules:
 - Return ONLY a JSON object: {"name": "...", "emoji": "..."}
 - Name: 2-4 words, Title Case, max 30 chars. Be creative but descriptive.
 - Emoji: single emoji that represents the project theme.
 - Examples: {"name": "Task Flow Pro", "emoji": "✅"}, {"name": "Recipe Vault", "emoji": "🍳"}, {"name": "Budget Tracker", "emoji": "💰"}
-- No quotes around the JSON, no markdown, no explanation.`,
-        messages: [
+- No quotes around the JSON, no markdown, no explanation.` },
           { role: "user", content: prompt }
         ],
       }),
     });
 
     if (!response.ok) {
-      // Fallback: just truncate the prompt
       const fallbackName = prompt.slice(0, 30).replace(/\s+\S*$/, "") || "My Project";
       return new Response(JSON.stringify({ name: fallbackName, emoji: "🚀" }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -45,7 +44,7 @@ Rules:
     }
 
     const data = await response.json();
-    const content = data.content?.[0]?.text?.trim() || "";
+    const content = data.choices?.[0]?.message?.content?.trim() || "";
     
     try {
       // Try to parse the AI response as JSON

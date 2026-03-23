@@ -13,8 +13,8 @@ serve(async (req) => {
     const body = await req.json();
     const { prompt, hasHistory, existingFileNames } = body;
     hasExistingCode = !!body.hasExistingCode;
-    const ANTHROPIC_API_KEY = Deno.env.get("ANTHROPIC_API_KEY");
-    if (!ANTHROPIC_API_KEY) throw new Error("ANTHROPIC_API_KEY not configured");
+    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
+    if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY not configured");
 
     // Build file context for smarter questions
     const fileContext = existingFileNames?.length
@@ -105,71 +105,75 @@ Questions: [
 
 Use the classify_intent tool to return your classification.`;
 
-    // Anthropic tool definition
     const tools = [{
-      name: "classify_intent",
-      description: "Classify the user's intent and provide analysis",
-      input_schema: {
-        type: "object",
-        properties: {
-          intent: { type: "string", enum: ["chat", "build", "clarify"], description: "The classified intent" },
-          confidence: { type: "number", description: "Confidence score between 0 and 1" },
-          reasoning: { type: "string", description: "One sentence explaining why this intent was chosen" },
-          analysis: {
-            type: "object",
-            properties: {
-              needsBackend: { type: "boolean", description: "Whether the request needs backend/database" },
-              needsAuth: { type: "boolean", description: "Whether the request needs authentication" },
-              complexity: { type: "string", enum: ["simple", "medium", "complex"], description: "Complexity level" },
-            },
-            required: ["needsBackend", "needsAuth", "complexity"],
-          },
-          questions: {
-            type: "array",
-            description: "Clarifying questions (only for clarify intent). Generate 2-4 contextual questions.",
-            items: {
+      type: "function",
+      function: {
+        name: "classify_intent",
+        description: "Classify the user's intent and provide analysis",
+        parameters: {
+          type: "object",
+          properties: {
+            intent: { type: "string", enum: ["chat", "build", "clarify"], description: "The classified intent" },
+            confidence: { type: "number", description: "Confidence score between 0 and 1" },
+            reasoning: { type: "string", description: "One sentence explaining why this intent was chosen" },
+            analysis: {
               type: "object",
               properties: {
-                id: { type: "string" },
-                header: { type: "string" },
-                text: { type: "string" },
-                multiSelect: { type: "boolean" },
-                options: {
-                  type: "array",
-                  items: {
-                    type: "object",
-                    properties: {
-                      label: { type: "string" },
-                      value: { type: "string" },
-                      description: { type: "string" },
+                needsBackend: { type: "boolean", description: "Whether the request needs backend/database" },
+                needsAuth: { type: "boolean", description: "Whether the request needs authentication" },
+                complexity: { type: "string", enum: ["simple", "medium", "complex"], description: "Complexity level" },
+              },
+              required: ["needsBackend", "needsAuth", "complexity"],
+            },
+            questions: {
+              type: "array",
+              description: "Clarifying questions (only for clarify intent). Generate 2-4 contextual questions.",
+              items: {
+                type: "object",
+                properties: {
+                  id: { type: "string" },
+                  header: { type: "string" },
+                  text: { type: "string" },
+                  multiSelect: { type: "boolean" },
+                  options: {
+                    type: "array",
+                    items: {
+                      type: "object",
+                      properties: {
+                        label: { type: "string" },
+                        value: { type: "string" },
+                        description: { type: "string" },
+                      },
+                      required: ["label", "value", "description"],
                     },
-                    required: ["label", "value", "description"],
                   },
                 },
+                required: ["id", "header", "text", "multiSelect", "options"],
               },
-              required: ["id", "header", "text", "multiSelect", "options"],
             },
           },
+          required: ["intent", "confidence", "reasoning", "analysis"],
+          additionalProperties: false,
         },
-        required: ["intent", "confidence", "reasoning", "analysis"],
       },
     }];
 
-    const response = await fetch("https://api.anthropic.com/v1/messages", {
+    const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
       headers: {
-        "x-api-key": ANTHROPIC_API_KEY,
-        "anthropic-version": "2023-06-01",
+        Authorization: `Bearer ${LOVABLE_API_KEY}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "claude-sonnet-4-20250514",
+        model: "google/gemini-2.5-flash",
         max_tokens: 2000,
         temperature: 0.1,
-        system: systemContent,
-        messages: [{ role: "user", content: prompt }],
+        messages: [
+          { role: "system", content: systemContent },
+          { role: "user", content: prompt },
+        ],
         tools,
-        tool_choice: { type: "tool", name: "classify_intent" },
+        tool_choice: { type: "function", function: { name: "classify_intent" } },
       }),
     });
 
@@ -185,12 +189,11 @@ Use the classify_intent tool to return your classification.`;
     }
 
     const data = await response.json();
-    // Anthropic tool use: extract from content array
-    const toolUseBlock = data.content?.find((b: any) => b.type === "tool_use" && b.name === "classify_intent");
+    const toolCall = data.choices?.[0]?.message?.tool_calls?.[0];
     
-    if (toolUseBlock?.input) {
+    if (toolCall?.function?.arguments) {
       try {
-        const parsed = toolUseBlock.input;
+        const parsed = JSON.parse(toolCall.function.arguments);
         if (!["chat", "build", "clarify"].includes(parsed.intent)) {
           parsed.intent = "build";
         }

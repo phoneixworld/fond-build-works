@@ -275,8 +275,8 @@ serve(async (req) => {
 
   try {
     const { messages, project_id, tech_stack, schemas, model, design_theme, knowledge, template_context, current_code, snippets_context, retry_context, max_tokens: requestedMaxTokens, task_type, ir_context } = await req.json();
-    const ANTHROPIC_API_KEY = Deno.env.get("ANTHROPIC_API_KEY");
-    if (!ANTHROPIC_API_KEY) throw new Error("ANTHROPIC_API_KEY is not configured. Add your Anthropic API key in project secrets.");
+    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
+    if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY is not configured. Check your Lovable Cloud setup.");
 
     // Guard: Smart truncation for large messages
     // For requirement docs, intelligently extract key sections instead of naive truncation
@@ -441,58 +441,49 @@ FIX CHECKLIST:
     }
     console.log(`[build-agent] 💰 maxTokens=${maxTokens} | temp=${temperature}`);
 
-    // ─── Anthropic Messages API call ───────────────────────────────────
-    // Convert OpenAI-style messages to Anthropic format
-    // Anthropic requires system prompt as a separate parameter, not in messages array
-    const anthropicMessages = messages
-      .filter((m: any) => m.role !== "system")
-      .map((m: any) => ({
-        role: m.role === "assistant" ? "assistant" : "user",
-        content: typeof m.content === "string" ? m.content : JSON.stringify(m.content),
-      }));
+    // ─── Lovable AI Gateway call (OpenAI-compatible) ────────────────────
+    const allMessages = [
+      { role: "system", content: systemPrompt },
+      ...messages
+        .filter((m: any) => m.role !== "system")
+        .map((m: any) => ({
+          role: m.role === "assistant" ? "assistant" : "user",
+          content: typeof m.content === "string" ? m.content : JSON.stringify(m.content),
+        })),
+    ];
 
     let response: Response | null = null;
     let lastError = "";
     for (let attempt = 0; attempt < 2; attempt++) {
       try {
-        response = await fetch("https://api.anthropic.com/v1/messages", {
+        response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
           method: "POST",
           headers: {
-            "x-api-key": ANTHROPIC_API_KEY,
-            "anthropic-version": "2023-06-01",
+            Authorization: `Bearer ${LOVABLE_API_KEY}`,
             "Content-Type": "application/json",
           },
           body: JSON.stringify({
-            model: selectedModel,
+            model: "google/gemini-2.5-pro",
             max_tokens: maxTokens,
             temperature,
-            system: systemPrompt,
-            messages: anthropicMessages,
+            messages: allMessages,
             stream: true,
           }),
         });
 
         if (response.ok && response.body) {
-          console.log(`[build-agent] ✅ Anthropic streaming response (attempt ${attempt + 1})`);
+          console.log(`[build-agent] ✅ Lovable AI streaming response (attempt ${attempt + 1})`);
           break;
         }
 
         if (response.status === 429) {
-          const retryAfter = response.headers.get("retry-after");
-          return new Response(JSON.stringify({ error: `Rate limited by Anthropic. ${retryAfter ? `Retry after ${retryAfter}s.` : "Try again shortly."}` }), {
+          return new Response(JSON.stringify({ error: "Rate limited. Try again shortly." }), {
             status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" },
           });
         }
-        if (response.status === 401) {
-          return new Response(JSON.stringify({ error: "Invalid ANTHROPIC_API_KEY. Check your API key in project secrets." }), {
-            status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
-          });
-        }
-        if (response.status === 402 || response.status === 400) {
-          const t = await response.text();
-          console.error(`[build-agent] Anthropic ${response.status}:`, t.slice(0, 500));
-          return new Response(JSON.stringify({ error: `Anthropic billing error (${response.status}): ${t.slice(0, 200)}` }), {
-            status: response.status, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        if (response.status === 402) {
+          return new Response(JSON.stringify({ error: "Usage limit reached. Add credits to continue." }), {
+            status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" },
           });
         }
         
@@ -501,7 +492,7 @@ FIX CHECKLIST:
         lastError = `Status ${response.status}: ${t.slice(0, 200)}`;
         
         if (response.status >= 500 && attempt === 0) {
-          console.log("[build-agent] Retrying after Anthropic 5xx...");
+          console.log("[build-agent] Retrying after 5xx...");
           await new Promise(r => setTimeout(r, 2000));
           continue;
         }
@@ -526,79 +517,8 @@ FIX CHECKLIST:
       });
     }
 
-    // ─── Transform Anthropic SSE → OpenAI-compatible SSE ──────────────
-    // The client expects OpenAI format: data: {"choices":[{"delta":{"content":"..."}}]}
-    const reader = response.body.getReader();
-    const encoder = new TextEncoder();
-    const decoder = new TextDecoder();
-
-    const transformedStream = new ReadableStream({
-      async start(controller) {
-        let buffer = "";
-        let closed = false;
-        const safeClose = () => {
-          if (!closed) {
-            closed = true;
-            try { controller.close(); } catch { /* already closed */ }
-          }
-        };
-        const safeEnqueue = (chunk: Uint8Array) => {
-          if (!closed) {
-            try { controller.enqueue(chunk); } catch { /* stream closed */ }
-          }
-        };
-        try {
-          while (!closed) {
-            const { done, value } = await reader.read();
-            if (done) {
-              safeEnqueue(encoder.encode("data: [DONE]\n\n"));
-              safeClose();
-              break;
-            }
-            
-            buffer += decoder.decode(value, { stream: true });
-            const lines = buffer.split("\n");
-            buffer = lines.pop() || "";
-            
-            for (const line of lines) {
-              if (closed) break;
-              const trimmed = line.trim();
-              if (!trimmed || trimmed.startsWith(":") || trimmed.startsWith("event: ")) continue;
-              
-              if (trimmed.startsWith("data: ")) {
-                const jsonStr = trimmed.slice(6);
-                try {
-                  const event = JSON.parse(jsonStr);
-                  
-                  if (event.type === "content_block_delta" && event.delta?.text) {
-                    const openaiChunk = {
-                      choices: [{ delta: { content: event.delta.text }, index: 0 }],
-                    };
-                    safeEnqueue(encoder.encode(`data: ${JSON.stringify(openaiChunk)}\n\n`));
-                  } else if (event.type === "message_stop") {
-                    safeEnqueue(encoder.encode("data: [DONE]\n\n"));
-                    safeClose();
-                  } else if (event.type === "error") {
-                    console.error("[build-agent] Anthropic stream error:", event.error);
-                    const errChunk = { choices: [{ delta: { content: `\n\n[ERROR: ${event.error?.message || "Stream error"}]` }, index: 0 }] };
-                    safeEnqueue(encoder.encode(`data: ${JSON.stringify(errChunk)}\n\n`));
-                    safeEnqueue(encoder.encode("data: [DONE]\n\n"));
-                    safeClose();
-                  }
-                } catch {
-                  // Non-JSON data line, skip
-                }
-              }
-            }
-          }
-        } catch (err) {
-          console.error("[build-agent] Stream transform error:", err);
-          if (!closed) { try { controller.error(err); } catch { /* */ } }
-        }
-      },
-    });
-
-    return new Response(transformedStream, {
+    // Lovable AI gateway returns OpenAI-compatible SSE — pass through directly
+    return new Response(response.body, {
       headers: { ...corsHeaders, "Content-Type": "text/event-stream" },
     });
   } catch (e) {

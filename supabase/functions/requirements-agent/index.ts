@@ -10,8 +10,8 @@ serve(async (req) => {
 
   try {
     const { prompt, matchedTemplate, existingSchemas } = await req.json();
-    const ANTHROPIC_API_KEY = Deno.env.get("ANTHROPIC_API_KEY");
-    if (!ANTHROPIC_API_KEY) throw new Error("ANTHROPIC_API_KEY not configured");
+    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
+    if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY not configured");
 
     // If a template was matched client-side, use AI to customize it
     // If no template, use AI to extract a domain model from scratch
@@ -52,26 +52,27 @@ Analyze the user's prompt and generate a complete domain model with:
 - Think about what pages the app needs
 ${existingSchemas?.length ? `\n## EXISTING SCHEMAS (don't duplicate):\n${JSON.stringify(existingSchemas)}` : ""}`;
 
-    const response = await fetch("https://api.anthropic.com/v1/messages", {
+    const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
       headers: {
-        "x-api-key": ANTHROPIC_API_KEY,
-        "anthropic-version": "2023-06-01",
+        Authorization: `Bearer ${LOVABLE_API_KEY}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "claude-sonnet-4-20250514",
+        model: "google/gemini-2.5-flash",
         max_tokens: 4096,
         temperature: 0.2,
-        system: systemPrompt,
         messages: [
+          { role: "system", content: systemPrompt },
           { role: "user", content: prompt },
         ],
         tools: [
           {
-            name: "create_domain_model",
-            description: "Create a structured domain model for the application",
-            input_schema: {
+            type: "function",
+            function: {
+              name: "create_domain_model",
+              description: "Create a structured domain model for the application",
+              parameters: {
                 type: "object",
                 properties: {
                   templateName: { type: "string", description: "Name of the application type" },
@@ -158,7 +159,7 @@ ${existingSchemas?.length ? `\n## EXISTING SCHEMAS (don't duplicate):\n${JSON.st
             },
           },
         ],
-        tool_choice: { type: "tool", name: "create_domain_model" },
+        tool_choice: { type: "function", function: { name: "create_domain_model" } },
       }),
     });
 
@@ -168,16 +169,21 @@ ${existingSchemas?.length ? `\n## EXISTING SCHEMAS (don't duplicate):\n${JSON.st
           status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
+      if (response.status === 402) {
+        return new Response(JSON.stringify({ error: "Usage limit reached." }), {
+          status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
       const t = await response.text();
       console.error("requirements-agent error:", response.status, t);
       throw new Error("Requirements agent error");
     }
 
     const data = await response.json();
-    const toolUseBlock = data.content?.find((b: any) => b.type === "tool_use" && b.name === "create_domain_model");
+    const toolCall = data.choices?.[0]?.message?.tool_calls?.[0];
 
-    if (toolUseBlock?.input) {
-      const domainModel = toolUseBlock.input;
+    if (toolCall?.function?.arguments) {
+      const domainModel = JSON.parse(toolCall.function.arguments);
       domainModel.templateId = matchedTemplate?.templateId || "custom";
       return new Response(JSON.stringify(domainModel), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
