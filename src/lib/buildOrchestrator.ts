@@ -199,13 +199,16 @@ function checkDomainCoherence(
     };
   }
 
-  // Extract tokens from IR entities, pages, navigation
+  // Extract tokens from IR entities, pages, navigation, roles, modules
   const irText = [
     ...Object.keys(ir.entities),
     ...ir.pages.map(p => p.name),
     ...ir.navigation.map(n => n.label),
     ...ir.components,
     ...ir.contexts.map(c => c.name),
+    ...(ir.roles || []).map(r => r.name + " " + r.label),
+    ...(ir.modules || []).map(m => m.name + " " + m.label),
+    ...(ir.workflows || []).map(w => w.name + " " + w.steps.map(s => s.name).join(" ")),
   ].join(" ");
 
   // Also scan generated file paths and first 200 chars of each file
