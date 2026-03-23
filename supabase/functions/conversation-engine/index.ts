@@ -853,13 +853,20 @@ Deno.serve(async (req) => {
 
         const chatHistory = (project?.chat_history || []) as Array<{ role: string; content: string }>;
         
-        // Extract meaningful messages — use a low threshold to avoid blocking builds
-        // that have brief but valid instructions (e.g. "add auth" is only 8 chars)
-        const substantiveMessages = chatHistory.filter(
-          (m: any) => m.content && m.content.length > 5
+        // CRITICAL: Only use USER messages as requirements.
+        // Assistant responses (acknowledgments, summaries, confirmations) are NOT requirements
+        // and cause the build agent to drift from the user's actual request.
+        const NOISE_PATTERNS = /^(yes|yep|yeah|go ahead|proceed|do it|ok|okay|sure|continue|start|build it|just do it)\s*[.!]?$/i;
+        const META_PATTERNS = /^(i can generate|proceeding with|changes complete|here's a summary|of course|i've just finished|what would you like)/i;
+        
+        const userMessages = chatHistory.filter(
+          (m: any) => m.role === "user" && m.content && m.content.length > 5 && !NOISE_PATTERNS.test(m.content.trim())
         );
 
-        if (substantiveMessages.length === 0) {
+        // Find the primary build trigger — the last substantive user message
+        const buildTrigger = userMessages.length > 0 ? userMessages[userMessages.length - 1].content : "";
+
+        if (userMessages.length === 0) {
           // Even with no chat history, if the project has a name, allow building
           // with a minimal context — the build agent can handle sparse prompts
           const projectName = project?.name || "";
