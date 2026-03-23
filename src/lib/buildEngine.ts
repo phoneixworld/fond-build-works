@@ -1079,6 +1079,7 @@ ${existingFileList}
     console.warn(`[BuildEngine:planned] Auth conformance failed (score: ${authValidation.score}/100):`, authValidation.errors);
   }
 
+  const lintResult = lintDesignTokens(accumulatedFiles);
   accumulatedFiles = lintResult.files;
   if (lintResult.replacements > 0) {
     console.log(`[BuildEngine:planned] Design lint: ${lintResult.replacements} raw color(s) → semantic tokens`);
