@@ -954,22 +954,22 @@ Deno.serve(async (req) => {
       // Also try AI-powered semantic extraction for richer understanding
       let aiExtractedContext = "";
       try {
-        const ANTHROPIC_API_KEY = Deno.env.get("ANTHROPIC_API_KEY");
-        if (ANTHROPIC_API_KEY && allReqs.length > 2) {
+        const LOVABLE_KEY = Deno.env.get("LOVABLE_API_KEY");
+        if (LOVABLE_KEY && allReqs.length > 2) {
           const allRawText = allReqs.map((r: any) => r.raw_text).join("\n\n");
           if (allRawText.length > 1000) {
-            const extractionResp = await fetch("https://api.anthropic.com/v1/messages", {
+            const extractionResp = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
               method: "POST",
               headers: {
-                "x-api-key": ANTHROPIC_API_KEY,
-                "anthropic-version": "2023-06-01",
+                Authorization: `Bearer ${LOVABLE_KEY}`,
                 "Content-Type": "application/json",
               },
               body: JSON.stringify({
-                model: "claude-sonnet-4-20250514",
+                model: "google/gemini-2.5-flash",
                 max_tokens: 4000,
                 temperature: 0.1,
-                system: `You are a requirements analysis engine. Extract a precise build manifest from the requirements. Output JSON with:
+                messages: [
+                  { role: "system", content: `You are a requirements analysis engine. Extract a precise build manifest from the requirements. Output JSON with:
 {
   "modules": [{"name": "string", "description": "string", "entities": ["string"], "features": ["string"], "dependsOn": ["string"]}],
   "buildOrder": ["module names in dependency order"],
@@ -977,14 +977,15 @@ Deno.serve(async (req) => {
   "totalFeatures": number,
   "complexity": "simple" | "medium" | "complex" | "enterprise"
 }
-Output ONLY valid JSON. No markdown, no explanation.`,
-                messages: [{ role: "user", content: allRawText.slice(0, 30000) }],
+Output ONLY valid JSON. No markdown, no explanation.` },
+                  { role: "user", content: allRawText.slice(0, 30000) },
+                ],
               }),
             });
 
             if (extractionResp.ok) {
               const extractionData = await extractionResp.json();
-              const extracted = extractionData.content?.[0]?.text?.trim() || "";
+              const extracted = extractionData.choices?.[0]?.message?.content?.trim() || "";
               try {
                 const cleaned = extracted.replace(/```json?\s*/g, "").replace(/```/g, "").trim();
                 const manifest = JSON.parse(cleaned);
