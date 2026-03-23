@@ -658,9 +658,76 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
                 retryFullResponse += chunk;
                 setBuildStreamContent(retryFullResponse);
               },
-              onDone: (retryText) => {
+              onDone: async (retryText) => {
                 const retryResult = parseReactFiles(retryText);
                 if (retryResult.files) {
+                  // Re-validate the retry output
+                  const retryValidation = validateReactCode(retryResult.files);
+                  const currentRetryCount = buildRetryCount + 1;
+                  
+                  if (!retryValidation.valid && currentRetryCount < MAX_BUILD_RETRIES) {
+                    // Recursive retry — validate again and fix
+                    console.warn(`[BuildOrch:retry] Retry ${currentRetryCount} still has ${retryValidation.errors.length} error(s), retrying again...`);
+                    setBuildRetryCount(currentRetryCount + 1);
+                    setBuildStep(`🔄 Auto-fixing (attempt ${currentRetryCount + 1}/${MAX_BUILD_RETRIES + 1})...`);
+                    
+                    const nextRetryContext = formatRetryContext(retryValidation.errors, currentRetryCount + 1, retryResult.files);
+                    let nextRetryResponse = "";
+                    
+                    await streamBuildAgent({
+                      messages: apiMessages,
+                      projectId: currentProject.id,
+                      techStack: currentProject.tech_stack || "react-cdn",
+                      schemas,
+                      model: selectedModel,
+                      designTheme: themeInfo?.prompt,
+                      knowledge,
+                      currentCode: Object.entries(retryResult.files).map(([p, c]) => `--- ${p}\n${c}`).join("\n\n"),
+                      retryContext: nextRetryContext,
+                      onDelta: (chunk) => { nextRetryResponse += chunk; setBuildStreamContent(nextRetryResponse); },
+                      onDone: (finalRetryText) => {
+                        const finalResult = parseReactFiles(finalRetryText);
+                        const filesToUse = finalResult.files || retryResult.files;
+                        setSandpackFiles(filesToUse);
+                        syncSandpackToVirtualFS(filesToUse);
+                        const deps = finalResult.files ? finalResult.deps : retryResult.deps;
+                        if (Object.keys(deps).length > 0) setSandpackDeps(deps);
+                        setPreviewMode("sandpack");
+                        
+                        const chatText = finalResult.chatText || retryResult.chatText || "✅ Fixed and rebuilt successfully";
+                        setMessages((prev) => {
+                          const last = prev[prev.length - 1];
+                          if (last?.role === "assistant") {
+                            return prev.map((m, i) => (i === prev.length - 1 ? { ...m, content: chatText } : m));
+                          }
+                          return prev;
+                        });
+                        
+                        setIsLoading(false); setIsBuilding(false); setBuildStep("");
+                        setPipelineStep("complete"); setCurrentAgent(null);
+                        setBuildRetryCount(0); isSendingRef.current = false;
+                        setTimeout(() => setBuildStreamContent(""), 3000);
+                        saveProject({ chat_history: messagesRef.current.map(m => ({ role: m.role, content: typeof m.content === "string" ? m.content : getTextContent(m.content) })) });
+                      },
+                      onError: (err) => {
+                        console.error("[BuildOrch:retry2] Final retry failed:", err);
+                        // Use best result so far
+                        setSandpackFiles(retryResult.files!);
+                        syncSandpackToVirtualFS(retryResult.files!);
+                        if (Object.keys(retryResult.deps).length > 0) setSandpackDeps(retryResult.deps);
+                        setPreviewMode("sandpack");
+                        setIsLoading(false); setIsBuilding(false); setBuildStep("");
+                        setPipelineStep("complete"); setCurrentAgent(null);
+                        setBuildRetryCount(0); isSendingRef.current = false;
+                      },
+                    });
+                    return;
+                  }
+                  
+                  if (!retryValidation.valid) {
+                    console.warn("[BuildOrch:retry] Max retries reached, using best result with warnings:", retryValidation.errors);
+                  }
+                  
                   setSandpackFiles(retryResult.files);
                   syncSandpackToVirtualFS(retryResult.files);
                   if (Object.keys(retryResult.deps).length > 0) setSandpackDeps(retryResult.deps);
