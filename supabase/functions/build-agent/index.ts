@@ -394,18 +394,16 @@ FIX CHECKLIST:
     } else if (task_type === "schema" || task_type === "backend") {
       selectedModel = "google/gemini-2.5-pro";
       routeReason = `${task_type} task → gemini-2.5-pro`;
-    } else if (complexity >= 70) {
+    } else if (!current_code) {
+      // New app builds ALWAYS use Pro — short prompts score low but need quality
       selectedModel = "google/gemini-2.5-pro";
-      routeReason = `High complexity (${complexity}/100) → gemini-2.5-pro`;
+      routeReason = `New app build → gemini-2.5-pro (always Pro for fresh builds)`;
     } else if (complexity >= 40) {
       selectedModel = "google/gemini-2.5-pro";
-      routeReason = `Medium complexity (${complexity}/100) → gemini-2.5-pro`;
-    } else if (complexity >= 20) {
-      selectedModel = "google/gemini-2.5-flash";
-      routeReason = `Low complexity (${complexity}/100) → gemini-2.5-flash`;
+      routeReason = `Medium+ complexity (${complexity}/100) → gemini-2.5-pro`;
     } else {
       selectedModel = "google/gemini-2.5-flash";
-      routeReason = `Trivial (${complexity}/100) → gemini-2.5-flash`;
+      routeReason = `Iteration (${complexity}/100) → gemini-2.5-flash`;
     }
     
     console.log(`[build-agent] 🎯 CostRouter: ${routeReason} | tokens≈${estimatedInputTokens} | features=${featureCount} | modules=${modCount}`);
