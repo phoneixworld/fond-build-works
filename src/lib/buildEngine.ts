@@ -1073,7 +1073,12 @@ ${existingFileList}
     }
   }
 
-  const lintResult = lintDesignTokens(accumulatedFiles);
+  // Auth conformance validation for planned builds
+  const authValidation = validateAuthConformance(accumulatedFiles, prompt);
+  if (!authValidation.valid) {
+    console.warn(`[BuildEngine:planned] Auth conformance failed (score: ${authValidation.score}/100):`, authValidation.errors);
+  }
+
   accumulatedFiles = lintResult.files;
   if (lintResult.replacements > 0) {
     console.log(`[BuildEngine:planned] Design lint: ${lintResult.replacements} raw color(s) → semantic tokens`);
