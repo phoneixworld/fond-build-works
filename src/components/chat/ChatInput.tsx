@@ -98,10 +98,10 @@ const ChatInput = ({
           }}
           disabled={isLoading}
         />
-        <input
+         <input
           ref={fileInputRef}
           type="file"
-          accept="image/*"
+          accept="image/*,.pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
           multiple
           onChange={onFileSelect}
           className="hidden"
