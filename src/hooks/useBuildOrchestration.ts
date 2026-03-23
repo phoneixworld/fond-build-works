@@ -1705,6 +1705,14 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
 
       // ── EDIT: Route through FSM-wired edit pipeline ──
       if (convResult.action === "edit") {
+        const hasExplicitEditVerb = /\b(fix|change|update|modify|refactor|patch|repair|replace|add|remove|delete)\b/i.test(finalText);
+        const isQuestionOnlyEdit = finalText.trim().endsWith("?") || /^(why|what|where|who|how)\b/i.test(finalText.trim());
+        if (isQuestionOnlyEdit && !hasExplicitEditVerb) {
+          setCurrentAgent("chat");
+          setPipelineStep("chatting");
+          sendChatMessage(finalText, images);
+          return;
+        }
         setCurrentAgent("edit");
         setPipelineStep("resolving");
         sendEditMessage(finalText, images);
