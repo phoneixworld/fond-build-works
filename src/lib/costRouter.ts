@@ -39,10 +39,10 @@ export interface CostRouteResult {
   costTier: number;
 }
 
-// Anthropic Claude model tiers
+// Lovable AI Gateway model tiers
 const MODELS = {
-  "claude-haiku-3-5-20241022": { costTier: 1, maxContext: 200000, label: "Haiku 3.5" },
-  "claude-sonnet-4-20250514": { costTier: 3, maxContext: 200000, label: "Sonnet 4" },
+  "google/gemini-2.5-flash": { costTier: 1, maxContext: 1000000, label: "Gemini 2.5 Flash" },
+  "google/gemini-2.5-pro": { costTier: 3, maxContext: 1000000, label: "Gemini 2.5 Pro" },
 } as const;
 
 /**
