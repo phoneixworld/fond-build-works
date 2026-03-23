@@ -91,6 +91,7 @@ export function useChatAgent(config: ChatAgentConfig) {
     messagesRef, isSendingRef, isLoadingRef, buildMessageContent,
     sandpackFilesRef, previewErrors,
   } = config;
+  const setPendingBuildPrompt = config.setPendingBuildPrompt;
 
   const sendChatMessage = useCallback(async (text: string, images: string[] = []) => {
     if (!text || !currentProject) return;
