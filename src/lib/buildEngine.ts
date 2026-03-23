@@ -774,35 +774,93 @@ async function runDirectBuild(
     finalFiles = stubBrokenFiles(finalFiles, postMergeErrors);
   }
 
-  // Schema-first validation — if files contain schema artifacts, validate them
-  if (requiresSchemaValidation(finalFiles)) {
-    const schemaArtifacts = extractSchemaArtifacts(finalFiles);
-    const schemaValidation = validateSchemaArtifacts(schemaArtifacts);
-    if (!schemaValidation.valid) {
-      console.error(`[BuildEngine:direct] SCHEMA VALIDATION FAILED:`, schemaValidation.errors);
-      console.warn(`[BuildEngine:direct] Missing RLS for:`, schemaValidation.missingRls);
-    } else {
-      console.log(`[BuildEngine:direct] Schema validated: ${schemaValidation.tables.length} tables ✅`);
-    }
-  }
+  // ── BACKEND VALIDATION WITH RETRY ──────────────────────────────────────
+  // If backend intent is detected and validation fails, retry the build with
+  // the validation error context so the agent fixes forbidden patterns.
+  const hasBackendIntent = detectBackendIntent(finalFiles, prompt);
+  
+  if (hasBackendIntent) {
+    let retryAttempt = 0;
+    const MAX_VALIDATION_RETRIES = 1; // One retry to fix violations
 
-  // Backend output validation — check for forbidden patterns and missing artifacts
-  const backendValidation = validateBuildOutput(finalFiles, prompt);
-  if (!backendValidation.valid) {
-    console.warn(`[BuildEngine:direct] Backend validation failed (score: ${backendValidation.score}/100):`,
-      { forbidden: backendValidation.forbiddenViolations.length, missing: backendValidation.missingRequirements.length });
-    if (backendValidation.forbiddenViolations.length > 0) {
-      console.warn("[BuildEngine:direct] Forbidden patterns:", backendValidation.forbiddenViolations.map(v => `${v.file}:${v.line} ${v.pattern}`));
-    }
-    if (backendValidation.missingRequirements.length > 0) {
-      console.warn("[BuildEngine:direct] Missing requirements:", backendValidation.missingRequirements);
-    }
-  }
+    while (retryAttempt <= MAX_VALIDATION_RETRIES) {
+      // Schema-first validation
+      if (requiresSchemaValidation(finalFiles)) {
+        const schemaArtifacts = extractSchemaArtifacts(finalFiles);
+        const schemaValidation = validateSchemaArtifacts(schemaArtifacts);
+        if (!schemaValidation.valid) {
+          console.error(`[BuildEngine:direct] SCHEMA VALIDATION FAILED:`, schemaValidation.errors);
+        } else {
+          console.log(`[BuildEngine:direct] Schema validated: ${schemaValidation.tables.length} tables ✅`);
+        }
+      }
 
-  // Auth conformance validation
-  const authValidation = validateAuthConformance(finalFiles, prompt);
-  if (!authValidation.valid) {
-    console.warn(`[BuildEngine:direct] Auth conformance failed (score: ${authValidation.score}/100):`, authValidation.errors);
+      // Backend output validation
+      const backendValidation = validateBuildOutput(finalFiles, prompt);
+      
+      // Auth conformance validation
+      const authValidation = validateAuthConformance(finalFiles, prompt);
+
+      const hasForbidden = backendValidation.forbiddenViolations.length > 0;
+      const hasMissing = backendValidation.missingRequirements.length > 0;
+      const hasAuthIssues = !authValidation.valid;
+
+      if (!hasForbidden && !hasMissing && !hasAuthIssues) {
+        console.log(`[BuildEngine:direct] ✅ Backend validation passed (score: ${backendValidation.score}/100)`);
+        break; // All good
+      }
+
+      if (retryAttempt >= MAX_VALIDATION_RETRIES) {
+        // Max retries exhausted — log and proceed with degraded output
+        console.warn(`[BuildEngine:direct] ⚠️ Backend validation STILL failing after retry — proceeding with degraded output`);
+        if (hasForbidden) console.warn("[BuildEngine:direct] Forbidden:", backendValidation.forbiddenViolations.map(v => `${v.file}:${v.line} ${v.pattern}`));
+        if (hasMissing) console.warn("[BuildEngine:direct] Missing:", backendValidation.missingRequirements);
+        if (hasAuthIssues) console.warn("[BuildEngine:direct] Auth issues:", authValidation.errors);
+        break;
+      }
+
+      // ── RETRY: Re-run build agent with validation failure context ──
+      console.warn(`[BuildEngine:direct] 🔄 Backend validation failed (score: ${backendValidation.score}/100) — retrying with fix context...`);
+      callbacks.onProgress({ phase: "validating", message: "Fixing backend violations..." });
+
+      const retryContext = formatValidationRetryContext(backendValidation);
+      const authContext = hasAuthIssues 
+        ? `\n\n## AUTH CONFORMANCE FAILURES:\n${authValidation.errors.join("\n")}\n\nFix: Use supabase.auth.* methods, never localStorage for auth.`
+        : "";
+      
+      const retryPrompt = `${prompt}\n\n--- VALIDATION FAILURE (must fix) ---\n${retryContext}${authContext}\n\nRe-generate the code fixing ALL violations above. Use real Supabase client for persistence, proper auth patterns, and include SQL migrations with RLS policies.`;
+
+      try {
+        const retryResult = await executeSingleTask(retryPrompt, config, existingCode, callbacks.onDelta, 0, undefined, undefined, prompt);
+        if (Object.keys(retryResult.files).length > 0) {
+          // Re-merge retry output
+          const retryMerged = mergeFiles(baseOrExisting, retryResult.files, false, config.existingFiles ? baseOrExisting : undefined);
+          finalFiles = retryMerged.files;
+          conflicts = retryMerged.conflicts;
+          
+          // Re-validate syntax
+          const retryErrors = validateAllFiles(finalFiles);
+          if (retryErrors.length > 0) {
+            finalFiles = stubBrokenFiles(finalFiles, retryErrors);
+          }
+        }
+      } catch (retryErr) {
+        console.error("[BuildEngine:direct] Validation retry failed:", retryErr);
+      }
+
+      retryAttempt++;
+    }
+  } else {
+    // No backend intent — just log schema/validation status
+    if (requiresSchemaValidation(finalFiles)) {
+      const schemaArtifacts = extractSchemaArtifacts(finalFiles);
+      const schemaValidation = validateSchemaArtifacts(schemaArtifacts);
+      if (!schemaValidation.valid) {
+        console.error(`[BuildEngine:direct] SCHEMA VALIDATION FAILED:`, schemaValidation.errors);
+      } else {
+        console.log(`[BuildEngine:direct] Schema validated: ${schemaValidation.tables.length} tables ✅`);
+      }
+    }
   }
   const valMs = valTimer.elapsed();
 
@@ -1048,35 +1106,80 @@ ${existingFileList}
     accumulatedFiles = stubBrokenFiles(accumulatedFiles, finalErrors);
   }
 
-  // Schema-first validation for planned builds
-  if (requiresSchemaValidation(accumulatedFiles)) {
-    const schemaArtifacts = extractSchemaArtifacts(accumulatedFiles);
-    const schemaValidation = validateSchemaArtifacts(schemaArtifacts);
-    if (!schemaValidation.valid) {
-      console.error(`[BuildEngine:planned] SCHEMA VALIDATION FAILED:`, schemaValidation.errors);
-      console.warn(`[BuildEngine:planned] Missing RLS for:`, schemaValidation.missingRls);
-    } else {
-      console.log(`[BuildEngine:planned] Schema validated: ${schemaValidation.tables.length} tables ✅`);
-    }
-  }
+  // ── BACKEND VALIDATION WITH RETRY (planned builds) ─────────────────────
+  const hasBackendIntent = detectBackendIntent(accumulatedFiles, prompt);
+  
+  if (hasBackendIntent) {
+    let retryAttempt = 0;
+    const MAX_VALIDATION_RETRIES = 1;
 
-  // Backend output validation for planned builds
-  const backendValidation = validateBuildOutput(accumulatedFiles, prompt);
-  if (!backendValidation.valid) {
-    console.warn(`[BuildEngine:planned] Backend validation failed (score: ${backendValidation.score}/100):`,
-      { forbidden: backendValidation.forbiddenViolations.length, missing: backendValidation.missingRequirements.length });
-    if (backendValidation.forbiddenViolations.length > 0) {
-      console.warn("[BuildEngine:planned] Forbidden patterns:", backendValidation.forbiddenViolations.map(v => `${v.file}:${v.line} ${v.pattern}`));
-    }
-    if (backendValidation.missingRequirements.length > 0) {
-      console.warn("[BuildEngine:planned] Missing requirements:", backendValidation.missingRequirements);
-    }
-  }
+    while (retryAttempt <= MAX_VALIDATION_RETRIES) {
+      if (requiresSchemaValidation(accumulatedFiles)) {
+        const schemaArtifacts = extractSchemaArtifacts(accumulatedFiles);
+        const schemaValidation = validateSchemaArtifacts(schemaArtifacts);
+        if (!schemaValidation.valid) {
+          console.error(`[BuildEngine:planned] SCHEMA VALIDATION FAILED:`, schemaValidation.errors);
+        } else {
+          console.log(`[BuildEngine:planned] Schema validated: ${schemaValidation.tables.length} tables ✅`);
+        }
+      }
 
-  // Auth conformance validation for planned builds
-  const authValidation = validateAuthConformance(accumulatedFiles, prompt);
-  if (!authValidation.valid) {
-    console.warn(`[BuildEngine:planned] Auth conformance failed (score: ${authValidation.score}/100):`, authValidation.errors);
+      const backendValidation = validateBuildOutput(accumulatedFiles, prompt);
+      const authValidation = validateAuthConformance(accumulatedFiles, prompt);
+
+      const hasForbidden = backendValidation.forbiddenViolations.length > 0;
+      const hasMissing = backendValidation.missingRequirements.length > 0;
+      const hasAuthIssues = !authValidation.valid;
+
+      if (!hasForbidden && !hasMissing && !hasAuthIssues) {
+        console.log(`[BuildEngine:planned] ✅ Backend validation passed (score: ${backendValidation.score}/100)`);
+        break;
+      }
+
+      if (retryAttempt >= MAX_VALIDATION_RETRIES) {
+        console.warn(`[BuildEngine:planned] ⚠️ Backend validation STILL failing after retry — proceeding with degraded output`);
+        break;
+      }
+
+      // ── RETRY: Run a fix-up task against the accumulated files ──
+      console.warn(`[BuildEngine:planned] 🔄 Backend validation failed (score: ${backendValidation.score}/100) — running fix-up task...`);
+      callbacks.onProgress({ phase: "validating", message: "Fixing backend violations..." });
+
+      const retryContext = formatValidationRetryContext(backendValidation);
+      const authContext = hasAuthIssues 
+        ? `\n\n## AUTH CONFORMANCE FAILURES:\n${authValidation.errors.join("\n")}\n\nFix: Use supabase.auth.* methods, never localStorage for auth.`
+        : "";
+      
+      const fixPrompt = `Fix the following validation failures in the existing code:\n\n${retryContext}${authContext}\n\nRe-generate ONLY the files that need fixing. Use real Supabase client for persistence, proper auth patterns, and include SQL migrations with RLS policies.`;
+
+      try {
+        const existingCode = buildFullCodeContext(accumulatedFiles);
+        const fixResult = await executeSingleTask(fixPrompt, config, existingCode, callbacks.onDelta, 0, undefined, "backend", prompt);
+        if (Object.keys(fixResult.files).length > 0) {
+          const fixMerged = mergeFiles(accumulatedFiles, fixResult.files, false);
+          accumulatedFiles = fixMerged.files;
+          
+          const fixErrors = validateAllFiles(accumulatedFiles);
+          if (fixErrors.length > 0) {
+            accumulatedFiles = stubBrokenFiles(accumulatedFiles, fixErrors);
+          }
+        }
+      } catch (retryErr) {
+        console.error("[BuildEngine:planned] Validation retry failed:", retryErr);
+      }
+
+      retryAttempt++;
+    }
+  } else {
+    if (requiresSchemaValidation(accumulatedFiles)) {
+      const schemaArtifacts = extractSchemaArtifacts(accumulatedFiles);
+      const schemaValidation = validateSchemaArtifacts(schemaArtifacts);
+      if (!schemaValidation.valid) {
+        console.error(`[BuildEngine:planned] SCHEMA VALIDATION FAILED:`, schemaValidation.errors);
+      } else {
+        console.log(`[BuildEngine:planned] Schema validated: ${schemaValidation.tables.length} tables ✅`);
+      }
+    }
   }
 
   const lintResult = lintDesignTokens(accumulatedFiles);
