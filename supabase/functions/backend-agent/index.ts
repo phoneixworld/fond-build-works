@@ -10,12 +10,18 @@ const ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY")!;
 const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
 
 /**
- * Backend Agent — generates data layer, API hooks, and mock stores
- * based on a domain model from the Requirements Agent.
+ * Backend Agent — generates data layer, SQL migrations, RLS policies,
+ * and API hooks based on a domain model from the Requirements Agent.
  *
  * Task types:
- * - "schema": Generate mock data files + type definitions
+ * - "schema": Generate SQL migrations, RLS policies, schema.json, and typed hooks
  * - "backend": Generate CRUD hooks, contexts, and API integration
+ *
+ * RULES:
+ * - ALWAYS generate SQL migrations for schema tasks
+ * - ALWAYS generate RLS policies for every table
+ * - ALWAYS use project-api/project-auth — NEVER use localStorage for auth
+ * - NEVER use mock data as primary persistence
  */
 
 serve(async (req) => {

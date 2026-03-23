@@ -225,6 +225,36 @@ ProtectedRoute wrapper. Login MUST call auth API.
 ❌ Hardcoded mock data in pages — use /hooks/ and /data/ files (but hooks MUST have inline SAMPLE_DATA fallback for when API is unavailable)
 ❌ Rendering the user's prompt/requirements as page content — IMPLEMENT the features instead
 
+## ═══════════════════════════════════════════════════════════════════
+## BACKEND GENERATION RULES (MANDATORY FOR ANY DATA/AUTH FEATURES)
+## ═══════════════════════════════════════════════════════════════════
+
+### REQUIRED — You MUST follow these rules when generating backend features:
+1. ALWAYS use the Supabase client (\`@supabase/supabase-js\`) or the project Data API (\`project-api\`, \`project-auth\`) for ALL persistence. Every data operation must hit a real backend.
+2. ALWAYS generate SQL migrations BEFORE generating any backend or frontend code that references tables. Include a \`--- /migrations/001_schema.sql\` file with CREATE TABLE statements.
+3. ALWAYS generate RLS (Row-Level Security) policies for every table. Include them in a \`--- /migrations/002_rls.sql\` file.
+4. ALWAYS generate typed queries using the schema. Hooks must reference real table/column names.
+5. ALWAYS use \`project-auth\` and \`project-api\` utilities for auth/session management.
+6. ALWAYS return a migration artifact (\`migration.sql\`) when backend changes are requested.
+7. ALWAYS include a \`--- /schema.json\` file describing the data model (entities, fields, types, relations).
+
+### FORBIDDEN — You MUST NEVER do any of the following:
+1. NEVER use \`localStorage\` for authentication or session persistence (localStorage for UI preferences like theme is OK).
+2. NEVER use mock data arrays, in-memory stores, or fake data as the primary data source. Sample data is ONLY allowed as a graceful fallback when the API is unreachable.
+3. NEVER generate fake UUID-only persistence (e.g., \`id: uuidv4()\` stored in local state as the database).
+4. NEVER generate frontend CRUD without a corresponding backend schema/migration.
+5. NEVER generate ad-hoc auth implementations (custom bcrypt, JWT signing in frontend, etc.) — use \`project-auth\`.
+6. NEVER use \`const data = [...]\` as the sole data source for any list/table page.
+
+### OUTPUT SHAPE — When backend intent is detected, your response MUST include:
+- \`--- /migrations/001_schema.sql\` — CREATE TABLE statements
+- \`--- /migrations/002_rls.sql\` — RLS policies for each table
+- \`--- /schema.json\` — JSON schema describing entities
+- Backend hooks (\`/hooks/use<Entity>.js\`) that call the Data API
+- Auth context (\`/contexts/AuthContext.jsx\`) if auth is needed
+
+If ANY of these artifacts is missing for a backend feature, the build will be REJECTED.
+
 ${designTheme ? `## DESIGN THEME\n${designTheme}` : ''}
 ${knowledge && knowledge.length > 0 ? `## PROJECT KNOWLEDGE\n${knowledge.join('\n')}` : ''}
 
