@@ -1744,6 +1744,8 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
 
         conversationStartBuilding?.();
         
+        // ── REQUIREMENTS ASSEMBLY: Build a complete requirements string ──
+        // Priority 1: Server-compiled requirements from conversation-engine FSM
         const requirements = await Promise.resolve(conversationGetRequirements?.() || "");
 
         if (isSmartSendStale()) {
@@ -1751,34 +1753,48 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
           return;
         }
 
-        if (requirements && requirements.length > 50) {
-          const buildPrompt = requirements + "\n\n" + finalText;
-          console.log(`[SmartSend] Build prompt length: ${buildPrompt.length} chars (requirements: ${requirements.length})`);
+        // Priority 2: Fall back to chat history mining if FSM requirements are empty
+        // This captures cases where the gather phase wasn't used (direct chat → build)
+        let assembledRequirements = requirements;
+
+        if (!assembledRequirements || assembledRequirements.length <= 50) {
+          // Mine the FULL chat history for requirements context
+          // Include assistant messages (they contain plans/proposals the user confirmed)
+          const ERROR_NOISE = /\b(element type is invalid|unclosed block|unclosed bracket|is not a function|is not defined|something went wrong|syntax error|check the render|you likely forgot|mixed up default|module not found|cannot find module|auto-fix|auto fix|✅ Fixed|⚠️ Found|⚠️ Build)\b/i;
+          const FRUSTRATION_NOISE = /^(stupid|idiot|bloody|damn|hell|wtf|omg|ugh|why|\?{2,}|\.{3,}|!{2,})$/i;
+          const STATUS_MSG = /^(✅|⚠️|🔧|🔄|Building|Processing|Thinking|Generating)/;
           
-          setCurrentAgent("build");
-          setPipelineStep("planning");
-          sendMessage(buildPrompt, images);
-          return;
-        }
-        
-        // Filter out error messages, frustrated replies, and non-requirement content from chat history
-        const ERROR_NOISE = /\b(element type is invalid|unclosed block|unclosed bracket|is not a function|is not defined|something went wrong|syntax error|check the render|you likely forgot|mixed up default|module not found|cannot find module|auto-fix|auto fix|✅ Fixed|⚠️ Found|⚠️ Build)\b/i;
-        const FRUSTRATION_NOISE = /^(stupid|idiot|bloody|damn|hell|wtf|omg|ugh|why|\?{2,}|\.{3,}|!{2,})$/i;
-        const chatContext = messages
-          .filter(m => {
-            const text = typeof m.content === "string" ? m.content : "";
-            if (text.length < 30) return false;
-            if (ERROR_NOISE.test(text)) return false;
-            if (FRUSTRATION_NOISE.test(text.trim())) return false;
+          const relevantMessages = messages.filter(m => {
+            const msgText = typeof m.content === "string" ? m.content : "";
+            // Always skip error noise and frustration
+            if (ERROR_NOISE.test(msgText)) return false;
+            if (FRUSTRATION_NOISE.test(msgText.trim())) return false;
             // Skip assistant status messages
-            if (m.role === "assistant" && /^(✅|⚠️|🔧|🔄|Building|Processing)/.test(text.trim())) return false;
-            return true;
-          })
-          .map(m => `**${m.role === "user" ? "User" : "Assistant"}:**\n${m.content}`)
-          .join("\n\n");
-        
-        if (chatContext.length > 100) {
-          const buildPrompt = `# APPLICATION REQUIREMENTS (from conversation)\n\n${chatContext}\n\n## BUILD INSTRUCTION\nBuild the COMPLETE application based on the conversation above.\n\n${finalText}`;
+            if (m.role === "assistant" && STATUS_MSG.test(msgText.trim())) return false;
+            // Keep ALL user messages (even short confirmations like "all the above")
+            // because they confirm previous assistant proposals
+            if (m.role === "user") return true;
+            // Keep assistant messages that contain substantive proposals (>50 chars)
+            if (m.role === "assistant" && msgText.length > 50) return true;
+            return false;
+          });
+
+          const chatContext = relevantMessages
+            .map(m => {
+              const msgText = typeof m.content === "string" ? m.content : "";
+              return `**${m.role === "user" ? "User" : "Assistant"}:**\n${msgText}`;
+            })
+            .join("\n\n");
+
+          if (chatContext.length > 100) {
+            assembledRequirements = `# APPLICATION REQUIREMENTS (from conversation)\n\n${chatContext}\n\n--- END REQUIREMENTS ---\nBuild the COMPLETE application incorporating ALL above requirements.`;
+          }
+        }
+
+        // Final assembly: combine accumulated requirements with trigger text
+        if (assembledRequirements && assembledRequirements.length > 50) {
+          const buildPrompt = assembledRequirements + "\n\n## BUILD TRIGGER\n" + finalText;
+          console.log(`[SmartSend] Build prompt length: ${buildPrompt.length} chars (requirements: ${assembledRequirements.length})`);
           
           setCurrentAgent("build");
           setPipelineStep("planning");
@@ -1786,7 +1802,10 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
           return;
         }
         
-        // No accumulated context — fall through to direct build below
+        // SAFETY: If we still have no context, log a warning — this means
+        // the user said "go ahead" with no prior requirements
+        console.warn(`[SmartSend] Build triggered with no accumulated requirements. finalText="${finalText}"`);
+        // Fall through to direct build below (will use finalText as-is)
       }
 
       // ── CHAT: Route to chat agent (unless this is clearly a runtime fix request) ──
