@@ -555,17 +555,26 @@ Deno.serve(async (req) => {
       let reason = "";
 
       // Edit detection — must check before build signals
-      const EDIT_VERBS = /\b(change|update|fix|modify|replace|add|remove|make|move|rename|resize|restyle|improve|tweak|adjust|refactor|sort|filter|reorder|swap|hide|show|toggle|enable|disable|increase|decrease|align|center)\b/i;
+      const EDIT_VERBS = /\b(change|update|fix|modify|replace|add|remove|make|move|rename|resize|restyle|improve|tweak|adjust|refactor|sort|filter|reorder|swap|hide|show|toggle|enable|disable|increase|decrease|align|center|patch|repair)\b/i;
+      const ACTIONABLE_EDIT_VERBS = /\b(fix|change|update|modify|refactor|patch|repair|replace|add|remove|delete)\b/i;
       const BUG_REPORT = /\b(doesn['']?t work|does not work|not working|broken|bug|crash|error|fails?|failing|wrong|issue|problem|stuck|blank|empty|missing|disappeared|nothing shows|nothing loads|nothing happens|white screen|no content|not loading|not showing|not rendering|not displaying|can['']?t see|cannot see|shows nothing|displays nothing|page is blank|screen is blank|portal is blank|app is blank)\b/i;
       const EDIT_TARGETS = /\b(table|button|form|sidebar|nav|header|footer|modal|dialog|card|chart|page|column|row|field|input|label|title|heading|text|color|font|spacing|padding|margin|border|icon|image|logo|search|tab|badge|avatar|menu|dropdown|sign\s*up|signup|login|log\s*in|auth|register|registration|password|session|portal|screen|app|view|dashboard|layout|content|display|render)\b/i;
       const BUILD_FULL = /\b(build|create|generate|scaffold|new app|new project|from scratch|entire|whole app|full app|complete app)\b/i;
       const REBUILD_SIGNALS = /\b(regenerate|rebuild|redo|re-generate|re-build|recreate|re-create|start over|redo all|regenerate all)\b/i;
+      const looksLikeQuestionOnly = QUESTION_ONLY_SIGNALS.test(text) || CHAT_SIGNALS.test(lower);
+      const hasActionableEditVerb = ACTIONABLE_EDIT_VERBS.test(lower);
 
       // ── ERROR MESSAGE DETECTION: Never store error messages as requirements ──
       const ERROR_MESSAGE_PATTERNS = /\b(element type is invalid|expected a string|unclosed block|unclosed bracket|is not a function|is not defined|cannot read prop|unexpected token|syntax error|render method|check the render|you likely forgot to export|mixed up default and named imports|something went wrong|module not found|cannot find module)\b/i;
       const isErrorMessage = ERROR_MESSAGE_PATTERNS.test(lower);
 
-      if (isErrorMessage && hasExistingCode) {
+      if (NEGATIVE_BUILD_EDIT_SIGNALS.test(lower)) {
+        recommendedAction = "chat";
+        reason = "User explicitly requested explanation/chat-only response";
+      } else if (looksLikeQuestionOnly && !hasActionableEditVerb) {
+        recommendedAction = "chat";
+        reason = "Question/diagnostic request without actionable edit verb";
+      } else if (isErrorMessage && hasExistingCode) {
         // Error messages with existing code → always edit, never gather
         recommendedAction = "edit";
         reason = "Error message detected — routing to edit (fix existing code, NOT a requirement)";
@@ -574,18 +583,26 @@ Deno.serve(async (req) => {
         recommendedAction = "chat";
         reason = "Error message detected without existing code — routing to chat";
       } else if (BUILD_SIGNALS.test(lower)) {
-        recommendedAction = "build";
-        reason = "User explicitly requested build";
+        if (currentMode === "gathering" || currentMode === "ready") {
+          recommendedAction = "build";
+          reason = "User explicitly confirmed build with gathered context";
+        } else {
+          recommendedAction = "chat";
+          reason = "Confirmation phrase without gathered requirements";
+        }
       } else if (REBUILD_SIGNALS.test(lower)) {
         recommendedAction = "build";
         reason = "User requested regeneration/rebuild";
       } else if (hasExistingCode && EDIT_VERBS.test(lower) && EDIT_TARGETS.test(lower) && !BUILD_FULL.test(lower)) {
         recommendedAction = "edit";
         reason = "Edit intent detected (verb + target + existing code)";
-      } else if (hasExistingCode && BUG_REPORT.test(lower) && !BUILD_FULL.test(lower)) {
-        // Bug reports with existing code ALWAYS route to edit — no target requirement
+      } else if (hasExistingCode && BUG_REPORT.test(lower) && !BUILD_FULL.test(lower) && hasActionableEditVerb && !looksLikeQuestionOnly) {
+        // Bug report with explicit fix intent routes to edit
         recommendedAction = "edit";
-        reason = "Bug report detected — routing to edit (fix existing code)";
+        reason = "Bug report + fix intent detected — routing to edit";
+      } else if (hasExistingCode && BUG_REPORT.test(lower) && !BUILD_FULL.test(lower)) {
+        recommendedAction = "chat";
+        reason = "Issue reported without explicit fix command — keeping in chat mode";
       } else if (CHAT_SIGNALS.test(lower)) {
         recommendedAction = "chat";
         reason = "User asking a question";
