@@ -159,7 +159,7 @@ ${existingSchemas?.length ? `\n## EXISTING SCHEMAS (don't duplicate):\n${JSON.st
             },
           },
         ],
-        tool_choice: { type: "tool", name: "create_domain_model" },
+        tool_choice: { type: "function", function: { name: "create_domain_model" } },
       }),
     });
 
@@ -169,16 +169,21 @@ ${existingSchemas?.length ? `\n## EXISTING SCHEMAS (don't duplicate):\n${JSON.st
           status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
+      if (response.status === 402) {
+        return new Response(JSON.stringify({ error: "Usage limit reached." }), {
+          status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
       const t = await response.text();
       console.error("requirements-agent error:", response.status, t);
       throw new Error("Requirements agent error");
     }
 
     const data = await response.json();
-    const toolUseBlock = data.content?.find((b: any) => b.type === "tool_use" && b.name === "create_domain_model");
+    const toolCall = data.choices?.[0]?.message?.tool_calls?.[0];
 
-    if (toolUseBlock?.input) {
-      const domainModel = toolUseBlock.input;
+    if (toolCall?.function?.arguments) {
+      const domainModel = JSON.parse(toolCall.function.arguments);
       domainModel.templateId = matchedTemplate?.templateId || "custom";
       return new Response(JSON.stringify(domainModel), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
