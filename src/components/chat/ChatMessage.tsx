@@ -694,6 +694,7 @@ const ChatMessage = ({ content, role, timestamp, meta, isLoading, onEdit, onRege
   const isUser = role === "user";
   const textContent = getTextContent(content);
   const imageUrls = getImageUrls(content);
+  const isStreaming = !!(meta as any)?.isStreaming;
   
   const contextHints = !isUser ? detectContextHints(textContent) : [];
   const cleanText = !isUser ? stripContextMarkers(textContent) : textContent;
@@ -704,7 +705,7 @@ const ChatMessage = ({ content, role, timestamp, meta, isLoading, onEdit, onRege
     : { cleanText: cleanText, codeBlocks: [], hadRawHtml: false };
   
   const { suggestions, cleanText: textWithoutSuggestions } = !isUser ? parseSuggestions(strippedText) : { suggestions: [], cleanText: strippedText };
-  const sections = !isUser ? parseStructuredResponse(textWithoutSuggestions, isLoading) : [];
+  const sections = !isUser ? parseStructuredResponse(textWithoutSuggestions, isLoading || isStreaming) : [];
 
   return (
     <motion.div
