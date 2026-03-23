@@ -73,6 +73,7 @@ export interface ChatAgentConfig {
   setPipelineStep: (step: PipelineStep | null) => void;
   setCurrentAgent: (agent: string | null) => void;
   setIsLoading: (v: boolean) => void;
+  setPendingBuildPrompt?: (prompt: string | null) => void;
   messagesRef: React.RefObject<Msg[]>;
   isSendingRef: React.MutableRefObject<boolean>;
   isLoadingRef: React.MutableRefObject<boolean>;
