@@ -798,6 +798,12 @@ async function runDirectBuild(
       console.warn("[BuildEngine:direct] Missing requirements:", backendValidation.missingRequirements);
     }
   }
+
+  // Auth conformance validation
+  const authValidation = validateAuthConformance(finalFiles, prompt);
+  if (!authValidation.valid) {
+    console.warn(`[BuildEngine:direct] Auth conformance failed (score: ${authValidation.score}/100):`, authValidation.errors);
+  }
   const valMs = valTimer.elapsed();
 
   const totalSize = Object.values(finalFiles).reduce((s, c) => s + c.length, 0);
