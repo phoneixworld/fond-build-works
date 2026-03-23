@@ -6,12 +6,13 @@
  * so Phoenix can actually diagnose issues instead of bluffing.
  */
 
-import { useCallback } from "react";
+import { useCallback, useRef } from "react";
 import { hasBuildConfirmation, stripBuildMarker } from "@/lib/agentPipeline";
 import type { PipelineStep } from "@/lib/agentPipeline";
 import { supabase } from "@/integrations/supabase/client";
 import { type MsgContent, getTextContent } from "@/lib/codeParser";
 import { streamThroughCacheProxy, type CacheHitResult } from "@/lib/semanticCache";
+import { TokenBuffer } from "@/lib/tokenBuffer";
 
 type MsgMeta = { tokens?: number; durationMs?: number; model?: string };
 type Msg = { role: "user" | "assistant"; content: MsgContent; timestamp?: number; meta?: MsgMeta };
@@ -129,6 +130,9 @@ export function useChatAgent(config: ChatAgentConfig) {
       });
     };
 
+    // Create a token buffer for smooth streaming
+    const tokenBufferRef = { current: null as TokenBuffer | null };
+
     // Stream through the 3-layer cache proxy — now with workspace context
     await streamThroughCacheProxy({
       messages: apiMessages,
@@ -145,23 +149,37 @@ export function useChatAgent(config: ChatAgentConfig) {
         }
       },
       onDelta: (chunk) => {
-        fullChatResponse += chunk;
-        tokenCount += Math.ceil(chunk.length / 4); // rough token estimate
-        const displayText = stripBuildMarker(fullChatResponse);
-        setMessages((prev) => {
-          const last = prev[prev.length - 1];
-          if (last?.role === "assistant") {
-            return prev.map((m, i) => (i === prev.length - 1 ? { ...m, content: displayText } : m));
-          }
-          return [...prev, { role: "assistant", content: displayText, timestamp: Date.now() }];
-        });
+        // Initialize token buffer on first delta
+        if (!tokenBufferRef.current) {
+          tokenBufferRef.current = new TokenBuffer({
+            tokenDelay: 8,
+            onToken: (token) => {
+              fullChatResponse += token;
+              tokenCount += Math.ceil(token.length / 4);
+              const displayText = stripBuildMarker(fullChatResponse);
+              setMessages((prev) => {
+                const last = prev[prev.length - 1];
+                if (last?.role === "assistant") {
+                  return prev.map((m, i) => (i === prev.length - 1 ? { ...m, content: displayText, meta: { isStreaming: true } as any } : m));
+                }
+                return [...prev, { role: "assistant", content: displayText, timestamp: Date.now(), meta: { isStreaming: true } as any }];
+              });
+            },
+          });
+        }
+        tokenBufferRef.current.push(chunk);
       },
       onDone: (finalText) => {
+        if (tokenBufferRef.current) {
+          // Flush remaining tokens then finalize
+          tokenBufferRef.current.flush();
+        }
         if (fullChatResponse) {
-          finalize(finalText, false);
+          finalize(finalText || fullChatResponse, false);
         }
       },
       onError: (err) => {
+        if (tokenBufferRef.current) tokenBufferRef.current.flush();
         setMessages((prev) => [...prev, { role: "assistant", content: `⚠️ ${err}`, timestamp: Date.now() }]);
         setIsLoading(false);
         setBuildStep("");
