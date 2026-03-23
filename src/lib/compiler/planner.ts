@@ -60,38 +60,56 @@ type AppType = "landing" | "dashboard" | "crud";
 function detectAppType(rawRequirements: string, ir: BuildContext["ir"]): AppType {
   const text = rawRequirements.toLowerCase();
 
+  // Landing signals — ONLY explicit landing/marketing page requests
   const landingSignals = [
     "landing page", "website", "homepage", "home page", "marketing",
     "portfolio", "hero section", "testimonials", "pricing page",
     "saas", "startup", "company website", "business website",
     "brochure", "informational", "promotional", "showcase",
-    "college website", "school website", "university", "institution",
     "restaurant website", "agency website", "personal website",
     "features section", "about us", "contact page",
   ];
+
+  // NOTE: "university", "institution", "college website", "school website"
+  // are NOT landing signals — they are domain contexts that could be
+  // either landing pages OR management systems. The dashboard signals
+  // below will catch the management/portal/ERP use case.
 
   const dashboardSignals = [
     "dashboard", "admin panel", "management system", "crm", "erp",
     "inventory", "tracking", "analytics", "reporting", "monitor",
     "crud", "data table", "records", "manage users", "manage orders",
     "employee", "task manager", "project management",
+    // Domain-specific app signals (NOT landing pages)
+    "portal", "logbook", "e-logbook", "elogbook", "system",
+    "platform", "module", "workflow", "approval",
+    "competency", "assessment", "rotation", "posting",
+    "attendance", "payroll", "roster", "shift", "timesheet",
+    "patient", "appointment", "prescription", "diagnosis",
+    "enrollment", "admission", "timetable", "curriculum",
+    "invoice", "billing", "order management", "warehouse",
+    "role-based", "multi-role", "user role", "access control",
+    "student management", "faculty", "department",
+    "university admin", "institution admin",
   ];
 
   const landingScore = landingSignals.filter(s => text.includes(s)).length;
   const dashboardScore = dashboardSignals.filter(s => text.includes(s)).length;
 
-  // If IR has entities (data models), lean toward dashboard/CRUD
-  if (ir.entities.length >= 2 && dashboardScore >= landingScore) return "dashboard";
+  // If IR has entities (data models), strongly lean toward dashboard/CRUD
+  if (ir.entities.length >= 2) return "dashboard";
 
-  // Strong landing signals
-  if (landingScore > dashboardScore) return "landing";
-  if (landingScore > 0 && ir.entities.length === 0) return "landing";
+  // Dashboard signals dominate — it's an app, not a marketing page
+  if (dashboardScore > 0) return dashboardScore >= 2 ? "dashboard" : (landingScore > dashboardScore ? "landing" : "dashboard");
 
-  // Default to dashboard for apps with data models
+  // Strong landing signals with NO dashboard signals
+  if (landingScore > 0 && dashboardScore === 0) return "landing";
+
+  // Default to dashboard for apps with any data models
   if (ir.entities.length > 0) return "dashboard";
 
-  // Default based on overall tone
-  return dashboardScore > 0 ? "dashboard" : "landing";
+  // True fallback — no signals at all
+  return "landing";
 }
 
 let taskCounter = 0;
@@ -248,7 +266,7 @@ Login/Signup routes must stay public (never wrapped in ProtectedRoute).`,
 Create THESE files:
 1. /components/Navbar.jsx — Sticky top navbar with:
    - Logo/brand name on the left
-   - Navigation links (Features, How It Works, Pricing, Testimonials, Contact)
+   - Navigation links derived from the page sections (DO NOT hardcode generic items like "Features, How It Works, Pricing, Testimonials, Contact" — use section names that match the actual content)
    - Mobile hamburger menu with slide-down
    - Sign In + Get Started CTA buttons
    - Transparent → solid bg on scroll
