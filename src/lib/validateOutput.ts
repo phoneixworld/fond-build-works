@@ -31,8 +31,13 @@ const FORBIDDEN_PATTERNS: Array<{ regex: RegExp; label: string; fileFilter?: Reg
     fileFilter: /\.(jsx?|tsx?)$/,
   },
   {
-    regex: /const\s+(?:mock|fake|dummy)(?:Data|Users?|Items?|Records?)\s*=\s*\[/i,
-    label: "Mock/fake data array as primary data source",
+    regex: /const\s+(?:mock|fake|dummy|sample|seed|initial)(?:Data|Users?|Items?|Records?|Contacts?|Tasks?|Orders?|Products?)\s*=\s*\[/i,
+    label: "Mock/fake/sample data array as primary data source",
+    fileFilter: /\.(jsx?|tsx?)$/,
+  },
+  {
+    regex: /const\s+SAMPLE_DATA\s*=\s*\[/,
+    label: "SAMPLE_DATA inline array (must use Data API instead)",
     fileFilter: /\.(jsx?|tsx?)$/,
   },
   {
@@ -49,6 +54,11 @@ const FORBIDDEN_PATTERNS: Array<{ regex: RegExp; label: string; fileFilter?: Reg
     regex: /(?:const|let)\s+\[.*,\s*set\w+\]\s*=\s*useState\s*\(\s*\[[\s\S]{20,200}\{[\s\S]{10,100}id\s*:/,
     label: "useState with inline data array (in-memory persistence)",
     fileFilter: /(?:\/pages\/|\/hooks\/).*\.(jsx?|tsx?)$/,
+  },
+  {
+    regex: /setData\(\s*(?:SAMPLE_DATA|sampleData|mockData|fakeData|initialData)\s*\)/,
+    label: "Fallback to inline data array instead of real API",
+    fileFilter: /\.(jsx?|tsx?)$/,
   },
 ];
 
