@@ -658,14 +658,26 @@ const ChatPanel = forwardRef<ChatPanelHandle, { initialPrompt?: string; onVersio
     ).join("\n\n");
     const fullPrompt = `${docContext}\n\n${userInput}`;
 
+    // ── CRITICAL FIX: Store document text as a requirement phase ──
+    // This ensures the document context survives into the build pipeline
+    // even if the user confirms later with "go ahead" (which wouldn't carry the doc text).
+    for (const doc of docs) {
+      if (doc.text && doc.text.length > 50) {
+        const docPhaseText = `[Uploaded Document: ${doc.name}]\n\n${doc.text}`;
+        conversationAddPhaseCb(docPhaseText, false);
+        console.log(`[ChatPanel] Stored document "${doc.name}" as requirement phase (${doc.text.length} chars)`);
+      }
+    }
+    // Also store the user's accompanying text as a phase if substantive
+    if (userInput && userInput.length > 10) {
+      conversationAddPhaseCb(userInput, images.length > 0, images.length > 0 ? images : undefined);
+    }
+
     // Add the clean display message FIRST so it's immediately visible
     const displayMsg: Msg = { role: "user", content: cleanDisplay, timestamp: Date.now() };
     setMessages(prev => [...prev, displayMsg]);
 
-    // Send the full context to the pipeline — handleSmartSend will add its own
-    // user message, so we need to intercept. We use a special __docContext flag.
-    // Instead, we directly call handleSmartSend with the full prompt,
-    // then immediately fix the last user message to show clean display.
+    // Send the full context to the pipeline
     handleSmartSend(fullPrompt, images);
 
     // Immediately fix — no setTimeout race condition
@@ -687,7 +699,7 @@ const ChatPanel = forwardRef<ChatPanelHandle, { initialPrompt?: string; onVersio
       }
       return updated;
     });
-  }, [handleSmartSend]);
+  }, [handleSmartSend, conversationAddPhaseCb]);
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === "Enter" && !e.shiftKey) {
