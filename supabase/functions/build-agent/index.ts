@@ -231,7 +231,7 @@ ProtectedRoute wrapper. Login MUST call auth API.
 ❌ Empty route targets — every nav item → fully implemented page
 ❌ console.log spam — max 1 per file for errors only
 ❌ Inline styles — use Tailwind + design tokens
-❌ Hardcoded mock data in pages — use /hooks/ and /data/ files (but hooks MUST have inline SAMPLE_DATA fallback for when API is unavailable)
+❌ Hardcoded mock data in pages — ALL data MUST come from API calls with loading skeletons and empty states
 ❌ Rendering the user's prompt/requirements as page content — IMPLEMENT the features instead
 
 ## ═══════════════════════════════════════════════════════════════════

@@ -266,28 +266,54 @@ ${sampleRows}
 }
 
 function generateListPage(name: string, entity: string, title: string): string {
-  return `import React, { useState } from "react";
+  const pluralName = entity.toLowerCase() + "s";
+  return `import React, { useState, useEffect } from "react";
 import { Plus, Search, Filter, MoreVertical } from "lucide-react";
 
-const SAMPLE_DATA = [
-  { id: 1, name: "Sarah Johnson", status: "Active", email: "sarah@example.com", date: "Mar 15, 2024" },
-  { id: 2, name: "Michael Chen", status: "Active", email: "michael@example.com", date: "Mar 14, 2024" },
-  { id: 3, name: "Emily Brown", status: "Pending", email: "emily@example.com", date: "Mar 13, 2024" },
-  { id: 4, name: "James Wilson", status: "Inactive", email: "james@example.com", date: "Mar 12, 2024" },
-  { id: 5, name: "Sophia Martinez", status: "Active", email: "sophia@example.com", date: "Mar 11, 2024" },
-  { id: 6, name: "David Lee", status: "Active", email: "david@example.com", date: "Mar 10, 2024" },
-];
+const API_BASE = window.__SUPABASE_URL__ || "";
+const API_KEY = window.__SUPABASE_KEY__ || "";
+const PROJECT_ID = window.__PROJECT_ID__ || "";
 
 export default function ${name}() {
+  const [data, setData] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
-  const filtered = SAMPLE_DATA.filter(item => item.name.toLowerCase().includes(search.toLowerCase()));
+
+  useEffect(() => {
+    async function fetchData() {
+      if (!API_BASE || !PROJECT_ID) { setLoading(false); return; }
+      try {
+        const res = await fetch(\`\${API_BASE}/functions/v1/project-api\`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "Authorization": \`Bearer \${API_KEY}\` },
+          body: JSON.stringify({ project_id: PROJECT_ID, collection: "${pluralName}", action: "list" }),
+        });
+        const json = await res.json();
+        setData(json.data || []);
+      } catch (e) { console.error("Failed to fetch ${pluralName}:", e); }
+      finally { setLoading(false); }
+    }
+    fetchData();
+  }, []);
+
+  const filtered = data.filter(item => (item.name || "").toLowerCase().includes(search.toLowerCase()));
+
+  if (loading) {
+    return (
+      <div className="p-6 space-y-6 animate-pulse">
+        <div className="h-8 bg-[var(--color-bg-secondary)] rounded w-48" />
+        <div className="h-10 bg-[var(--color-bg-secondary)] rounded w-64" />
+        <div className="space-y-3">{[1,2,3,4,5].map(i => <div key={i} className="h-12 bg-[var(--color-bg-secondary)] rounded" />)}</div>
+      </div>
+    );
+  }
 
   return (
     <div className="p-6 space-y-6">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-[var(--color-text)]">${title}</h1>
-          <p className="text-sm text-[var(--color-text-muted)] mt-1">{SAMPLE_DATA.length} total ${entity.toLowerCase()}s</p>
+          <p className="text-sm text-[var(--color-text-muted)] mt-1">{data.length} total ${entity.toLowerCase()}s</p>
         </div>
         <button className="flex items-center gap-2 px-4 py-2 bg-[var(--color-primary)] text-white rounded-lg text-sm font-medium hover:opacity-90 transition-opacity">
           <Plus className="w-4 h-4" />
@@ -317,9 +343,8 @@ export default function ${name}() {
           <thead>
             <tr className="border-b border-[var(--color-border)] bg-[var(--color-bg-secondary)]">
               <th className="text-left px-5 py-3 text-xs font-medium text-[var(--color-text-secondary)] uppercase">Name</th>
-              <th className="text-left px-5 py-3 text-xs font-medium text-[var(--color-text-secondary)] uppercase">Email</th>
               <th className="text-left px-5 py-3 text-xs font-medium text-[var(--color-text-secondary)] uppercase">Status</th>
-              <th className="text-left px-5 py-3 text-xs font-medium text-[var(--color-text-secondary)] uppercase">Date</th>
+              <th className="text-left px-5 py-3 text-xs font-medium text-[var(--color-text-secondary)] uppercase">Created</th>
               <th className="text-right px-5 py-3 text-xs font-medium text-[var(--color-text-secondary)] uppercase"></th>
             </tr>
           </thead>
@@ -327,11 +352,10 @@ export default function ${name}() {
             {filtered.map((row) => (
               <tr key={row.id} className="border-b border-[var(--color-border)] last:border-0 hover:bg-[var(--color-bg-secondary)] transition-colors">
                 <td className="px-5 py-3.5 font-medium text-[var(--color-text)]">{row.name}</td>
-                <td className="px-5 py-3.5 text-[var(--color-text-secondary)]">{row.email}</td>
                 <td className="px-5 py-3.5">
-                  <span className={\`px-2 py-0.5 rounded-full text-xs font-medium \${row.status === "Active" ? "bg-green-100 text-green-700" : row.status === "Pending" ? "bg-yellow-100 text-yellow-700" : "bg-gray-100 text-gray-600"}\`}>{row.status}</span>
+                  <span className={\`px-2 py-0.5 rounded-full text-xs font-medium \${(row.status || "Active") === "Active" ? "bg-green-100 text-green-700" : "bg-yellow-100 text-yellow-700"}\`}>{row.status || "Active"}</span>
                 </td>
-                <td className="px-5 py-3.5 text-[var(--color-text-secondary)]">{row.date}</td>
+                <td className="px-5 py-3.5 text-[var(--color-text-secondary)]">{row.created_at ? new Date(row.created_at).toLocaleDateString() : "—"}</td>
                 <td className="px-5 py-3.5 text-right">
                   <button className="p-1 hover:bg-[var(--color-bg-secondary)] rounded"><MoreVertical className="w-4 h-4 text-[var(--color-text-muted)]" /></button>
                 </td>
@@ -342,8 +366,8 @@ export default function ${name}() {
         {filtered.length === 0 && (
           <div className="py-12 text-center">
             <Search className="w-10 h-10 mx-auto text-[var(--color-text-muted)] mb-3" />
-            <p className="text-sm font-medium text-[var(--color-text)]">No results found</p>
-            <p className="text-xs text-[var(--color-text-muted)] mt-1">Try adjusting your search terms</p>
+            <p className="text-sm font-medium text-[var(--color-text)]">{data.length === 0 ? "No ${entity.toLowerCase()}s yet" : "No results found"}</p>
+            <p className="text-xs text-[var(--color-text-muted)] mt-1">{data.length === 0 ? "Create your first ${entity.toLowerCase()} to get started" : "Try adjusting your search terms"}</p>
           </div>
         )}
       </div>
@@ -452,32 +476,62 @@ export default function ${name}() {
 }
 
 function generateStaticPage(name: string, title: string): string {
-  return `import React, { useState } from "react";
+  const collectionName = title.toLowerCase().replace(/\s+/g, "_");
+  return `import React, { useState, useEffect } from "react";
 import { FileText, Plus, Search, Filter, MoreVertical, Edit, Trash2, Eye } from "lucide-react";
 
-const SAMPLE_DATA = [
-  { id: 1, name: "Item Alpha", category: "Category A", status: "Active", updated: "Mar 15, 2024", assignee: "Sarah Johnson" },
-  { id: 2, name: "Item Beta", category: "Category B", status: "Pending", updated: "Mar 14, 2024", assignee: "Michael Chen" },
-  { id: 3, name: "Item Gamma", category: "Category A", status: "Active", updated: "Mar 13, 2024", assignee: "Emily Brown" },
-  { id: 4, name: "Item Delta", category: "Category C", status: "Inactive", updated: "Mar 12, 2024", assignee: "James Wilson" },
-  { id: 5, name: "Item Epsilon", category: "Category B", status: "Active", updated: "Mar 11, 2024", assignee: "Sophia Martinez" },
-  { id: 6, name: "Item Zeta", category: "Category A", status: "Pending", updated: "Mar 10, 2024", assignee: "David Lee" },
-];
+const API_BASE = window.__SUPABASE_URL__ || "";
+const API_KEY = window.__SUPABASE_KEY__ || "";
+const PROJECT_ID = window.__PROJECT_ID__ || "";
 
 export default function ${name}() {
+  const [data, setData] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [showModal, setShowModal] = useState(false);
-  const filtered = SAMPLE_DATA.filter(item =>
-    item.name.toLowerCase().includes(search.toLowerCase()) ||
-    item.assignee.toLowerCase().includes(search.toLowerCase())
+
+  useEffect(() => {
+    async function fetchData() {
+      if (!API_BASE || !PROJECT_ID) { setLoading(false); return; }
+      try {
+        const res = await fetch(\`\${API_BASE}/functions/v1/project-api\`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "Authorization": \`Bearer \${API_KEY}\` },
+          body: JSON.stringify({ project_id: PROJECT_ID, collection: "${collectionName}", action: "list" }),
+        });
+        const json = await res.json();
+        setData(json.data || []);
+      } catch (e) { console.error("Failed to fetch ${collectionName}:", e); }
+      finally { setLoading(false); }
+    }
+    fetchData();
+  }, []);
+
+  const filtered = data.filter(item =>
+    (item.name || "").toLowerCase().includes(search.toLowerCase())
   );
+
+  if (loading) {
+    return (
+      <div className="p-6 space-y-6 animate-pulse">
+        <div className="h-8 bg-[var(--color-bg-secondary)] rounded w-48" />
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          {[1,2,3].map(i => <div key={i} className="h-24 bg-[var(--color-bg-secondary)] rounded-xl" />)}
+        </div>
+        <div className="space-y-3">{[1,2,3,4,5].map(i => <div key={i} className="h-12 bg-[var(--color-bg-secondary)] rounded" />)}</div>
+      </div>
+    );
+  }
+
+  const activeCount = data.filter(d => (d.status || "Active") === "Active").length;
+  const pendingCount = data.filter(d => d.status === "Pending").length;
 
   return (
     <div className="p-6 space-y-6 animate-fade-in">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-[var(--color-text)]">${title}</h1>
-          <p className="text-sm text-[var(--color-text-muted)] mt-1">{SAMPLE_DATA.length} total records</p>
+          <p className="text-sm text-[var(--color-text-muted)] mt-1">{data.length} total records</p>
         </div>
         <button
           onClick={() => setShowModal(true)}
@@ -508,18 +562,15 @@ export default function ${name}() {
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <div className="bg-white rounded-xl border border-[var(--color-border)] p-4">
           <p className="text-xs font-medium text-[var(--color-text-secondary)] uppercase tracking-wide">Total</p>
-          <p className="text-2xl font-bold text-[var(--color-text)] mt-1">{SAMPLE_DATA.length}</p>
-          <p className="text-xs text-[var(--color-success)] mt-1">+12% from last month</p>
+          <p className="text-2xl font-bold text-[var(--color-text)] mt-1">{data.length}</p>
         </div>
         <div className="bg-white rounded-xl border border-[var(--color-border)] p-4">
           <p className="text-xs font-medium text-[var(--color-text-secondary)] uppercase tracking-wide">Active</p>
-          <p className="text-2xl font-bold text-[var(--color-text)] mt-1">{SAMPLE_DATA.filter(d => d.status === "Active").length}</p>
-          <p className="text-xs text-[var(--color-success)] mt-1">+8% from last month</p>
+          <p className="text-2xl font-bold text-[var(--color-text)] mt-1">{activeCount}</p>
         </div>
         <div className="bg-white rounded-xl border border-[var(--color-border)] p-4">
           <p className="text-xs font-medium text-[var(--color-text-secondary)] uppercase tracking-wide">Pending</p>
-          <p className="text-2xl font-bold text-[var(--color-text)] mt-1">{SAMPLE_DATA.filter(d => d.status === "Pending").length}</p>
-          <p className="text-xs text-[var(--color-warning)] mt-1">Needs attention</p>
+          <p className="text-2xl font-bold text-[var(--color-text)] mt-1">{pendingCount}</p>
         </div>
       </div>
 
@@ -528,9 +579,7 @@ export default function ${name}() {
           <thead>
             <tr className="border-b border-[var(--color-border)] bg-[var(--color-bg-secondary)]">
               <th className="text-left px-5 py-3 text-xs font-medium text-[var(--color-text-secondary)] uppercase">Name</th>
-              <th className="text-left px-5 py-3 text-xs font-medium text-[var(--color-text-secondary)] uppercase">Category</th>
               <th className="text-left px-5 py-3 text-xs font-medium text-[var(--color-text-secondary)] uppercase">Status</th>
-              <th className="text-left px-5 py-3 text-xs font-medium text-[var(--color-text-secondary)] uppercase">Assignee</th>
               <th className="text-left px-5 py-3 text-xs font-medium text-[var(--color-text-secondary)] uppercase">Updated</th>
               <th className="text-right px-5 py-3 text-xs font-medium text-[var(--color-text-secondary)] uppercase">Actions</th>
             </tr>
@@ -539,12 +588,10 @@ export default function ${name}() {
             {filtered.map((row) => (
               <tr key={row.id} className="border-b border-[var(--color-border)] last:border-0 hover:bg-[var(--color-bg-secondary)] transition-colors">
                 <td className="px-5 py-3.5 font-medium text-[var(--color-text)]">{row.name}</td>
-                <td className="px-5 py-3.5 text-[var(--color-text-secondary)]">{row.category}</td>
                 <td className="px-5 py-3.5">
-                  <span className={\`px-2 py-0.5 rounded-full text-xs font-medium \${row.status === "Active" ? "bg-green-100 text-green-700" : row.status === "Pending" ? "bg-yellow-100 text-yellow-700" : "bg-gray-100 text-gray-600"}\`}>{row.status}</span>
+                  <span className={\`px-2 py-0.5 rounded-full text-xs font-medium \${(row.status || "Active") === "Active" ? "bg-green-100 text-green-700" : row.status === "Pending" ? "bg-yellow-100 text-yellow-700" : "bg-gray-100 text-gray-600"}\`}>{row.status || "Active"}</span>
                 </td>
-                <td className="px-5 py-3.5 text-[var(--color-text-secondary)]">{row.assignee}</td>
-                <td className="px-5 py-3.5 text-[var(--color-text-secondary)]">{row.updated}</td>
+                <td className="px-5 py-3.5 text-[var(--color-text-secondary)]">{row.updated_at ? new Date(row.updated_at).toLocaleDateString() : "—"}</td>
                 <td className="px-5 py-3.5 text-right">
                   <div className="flex items-center justify-end gap-1">
                     <button className="p-1.5 hover:bg-[var(--color-bg-secondary)] rounded-lg" title="View"><Eye className="w-3.5 h-3.5 text-[var(--color-text-muted)]" /></button>
@@ -559,8 +606,8 @@ export default function ${name}() {
         {filtered.length === 0 && (
           <div className="py-12 text-center">
             <Search className="w-10 h-10 mx-auto text-[var(--color-text-muted)] mb-3" />
-            <p className="text-sm font-medium text-[var(--color-text)]">No results found</p>
-            <p className="text-xs text-[var(--color-text-muted)] mt-1">Try adjusting your search terms</p>
+            <p className="text-sm font-medium text-[var(--color-text)]">{data.length === 0 ? "No records yet" : "No results found"}</p>
+            <p className="text-xs text-[var(--color-text-muted)] mt-1">{data.length === 0 ? "Create your first record to get started" : "Try adjusting your search terms"}</p>
           </div>
         )}
       </div>
@@ -573,14 +620,6 @@ export default function ${name}() {
               <div>
                 <label className="block text-sm font-medium text-[var(--color-text)] mb-1">Name</label>
                 <input type="text" placeholder="Enter name" className="w-full px-3 py-2 text-sm border border-[var(--color-border)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]/20" />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-[var(--color-text)] mb-1">Category</label>
-                <select className="w-full px-3 py-2 text-sm border border-[var(--color-border)] rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]/20">
-                  <option>Category A</option>
-                  <option>Category B</option>
-                  <option>Category C</option>
-                </select>
               </div>
               <div className="flex gap-3 pt-2">
                 <button className="flex-1 px-4 py-2 bg-[var(--color-primary)] text-white rounded-lg text-sm font-medium hover:opacity-90">Save</button>
