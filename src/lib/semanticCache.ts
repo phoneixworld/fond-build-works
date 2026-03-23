@@ -183,8 +183,11 @@ export async function streamThroughCacheProxy({
       ? lastUserMsg.content.filter((c: any) => c.type === "text").map((c: any) => c.text).join(" ")
       : "";
 
-  // L1 check (sub-1ms)
-  if (userPrompt.length > 5) {
+  // HARD BYPASS: bare confirmations must never hit cache
+  if (isBareConfirmation(userPrompt)) {
+    console.log(`[SemanticCache] Stream bypass — bare confirmation: "${userPrompt}"`);
+    // Fall through to L2/AI call below
+  } else if (userPrompt.length > 5) {
     const l1 = corpus.findSimilar(userPrompt);
     if (l1.match) {
       const result: CacheHitResult = {
