@@ -853,13 +853,20 @@ Deno.serve(async (req) => {
 
         const chatHistory = (project?.chat_history || []) as Array<{ role: string; content: string }>;
         
-        // Extract meaningful messages — use a low threshold to avoid blocking builds
-        // that have brief but valid instructions (e.g. "add auth" is only 8 chars)
-        const substantiveMessages = chatHistory.filter(
-          (m: any) => m.content && m.content.length > 5
+        // CRITICAL: Only use USER messages as requirements.
+        // Assistant responses (acknowledgments, summaries, confirmations) are NOT requirements
+        // and cause the build agent to drift from the user's actual request.
+        const NOISE_PATTERNS = /^(yes|yep|yeah|go ahead|proceed|do it|ok|okay|sure|continue|start|build it|just do it)\s*[.!]?$/i;
+        const META_PATTERNS = /^(i can generate|proceeding with|changes complete|here's a summary|of course|i've just finished|what would you like)/i;
+        
+        const userMessages = chatHistory.filter(
+          (m: any) => m.role === "user" && m.content && m.content.length > 5 && !NOISE_PATTERNS.test(m.content.trim())
         );
 
-        if (substantiveMessages.length === 0) {
+        // Find the primary build trigger — the last substantive user message
+        const buildTrigger = userMessages.length > 0 ? userMessages[userMessages.length - 1].content : "";
+
+        if (userMessages.length === 0) {
           // Even with no chat history, if the project has a name, allow building
           // with a minimal context — the build agent can handle sparse prompts
           const projectName = project?.name || "";
@@ -877,16 +884,18 @@ Deno.serve(async (req) => {
           return json({ error: "No requirements to compile", context: "", buildReadiness: { isReady: false, score: 0 } }, 400);
         }
 
-        // Build context from chat history
+        // Build context from USER messages only — no assistant responses
         let chatContext = `# APPLICATION REQUIREMENTS (extracted from conversation)\n\n`;
         chatContext += `## Project: ${project?.name || "Untitled"}\n\n`;
-        chatContext += `## CONVERSATION CONTEXT\n\n`;
-        for (const msg of substantiveMessages) {
-          chatContext += `**${msg.role === "user" ? "User" : "Assistant"}:**\n${msg.content}\n\n`;
+        chatContext += `## USER REQUIREMENTS\n\n`;
+        for (const msg of userMessages) {
+          chatContext += `- ${msg.content}\n\n`;
         }
-        chatContext += `\n## BUILD INSTRUCTION\n`;
-        chatContext += `Build the COMPLETE application based on the conversation above.\n`;
-        chatContext += `Implement every feature, page, and module discussed. Do NOT simplify or skip features.\n`;
+        chatContext += `\n## BUILD TRIGGER\n`;
+        chatContext += `${buildTrigger}\n\n`;
+        chatContext += `## BUILD INSTRUCTION\n`;
+        chatContext += `Build EXACTLY what the user requested above. Stay focused on the domain "${project?.name || ""}". Do NOT drift to unrelated features.\n`;
+        chatContext += `Implement the core features implied by the user's request. Do NOT add features the user did not ask for.\n`;
 
         // Transition to building
         await transitionState(supabase, projectId, "building", {}, userId, "Build from chat context (no formal requirements)");
