@@ -6,8 +6,8 @@
  * so Phoenix can actually diagnose issues instead of bluffing.
  */
 
-import { useCallback, useRef } from "react";
-import { hasBuildConfirmation, stripBuildMarker } from "@/lib/agentPipeline";
+import { useCallback } from "react";
+import { stripBuildMarker } from "@/lib/agentPipeline";
 import type { PipelineStep } from "@/lib/agentPipeline";
 import { supabase } from "@/integrations/supabase/client";
 import { type MsgContent, getTextContent } from "@/lib/codeParser";
@@ -16,6 +16,49 @@ import { TokenBuffer } from "@/lib/tokenBuffer";
 
 type MsgMeta = { tokens?: number; durationMs?: number; model?: string };
 type Msg = { role: "user" | "assistant"; content: MsgContent; timestamp?: number; meta?: MsgMeta };
+
+const BARE_CONFIRMATIONS = new Set([
+  "ok", "okay", "sure", "go ahead", "yes", "yep", "yeah", "proceed", "do it", "start", "continue", "approved",
+]);
+
+const ACTIONABLE_INTENT = /\b(build|create|generate|scaffold|fix|edit|modify|change|update|refactor|add|remove|delete|implement|rewrite|repair|patch)\b/i;
+const READ_ONLY_QA = /^(what|why|how|when|where|who|can you explain|explain|tell me|help me understand|compare|difference between|is it|are we)\b/i;
+const NEGATIVE_BUILD = /\b(do not build|don't build|dont build|do not edit|don't edit|dont edit|stop building|root cause only|just explain|only explain)\b/i;
+
+function extractTextFromContent(content: any): string {
+  if (typeof content === "string") return content;
+  if (Array.isArray(content)) {
+    return content
+      .filter((part: any) => part?.type === "text" && typeof part?.text === "string")
+      .map((part: any) => part.text)
+      .join(" ");
+  }
+  return "";
+}
+
+function isBareConfirmationText(text: string): boolean {
+  const normalized = text.trim().toLowerCase().replace(/[?.!,]+$/g, "");
+  return BARE_CONFIRMATIONS.has(normalized) || normalized.length < 4;
+}
+
+function inferCacheIntent(text: string): "read_only_qa" | "actionable" {
+  const normalized = text.trim().toLowerCase();
+  if (!normalized) return "actionable";
+  if (isBareConfirmationText(normalized)) return "actionable";
+  if (NEGATIVE_BUILD.test(normalized)) return "actionable";
+  if (ACTIONABLE_INTENT.test(normalized)) return "actionable";
+  if (READ_ONLY_QA.test(normalized) || normalized.endsWith("?")) return "read_only_qa";
+  return "actionable";
+}
+
+function buildRequirementsSnippet(apiMessages: Array<{ role: string; content: any }>): string {
+  const userMsgs = apiMessages
+    .filter((m) => m.role === "user")
+    .map((m) => extractTextFromContent(m.content))
+    .filter((t) => t && !isBareConfirmationText(t));
+
+  return userMsgs.join("\n\n").slice(0, 1200);
+}
 
 export interface ChatAgentConfig {
   currentProject: any;
@@ -26,7 +69,6 @@ export interface ChatAgentConfig {
   setBuildStep: (s: string) => void;
   setPipelineStep: (step: PipelineStep | null) => void;
   setCurrentAgent: (agent: string | null) => void;
-  setPendingBuildPrompt: (prompt: string | null) => void;
   setIsLoading: (v: boolean) => void;
   messagesRef: React.RefObject<Msg[]>;
   isSendingRef: React.MutableRefObject<boolean>;
@@ -41,7 +83,7 @@ export function useChatAgent(config: ChatAgentConfig) {
   const {
     currentProject, saveProject,
     setMessages, setInput, setAttachedImages, setBuildStep,
-    setPipelineStep, setCurrentAgent, setPendingBuildPrompt, setIsLoading,
+    setPipelineStep, setCurrentAgent, setIsLoading,
     messagesRef, isSendingRef, isLoadingRef, buildMessageContent,
     sandpackFilesRef, previewErrors,
   } = config;
@@ -78,6 +120,9 @@ export function useChatAgent(config: ChatAgentConfig) {
     } catch {}
 
     const userText = typeof text === "string" ? text : "";
+    const cacheIntent = inferCacheIntent(userText);
+    const bypassCache = cacheIntent !== "read_only_qa";
+    const requirementsSnippet = buildRequirementsSnippet(apiMessages);
 
     // FIX #1: Collect workspace file list for chat-agent context
     const workspaceFiles: string[] = [];
@@ -102,10 +147,6 @@ export function useChatAgent(config: ChatAgentConfig) {
       setPipelineStep(null);
       setCurrentAgent(null);
       isSendingRef.current = false;
-
-      if (hasBuildConfirmation(responseText)) {
-        setPendingBuildPrompt(userText);
-      }
 
       const displayText = stripBuildMarker(responseText);
       const cacheTag = isCached && cacheInfo
@@ -141,6 +182,9 @@ export function useChatAgent(config: ChatAgentConfig) {
       knowledge,
       workspaceFiles: workspaceFiles.length > 0 ? workspaceFiles : undefined,
       recentErrors: recentErrors.length > 0 ? recentErrors : undefined,
+      bypassCache,
+      cacheIntent,
+      requirementsSnippet,
       onCacheHit: (result) => {
         console.log(`[ChatAgent] Cache hit: ${result.layer} ${result.matchType} (${(result.similarity * 100).toFixed(1)}%)`);
         setBuildStep(`⚡ ${result.layer} cache hit`);
