@@ -153,6 +153,12 @@ export function useChatAgent(config: ChatAgentConfig) {
       setCurrentAgent(null);
       isSendingRef.current = false;
 
+      // Detect [BUILD_CONFIRMED] marker and trigger build pipeline
+      if (hasBuildConfirmation(responseText) && setPendingBuildPrompt) {
+        console.log("[ChatAgent] BUILD_CONFIRMED detected in chat response — signaling build pipeline");
+        setPendingBuildPrompt(responseText);
+      }
+
       const displayText = stripBuildMarker(responseText);
       const cacheTag = isCached && cacheInfo
         ? `\n\n_⚡ ${cacheInfo.layer} cache ${cacheInfo.matchType} hit (${(cacheInfo.similarity * 100).toFixed(0)}% match)_`
