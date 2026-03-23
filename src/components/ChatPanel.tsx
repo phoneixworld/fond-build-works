@@ -486,6 +486,7 @@ const ChatPanel = forwardRef<ChatPanelHandle, { initialPrompt?: string; onVersio
       setPreviewMode("html");
       setPreviewErrors([]);
       setAttachedImages([]);
+      setAttachedDocuments([]);
       setVirtualFiles({});
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
