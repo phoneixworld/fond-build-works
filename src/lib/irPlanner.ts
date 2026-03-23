@@ -24,29 +24,42 @@ export async function planIRFromRequirements(
   rawRequirements: string
 ): Promise<IR> {
   const trimmed = rawRequirements.trim();
+  const normalized = trimmed.toLowerCase().replace(/[?.!,]+$/g, "");
 
-  // ── GUARDRAIL 1: Minimum length ──
-  if (trimmed.length < 50) {
+  const BARE_CONFIRMATION = /^(ok|okay|sure|go ahead|yes|yep|yeah|proceed|do it|continue|build it|start|approved|confirm)$/i;
+  if (BARE_CONFIRMATION.test(normalized)) {
     throw new Error(
       `IRPlanner: requirements too short to plan a build (${trimmed.length} chars). ` +
-      `Received: "${trimmed.slice(0, 40)}". The build pipeline must pass accumulated requirements, not a trigger phrase.`
+      `Received confirmation phrase "${trimmed}" instead of requirements.`
     );
   }
 
-  // ── GUARDRAIL 2: Domain keyword presence ──
+  // ── GUARDRAIL 1: Domain keyword presence ──
   const DOMAIN_KEYWORDS = /\b(dashboard|employee|department|attendance|logbook|e-?log|university|student|hr|erp|crm|ecommerce|shop|product|invoice|patient|hospital|school|task|project|blog|chat|user|admin|auth|login|signup|form|table|list|report|analytics|calendar|schedule|booking|inventory|order|payment|notification|profile|settings|role|permission|workflow|approval|ticket|support|contact|lead|pipeline|kanban|board|chart|graph|widget|module|page|screen|view|faculty|competency|assessment|rotation|posting|curriculum|exam|grade|course|enrollment|ward|diagnosis|prescription|pharmacy|appointment|clinic|medical|postgraduate|cbme|training|supervisor|mentor|guide|evaluation|portfolio|milestone|certification|accreditation|residency|fellowship|specialty|onboarding|roster|shift|timesheet|payroll|salary|leave|benefit|compliance|grievance|recruit|candidate|appraisal|supplier|warehouse|purchase|stock|shipping|catalog|fee|admission|timetable|syllabus|classroom|announcement|parent|teacher)\b/i;
-  if (!DOMAIN_KEYWORDS.test(trimmed)) {
+  const hasDomainContext = DOMAIN_KEYWORDS.test(trimmed);
+  if (!hasDomainContext) {
     throw new Error(
       `IRPlanner: requirements missing domain context. No recognizable domain keywords found. ` +
       `The build pipeline must pass structured requirements describing what to build.`
     );
   }
 
+  // ── GUARDRAIL 2: Handle concise but valid domain prompts ──
+  let planningRequirements = trimmed;
+  if (trimmed.length < 50) {
+    planningRequirements = [
+      `Build request: ${trimmed}`,
+      `Scope: Generate a complete, production-ready application for this domain.`,
+      `Include core modules, navigation, entities, and end-to-end CRUD workflows with sensible defaults.`,
+    ].join("\n");
+    console.warn(`[IRPlanner] Expanded short domain request (${trimmed.length} chars) into structured requirements payload.`);
+  }
+
   // ── GUARDRAIL 3: Detect complexity tier ──
-  const complexityTier = detectComplexityTier(trimmed);
+  const complexityTier = detectComplexityTier(planningRequirements);
 
   const system = buildIRSystemPrompt(complexityTier);
-  const user = buildUserPrompt(rawRequirements, complexityTier);
+  const user = buildUserPrompt(planningRequirements, complexityTier);
   const raw = await llm({ system, user });
   const json = extractJson(raw);
   const ir = JSON.parse(json) as IR;

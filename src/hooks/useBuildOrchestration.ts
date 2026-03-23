@@ -1500,6 +1500,54 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
 
     const hasExistingCode = !!(sandpackFilesRef.current && Object.keys(sandpackFilesRef.current).length > 0);
 
+    const buildRequirementsPayload = async (triggerText: string) => {
+      // Priority 1: Server-compiled requirements from conversation-engine FSM
+      const requirements = await Promise.resolve(conversationGetRequirements?.() || "");
+      let assembledRequirements = requirements;
+
+      // Priority 2: Fall back to chat history mining if FSM requirements are empty
+      if (!assembledRequirements || assembledRequirements.length <= 50) {
+        const ERROR_NOISE = /\b(element type is invalid|unclosed block|unclosed bracket|is not a function|is not defined|something went wrong|syntax error|check the render|you likely forgot|mixed up default|module not found|cannot find module|auto-fix|auto fix|✅ Fixed|⚠️ Found|⚠️ Build)\b/i;
+        const FRUSTRATION_NOISE = /^(stupid|idiot|bloody|damn|hell|wtf|omg|ugh|why|\?{2,}|\.{3,}|!{2,})$/i;
+        const STATUS_MSG = /^(✅|⚠️|🔧|🔄|Building|Processing|Thinking|Generating)/;
+
+        const relevantMessages = messagesRef.current.filter(m => {
+          const msgText = getTextContent(m.content);
+          if (ERROR_NOISE.test(msgText)) return false;
+          if (FRUSTRATION_NOISE.test(msgText.trim())) return false;
+          if (m.role === "assistant" && STATUS_MSG.test(msgText.trim())) return false;
+          if (m.role === "user") return true;
+          if (m.role === "assistant" && msgText.length > 50) return true;
+          return false;
+        });
+
+        const chatContext = relevantMessages
+          .map(m => `**${m.role === "user" ? "User" : "Assistant"}:**\n${getTextContent(m.content)}`)
+          .join("\n\n");
+
+        if (chatContext.length > 100) {
+          assembledRequirements = `# APPLICATION REQUIREMENTS (from conversation)\n\n${chatContext}\n\n--- END REQUIREMENTS ---\nBuild the COMPLETE application incorporating ALL above requirements.`;
+        }
+      }
+
+      if (assembledRequirements && assembledRequirements.length > 50) {
+        return `${assembledRequirements}\n\n## BUILD TRIGGER\n${triggerText}`;
+      }
+
+      // Final fallback: promote concise domain request into build-safe requirements
+      const normalizedTrigger = triggerText.trim();
+      if (!normalizedTrigger) return triggerText;
+
+      return [
+        "# APPLICATION REQUIREMENTS",
+        "",
+        normalizedTrigger,
+        "",
+        "Build a complete, production-ready application for this domain request with sensible defaults.",
+        "Include core modules, sidebar navigation, realistic entities, and end-to-end CRUD workflows.",
+      ].join("\n");
+    };
+
     // ── Mandatory confirmation flow for generation/refactor/fix/high-impact requests ──
     if (pendingExecution) {
       const reply = parseConfirmationReply(finalText);
@@ -1535,9 +1583,15 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
           return;
         }
 
+        const approvedBuildPrompt = await buildRequirementsPayload(approved.prompt);
+        if (isSmartSendStale()) {
+          console.warn("[SmartSend] Project switched during confirmation build assembly, aborting");
+          return;
+        }
+
         setCurrentAgent("build");
         setPipelineStep("planning");
-        sendMessage(approved.prompt, approved.images);
+        sendMessage(approvedBuildPrompt, approved.images);
         return;
       }
     }
@@ -1734,69 +1788,18 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
         }
 
         conversationStartBuilding?.();
-        
-        // ── REQUIREMENTS ASSEMBLY: Build a complete requirements string ──
-        // Priority 1: Server-compiled requirements from conversation-engine FSM
-        const requirements = await Promise.resolve(conversationGetRequirements?.() || "");
+        const buildPrompt = await buildRequirementsPayload(finalText);
 
         if (isSmartSendStale()) {
           console.warn("[SmartSend] Project switched during requirements fetch, aborting");
           return;
         }
 
-        // Priority 2: Fall back to chat history mining if FSM requirements are empty
-        // This captures cases where the gather phase wasn't used (direct chat → build)
-        let assembledRequirements = requirements;
-
-        if (!assembledRequirements || assembledRequirements.length <= 50) {
-          // Mine the FULL chat history for requirements context
-          // Include assistant messages (they contain plans/proposals the user confirmed)
-          const ERROR_NOISE = /\b(element type is invalid|unclosed block|unclosed bracket|is not a function|is not defined|something went wrong|syntax error|check the render|you likely forgot|mixed up default|module not found|cannot find module|auto-fix|auto fix|✅ Fixed|⚠️ Found|⚠️ Build)\b/i;
-          const FRUSTRATION_NOISE = /^(stupid|idiot|bloody|damn|hell|wtf|omg|ugh|why|\?{2,}|\.{3,}|!{2,})$/i;
-          const STATUS_MSG = /^(✅|⚠️|🔧|🔄|Building|Processing|Thinking|Generating)/;
-          
-          const relevantMessages = messages.filter(m => {
-            const msgText = typeof m.content === "string" ? m.content : "";
-            // Always skip error noise and frustration
-            if (ERROR_NOISE.test(msgText)) return false;
-            if (FRUSTRATION_NOISE.test(msgText.trim())) return false;
-            // Skip assistant status messages
-            if (m.role === "assistant" && STATUS_MSG.test(msgText.trim())) return false;
-            // Keep ALL user messages (even short confirmations like "all the above")
-            // because they confirm previous assistant proposals
-            if (m.role === "user") return true;
-            // Keep assistant messages that contain substantive proposals (>50 chars)
-            if (m.role === "assistant" && msgText.length > 50) return true;
-            return false;
-          });
-
-          const chatContext = relevantMessages
-            .map(m => {
-              const msgText = typeof m.content === "string" ? m.content : "";
-              return `**${m.role === "user" ? "User" : "Assistant"}:**\n${msgText}`;
-            })
-            .join("\n\n");
-
-          if (chatContext.length > 100) {
-            assembledRequirements = `# APPLICATION REQUIREMENTS (from conversation)\n\n${chatContext}\n\n--- END REQUIREMENTS ---\nBuild the COMPLETE application incorporating ALL above requirements.`;
-          }
-        }
-
-        // Final assembly: combine accumulated requirements with trigger text
-        if (assembledRequirements && assembledRequirements.length > 50) {
-          const buildPrompt = assembledRequirements + "\n\n## BUILD TRIGGER\n" + finalText;
-          console.log(`[SmartSend] Build prompt length: ${buildPrompt.length} chars (requirements: ${assembledRequirements.length})`);
-          
-          setCurrentAgent("build");
-          setPipelineStep("planning");
-          sendMessage(buildPrompt, images);
-          return;
-        }
-        
-        // SAFETY: If we still have no context, log a warning — this means
-        // the user said "go ahead" with no prior requirements
-        console.warn(`[SmartSend] Build triggered with no accumulated requirements. finalText="${finalText}"`);
-        // Fall through to direct build below (will use finalText as-is)
+        console.log(`[SmartSend] Build prompt length: ${buildPrompt.length} chars`);
+        setCurrentAgent("build");
+        setPipelineStep("planning");
+        sendMessage(buildPrompt, images);
+        return;
       }
 
       // ── CHAT: Route to chat agent (unless this is clearly a runtime fix request) ──
