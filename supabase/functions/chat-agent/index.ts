@@ -268,7 +268,10 @@ serve(async (req) => {
       recent_errors,
     );
 
-    const prunedMessages = pruneConversationContext([{ role: "system", content: systemPrompt }, ...messages]);
+    const shouldPreserveConversationHistory = isMetaConversationPrompt(latestUserText);
+    const prunedMessages = shouldPreserveConversationHistory
+      ? [{ role: "system", content: systemPrompt }, ...messages]
+      : pruneConversationContext([{ role: "system", content: systemPrompt }, ...messages]);
 
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
