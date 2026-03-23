@@ -208,20 +208,21 @@ function sqlDefault(value: any, type: string): string {
 
 function generateSampleRecords(entity: any): any[] {
 
-function generateMockRecords(entity: any): any[] {
+// Reuse the existing generateValue function for sample record generation
+function generateSampleRecords(entity: any): any[] {
   const records = [];
-  const count = entity.seedCount || 5;
-  const names = ["Alice Johnson", "Bob Smith", "Carol Williams", "David Brown", "Eve Davis", "Frank Miller", "Grace Wilson", "Henry Moore", "Iris Taylor", "Jack Anderson", "Kate Thomas", "Leo Jackson", "Mia White", "Noah Harris", "Olivia Martin", "Paul Garcia", "Quinn Robinson", "Rose Clark", "Sam Lewis", "Tina Lee"];
-  const companies = ["Acme Corp", "TechVentures", "GlobalSoft", "DataDrive", "CloudFirst", "InnovateCo"];
-  const subjects = ["Mathematics", "Physics", "Chemistry", "Biology", "English", "History", "Computer Science", "Economics"];
-  const departments = ["Engineering", "Marketing", "Sales", "HR", "Finance", "Operations", "Support"];
+  const count = Math.min(entity.seedCount || 3, 5); // Fewer samples — just fallback data
+  const names = ["Alice Johnson", "Bob Smith", "Carol Williams", "David Brown", "Eve Davis"];
+  const companies = ["Acme Corp", "TechVentures", "GlobalSoft"];
+  const subjects = ["Mathematics", "Physics", "Chemistry", "Biology", "English"];
+  const departments = ["Engineering", "Marketing", "Sales", "HR", "Finance"];
 
   for (let i = 0; i < count; i++) {
-    const record: any = { id: `mock-${entity.pluralName}-${i + 1}` };
+    const record: any = { id: `sample-${entity.pluralName}-${i + 1}` };
     for (const field of entity.fields || []) {
       record[field.name] = generateValue(field, entity.name, i, names, companies, subjects, departments);
     }
-    record._created_at = new Date(Date.now() - (count - i) * 86400000).toISOString();
+    record.created_at = new Date(Date.now() - (count - i) * 86400000).toISOString();
     records.push(record);
   }
   return records;
