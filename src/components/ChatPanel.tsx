@@ -656,24 +656,34 @@ const ChatPanel = forwardRef<ChatPanelHandle, { initialPrompt?: string; onVersio
     setTimeout(() => handleSmartSend(userText), 50);
   }, [currentProject, handleSmartSend]);
 
-  const buildDocLabel = (): string => {
-    if (attachedDocuments.length === 0) return "";
-    return attachedDocuments.map(d => `📎 ${d.name}`).join("\n");
+  const cleanDocContentFromMessages = (docNames: string[], userInput: string) => {
+    // After send, replace the verbose doc content in the displayed user message with compact labels
+    setTimeout(() => {
+      setMessages(prev => {
+        const updated = [...prev];
+        for (let i = updated.length - 1; i >= 0; i--) {
+          if (updated[i].role === "user") {
+            const label = docNames.map(n => `📎 ${n}`).join("\n");
+            const cleanDisplay = `${label}\n${userInput}`.trim();
+            updated[i] = { ...updated[i], content: cleanDisplay };
+            break;
+          }
+        }
+        return updated;
+      });
+    }, 100);
   };
-
-  const pendingDocContentRef = useRef<string>("");
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
       if (input.trim() || attachedImages.length > 0 || attachedDocuments.length > 0) {
-        // Store full doc content for the AI, but display only labels
         if (attachedDocuments.length > 0) {
           const docParts = attachedDocuments.map(d => `[Attached document: ${d.name}]\n${d.text}`).join("\n\n");
-          pendingDocContentRef.current = docParts;
-          const displayText = `${buildDocLabel()}\n${input.trim()}`;
-          // The doc content is injected via the conversation context, not in the visible message
-          handleSmartSend(`${docParts}\n\n${input.trim()}`, attachedImages);
+          const docNames = attachedDocuments.map(d => d.name);
+          const userInput = input.trim();
+          handleSmartSend(`${docParts}\n\n${userInput}`, attachedImages);
+          cleanDocContentFromMessages(docNames, userInput);
         } else {
           handleSmartSend(input.trim(), attachedImages);
         }
@@ -686,7 +696,10 @@ const ChatPanel = forwardRef<ChatPanelHandle, { initialPrompt?: string; onVersio
     if (input.trim() || attachedImages.length > 0 || attachedDocuments.length > 0) {
       if (attachedDocuments.length > 0) {
         const docParts = attachedDocuments.map(d => `[Attached document: ${d.name}]\n${d.text}`).join("\n\n");
-        handleSmartSend(`${docParts}\n\n${input.trim()}`, attachedImages);
+        const docNames = attachedDocuments.map(d => d.name);
+        const userInput = input.trim();
+        handleSmartSend(`${docParts}\n\n${userInput}`, attachedImages);
+        cleanDocContentFromMessages(docNames, userInput);
       } else {
         handleSmartSend(input.trim(), attachedImages);
       }
