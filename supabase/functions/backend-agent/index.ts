@@ -207,9 +207,6 @@ function sqlDefault(value: any, type: string): string {
 }
 
 function generateSampleRecords(entity: any): any[] {
-
-// Reuse the existing generateValue function for sample record generation
-function generateSampleRecords(entity: any): any[] {
   const records = [];
   const count = Math.min(entity.seedCount || 3, 5); // Fewer samples — just fallback data
   const names = ["Alice Johnson", "Bob Smith", "Carol Williams", "David Brown", "Eve Davis"];
