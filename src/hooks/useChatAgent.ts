@@ -7,7 +7,7 @@
  */
 
 import { useCallback } from "react";
-import { stripBuildMarker } from "@/lib/agentPipeline";
+import { stripBuildMarker, hasBuildConfirmation } from "@/lib/agentPipeline";
 import type { PipelineStep } from "@/lib/agentPipeline";
 import { supabase } from "@/integrations/supabase/client";
 import { type MsgContent, getTextContent } from "@/lib/codeParser";
@@ -73,6 +73,7 @@ export interface ChatAgentConfig {
   setPipelineStep: (step: PipelineStep | null) => void;
   setCurrentAgent: (agent: string | null) => void;
   setIsLoading: (v: boolean) => void;
+  setPendingBuildPrompt?: (prompt: string | null) => void;
   messagesRef: React.RefObject<Msg[]>;
   isSendingRef: React.MutableRefObject<boolean>;
   isLoadingRef: React.MutableRefObject<boolean>;
@@ -90,6 +91,7 @@ export function useChatAgent(config: ChatAgentConfig) {
     messagesRef, isSendingRef, isLoadingRef, buildMessageContent,
     sandpackFilesRef, previewErrors,
   } = config;
+  const setPendingBuildPrompt = config.setPendingBuildPrompt;
 
   const sendChatMessage = useCallback(async (text: string, images: string[] = []) => {
     if (!text || !currentProject) return;
@@ -150,6 +152,12 @@ export function useChatAgent(config: ChatAgentConfig) {
       setPipelineStep(null);
       setCurrentAgent(null);
       isSendingRef.current = false;
+
+      // Detect [BUILD_CONFIRMED] marker and trigger build pipeline
+      if (hasBuildConfirmation(responseText) && setPendingBuildPrompt) {
+        console.log("[ChatAgent] BUILD_CONFIRMED detected in chat response — signaling build pipeline");
+        setPendingBuildPrompt(responseText);
+      }
 
       const displayText = stripBuildMarker(responseText);
       const cacheTag = isCached && cacheInfo
