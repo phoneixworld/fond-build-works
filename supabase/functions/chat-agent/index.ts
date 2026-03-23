@@ -183,6 +183,7 @@ function getLatestUserText(messages: any[]): string {
 }
 
 const EMAIL_REGEX = /[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i;
+const META_CONVERSATION_QA = /\b(what was my request|what did i ask|what am i asking|what did i say|what are you generating|is that all|is this all|did you understand|why are you building|why are you still building|remember my request|repeat my request|summarize my request|do you know how to build)\b/i;
 
 function parseEmailRegistrationCheckIntent(text: string): { shouldCheck: boolean; email: string | null } {
   const email = text.match(EMAIL_REGEX)?.[0]?.toLowerCase() ?? null;
