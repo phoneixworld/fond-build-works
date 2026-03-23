@@ -37,8 +37,10 @@ const VALID_TRANSITIONS: Record<ConversationMode, ConversationMode[]> = {
 // ─── Signal Detection ────────────────────────────────────────────────────
 const PHASED_SIGNALS = /\b(phase by phase|step by step|i['']ll give you|one at a time|let me explain|first let me|i['']ll share|i['']ll provide|wait for my|before you start|i will share|i will give|phase\s*\d|step\s*\d|part\s*\d|section\s*\d)\b/i;
 const INFO_SIGNALS = /^(these are|here are|here is|this is|below are|following are|attached are|now for|next is|the next|moving on|continuing with|for phase|for step|for part)\b/i;
-    const BUILD_SIGNALS = /^(now build|go ahead|build it|start building|that['']s all|that['']s everything|you can start|proceed|let['']s build|ready to build|start now|begin|execute|generate|now create|do it)\b/i;
+const BUILD_SIGNALS = /^(now build|go ahead|build it|start building|that['']s all|that['']s everything|you can start|proceed|let['']s build|ready to build|start now|begin|execute|generate|now create|do it)\b/i;
 const CHAT_SIGNALS = /^(what is|how do|can you explain|tell me|describe|compare|difference between|help me understand|why|what are)\b/i;
+const NEGATIVE_BUILD_EDIT_SIGNALS = /\b(do not build|don't build|dont build|stop building|no build|do not edit|don't edit|dont edit|just explain|only explain|root cause only|without fixing)\b/i;
+const QUESTION_ONLY_SIGNALS = /^(why|what|where|who|how)\b|\?$/i;
 
 // ─── Agent Registry ──────────────────────────────────────────────────────
 const AGENTS = [
