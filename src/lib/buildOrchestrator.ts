@@ -107,5 +107,126 @@ export async function orchestrateBuild(options: {
   // 8. APP.JSX (uses route wrappers for optimistic rendering)
   files["/App.jsx"] = synthesizeAppFromIR(ir);
 
+  // 9. POST-BUILD DOMAIN COHERENCE CHECK
+  // Verify that the generated IR actually reflects the requested domain.
+  // Catches cases where cache poisoning, context loss, or hallucination
+  // produced an unrelated app (e.g., IDE portal instead of HR ERP).
+  const coherenceResult = checkDomainCoherence(rawRequirements, ir, files);
+  if (!coherenceResult.passed) {
+    console.error(
+      `[BuildOrchestrator] ❌ DOMAIN COHERENCE FAILED\n` +
+      `  Requested tokens: ${coherenceResult.requestedTokens.join(", ")}\n` +
+      `  Generated tokens: ${coherenceResult.generatedTokens.join(", ")}\n` +
+      `  Overlap: ${coherenceResult.overlapCount}/${coherenceResult.requestedTokens.length}\n` +
+      `  Reason: ${coherenceResult.reason}`
+    );
+    throw new Error(
+      `Build aborted — domain mismatch. The generated app does not match the requested domain. ` +
+      `Expected tokens like [${coherenceResult.requestedTokens.slice(0, 5).join(", ")}] ` +
+      `but generated [${coherenceResult.generatedTokens.slice(0, 5).join(", ")}]. ` +
+      `This may indicate stale cache or context loss.`
+    );
+  }
+
+  console.log(
+    `[BuildOrchestrator] ✅ Domain coherence passed: ${coherenceResult.overlapCount}/${coherenceResult.requestedTokens.length} tokens matched`
+  );
+
   return files;
+}
+
+// ─── Domain Coherence Checker ──────────────────────────────────────────────
+
+interface CoherenceResult {
+  passed: boolean;
+  requestedTokens: string[];
+  generatedTokens: string[];
+  overlapCount: number;
+  reason: string;
+}
+
+/**
+ * Extracts domain-relevant tokens from text.
+ * Looks for nouns/concepts that indicate what the app is about.
+ */
+function extractDomainTokens(text: string): string[] {
+  const normalized = text.toLowerCase();
+  // Extract multi-word and single-word domain concepts
+  const tokens = new Set<string>();
+
+  // Common domain concepts (multi-word first)
+  const DOMAIN_PATTERNS = [
+    /\b(employee management|time tracking|performance review|onboarding workflow|org(?:anization)? structure)\b/gi,
+    /\b(log ?book|e-?log|clinical posting|competency framework|exam eligibility)\b/gi,
+    /\b(project management|task board|kanban board|sales pipeline|invoice management)\b/gi,
+    /\b(user management|role management|access control|file storage|data analytics)\b/gi,
+  ];
+
+  for (const pattern of DOMAIN_PATTERNS) {
+    const matches = text.match(pattern) || [];
+    for (const m of matches) tokens.add(m.toLowerCase().trim());
+  }
+
+  // Single-word domain nouns
+  const NOUN_PATTERN = /\b(employee|department|attendance|pto|review|onboarding|hr|erp|payroll|salary|leave|roster|shift|timesheet|appraisal|hire|recruit|candidate|benefit|compliance|grievance|training|university|student|faculty|logbook|competency|posting|rotation|assessment|curriculum|exam|grade|course|enrollment|hospital|patient|doctor|nurse|ward|diagnosis|prescription|pharmacy|lab|appointment|crm|contact|lead|deal|pipeline|invoice|quote|proposal|client|customer|account|opportunity|ecommerce|product|cart|order|checkout|shipping|catalog|inventory|warehouse|supplier|purchase|stock|blog|post|comment|author|category|tag|article|chat|message|conversation|channel|thread|notification|task|project|milestone|sprint|backlog|ticket|issue|bug|feature|dashboard|report|analytics|chart|metric|kpi|widget|calendar|schedule|booking|event|meeting|agenda|school|teacher|parent|timetable|fee|admission|announcement|classroom|syllabus)\b/gi;
+
+  const nounMatches = normalized.match(NOUN_PATTERN) || [];
+  for (const m of nounMatches) tokens.add(m);
+
+  return [...tokens];
+}
+
+function checkDomainCoherence(
+  rawRequirements: string,
+  ir: IR,
+  files: Record<string, string>
+): CoherenceResult {
+  // Extract tokens from requirements
+  const requestedTokens = extractDomainTokens(rawRequirements);
+
+  // If requirements are too generic to extract tokens, skip the check
+  // (the IR planner guardrails should have caught this, but be safe)
+  if (requestedTokens.length < 2) {
+    return {
+      passed: true,
+      requestedTokens,
+      generatedTokens: [],
+      overlapCount: 0,
+      reason: "Skipped — too few domain tokens in requirements to validate",
+    };
+  }
+
+  // Extract tokens from IR entities, pages, navigation
+  const irText = [
+    ...Object.keys(ir.entities),
+    ...ir.pages.map(p => p.name),
+    ...ir.navigation.map(n => n.label),
+    ...ir.components,
+    ...ir.contexts.map(c => c.name),
+  ].join(" ");
+
+  // Also scan generated file paths and first 200 chars of each file
+  const fileText = Object.entries(files)
+    .map(([path, content]) => `${path} ${content.slice(0, 200)}`)
+    .join(" ");
+
+  const generatedTokens = extractDomainTokens(`${irText} ${fileText}`);
+
+  // Calculate overlap
+  const requestedSet = new Set(requestedTokens);
+  const overlapCount = generatedTokens.filter(t => requestedSet.has(t)).length;
+
+  // Require at least 20% overlap OR at least 2 matching tokens
+  const overlapRatio = requestedTokens.length > 0 ? overlapCount / requestedTokens.length : 0;
+  const passed = overlapCount >= 2 || overlapRatio >= 0.2;
+
+  return {
+    passed,
+    requestedTokens: requestedTokens.slice(0, 20),
+    generatedTokens: generatedTokens.slice(0, 20),
+    overlapCount,
+    reason: passed
+      ? `${overlapCount} domain tokens matched (${(overlapRatio * 100).toFixed(0)}%)`
+      : `Only ${overlapCount} domain tokens matched (${(overlapRatio * 100).toFixed(0)}%) — generated app does not match requested domain`,
+  };
 }
