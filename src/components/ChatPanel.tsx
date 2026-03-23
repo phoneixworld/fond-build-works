@@ -661,20 +661,22 @@ const ChatPanel = forwardRef<ChatPanelHandle, { initialPrompt?: string; onVersio
     return attachedDocuments.map(d => `📎 ${d.name}`).join("\n");
   };
 
-  const buildMessageWithDocs = (text: string): string => {
-    if (attachedDocuments.length === 0) return text;
-    const docParts = attachedDocuments.map(d => `[Attached document: ${d.name}]\n${d.text}`).join("\n\n");
-    return `${docParts}\n\n${text}`;
-  };
+  const pendingDocContentRef = useRef<string>("");
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
       if (input.trim() || attachedImages.length > 0 || attachedDocuments.length > 0) {
-        const displayText = buildDocLabel() ? `${buildDocLabel()}\n${input.trim()}` : input.trim();
-        const aiText = buildMessageWithDocs(input.trim());
-        // Show compact label in chat, send full text to AI
-        handleSmartSend(aiText, attachedImages, displayText);
+        // Store full doc content for the AI, but display only labels
+        if (attachedDocuments.length > 0) {
+          const docParts = attachedDocuments.map(d => `[Attached document: ${d.name}]\n${d.text}`).join("\n\n");
+          pendingDocContentRef.current = docParts;
+          const displayText = `${buildDocLabel()}\n${input.trim()}`;
+          // The doc content is injected via the conversation context, not in the visible message
+          handleSmartSend(`${docParts}\n\n${input.trim()}`, attachedImages);
+        } else {
+          handleSmartSend(input.trim(), attachedImages);
+        }
         setAttachedDocuments([]);
       }
     }
@@ -682,9 +684,12 @@ const ChatPanel = forwardRef<ChatPanelHandle, { initialPrompt?: string; onVersio
 
   const handleSendClick = () => {
     if (input.trim() || attachedImages.length > 0 || attachedDocuments.length > 0) {
-      const displayText = buildDocLabel() ? `${buildDocLabel()}\n${input.trim()}` : input.trim();
-      const aiText = buildMessageWithDocs(input.trim());
-      handleSmartSend(aiText, attachedImages, displayText);
+      if (attachedDocuments.length > 0) {
+        const docParts = attachedDocuments.map(d => `[Attached document: ${d.name}]\n${d.text}`).join("\n\n");
+        handleSmartSend(`${docParts}\n\n${input.trim()}`, attachedImages);
+      } else {
+        handleSmartSend(input.trim(), attachedImages);
+      }
       setAttachedDocuments([]);
     }
   };
