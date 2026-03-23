@@ -157,9 +157,12 @@ function extractDomainTokens(text: string): string[] {
   // Common domain concepts (multi-word first)
   const DOMAIN_PATTERNS = [
     /\b(employee management|time tracking|performance review|onboarding workflow|org(?:anization)? structure)\b/gi,
-    /\b(log ?book|e-?log|clinical posting|competency framework|exam eligibility)\b/gi,
+    /\b(log ?book|e-?log|clinical posting|competency framework|exam eligibility|competency.based|medical education)\b/gi,
     /\b(project management|task board|kanban board|sales pipeline|invoice management)\b/gi,
     /\b(user management|role management|access control|file storage|data analytics)\b/gi,
+    /\b(academic structure|student management|faculty evaluation|assessment template|posting rotation)\b/gi,
+    /\b(university admin|institution admin|platform admin|head of department|primary guide)\b/gi,
+    /\b(kpi monitoring|exam eligibility|accreditation|certification|residency program)\b/gi,
   ];
 
   for (const pattern of DOMAIN_PATTERNS) {
