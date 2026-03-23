@@ -39,6 +39,7 @@ const PHASED_SIGNALS = /\b(phase by phase|step by step|i['']ll give you|one at a
 const INFO_SIGNALS = /^(these are|here are|here is|this is|below are|following are|attached are|now for|next is|the next|moving on|continuing with|for phase|for step|for part)\b/i;
 const BUILD_SIGNALS = /^(now build|go ahead|build it|start building|that['']s all|that['']s everything|you can start|proceed|let['']s build|ready to build|start now|begin|execute|generate|now create|do it)\b/i;
 const CHAT_SIGNALS = /^(what is|how do|can you explain|tell me|describe|compare|difference between|help me understand|why|what are)\b/i;
+const META_CHAT_SIGNALS = /\b(what was my request|what did i ask|what am i asking|what did i say|what are you generating|is that all|is this all|did you understand|why are you building|why are you still building|remember my request|repeat my request|summarize my request|do you know how to build)\b/i;
 const NEGATIVE_BUILD_EDIT_SIGNALS = /\b(do not build|don't build|dont build|stop building|no build|do not edit|don't edit|dont edit|just explain|only explain|root cause only|without fixing)\b/i;
 const QUESTION_ONLY_SIGNALS = /^(why|what|where|who|how)\b|\?$/i;
 
@@ -562,6 +563,7 @@ Deno.serve(async (req) => {
       const BUILD_FULL = /\b(build|create|generate|scaffold|new app|new project|from scratch|entire|whole app|full app|complete app)\b/i;
       const REBUILD_SIGNALS = /\b(regenerate|rebuild|redo|re-generate|re-build|recreate|re-create|start over|redo all|regenerate all)\b/i;
       const looksLikeQuestionOnly = QUESTION_ONLY_SIGNALS.test(text) || CHAT_SIGNALS.test(lower);
+      const looksLikeMetaConversation = META_CHAT_SIGNALS.test(lower);
       const hasActionableEditVerb = ACTIONABLE_EDIT_VERBS.test(lower);
 
       // ── ERROR MESSAGE DETECTION: Never store error messages as requirements ──
@@ -571,6 +573,9 @@ Deno.serve(async (req) => {
       if (NEGATIVE_BUILD_EDIT_SIGNALS.test(lower)) {
         recommendedAction = "chat";
         reason = "User explicitly requested explanation/chat-only response";
+      } else if (looksLikeMetaConversation) {
+        recommendedAction = "chat";
+        reason = "Meta conversation query detected — answer in chat without triggering build/edit";
       } else if (looksLikeQuestionOnly && !hasActionableEditVerb) {
         recommendedAction = "chat";
         reason = "Question/diagnostic request without actionable edit verb";

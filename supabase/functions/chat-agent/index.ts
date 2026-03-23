@@ -111,6 +111,12 @@ Distinguish between SIMPLE REFINEMENTS and COMPLEX FEATURES:
 - End with: "Ready to build this — say **go ahead**."
 - Wait for explicit user confirmation before including [BUILD_CONFIRMED]
 
+**META CONVERSATION QUESTIONS** ("what was my request", "what are you generating", "is that all", "why are you building"):
+- Answer directly from conversation history in 1-3 sentences
+- Do NOT output a new feature plan
+- Do NOT ask for "go ahead"
+- Do NOT include [BUILD_CONFIRMED]
+
 ## HARD RULES
 1. NEVER output code fences (\`\`\`html, \`\`\`react-preview, \`\`\`jsx, etc.)
 2. NEVER write HTML, CSS, JavaScript, or JSX
@@ -176,7 +182,12 @@ function getLatestUserText(messages: any[]): string {
   return "";
 }
 
+function isMetaConversationPrompt(text: string): boolean {
+  return META_CONVERSATION_QA.test((text || "").toLowerCase());
+}
+
 const EMAIL_REGEX = /[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i;
+const META_CONVERSATION_QA = /\b(what was my request|what did i ask|what am i asking|what did i say|what are you generating|is that all|is this all|did you understand|why are you building|why are you still building|remember my request|repeat my request|summarize my request|do you know how to build)\b/i;
 
 function parseEmailRegistrationCheckIntent(text: string): { shouldCheck: boolean; email: string | null } {
   const email = text.match(EMAIL_REGEX)?.[0]?.toLowerCase() ?? null;
@@ -257,7 +268,10 @@ serve(async (req) => {
       recent_errors,
     );
 
-    const prunedMessages = pruneConversationContext([{ role: "system", content: systemPrompt }, ...messages]);
+    const shouldPreserveConversationHistory = isMetaConversationPrompt(latestUserText);
+    const prunedMessages = shouldPreserveConversationHistory
+      ? [{ role: "system", content: systemPrompt }, ...messages]
+      : pruneConversationContext([{ role: "system", content: systemPrompt }, ...messages]);
 
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",

@@ -24,6 +24,8 @@ const BARE_CONFIRMATIONS = new Set([
 const ACTIONABLE_INTENT = /\b(build|create|generate|scaffold|fix|edit|modify|change|update|refactor|add|remove|delete|implement|rewrite|repair|patch)\b/i;
 const READ_ONLY_QA = /^(what|why|how|when|where|who|can you explain|explain|tell me|help me understand|compare|difference between|is it|are we)\b/i;
 const NEGATIVE_BUILD = /\b(do not build|don't build|dont build|do not edit|don't edit|dont edit|stop building|root cause only|just explain|only explain)\b/i;
+const META_CONVERSATION_QA = /\b(what was my request|what did i ask|what am i asking|what did i say|what are you generating|is that all|is this all|did you understand|why are you building|why are you still building|remember my request|repeat my request|summarize my request|do you know how to build)\b/i;
+const FRUSTRATION_OR_ESCALATION = /\b(you are continuing to build|i said do not build|dont build anything|don't build anything|stop building|why are you continuing|why are you still)\b/i;
 
 function extractTextFromContent(content: any): string {
   if (typeof content === "string") return content;
@@ -46,6 +48,7 @@ function inferCacheIntent(text: string): "read_only_qa" | "actionable" {
   if (!normalized) return "actionable";
   if (isBareConfirmationText(normalized)) return "actionable";
   if (NEGATIVE_BUILD.test(normalized)) return "actionable";
+  if (META_CONVERSATION_QA.test(normalized) || FRUSTRATION_OR_ESCALATION.test(normalized)) return "actionable";
   if (ACTIONABLE_INTENT.test(normalized)) return "actionable";
   if (READ_ONLY_QA.test(normalized) || normalized.endsWith("?")) return "read_only_qa";
   return "actionable";
