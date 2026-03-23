@@ -563,6 +563,7 @@ Deno.serve(async (req) => {
       const BUILD_FULL = /\b(build|create|generate|scaffold|new app|new project|from scratch|entire|whole app|full app|complete app)\b/i;
       const REBUILD_SIGNALS = /\b(regenerate|rebuild|redo|re-generate|re-build|recreate|re-create|start over|redo all|regenerate all)\b/i;
       const looksLikeQuestionOnly = QUESTION_ONLY_SIGNALS.test(text) || CHAT_SIGNALS.test(lower);
+      const looksLikeMetaConversation = META_CHAT_SIGNALS.test(lower);
       const hasActionableEditVerb = ACTIONABLE_EDIT_VERBS.test(lower);
 
       // ── ERROR MESSAGE DETECTION: Never store error messages as requirements ──
@@ -572,6 +573,9 @@ Deno.serve(async (req) => {
       if (NEGATIVE_BUILD_EDIT_SIGNALS.test(lower)) {
         recommendedAction = "chat";
         reason = "User explicitly requested explanation/chat-only response";
+      } else if (looksLikeMetaConversation) {
+        recommendedAction = "chat";
+        reason = "Meta conversation query detected — answer in chat without triggering build/edit";
       } else if (looksLikeQuestionOnly && !hasActionableEditVerb) {
         recommendedAction = "chat";
         reason = "Question/diagnostic request without actionable edit verb";
