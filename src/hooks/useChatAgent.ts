@@ -7,7 +7,7 @@
  */
 
 import { useCallback } from "react";
-import { stripBuildMarker } from "@/lib/agentPipeline";
+import { stripBuildMarker, hasBuildConfirmation } from "@/lib/agentPipeline";
 import type { PipelineStep } from "@/lib/agentPipeline";
 import { supabase } from "@/integrations/supabase/client";
 import { type MsgContent, getTextContent } from "@/lib/codeParser";
