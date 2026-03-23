@@ -382,40 +382,32 @@ FIX CHECKLIST:
     if (current_code) complexity += 5;
     complexity = Math.min(complexity, 100);
 
-    // Route to Anthropic Claude models
+    // Route to appropriate Lovable AI Gateway model based on complexity
     let selectedModel: string;
     let routeReason: string;
     
     if (model) {
-      // Map any legacy model names to Anthropic equivalents
-      const anthropicMap: Record<string, string> = {
-        "google/gemini-2.5-pro": "claude-sonnet-4-20250514",
-        "google/gemini-3-flash-preview": "claude-sonnet-4-20250514",
-        "google/gemini-2.5-flash": "claude-sonnet-4-20250514",
-        "google/gemini-2.5-flash-lite": "claude-sonnet-4-20250514",
-        "openai/gpt-5": "claude-sonnet-4-20250514",
-        "openai/gpt-5-mini": "claude-sonnet-4-20250514",
-      };
-      selectedModel = anthropicMap[model] || "claude-sonnet-4-20250514";
-      routeReason = `User override mapped to: ${selectedModel}`;
+      // User explicitly chose a model — use it directly (must be gateway-compatible)
+      selectedModel = model;
+      routeReason = `User override: ${selectedModel}`;
     } else if (retry_context) {
-      selectedModel = "claude-sonnet-4-20250514";
-      routeReason = `Retry → Sonnet 4 (focused fix)`;
+      selectedModel = "google/gemini-2.5-pro";
+      routeReason = `Retry → gemini-2.5-pro (focused fix)`;
     } else if (task_type === "schema" || task_type === "backend") {
-      selectedModel = "claude-sonnet-4-20250514";
-      routeReason = `${task_type} task → Sonnet 4`;
+      selectedModel = "google/gemini-2.5-pro";
+      routeReason = `${task_type} task → gemini-2.5-pro`;
     } else if (complexity >= 70) {
-      selectedModel = "claude-sonnet-4-20250514";
-      routeReason = `High complexity (${complexity}/100) → Sonnet 4`;
+      selectedModel = "google/gemini-2.5-pro";
+      routeReason = `High complexity (${complexity}/100) → gemini-2.5-pro`;
     } else if (complexity >= 40) {
-      selectedModel = "claude-sonnet-4-20250514";
-      routeReason = `Medium complexity (${complexity}/100) → Sonnet 4`;
+      selectedModel = "google/gemini-2.5-pro";
+      routeReason = `Medium complexity (${complexity}/100) → gemini-2.5-pro`;
     } else if (complexity >= 20) {
-      selectedModel = "claude-sonnet-4-20250514";
-      routeReason = `Low complexity (${complexity}/100) → Sonnet 4`;
+      selectedModel = "google/gemini-2.5-flash";
+      routeReason = `Low complexity (${complexity}/100) → gemini-2.5-flash`;
     } else {
-      selectedModel = "claude-sonnet-4-20250514";
-      routeReason = `Trivial (${complexity}/100) → Sonnet 4`;
+      selectedModel = "google/gemini-2.5-flash";
+      routeReason = `Trivial (${complexity}/100) → gemini-2.5-flash`;
     }
     
     console.log(`[build-agent] 🎯 CostRouter: ${routeReason} | tokens≈${estimatedInputTokens} | features=${featureCount} | modules=${modCount}`);
