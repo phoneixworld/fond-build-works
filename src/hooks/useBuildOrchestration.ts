@@ -392,12 +392,34 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
     syncSandpackToVirtualFS, handleOnError,
   } as InstantBuildConfig);
 
-  // Legacy [BUILD_CONFIRMED] auto-execution is intentionally disabled.
-  // All build/edit execution must flow through explicit pendingExecution confirmation.
+  // [BUILD_CONFIRMED] from chat-agent triggers actual build execution.
+  // This fires when the chat agent emits the marker after user confirms.
   useEffect(() => {
-    if (pendingBuildPrompt) {
-      console.warn("[BuildOrch] Ignoring legacy BUILD_CONFIRMED marker; explicit confirmation gate is required.");
+    if (pendingBuildPrompt && !isSendingRef.current && !isLoadingRef.current) {
+      console.log("[BuildOrch] BUILD_CONFIRMED marker detected — triggering build pipeline");
+      const buildPrompt = pendingBuildPrompt;
       setPendingBuildPrompt(null);
+
+      // Assemble requirements from conversation history
+      const relevantMessages = messagesRef.current.filter(m => {
+        const msgText = getTextContent(m.content);
+        if (m.role !== "user") return false;
+        const NOISE = /^(yes|yep|yeah|go ahead|proceed|do it|ok|okay|sure|continue|start|build it|just do it|fuck off|go away)\b/i;
+        return !NOISE.test(msgText.trim().toLowerCase()) && msgText.trim().length > 10;
+      });
+
+      const userRequirements = relevantMessages
+        .map(m => getTextContent(m.content))
+        .join("\n\n");
+
+      const finalPrompt = userRequirements.length > 50
+        ? `# APPLICATION REQUIREMENTS\n\n${userRequirements}\n\nBuild a complete, production-ready application for this domain request.`
+        : buildPrompt;
+
+      setCurrentAgent("build");
+      setPipelineStep("planning");
+      // Use setTimeout to avoid calling sendMessage during render
+      setTimeout(() => sendMessage(finalPrompt, []), 0);
     }
   }, [pendingBuildPrompt]);
 
