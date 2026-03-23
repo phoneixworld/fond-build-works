@@ -48,6 +48,7 @@ function inferCacheIntent(text: string): "read_only_qa" | "actionable" {
   if (!normalized) return "actionable";
   if (isBareConfirmationText(normalized)) return "actionable";
   if (NEGATIVE_BUILD.test(normalized)) return "actionable";
+  if (META_CONVERSATION_QA.test(normalized) || FRUSTRATION_OR_ESCALATION.test(normalized)) return "actionable";
   if (ACTIONABLE_INTENT.test(normalized)) return "actionable";
   if (READ_ONLY_QA.test(normalized) || normalized.endsWith("?")) return "read_only_qa";
   return "actionable";
