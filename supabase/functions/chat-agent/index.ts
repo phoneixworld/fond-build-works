@@ -1,4 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -8,15 +9,15 @@ const corsHeaders = {
 function pruneConversationContext(messages: any[], maxTokens: number = 12000): any[] {
   const systemMsg = messages.find(m => m.role === "system");
   const userMessages = messages.filter(m => m.role !== "system");
-  
+
   if (userMessages.length <= 4) return messages;
-  
+
   const recentMessages = userMessages.slice(-3);
   let currentTokens = JSON.stringify(recentMessages).length / 4;
-  
+
   const olderMessages = userMessages.slice(0, -3).reverse();
   const selectedOlder: any[] = [];
-  
+
   for (const msg of olderMessages) {
     const msgTokens = JSON.stringify(msg).length / 4;
     if (currentTokens + msgTokens < maxTokens * 0.7) {
@@ -26,7 +27,7 @@ function pruneConversationContext(messages: any[], maxTokens: number = 12000): a
       break;
     }
   }
-  
+
   const droppedCount = userMessages.length - selectedOlder.length - recentMessages.length;
   if (droppedCount > 0) {
     const contextNote = {
@@ -35,7 +36,7 @@ function pruneConversationContext(messages: any[], maxTokens: number = 12000): a
     };
     return [systemMsg, contextNote, ...selectedOlder, ...recentMessages].filter(Boolean);
   }
-  
+
   return [systemMsg, ...selectedOlder, ...recentMessages].filter(Boolean);
 }
 
@@ -138,12 +139,10 @@ End with: "Which would you like me to build?"
 - Project: ${projectId} | Stack: ${techStack}
 - Full-stack builder: React + Tailwind + data persistence + auth + custom APIs + Sandpack preview`;
 
-  // ── FIX #1: Inject real workspace file list so chat agent can see the project ──
   if (workspaceFiles && workspaceFiles.length > 0) {
     prompt += `\n\n## CURRENT WORKSPACE FILES (${workspaceFiles.length} files)\n${workspaceFiles.join("\n")}`;
   }
 
-  // ── FIX #1: Inject recent errors so chat agent can diagnose issues ──
   if (recentErrors && recentErrors.length > 0) {
     prompt += `\n\n## WORKSPACE ERRORS (most recent)\n${recentErrors.join("\n")}`;
   }
@@ -155,11 +154,98 @@ End with: "Which would you like me to build?"
   return prompt;
 }
 
+function getTextFromMessageContent(content: unknown): string {
+  if (typeof content === "string") return content;
+
+  if (Array.isArray(content)) {
+    return content
+      .filter((part: any) => part?.type === "text" && typeof part?.text === "string")
+      .map((part: any) => part.text)
+      .join(" ");
+  }
+
+  return "";
+}
+
+function getLatestUserText(messages: any[]): string {
+  for (let i = messages.length - 1; i >= 0; i--) {
+    if (messages[i]?.role === "user") {
+      return getTextFromMessageContent(messages[i].content).trim();
+    }
+  }
+  return "";
+}
+
+const EMAIL_REGEX = /[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i;
+
+function parseEmailRegistrationCheckIntent(text: string): { shouldCheck: boolean; email: string | null } {
+  const email = text.match(EMAIL_REGEX)?.[0]?.toLowerCase() ?? null;
+  if (!email) return { shouldCheck: false, email: null };
+
+  const normalized = text.toLowerCase();
+  const hasCheckVerb = /\b(check|verify|confirm|see|is|if|whether|can you check)\b/.test(normalized);
+  const hasRegistrationSignal = /\b(register(?:ed|d)?|exist(?:s)?|signed?\s*up|already\s+registered|already\s+exists?|account)\b/.test(normalized);
+
+  return { shouldCheck: hasCheckVerb && hasRegistrationSignal, email };
+}
+
+function createSseTextResponse(text: string): Response {
+  const chunk = `data: ${JSON.stringify({ choices: [{ delta: { content: text }, index: 0 }] })}\n\ndata: [DONE]\n\n`;
+  return new Response(chunk, {
+    headers: { ...corsHeaders, "Content-Type": "text/event-stream" },
+  });
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
-    const { messages, project_id, tech_stack, knowledge, workspace_files, recent_errors } = await req.json();
+    const { messages = [], project_id, tech_stack, knowledge, workspace_files, recent_errors } = await req.json();
+
+    const latestUserText = getLatestUserText(messages);
+    const emailCheckIntent = parseEmailRegistrationCheckIntent(latestUserText);
+
+    if (emailCheckIntent.shouldCheck && emailCheckIntent.email) {
+      const supabaseUrl = Deno.env.get("SUPABASE_URL");
+      const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+      if (!supabaseUrl || !serviceRoleKey) throw new Error("Backend config missing");
+
+      const adminClient = createClient(supabaseUrl, serviceRoleKey);
+      const email = emailCheckIntent.email;
+      let registered = false;
+
+      const { data: authUser, error: authError } = await adminClient
+        .schema("auth")
+        .from("users")
+        .select("id")
+        .eq("email", email)
+        .maybeSingle();
+
+      if (authError && authError.code !== "PGRST116") {
+        console.warn("[chat-agent] auth.users email check failed:", authError.message);
+      }
+      registered = Boolean(authUser);
+
+      if (!registered) {
+        const { data: profileUser, error: profileError } = await adminClient
+          .from("profiles")
+          .select("id")
+          .eq("email", email)
+          .maybeSingle();
+
+        if (profileError && profileError.code !== "PGRST116" && profileError.code !== "42P01") {
+          console.warn("[chat-agent] profiles fallback email check failed:", profileError.message);
+        }
+        registered = Boolean(profileUser);
+      }
+
+      const reply = registered
+        ? `Yes — ${email} is registered.`
+        : `No — ${email} is not registered.`;
+
+      return createSseTextResponse(reply);
+    }
+
     const ANTHROPIC_API_KEY = Deno.env.get("ANTHROPIC_API_KEY");
     if (!ANTHROPIC_API_KEY) throw new Error("ANTHROPIC_API_KEY is not configured");
 
@@ -172,15 +258,14 @@ serve(async (req) => {
     );
 
     const prunedMessages = pruneConversationContext([{ role: "system", content: systemPrompt }, ...messages]);
-    
-    // Separate system from messages for Anthropic
+
     const anthropicMessages = prunedMessages
       .filter((m: any) => m.role !== "system")
       .map((m: any) => ({
         role: m.role === "assistant" ? "assistant" : "user",
         content: typeof m.content === "string" ? m.content : JSON.stringify(m.content),
       }));
-    
+
     const anthropicSystem = prunedMessages
       .filter((m: any) => m.role === "system")
       .map((m: any) => m.content)
@@ -216,7 +301,6 @@ serve(async (req) => {
       });
     }
 
-    // Transform Anthropic SSE → OpenAI-compatible SSE
     const reader = response.body!.getReader();
     const encoder = new TextEncoder();
     const decoder = new TextDecoder();
