@@ -275,8 +275,8 @@ serve(async (req) => {
 
   try {
     const { messages, project_id, tech_stack, schemas, model, design_theme, knowledge, template_context, current_code, snippets_context, retry_context, max_tokens: requestedMaxTokens, task_type, ir_context } = await req.json();
-    const ANTHROPIC_API_KEY = Deno.env.get("ANTHROPIC_API_KEY");
-    if (!ANTHROPIC_API_KEY) throw new Error("ANTHROPIC_API_KEY is not configured. Add your Anthropic API key in project secrets.");
+    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
+    if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY is not configured. Check your Lovable Cloud setup.");
 
     // Guard: Smart truncation for large messages
     // For requirement docs, intelligently extract key sections instead of naive truncation
