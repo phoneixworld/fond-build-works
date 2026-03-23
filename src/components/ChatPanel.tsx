@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect, useCallback, forwardRef, useImperativeHandle } from "react";
+import { extractDocxStructured } from "@/lib/docxExtractor";
 import { useSelfHealing } from "@/hooks/useSelfHealing";
 import { useProjectContextCache } from "@/hooks/useProjectContextCache";
 import { useIntentClassification } from "@/hooks/useIntentClassification";
