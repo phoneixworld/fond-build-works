@@ -3,8 +3,11 @@
  * 
  * Coordinates all agents through a single pipeline.
  * The user sees one unified build experience; the orchestrator
- * sequences requirements → workflow → database → frontend → testing → governance
+ * sequences requirements → workflow → schema validation → database → frontend → testing → governance
  * behind the scenes.
+ * 
+ * SCHEMA-FIRST GATE: If the intent includes auth/CRUD/data/roles/storage,
+ * schema validation MUST pass before any backend or frontend code is generated.
  */
 
 import type { AgentName, AgentResult, AgentCallbacks, PipelineContext } from "./types";
@@ -12,10 +15,11 @@ import { planAgentWorkflow } from "./workflowAgent";
 import { runDatabaseAgent } from "./databaseAgent";
 import { runTestingAgent } from "./testingAgent";
 import { runGovernanceAgent } from "./governanceAgent";
+import { runSchemaPhase, requiresSchemaFirstGate, type SchemaPhaseResult } from "./schemaAgent";
 import { cloudLog } from "@/lib/cloudLogBus";
 
 export interface OrchestratorResult {
-  status: "success" | "partial" | "failed";
+  status: "success" | "partial" | "failed" | "schema_blocked";
   agentResults: Map<AgentName, AgentResult>;
   /** Merged files from all agents */
   workspace: Record<string, string>;
@@ -26,11 +30,13 @@ export interface OrchestratorResult {
   /** Human-readable summary */
   summary: string;
   totalDurationMs: number;
+  /** Schema validation result (if schema-first gate ran) */
+  schemaPhaseResult?: SchemaPhaseResult;
 }
 
 /**
  * Run the pre-build agent pipeline (before the compiler).
- * Handles: requirements analysis → workflow planning → database schema → 
+ * Handles: requirements analysis → workflow planning → schema validation → database schema → 
  * Returns enriched context for the compiler.
  */
 export async function runPreBuildAgents(
@@ -54,10 +60,25 @@ export async function runPreBuildAgents(
 
   cloudLog.info(`[Orchestrator] Agent plan: ${workflow.agents.join(" → ")}`, "orchestrator");
 
-  // Step 2: Database Agent (if needed, runs before frontend)
-  if (workflow.agents.includes("database")) {
+  // Step 2: Schema-First Gate (if intent requires backend/data)
+  if (requiresSchemaFirstGate(ctx)) {
     callbacks.onAgentStart("database");
-    callbacks.onAgentProgress("database", "Analyzing data models...");
+    callbacks.onAgentProgress("database", "Running schema-first validation...");
+
+    // Ensure database agent is in the plan
+    if (!ctx.agentPlan.includes("database")) {
+      ctx.agentPlan = ["database", ...ctx.agentPlan];
+    }
+
+    cloudLog.info("[Orchestrator] Schema-first gate activated — schema must validate before code gen", "orchestrator");
+  }
+
+  // Step 3: Database Agent (if needed, runs before frontend)
+  if (workflow.agents.includes("database") || ctx.agentPlan.includes("database")) {
+    if (!ctx.results.has("database")) {
+      callbacks.onAgentStart("database");
+      callbacks.onAgentProgress("database", "Analyzing data models...");
+    }
     
     const dbResult = await runDatabaseAgent(ctx);
     ctx.results.set("database", dbResult);
@@ -67,6 +88,32 @@ export async function runPreBuildAgents(
   }
 
   return ctx;
+}
+
+/**
+ * Validate schema artifacts produced by the backend-agent.
+ * BLOCKS the build if validation fails.
+ */
+export async function validateSchemaBeforeBuild(
+  ctx: PipelineContext,
+  schemaFiles: Record<string, string>,
+  callbacks: AgentCallbacks
+): Promise<SchemaPhaseResult> {
+  callbacks.onAgentStart("database");
+  callbacks.onAgentProgress("database", "Validating schema artifacts...");
+
+  const result = await runSchemaPhase(ctx, schemaFiles);
+  ctx.results.set("database", result);
+  callbacks.onAgentDone("database", result);
+
+  if (result.status === "failed") {
+    cloudLog.error(
+      `[Orchestrator] SCHEMA GATE BLOCKED BUILD: ${result.summary}`,
+      "orchestrator"
+    );
+  }
+
+  return result;
 }
 
 /**

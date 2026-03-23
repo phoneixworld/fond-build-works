@@ -20,6 +20,7 @@
 
 import { streamBuildAgent, validateReactCode, formatRetryContext, MAX_BUILD_RETRIES } from "@/lib/agentPipeline";
 import { validateBuildOutput, formatValidationRetryContext, detectBackendIntent } from "@/lib/validateOutput";
+import { validateSchemaArtifacts, extractSchemaArtifacts, requiresSchemaValidation } from "@/lib/schemaValidator";
 import { generatePlan, type BuildPlan, type PlanTask } from "@/lib/planningAgent";
 import { topologicalSort } from "@/lib/taskExecutor";
 import { mergeFiles, buildFullCodeContext, isBackendProtected, type MergeResult } from "@/lib/codeMerger";
@@ -772,12 +773,23 @@ async function runDirectBuild(
     finalFiles = stubBrokenFiles(finalFiles, postMergeErrors);
   }
 
+  // Schema-first validation — if files contain schema artifacts, validate them
+  if (requiresSchemaValidation(finalFiles)) {
+    const schemaArtifacts = extractSchemaArtifacts(finalFiles);
+    const schemaValidation = validateSchemaArtifacts(schemaArtifacts);
+    if (!schemaValidation.valid) {
+      console.error(`[BuildEngine:direct] SCHEMA VALIDATION FAILED:`, schemaValidation.errors);
+      console.warn(`[BuildEngine:direct] Missing RLS for:`, schemaValidation.missingRls);
+    } else {
+      console.log(`[BuildEngine:direct] Schema validated: ${schemaValidation.tables.length} tables ✅`);
+    }
+  }
+
   // Backend output validation — check for forbidden patterns and missing artifacts
   const backendValidation = validateBuildOutput(finalFiles, prompt);
   if (!backendValidation.valid) {
     console.warn(`[BuildEngine:direct] Backend validation failed (score: ${backendValidation.score}/100):`,
       { forbidden: backendValidation.forbiddenViolations.length, missing: backendValidation.missingRequirements.length });
-    // Log violations but don't block the build — the agent will improve over iterations
     if (backendValidation.forbiddenViolations.length > 0) {
       console.warn("[BuildEngine:direct] Forbidden patterns:", backendValidation.forbiddenViolations.map(v => `${v.file}:${v.line} ${v.pattern}`));
     }
@@ -1027,6 +1039,18 @@ ${existingFileList}
   if (finalErrors.length > 0) {
     console.warn("[BuildEngine:planned] Stubbing broken files post-assembly:", finalErrors);
     accumulatedFiles = stubBrokenFiles(accumulatedFiles, finalErrors);
+  }
+
+  // Schema-first validation for planned builds
+  if (requiresSchemaValidation(accumulatedFiles)) {
+    const schemaArtifacts = extractSchemaArtifacts(accumulatedFiles);
+    const schemaValidation = validateSchemaArtifacts(schemaArtifacts);
+    if (!schemaValidation.valid) {
+      console.error(`[BuildEngine:planned] SCHEMA VALIDATION FAILED:`, schemaValidation.errors);
+      console.warn(`[BuildEngine:planned] Missing RLS for:`, schemaValidation.missingRls);
+    } else {
+      console.log(`[BuildEngine:planned] Schema validated: ${schemaValidation.tables.length} tables ✅`);
+    }
   }
 
   // Backend output validation for planned builds

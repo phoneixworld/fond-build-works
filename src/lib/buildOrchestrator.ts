@@ -12,10 +12,12 @@ import { generateAuthContext } from "./templates/scaffoldTemplates";
 import { generateSkeletonFiles } from "./skeletonGenerator";
 import { generateRouteWrappers } from "./twoPhaseRenderer";
 import { generatePreloadFiles } from "./preloadGenerator";
+import { validateSchemaArtifacts, extractSchemaArtifacts, requiresSchemaValidation } from "./schemaValidator";
 
 /**
  * Orchestrates the entire build pipeline:
  *
+ * 0. SCHEMA-FIRST GATE — validate schema artifacts before proceeding
  * 1. IR Planner → IR
  * 2. Generate deterministic scaffolds (pages, layout, contexts, mock API)
  * 3. Generate skeleton components for instant UI
@@ -29,14 +31,36 @@ import { generatePreloadFiles } from "./preloadGenerator";
 export async function orchestrateBuild(options: {
   rawRequirements: string;
   callLLM: (opts: { system: string; user: string }) => Promise<string>;
+  /** Pre-generated schema files from backend-agent (schema-first) */
+  schemaFiles?: Record<string, string>;
 }): Promise<Record<string, string>> {
-  const { rawRequirements, callLLM } = options;
+  const { rawRequirements, callLLM, schemaFiles } = options;
+
+  // 0. SCHEMA-FIRST GATE — if schema files provided, validate before proceeding
+  if (schemaFiles && requiresSchemaValidation(schemaFiles)) {
+    const artifacts = extractSchemaArtifacts(schemaFiles);
+    const validation = validateSchemaArtifacts(artifacts);
+
+    if (!validation.valid) {
+      console.error("[BuildOrchestrator] Schema validation FAILED — blocking build:", validation.errors);
+      throw new Error(
+        `Schema validation failed (build blocked): ${validation.errors.join("; ")}`
+      );
+    }
+
+    console.log(`[BuildOrchestrator] Schema validated: ${validation.tables.length} tables ✅`);
+  }
 
   // 1. PLAN IR
   const ir: IR = await planIRFromRequirements(callLLM, rawRequirements);
 
   // 2. GENERATE FILES FROM IR
   const files: Record<string, string> = {};
+
+  // Merge validated schema files first (migrations, RLS, hooks)
+  if (schemaFiles) {
+    Object.assign(files, schemaFiles);
+  }
 
   // Pages
   Object.assign(files, scaffoldPagesFromIR(ir));
