@@ -547,7 +547,8 @@ Responsibilities:
   - Add a <Route> entry in /App.jsx pointing to a stub page.
   - Generate a simple, fully working stub page under /pages/Module/ModulePage.jsx that:
     - Imports PageHeader and DataTable from /components/
-    - Renders a basic table with 5-10 rows of realistic sample data
+    - Fetches data from project-api with loading skeleton and empty state UI
+    - NEVER uses inline SAMPLE_DATA arrays — all data must come from API calls
     - Uses proper layout and styling consistent with the rest of the app.
 - Do NOT remove existing routes or pages.`,
     produces: ["/App.jsx"],
