@@ -1,30 +1,26 @@
 /**
- * ChatStatusBanners — Self-healing status, error banner, template chip, and attached images.
- * 
- * Extracted from ChatPanel.tsx to reduce rendering JSX size.
+ * ChatStatusBanners — Self-healing status, error banner, template chip, attached images & documents.
  */
 
 import { motion, AnimatePresence } from "framer-motion";
-import { AlertTriangle, ShieldCheck, Wand2, X } from "lucide-react";
+import { AlertTriangle, ShieldCheck, Wand2, X, FileText } from "lucide-react";
 import type { PageTemplate } from "@/lib/pageTemplates";
 
 interface ChatStatusBannersProps {
-  // Self-healing
   isHealing: boolean;
   healingStatus: string;
-  // Errors
   previewErrors: string[];
   isLoading: boolean;
   healAttempts: number;
   maxHealAttempts: number;
   onAutoFix: () => void;
   onResetAndFix: () => void;
-  // Template
   selectedTemplate: PageTemplate | null;
   onClearTemplate: () => void;
-  // Images
   attachedImages: string[];
   onRemoveImage: (index: number) => void;
+  attachedDocuments?: { name: string; text: string }[];
+  onRemoveDocument?: (index: number) => void;
 }
 
 export default function ChatStatusBanners({
@@ -33,6 +29,7 @@ export default function ChatStatusBanners({
   onAutoFix, onResetAndFix,
   selectedTemplate, onClearTemplate,
   attachedImages, onRemoveImage,
+  attachedDocuments = [], onRemoveDocument,
 }: ChatStatusBannersProps) {
   return (
     <>
@@ -113,6 +110,40 @@ export default function ChatStatusBanners({
               <button onClick={onClearTemplate} className="ml-1 hover:text-primary/70 transition-colors">
                 <X className="w-3 h-3" />
               </button>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Attached documents preview */}
+      <AnimatePresence>
+        {attachedDocuments.length > 0 && (
+          <motion.div
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: "auto", opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            className="border-t border-border px-3 py-2"
+          >
+            <div className="flex gap-2 flex-wrap">
+              {attachedDocuments.map((doc, i) => (
+                <motion.div
+                  key={i}
+                  initial={{ opacity: 0, scale: 0.8 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  className="relative group inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-muted border border-border text-xs"
+                >
+                  <FileText className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
+                  <span className="truncate max-w-[120px]">{doc.name}</span>
+                  {onRemoveDocument && (
+                    <button
+                      onClick={() => onRemoveDocument(i)}
+                      className="ml-0.5 w-4 h-4 rounded-full bg-destructive text-destructive-foreground flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                    >
+                      <X className="w-2.5 h-2.5" />
+                    </button>
+                  )}
+                </motion.div>
+              ))}
             </div>
           </motion.div>
         )}
