@@ -21,6 +21,7 @@
 import { streamBuildAgent, validateReactCode, formatRetryContext, MAX_BUILD_RETRIES } from "@/lib/agentPipeline";
 import { validateBuildOutput, formatValidationRetryContext, detectBackendIntent } from "@/lib/validateOutput";
 import { validateSchemaArtifacts, extractSchemaArtifacts, requiresSchemaValidation } from "@/lib/schemaValidator";
+import { validateAuthConformance } from "@/lib/validateAuth";
 import { generatePlan, type BuildPlan, type PlanTask } from "@/lib/planningAgent";
 import { topologicalSort } from "@/lib/taskExecutor";
 import { mergeFiles, buildFullCodeContext, isBackendProtected, type MergeResult } from "@/lib/codeMerger";
@@ -797,6 +798,12 @@ async function runDirectBuild(
       console.warn("[BuildEngine:direct] Missing requirements:", backendValidation.missingRequirements);
     }
   }
+
+  // Auth conformance validation
+  const authValidation = validateAuthConformance(finalFiles, prompt);
+  if (!authValidation.valid) {
+    console.warn(`[BuildEngine:direct] Auth conformance failed (score: ${authValidation.score}/100):`, authValidation.errors);
+  }
   const valMs = valTimer.elapsed();
 
   const totalSize = Object.values(finalFiles).reduce((s, c) => s + c.length, 0);
@@ -1064,6 +1071,12 @@ ${existingFileList}
     if (backendValidation.missingRequirements.length > 0) {
       console.warn("[BuildEngine:planned] Missing requirements:", backendValidation.missingRequirements);
     }
+  }
+
+  // Auth conformance validation for planned builds
+  const authValidation = validateAuthConformance(accumulatedFiles, prompt);
+  if (!authValidation.valid) {
+    console.warn(`[BuildEngine:planned] Auth conformance failed (score: ${authValidation.score}/100):`, authValidation.errors);
   }
 
   const lintResult = lintDesignTokens(accumulatedFiles);
