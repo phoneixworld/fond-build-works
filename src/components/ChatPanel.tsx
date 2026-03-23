@@ -545,8 +545,10 @@ const ChatPanel = forwardRef<ChatPanelHandle, { initialPrompt?: string; onVersio
         }
       }
       setAttachedDocuments((prev) => [...prev.slice(0, 2), { name: file.name, text: text.slice(0, 80000) }]);
-    } catch {
-      setAttachedDocuments((prev) => [...prev.slice(0, 2), { name: file.name, text: `[Could not extract text from: ${file.name}]` }]);
+    } catch (err: any) {
+      const errorMsg = err?.message || `Could not extract text from: ${file.name}`;
+      alert(errorMsg);
+      console.error("[addDocumentFile]", errorMsg);
     }
   };
 
