@@ -157,9 +157,12 @@ function extractDomainTokens(text: string): string[] {
   // Common domain concepts (multi-word first)
   const DOMAIN_PATTERNS = [
     /\b(employee management|time tracking|performance review|onboarding workflow|org(?:anization)? structure)\b/gi,
-    /\b(log ?book|e-?log|clinical posting|competency framework|exam eligibility)\b/gi,
+    /\b(log ?book|e-?log|clinical posting|competency framework|exam eligibility|competency.based|medical education)\b/gi,
     /\b(project management|task board|kanban board|sales pipeline|invoice management)\b/gi,
     /\b(user management|role management|access control|file storage|data analytics)\b/gi,
+    /\b(academic structure|student management|faculty evaluation|assessment template|posting rotation)\b/gi,
+    /\b(university admin|institution admin|platform admin|head of department|primary guide)\b/gi,
+    /\b(kpi monitoring|exam eligibility|accreditation|certification|residency program)\b/gi,
   ];
 
   for (const pattern of DOMAIN_PATTERNS) {
@@ -168,7 +171,7 @@ function extractDomainTokens(text: string): string[] {
   }
 
   // Single-word domain nouns
-  const NOUN_PATTERN = /\b(employee|department|attendance|pto|review|onboarding|hr|erp|payroll|salary|leave|roster|shift|timesheet|appraisal|hire|recruit|candidate|benefit|compliance|grievance|training|university|student|faculty|logbook|competency|posting|rotation|assessment|curriculum|exam|grade|course|enrollment|hospital|patient|doctor|nurse|ward|diagnosis|prescription|pharmacy|lab|appointment|crm|contact|lead|deal|pipeline|invoice|quote|proposal|client|customer|account|opportunity|ecommerce|product|cart|order|checkout|shipping|catalog|inventory|warehouse|supplier|purchase|stock|blog|post|comment|author|category|tag|article|chat|message|conversation|channel|thread|notification|task|project|milestone|sprint|backlog|ticket|issue|bug|feature|dashboard|report|analytics|chart|metric|kpi|widget|calendar|schedule|booking|event|meeting|agenda|school|teacher|parent|timetable|fee|admission|announcement|classroom|syllabus)\b/gi;
+  const NOUN_PATTERN = /\b(employee|department|attendance|pto|review|onboarding|hr|erp|payroll|salary|leave|roster|shift|timesheet|appraisal|hire|recruit|candidate|benefit|compliance|grievance|training|university|student|faculty|logbook|competency|posting|rotation|assessment|curriculum|exam|grade|course|enrollment|hospital|patient|doctor|nurse|ward|diagnosis|prescription|pharmacy|lab|appointment|crm|contact|lead|deal|pipeline|invoice|quote|proposal|client|customer|account|opportunity|ecommerce|product|cart|order|checkout|shipping|catalog|inventory|warehouse|supplier|purchase|stock|blog|post|comment|author|category|tag|article|chat|message|conversation|channel|thread|notification|task|project|milestone|sprint|backlog|ticket|issue|bug|feature|dashboard|report|analytics|chart|metric|kpi|widget|calendar|schedule|booking|event|meeting|agenda|school|teacher|parent|timetable|fee|admission|announcement|classroom|syllabus|cbme|postgraduate|residency|fellowship|specialty|supervisor|mentor|guide|evaluation|portfolio|certification|accreditation|clinic|medical|surgery|eligibility|domain|module|workflow|permission|tenant)\b/gi;
 
   const nounMatches = normalized.match(NOUN_PATTERN) || [];
   for (const m of nounMatches) tokens.add(m);
@@ -196,13 +199,16 @@ function checkDomainCoherence(
     };
   }
 
-  // Extract tokens from IR entities, pages, navigation
+  // Extract tokens from IR entities, pages, navigation, roles, modules
   const irText = [
     ...Object.keys(ir.entities),
     ...ir.pages.map(p => p.name),
     ...ir.navigation.map(n => n.label),
     ...ir.components,
     ...ir.contexts.map(c => c.name),
+    ...(ir.roles || []).map(r => r.name + " " + r.label),
+    ...(ir.modules || []).map(m => m.name + " " + m.label),
+    ...(ir.workflows || []).map(w => w.name + " " + w.steps.map(s => s.name).join(" ")),
   ].join(" ");
 
   // Also scan generated file paths and first 200 chars of each file
