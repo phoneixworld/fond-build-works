@@ -94,6 +94,7 @@ function inferCacheIntent(prompt: string, explicitIntent?: string): "read_only_q
   const normalized = prompt.trim().toLowerCase();
   if (!normalized) return "actionable";
   if (isBareConfirmation(normalized)) return "actionable";
+  if (META_CONVERSATION_QA.test(normalized) || FRUSTRATION_OR_ESCALATION.test(normalized)) return "actionable";
   if (ACTIONABLE_INTENT.test(normalized)) return "actionable";
   if (READ_ONLY_QA.test(normalized) || normalized.endsWith("?")) return "read_only_qa";
   return "actionable";
