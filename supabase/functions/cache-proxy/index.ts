@@ -69,6 +69,8 @@ const EMAIL_REGEX = /[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i;
 const BARE_CONFIRMATIONS = new Set(["ok", "okay", "sure", "go ahead", "yes", "yep", "yeah", "proceed", "do it", "start", "continue", "approved"]);
 const ACTIONABLE_INTENT = /\b(build|create|generate|scaffold|fix|edit|modify|change|update|refactor|add|remove|delete|implement|rewrite|repair|patch)\b/i;
 const READ_ONLY_QA = /^(what|why|how|when|where|who|can you explain|explain|tell me|help me understand|compare|difference between|is it|are we)\b/i;
+const META_CONVERSATION_QA = /\b(what was my request|what did i ask|what am i asking|what did i say|what are you generating|is that all|is this all|did you understand|why are you building|why are you still building|remember my request|repeat my request|summarize my request|do you know how to build)\b/i;
+const FRUSTRATION_OR_ESCALATION = /\b(you are continuing to build|i said do not build|dont build anything|don't build anything|stop building|why are you continuing|why are you still)\b/i;
 
 function isEmailRegistrationCheckPrompt(prompt: string): boolean {
   if (!EMAIL_REGEX.test(prompt)) return false;
