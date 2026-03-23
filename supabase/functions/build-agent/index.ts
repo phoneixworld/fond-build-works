@@ -177,18 +177,27 @@ fetch(\`\${apiBase}/functions/v1/project-auth\`, {
 });
 \`\`\`
 
-### Backend Rules:
-- ANY app with persistent data SHOULD use Data API when available
-- Dashboard pages → fetch real data with skeleton loading, but ALWAYS provide inline SAMPLE_DATA as fallback
-- EVERY list page → Data API with loading/error/empty states
-- CRITICAL: Data hooks MUST gracefully handle API failures by falling back to sample data instead of showing error messages. Pattern:
+### Backend Rules (MANDATORY — VIOLATIONS WILL FAIL THE BUILD):
+- EVERY app with persistent data MUST use the Data API (project-api) for ALL CRUD operations. This is NON-NEGOTIABLE.
+- NEVER use useState with inline data arrays as primary data source. ALL data MUST come from API calls.
+- NEVER define const SAMPLE_DATA, const mockData, const fakeData, or any inline array as a data source.
+- EVERY list/dashboard page MUST fetch from project-api with proper loading skeleton + empty state UI.
+- Data hooks pattern (MANDATORY):
 \`\`\`
-const SAMPLE_DATA = [/* realistic sample items */];
-// In fetch catch block or when API_BASE is empty:
-setData(SAMPLE_DATA);
-setError(null); // Don't show errors for missing API — show sample data instead
+// hooks/useContacts.js — CORRECT pattern
+const [data, setData] = useState([]);
+const [loading, setLoading] = useState(true);
+useEffect(() => {
+  fetch(\\\`\\\${window.__SUPABASE_URL__}/functions/v1/project-api\\\`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "Authorization": \\\`Bearer \\\${window.__SUPABASE_KEY__}\\\` },
+    body: JSON.stringify({ project_id: window.__PROJECT_ID__, collection: "contacts", action: "list" })
+  }).then(r => r.json()).then(d => { setData(d.data || []); setLoading(false); })
+    .catch(() => setLoading(false));
+}, []);
 \`\`\`
-- When window.__SUPABASE_URL__ is empty or fetch fails, display the UI with sample data — NEVER show "Error loading" messages
+- Show loading skeleton while fetching, empty state with "Add first item" CTA when data is empty — NEVER fake data
+- If window.__SUPABASE_URL__ is not set, show a clean empty state — NEVER inject fake/sample data arrays
 
 ${schemas && schemas.length > 0 ? `## DATA MODELS\n${schemas.map((s: any) => {
   const fields = s.schema?.fields || [];
