@@ -319,7 +319,7 @@ function generateHookFile(entity: any, projectId: string, apiBase: string): stri
   const plural = entity.pluralName;
 
   return `import { useState, useEffect, useCallback } from "react";
-import { mock${name}s } from "../data/${plural}";
+import { sample${name}s } from "../data/${plural}_samples";
 import { API_CONFIG } from "../data/apiConfig";
 
 export function use${name}s() {
@@ -331,21 +331,18 @@ export function use${name}s() {
     setLoading(true);
     setError(null);
     try {
-      if (API_CONFIG.useRealApi) {
-        const resp = await fetch(API_CONFIG.apiBase + "/project-api", {
-          method: "POST",
-          headers: { "Content-Type": "application/json", "Authorization": "Bearer " + API_CONFIG.anonKey },
-          body: JSON.stringify({ project_id: API_CONFIG.projectId, action: "list", collection: "${plural}" }),
-        });
-        const json = await resp.json();
-        setItems(json.data || []);
-      } else {
-        await new Promise(r => setTimeout(r, 300));
-        setItems([...mock${name}s]);
-      }
+      const resp = await fetch(API_CONFIG.apiBase + "/functions/v1/project-api", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "Authorization": "Bearer " + API_CONFIG.anonKey },
+        body: JSON.stringify({ project_id: API_CONFIG.projectId, action: "list", collection: "${plural}" }),
+      });
+      const json = await resp.json();
+      setItems(json.data || []);
     } catch (err) {
-      setError(err.message || "Failed to fetch");
-      setItems([...mock${name}s]);
+      // Graceful fallback to sample data when API is unreachable
+      console.warn("[use${name}s] API unreachable, using sample data:", err?.message);
+      setItems([...sample${name}s]);
+      setError(null); // Don't show error — show sample data instead
     } finally {
       setLoading(false);
     }
@@ -353,50 +350,39 @@ export function use${name}s() {
 
   const create = useCallback(async (data) => {
     try {
-      if (API_CONFIG.useRealApi) {
-        const resp = await fetch(API_CONFIG.apiBase + "/project-api", {
-          method: "POST",
-          headers: { "Content-Type": "application/json", "Authorization": "Bearer " + API_CONFIG.anonKey },
-          body: JSON.stringify({ project_id: API_CONFIG.projectId, action: "create", collection: "${plural}", data }),
-        });
-        const json = await resp.json();
-        setItems(prev => [json.data, ...prev]);
-        return json.data;
-      } else {
-        const newItem = { id: "mock-" + Date.now(), ...data, _created_at: new Date().toISOString() };
-        setItems(prev => [newItem, ...prev]);
-        return newItem;
-      }
+      const resp = await fetch(API_CONFIG.apiBase + "/functions/v1/project-api", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "Authorization": "Bearer " + API_CONFIG.anonKey },
+        body: JSON.stringify({ project_id: API_CONFIG.projectId, action: "create", collection: "${plural}", data }),
+      });
+      const json = await resp.json();
+      if (json.error) throw new Error(json.error);
+      setItems(prev => [json.data, ...prev]);
+      return json.data;
     } catch (err) { setError(err.message); throw err; }
   }, []);
 
   const update = useCallback(async (id, data) => {
     try {
-      if (API_CONFIG.useRealApi) {
-        const resp = await fetch(API_CONFIG.apiBase + "/project-api", {
-          method: "POST",
-          headers: { "Content-Type": "application/json", "Authorization": "Bearer " + API_CONFIG.anonKey },
-          body: JSON.stringify({ project_id: API_CONFIG.projectId, action: "update", collection: "${plural}", id, data }),
-        });
-        const json = await resp.json();
-        setItems(prev => prev.map(item => item.id === id ? { ...item, ...json.data } : item));
-        return json.data;
-      } else {
-        setItems(prev => prev.map(item => item.id === id ? { ...item, ...data } : item));
-        return { id, ...data };
-      }
+      const resp = await fetch(API_CONFIG.apiBase + "/functions/v1/project-api", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "Authorization": "Bearer " + API_CONFIG.anonKey },
+        body: JSON.stringify({ project_id: API_CONFIG.projectId, action: "update", collection: "${plural}", id, data }),
+      });
+      const json = await resp.json();
+      if (json.error) throw new Error(json.error);
+      setItems(prev => prev.map(item => item.id === id ? { ...item, ...json.data } : item));
+      return json.data;
     } catch (err) { setError(err.message); throw err; }
   }, []);
 
   const remove = useCallback(async (id) => {
     try {
-      if (API_CONFIG.useRealApi) {
-        await fetch(API_CONFIG.apiBase + "/project-api", {
-          method: "POST",
-          headers: { "Content-Type": "application/json", "Authorization": "Bearer " + API_CONFIG.anonKey },
-          body: JSON.stringify({ project_id: API_CONFIG.projectId, action: "delete", collection: "${plural}", id }),
-        });
-      }
+      await fetch(API_CONFIG.apiBase + "/functions/v1/project-api", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "Authorization": "Bearer " + API_CONFIG.anonKey },
+        body: JSON.stringify({ project_id: API_CONFIG.projectId, action: "delete", collection: "${plural}", id }),
+      });
       setItems(prev => prev.filter(item => item.id !== id));
     } catch (err) { setError(err.message); throw err; }
   }, []);
