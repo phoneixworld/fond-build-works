@@ -153,16 +153,26 @@ serve(async (req) => {
       stream = true,
       cache_ttl = 3600,
       bypass_cache = false,
+      cache_intent,
+      requirements_snippet,
     } = body;
 
     // Extract the latest user message for cache key
     const lastUserMsg = [...messages].reverse().find((m: any) => m.role === "user");
     const userPrompt = extractUserText(lastUserMsg?.content);
+    const requirementsSnippet = deriveRequirementsSnippet(messages, requirements_snippet);
+    const resolvedIntent = inferCacheIntent(userPrompt, cache_intent);
 
     const isEmailRegistrationCheck = isEmailRegistrationCheckPrompt(userPrompt);
-    const shouldBypassCache = bypass_cache || isEmailRegistrationCheck;
-    const promptTokens = tokenize(userPrompt);
-    const exactHash = fnv1a(userPrompt.trim().toLowerCase());
+    const shouldBypassCache =
+      bypass_cache ||
+      isEmailRegistrationCheck ||
+      isBareConfirmation(userPrompt) ||
+      resolvedIntent !== "read_only_qa";
+
+    const semanticSeed = `${project_id || "no_project"}|${resolvedIntent}|${normalizeForHash(requirementsSnippet)}|${normalizeForHash(userPrompt)}`;
+    const promptTokens = tokenize(`${requirementsSnippet} ${userPrompt}`.trim());
+    const exactHash = fnv1a(semanticSeed);
 
     // ─── Cache Check ────────────────────────────────────────────────
     if (!shouldBypassCache && project_id && userPrompt.length > 5) {
