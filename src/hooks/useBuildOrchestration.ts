@@ -1845,11 +1845,11 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
         return;
       }
       
-      // If existing code, route to edit
+      // If existing code but no explicit command, stay in chat mode (no implicit edits)
       if (hasExistingCodeFallback) {
-        setCurrentAgent("edit");
-        setPipelineStep("resolving");
-        sendEditMessage(finalText, images);
+        setCurrentAgent("chat");
+        setPipelineStep("chatting");
+        sendChatMessage(finalText, images);
         return;
       }
     }
