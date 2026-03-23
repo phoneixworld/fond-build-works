@@ -1644,24 +1644,20 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
 
     // ── Step 1: Route through async server conversation analyzer ──
     const normalizedText = finalText.toLowerCase();
-    const looksLikeRuntimeFixRequest = hasExistingCode && !hasImages && (
-      normalizedText.includes("fix") ||
-      normalizedText.includes("bug") ||
-      normalizedText.includes("error") ||
-      normalizedText.includes("not working") ||
-      normalizedText.includes("not clickable") ||
-      normalizedText.includes("doesn't work") ||
-      normalizedText.includes("doesnt work") ||
-      normalizedText.includes("broken") ||
-      normalizedText.includes("crash") ||
-      normalizedText.includes("failed") ||
-      normalizedText.includes("fails") ||
-      normalizedText.includes("preview") ||
-      normalizedText.includes("generated code") ||
-      normalizedText.includes("runtime") ||
-      normalizedText.includes("problem")
-    );
     const explicitRebuildRequest = /\b(rebuild|from scratch|start over|regenerate app|new app|new project)\b/i.test(normalizedText);
+    const isQuestionOnly = finalText.trim().endsWith("?") || /^(why|what|where|who|how)\b/i.test(finalText.trim());
+    const explicitEditVerb = /\b(fix|change|update|modify|refactor|patch|repair|replace|add|remove|delete)\b/i.test(normalizedText);
+    const hasRuntimeSignal = /\b(bug|error|not working|doesn't work|doesnt work|broken|crash|failed|fails|preview|runtime|problem|issue)\b/i.test(normalizedText);
+    const stopOrExplainOnly = /\b(do not build|don't build|dont build|do not edit|don't edit|dont edit|just explain|only explain|root cause only|without fixing)\b/i.test(normalizedText);
+
+    if (stopOrExplainOnly || (isQuestionOnly && !explicitEditVerb)) {
+      setCurrentAgent("chat");
+      setPipelineStep("chatting");
+      sendChatMessage(finalText, images);
+      return;
+    }
+
+    const looksLikeRuntimeFixRequest = hasExistingCode && !hasImages && explicitEditVerb && hasRuntimeSignal && !isQuestionOnly;
 
     if (looksLikeRuntimeFixRequest && !explicitRebuildRequest) {
       console.log("[SmartSend] Runtime fix request → edit pipeline");
