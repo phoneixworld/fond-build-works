@@ -353,12 +353,12 @@ serve(async (req) => {
     const data = await aiResponse.json();
     const responseText = data.choices?.[0]?.message?.content || "";
 
-    if (project_id && responseText.length > 10 && !isEmailRegistrationCheck) {
+    if (project_id && responseText.length > 10 && !shouldBypassCache) {
       const tokensSaved = Math.round(responseText.length / 4);
       await supabase.from("cache_entries").upsert({
         project_id,
         cache_type: "semantic",
-        cache_key: `prompt:${exactHash}`,
+        cache_key: `semantic:${exactHash}`,
         prompt_hash: exactHash,
         cache_value: {
           response: responseText,
