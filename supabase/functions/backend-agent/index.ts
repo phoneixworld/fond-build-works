@@ -396,63 +396,66 @@ export function use${name}s() {
 }
 
 function generateAuthContext(projectId: string, apiBase: string): string {
-  return `import React, { createContext, useContext, useState, useEffect } from "react";
+  return `import React, { createContext, useContext, useState, useEffect, useRef } from "react";
 import { API_CONFIG } from "../data/apiConfig";
 
 const AuthContext = createContext(null);
 
+// Session token stored in memory — NOT localStorage (security best practice)
+let sessionToken = null;
+
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [token, setToken] = useState(() => localStorage.getItem("app_token"));
+  const mounted = useRef(true);
 
   useEffect(() => {
-    if (token) {
-      fetch(API_CONFIG.apiBase + "/project-auth", {
+    mounted.current = true;
+    // Restore session from project-auth "me" endpoint
+    if (sessionToken) {
+      fetch(API_CONFIG.apiBase + "/functions/v1/project-auth", {
         method: "POST",
         headers: { "Content-Type": "application/json", "Authorization": "Bearer " + API_CONFIG.anonKey },
-        body: JSON.stringify({ project_id: API_CONFIG.projectId, action: "me", token }),
+        body: JSON.stringify({ project_id: API_CONFIG.projectId, action: "me", token: sessionToken }),
       })
         .then(r => r.json())
-        .then(json => { if (json.user) setUser(json.user); })
-        .catch(() => {})
-        .finally(() => setLoading(false));
+        .then(json => { if (mounted.current && json.user) setUser(json.user); })
+        .catch(() => { sessionToken = null; })
+        .finally(() => { if (mounted.current) setLoading(false); });
     } else {
       setLoading(false);
     }
-  }, [token]);
+    return () => { mounted.current = false; };
+  }, []);
 
   const login = async (email, password) => {
-    const resp = await fetch(API_CONFIG.apiBase + "/project-auth", {
+    const resp = await fetch(API_CONFIG.apiBase + "/functions/v1/project-auth", {
       method: "POST",
       headers: { "Content-Type": "application/json", "Authorization": "Bearer " + API_CONFIG.anonKey },
       body: JSON.stringify({ project_id: API_CONFIG.projectId, action: "login", email, password }),
     });
     const json = await resp.json();
     if (json.error) throw new Error(json.error);
-    localStorage.setItem("app_token", json.token);
-    setToken(json.token);
+    sessionToken = json.token;
     setUser(json.user);
     return json.user;
   };
 
   const signup = async (email, password, displayName) => {
-    const resp = await fetch(API_CONFIG.apiBase + "/project-auth", {
+    const resp = await fetch(API_CONFIG.apiBase + "/functions/v1/project-auth", {
       method: "POST",
       headers: { "Content-Type": "application/json", "Authorization": "Bearer " + API_CONFIG.anonKey },
       body: JSON.stringify({ project_id: API_CONFIG.projectId, action: "signup", email, password, display_name: displayName }),
     });
     const json = await resp.json();
     if (json.error) throw new Error(json.error);
-    localStorage.setItem("app_token", json.token);
-    setToken(json.token);
+    sessionToken = json.token;
     setUser(json.user);
     return json.user;
   };
 
   const logout = () => {
-    localStorage.removeItem("app_token");
-    setToken(null);
+    sessionToken = null;
     setUser(null);
   };
 
