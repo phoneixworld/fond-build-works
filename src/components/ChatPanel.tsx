@@ -523,14 +523,46 @@ const ChatPanel = forwardRef<ChatPanelHandle, { initialPrompt?: string; onVersio
     "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
   ];
 
+  const extractDocxText = async (file: File): Promise<string> => {
+    const JSZip = (await import("jszip")).default;
+    const zip = await JSZip.loadAsync(file);
+    const docXml = await zip.file("word/document.xml")?.async("string");
+    if (!docXml) return "[Could not read document content]";
+    // Strip XML tags to get plain text, preserve paragraph breaks
+    const text = docXml
+      .replace(/<w:p[^>]*>/g, "\n")
+      .replace(/<w:tab\/>/g, "\t")
+      .replace(/<[^>]+>/g, "")
+      .replace(/&amp;/g, "&")
+      .replace(/&lt;/g, "<")
+      .replace(/&gt;/g, ">")
+      .replace(/&quot;/g, '"')
+      .replace(/&apos;/g, "'")
+      .replace(/\n{3,}/g, "\n\n")
+      .trim();
+    return text;
+  };
+
   const addDocumentFile = async (file: File) => {
     if (file.size > 20 * 1024 * 1024) return; // 20MB limit
     try {
-      const text = await file.text();
+      let text: string;
+      const isDocx = file.name.toLowerCase().endsWith(".docx") ||
+        file.type === "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+
+      if (isDocx) {
+        text = await extractDocxText(file);
+      } else {
+        // For PDF and .doc, read as text (best effort) — binary will show fallback
+        text = await file.text();
+        // If it looks like binary garbage, provide a helpful message
+        if (text.includes("\x00") || text.includes("PK!")) {
+          text = `[Binary document: ${file.name} — please convert to .docx for best results]`;
+        }
+      }
       setAttachedDocuments((prev) => [...prev.slice(0, 2), { name: file.name, text: text.slice(0, 50000) }]);
     } catch {
-      // Fallback: just attach name so user knows it was picked up
-      setAttachedDocuments((prev) => [...prev.slice(0, 2), { name: file.name, text: `[Binary document: ${file.name}]` }]);
+      setAttachedDocuments((prev) => [...prev.slice(0, 2), { name: file.name, text: `[Could not extract text from: ${file.name}]` }]);
     }
   };
 
