@@ -21,7 +21,14 @@ export interface DocxExtractionResult {
 /**
  * Extract structured text from a .docx File, preserving document hierarchy.
  */
+const MAX_DOCX_SIZE_MB = 10;
+const MAX_DOCX_SIZE_BYTES = MAX_DOCX_SIZE_MB * 1024 * 1024;
+
 export async function extractDocxStructured(file: File): Promise<DocxExtractionResult> {
+  if (file.size > MAX_DOCX_SIZE_BYTES) {
+    throw new Error(`This document is too large (${(file.size / 1024 / 1024).toFixed(1)}MB). The maximum supported size is ${MAX_DOCX_SIZE_MB}MB. Please upload a smaller document or break it into sections.`);
+  }
+
   const zip = await JSZip.loadAsync(file);
   const docXml = await zip.file("word/document.xml")?.async("string");
   if (!docXml) {
