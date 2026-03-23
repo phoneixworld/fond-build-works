@@ -318,12 +318,12 @@ serve(async (req) => {
           }
 
           // Store in cache
-          if (project_id && fullText.length > 10 && !isEmailRegistrationCheck) {
+          if (project_id && fullText.length > 10 && !shouldBypassCache) {
             const tokensSaved = Math.round(fullText.length / 4);
             await supabase.from("cache_entries").upsert({
               project_id,
               cache_type: "semantic",
-              cache_key: `prompt:${exactHash}`,
+              cache_key: `semantic:${exactHash}`,
               prompt_hash: exactHash,
               cache_value: {
                 response: fullText,
