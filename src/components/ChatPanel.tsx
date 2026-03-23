@@ -53,6 +53,7 @@ const ChatPanel = forwardRef<ChatPanelHandle, { initialPrompt?: string; onVersio
   const [selectedModel, setSelectedModel] = useState<AIModelId>(DEFAULT_MODEL);
   const [selectedTheme, setSelectedTheme] = useState<string>("minimal");
   const [attachedImages, setAttachedImages] = useState<string[]>([]);
+  const [attachedDocuments, setAttachedDocuments] = useState<{ name: string; text: string }[]>([]);
   const [isDragOver, setIsDragOver] = useState(false);
   const [showScrollBtn, setShowScrollBtn] = useState(false);
 

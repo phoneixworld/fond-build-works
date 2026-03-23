@@ -81,11 +81,11 @@ const ChatInput = ({
               disabled={isLoading}
               className="text-muted-foreground hover:text-foreground disabled:opacity-50 transition-colors pb-0.5"
             >
-              <ImagePlus className="w-4 h-4" />
-            </button>
+             <ImagePlus className="w-4 h-4" />
+           </button>
           </TooltipTrigger>
           <TooltipContent side="top" className="text-xs">
-            Attach image <kbd className="ml-1 px-1 py-0.5 rounded bg-muted text-[10px] font-mono">Ctrl+V</kbd>
+            Attach file (image, PDF, Word) <kbd className="ml-1 px-1 py-0.5 rounded bg-muted text-[10px] font-mono">Ctrl+V</kbd>
           </TooltipContent>
         </Tooltip>
         <VoiceInput
