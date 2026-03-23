@@ -1618,6 +1618,28 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
       }
     }
 
+    // ── Bare confirmation with no pendingExecution: user said "go ahead" / "yes" / "do it"
+    // after the chat agent proposed a plan. Detect and trigger build from conversation context.
+    const BARE_BUILD_CONFIRM = /^(yes|yep|yeah|go ahead|proceed|do it|build it|just do it|start|begin|execute|generate|now build|let'?s go|lets go|start building|go|ok build|okay build)\b/i;
+    if (!pendingExecution && BARE_BUILD_CONFIRM.test(finalText.trim().toLowerCase())) {
+      // Check if the last assistant message looks like a plan/proposal
+      const lastAssistant = [...messagesRef.current].reverse().find(m => m.role === "assistant");
+      const lastAssistantText = lastAssistant ? getTextContent(lastAssistant.content) : "";
+      const looksLikePlan = /\b(go ahead|ready to build|shall i proceed|want me to|i can generate|do you want me to proceed|say.*go ahead|employee directory|leave management|dashboard|portal|system|module)\b/i.test(lastAssistantText);
+
+      if (looksLikePlan && !hasExistingCode) {
+        console.log("[SmartSend] Bare confirmation after plan proposal → triggering build");
+        const buildPrompt = await buildRequirementsPayload(finalText);
+        if (isSmartSendStale()) return;
+
+        appendConversationTurn(finalText, images, "Building now.");
+        setCurrentAgent("build");
+        setPipelineStep("planning");
+        sendMessage(buildPrompt, []);
+        return;
+      }
+    }
+
     const isAutoFix = finalText.startsWith("🔧");
 
     // ── Step 0: Auto-fix bypass (self-healing, not user intent) ──
