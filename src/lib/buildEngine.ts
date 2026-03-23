@@ -773,12 +773,23 @@ async function runDirectBuild(
     finalFiles = stubBrokenFiles(finalFiles, postMergeErrors);
   }
 
+  // Schema-first validation — if files contain schema artifacts, validate them
+  if (requiresSchemaValidation(finalFiles)) {
+    const schemaArtifacts = extractSchemaArtifacts(finalFiles);
+    const schemaValidation = validateSchemaArtifacts(schemaArtifacts);
+    if (!schemaValidation.valid) {
+      console.error(`[BuildEngine:direct] SCHEMA VALIDATION FAILED:`, schemaValidation.errors);
+      console.warn(`[BuildEngine:direct] Missing RLS for:`, schemaValidation.missingRls);
+    } else {
+      console.log(`[BuildEngine:direct] Schema validated: ${schemaValidation.tables.length} tables ✅`);
+    }
+  }
+
   // Backend output validation — check for forbidden patterns and missing artifacts
   const backendValidation = validateBuildOutput(finalFiles, prompt);
   if (!backendValidation.valid) {
     console.warn(`[BuildEngine:direct] Backend validation failed (score: ${backendValidation.score}/100):`,
       { forbidden: backendValidation.forbiddenViolations.length, missing: backendValidation.missingRequirements.length });
-    // Log violations but don't block the build — the agent will improve over iterations
     if (backendValidation.forbiddenViolations.length > 0) {
       console.warn("[BuildEngine:direct] Forbidden patterns:", backendValidation.forbiddenViolations.map(v => `${v.file}:${v.line} ${v.pattern}`));
     }
