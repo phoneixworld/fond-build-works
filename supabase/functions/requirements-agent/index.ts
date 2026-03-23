@@ -10,8 +10,8 @@ serve(async (req) => {
 
   try {
     const { prompt, matchedTemplate, existingSchemas } = await req.json();
-    const ANTHROPIC_API_KEY = Deno.env.get("ANTHROPIC_API_KEY");
-    if (!ANTHROPIC_API_KEY) throw new Error("ANTHROPIC_API_KEY not configured");
+    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
+    if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY not configured");
 
     // If a template was matched client-side, use AI to customize it
     // If no template, use AI to extract a domain model from scratch
