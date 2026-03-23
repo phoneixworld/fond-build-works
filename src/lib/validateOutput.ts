@@ -85,6 +85,9 @@ export function detectBackendIntent(files: Record<string, string>, userPrompt: s
     "persist", "save", "store", "backend", "api", "table",
     "users", "admin", "dashboard with data", "manage",
     "create, read, update, delete", "add and edit",
+    "file upload", "upload", "comments", "relations",
+    "role", "access control", "rbac", "permission",
+    "real-time", "realtime", "notification", "websocket",
   ];
 
   if (backendKeywords.some(kw => promptLower.includes(kw))) return true;
