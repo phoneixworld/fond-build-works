@@ -984,7 +984,7 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
                 });
 
               // ── Record build in build_jobs table ──────────────────────────
-              const buildDurationMs = result.trace?.totalMs ?? null;
+              const buildDurationMs = result.trace?.totalDurationMs ?? null;
               const totalSizeBytes = Object.values(finalWorkspace).reduce((sum, code) => sum + (code?.length || 0), 0);
               const validationResults = {
                 valid: result.verification.ok,
