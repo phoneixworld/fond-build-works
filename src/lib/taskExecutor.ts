@@ -92,7 +92,7 @@ function buildCodeContext(files: Record<string, string>, budgetChars = 16000): s
  */
 function extractFilesFromOutput(text: string): Record<string, string> | null {
   const files: Record<string, string> = {};
-  const separatorRegex = /^-{3}\s+(\/?\w[\w/.-]*\.(?:jsx?|tsx?|css|sql|json|md|html|toml|yaml|yml|env|txt))\s*-{0,3}\s*$/;
+  const separatorRegex = /^-{3}\s+(\/?[A-Za-z0-9._/-]+\.[A-Za-z0-9]+)\s*-{0,3}\s*$/;
   const depsSeparator = /^-{3}\s+\/?dependencies\s*$/i;
 
   // Find code fence
