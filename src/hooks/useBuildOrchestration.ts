@@ -1042,19 +1042,27 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
       const liveSandpackFiles = sandpackFilesRef.current;
       const isFirstBuild = !liveSandpackFiles || Object.keys(liveSandpackFiles).length === 0;
 
+      // ── Phase 2: Check for explicit rebuild intent ──
+      const EXPLICIT_REBUILD = /\b(rebuild|from scratch|start over|regenerate|new app|new project)\b/i;
+      const BROAD_BUILD = /\b(build|create|generate)\s+(?:a|an|the|me|my)\s+(?:\w+\s+)?(portal|system|app|application|dashboard|platform|erp|crm|panel|hub|suite|tool|manager|tracker)\b/i;
+      const isExplicitRebuild = EXPLICIT_REBUILD.test(text) || BROAD_BUILD.test(text);
+
       // ── ITERATIVE BUILD GUARD ──
-      // If workspace already has files, this is an iteration, not a fresh build.
-      // Route to edit pipeline instead of regenerating from scratch.
-      if (!isFirstBuild && !text.startsWith("🔧 AUTO-FIX") && !text.includes("# APPLICATION REQUIREMENTS")) {
+      // If workspace already has files AND this is NOT an explicit rebuild request,
+      // route to edit pipeline instead of regenerating from scratch.
+      if (!isFirstBuild && !isExplicitRebuild && !text.startsWith("🔧 AUTO-FIX") && !text.includes("# APPLICATION REQUIREMENTS")) {
         console.log(`[BuildOrch] Workspace has ${Object.keys(liveSandpackFiles!).length} files — routing to edit pipeline instead of rebuild`);
         setCurrentAgent("edit");
         setPipelineStep("resolving");
-        // Release the sending lock so sendEditMessage can acquire it
         isSendingRef.current = false;
         setIsLoading(false);
         setIsBuilding(false);
         await sendEditMessage(text, images);
         return;
+      }
+      // If explicit rebuild with existing workspace, clear workspace for fresh build
+      if (!isFirstBuild && isExplicitRebuild) {
+        console.log(`[BuildOrch] Explicit rebuild detected — clearing workspace for fresh build`);
       }
 
       // ─── INSTANT PATH (delegated to useInstantBuild) ───
