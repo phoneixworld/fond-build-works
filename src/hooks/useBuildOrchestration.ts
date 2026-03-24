@@ -28,6 +28,53 @@ import { supabase } from "@/integrations/supabase/client";
 import { toExportPath } from "@/lib/pathNormalizer";
 import { StreamingPreviewController } from "@/lib/streamingPreview";
 import { type MsgContent, getTextContent } from "@/lib/codeParser";
+
+/** Generate a self-contained preview HTML from workspace files */
+function generatePreviewHtmlForBuild(files: Record<string, string>): string {
+  const cssFiles = Object.entries(files)
+    .filter(([p]) => p.endsWith(".css"))
+    .map(([, c]) => c)
+    .join("\n");
+
+  const componentCode = Object.entries(files)
+    .filter(([p]) => p.match(/\.(jsx|tsx|js|ts)$/) && !p.includes("vite.config"))
+    .sort(([a], [b]) => {
+      if (a.includes("App.")) return 1;
+      if (b.includes("App.")) return -1;
+      return a.localeCompare(b);
+    })
+    .map(([path, code]) => {
+      const cleaned = code
+        .replace(/^import\s+.*$/gm, "// [import removed]")
+        .replace(/^export\s+default\s+/gm, "window.__default_export__ = ")
+        .replace(/^export\s+/gm, "");
+      return `// === ${path} ===\n${cleaned}`;
+    })
+    .join("\n\n");
+
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Build Preview</title>
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js"><\/script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"><\/script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"><\/script>
+  <script src="https://cdn.tailwindcss.com"><\/script>
+  <style>${cssFiles}</style>
+</head>
+<body>
+  <div id="root"></div>
+  <script type="text/babel">
+    ${componentCode}
+    const rootEl = document.getElementById('root');
+    const AppComponent = typeof App !== 'undefined' ? App : (window.__default_export__ || (() => React.createElement('div', null, 'Preview')));
+    ReactDOM.createRoot(rootEl).render(React.createElement(AppComponent));
+  <\/script>
+</body>
+</html>`;
+}
 import { useChatAgent, type ChatAgentConfig } from "@/hooks/useChatAgent";
 import { useInstantBuild, type InstantBuildConfig } from "@/hooks/useInstantBuild";
 
@@ -1017,20 +1064,40 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
                   console.log("[Compiler] Inserting build_jobs record for user:", userId, "project:", currentProject.id);
 
                   const buildId = crypto.randomUUID();
-                  const storagePath = `artifacts/${currentProject.id}/${buildId}/`;
+                  const storagePath = `${currentProject.id}/${buildId}`;
 
+                  // Upload source files to build-artifacts bucket
                   await Promise.all(
                     Object.entries(finalWorkspace).map(async ([path, code]) => {
+                      const cleanPath = path.startsWith("/") ? path.slice(1) : path;
                       await supabase.storage
-                        .from("project_artifacts")
-                        .upload(`${storagePath}${path}`, new Blob([code], { type: "text/plain" }), {
+                        .from("build-artifacts")
+                        .upload(`${storagePath}/src/${cleanPath}`, new Blob([code], { type: "text/plain" }), {
                           upsert: true,
                         });
                     })
                   );
 
+                  // Generate and upload preview HTML
+                  const previewHtml = generatePreviewHtmlForBuild(finalWorkspace);
+                  const previewPath = `${storagePath}/preview/index.html`;
+                  await supabase.storage
+                    .from("build-artifacts")
+                    .upload(previewPath, new Blob([previewHtml], { type: "text/html" }), {
+                      contentType: "text/html",
+                      upsert: true,
+                    });
+
+                  const { data: publicUrlData } = supabase.storage
+                    .from("build-artifacts")
+                    .getPublicUrl(previewPath);
+                  const previewUrl = publicUrlData?.publicUrl || null;
+
                   const sourceFiles = Object.fromEntries(
-                    Object.keys(finalWorkspace).map((path) => [path, `${storagePath}${path}`])
+                    Object.keys(finalWorkspace).map((path) => {
+                      const cleanPath = path.startsWith("/") ? path.slice(1) : path;
+                      return [path, `${storagePath}/src/${cleanPath}`];
+                    })
                   );
 
                   supabase
@@ -1055,12 +1122,14 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
                       build_log: [
                         `[${new Date().toISOString()}] Build started`,
                         `[${new Date().toISOString()}] Files: ${Object.keys(finalWorkspace).length}`,
+                        `[${new Date().toISOString()}] Preview uploaded`,
                         `[${new Date().toISOString()}] Build complete in ${buildDurationMs ?? "?"}ms`,
                       ],
                       source_files: sourceFiles,
-                      output_files: sourceFiles,
+                      output_files: { ...sourceFiles, "preview/index.html": previewPath },
                       dependencies: {},
                       artifact_path: storagePath,
+                      preview_url: previewUrl,
                       error: result.status === "failed" ? result.knownIssues.join("; ") : null,
                       started_at: new Date(Date.now() - (buildDurationMs || 0)).toISOString(),
                       completed_at: new Date().toISOString(),
@@ -1069,7 +1138,7 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
                     .then(({ data: buildRow, error: buildErr }) => {
                       if (buildErr)
                         console.error("[Compiler] Failed to insert build_jobs record:", buildErr.message, buildErr);
-                      else console.log("[Compiler] ✅ Build recorded in build_jobs:", buildRow?.[0]?.id);
+                      else console.log("[Compiler] ✅ Build recorded in build_jobs:", buildRow?.[0]?.id, "preview:", previewUrl);
                     });
                 })
                 .catch((err) => {
