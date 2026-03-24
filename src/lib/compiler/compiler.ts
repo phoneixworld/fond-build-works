@@ -43,6 +43,7 @@ import {
 } from "@/lib/agents";
 import { reconcileSidebarAndRouter } from "./sidebarRouterReconciler";
 import { checkBuildInvariants } from "./buildInvariants";
+import { fetchServerPlan, serverPlanToTaskGraph } from "@/lib/serverPlanAgent";
 
 // ─── Public API ───────────────────────────────────────────────────────────
 
