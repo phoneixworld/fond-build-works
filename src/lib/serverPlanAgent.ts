@@ -6,7 +6,6 @@
  * This replaces client-only planning for new_app builds.
  */
 
-import type { IR } from "@/lib/ir";
 import type { CompilerTask, TaskGraph, TaskType } from "@/lib/compiler/types";
 import { cloudLog } from "@/lib/cloudLogBus";
 
@@ -68,6 +67,7 @@ export async function fetchServerPlan(options: {
       80,
     )}...", ${options.existingFiles?.length || 0} existing files`,
   );
+
   try {
     const resp = await fetch(`${BASE_URL}/functions/v1/plan-agent`, {
       method: "POST",
@@ -121,12 +121,11 @@ export async function fetchServerPlan(options: {
  * the actual generator/scaffolder conventions.
  *
  * Example:
- *   /pages/Contacts/Contacts.jsx   → /pages/Contacts/ContactsPage.jsx
- *   /pages/Deals/Deals.jsx         → /pages/Deals/DealsPage.jsx
- *   /pages/Tasks/Tasks.jsx         → /pages/Tasks/TasksPage.jsx
+ *   /pages/Deals/Deals.jsx   → /pages/Deals/DealsPage.jsx
+ *   /pages/Contacts/Contacts.jsx → /pages/Contacts/ContactsPage.jsx
  */
 function normalizePlannedPath(path: string): string {
-  // Only touch page files that follow /pages/Name/Name.jsx
+  // Only touch page files that follow /pages/Name/Name.jsx or .tsx
   const pageMatch = path.match(/^\/pages\/([^/]+)\/\1\.(jsx|tsx)$/);
   if (pageMatch) {
     const name = pageMatch[1];
@@ -178,22 +177,26 @@ export function serverPlanToTaskGraph(plan: ServerPlanResult): TaskGraph {
     };
   });
 
-  // Log if we have no schema/backend tasks at all — this is why
-  // you see "no schema, no migrations, no backend".
-  const hasSchemaOrBackend = tasks.some((t) => t.type === "backend" && /schema|migration|api|auth/i.test(t.label));
-  if (!hasSchemaOrBackend) {
-    cloudLog.warn(`[ServerPlan] TaskGraph has no schema/backend tasks — build will be UI-only`, "planner");
-    console.warn("[ServerPlan] ⚠️ TaskGraph has no schema/backend tasks — result will be frontend-only");
+  // Surface when the plan is UI-only (no schema/backend tasks),
+  // so we don't get silently "successful" but empty apps.
+  const hasBackendOrSchema = tasks.some((t) => t.type === "backend");
+  if (!hasBackendOrSchema) {
+    const msg =
+      "[ServerPlan] TaskGraph has no backend/schema tasks — build will be frontend-only (no schema, no migrations, no API)";
+    console.warn(msg);
+    cloudLog.warn(msg, "planner");
   }
 
   // Build pass ordering: group by priority (schema → backend → frontend)
   const passes: string[][] = [];
   const byPriority = new Map<number, string[]>();
+
   for (const task of tasks) {
     const p = task.priority;
     if (!byPriority.has(p)) byPriority.set(p, []);
     byPriority.get(p)!.push(task.id);
   }
+
   for (const priority of [...byPriority.keys()].sort()) {
     passes.push(byPriority.get(priority)!);
   }
