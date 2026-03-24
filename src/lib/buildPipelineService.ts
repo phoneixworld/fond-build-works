@@ -62,50 +62,8 @@ export interface BuildListItem {
   build_config: Record<string, unknown>;
 }
 
-/**
- * Submit files to the server-side build pipeline.
- * Returns build result with preview URL and validation results.
- */
-export async function triggerBuild(
-  projectId: string,
-  files: Record<string, string>,
-  dependencies: Record<string, string> = {},
-  buildConfig: Record<string, unknown> = {}
-): Promise<BuildResult> {
-  const { data: { session } } = await supabase.auth.getSession();
-  if (!session?.access_token) {
-    throw new Error("Not authenticated");
-  }
-
-  const response = await fetch(
-    `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/build-orchestrator`,
-    {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${session.access_token}`,
-      },
-      body: JSON.stringify({
-        project_id: projectId,
-        files,
-        dependencies,
-        build_config: buildConfig,
-      }),
-    }
-  );
-
-  const data = await response.json();
-
-  if (!response.ok) {
-    // If it's a validation failure (422), return the data — it has error details
-    if (response.status === 422) {
-      return data as BuildResult;
-    }
-    throw new Error(data.error || `Build failed with status ${response.status}`);
-  }
-
-  return data as BuildResult;
-}
+// triggerBuild has been REMOVED — all builds go through compile() in @/lib/compiler.
+// This service now provides read-only access to build history and artifacts.
 
 /**
  * Get a specific build's details.

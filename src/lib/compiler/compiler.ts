@@ -711,6 +711,31 @@ export async function compile(
     console.warn("[Compiler] Post-build agents failed (non-fatal):", err.message);
   }
 
+  // ── Phase 5.5: Domain Coherence Gate ──────────────────────────────────
+
+  callbacks.onPhase("coherence-check", "Verifying domain coherence...");
+
+  const { checkDomainCoherence } = await import("./domainCoherence");
+  const coherenceResult = checkDomainCoherence(ctx.rawRequirements, workspace);
+
+  if (!coherenceResult.passed) {
+    cloudLog.error(
+      `Domain coherence FAILED: ${coherenceResult.reason}`,
+      "compiler"
+    );
+    console.error(
+      `[Compiler] ❌ DOMAIN COHERENCE FAILED\n` +
+      `  Requested: ${coherenceResult.requestedTokens.slice(0, 5).join(", ")}\n` +
+      `  Generated: ${coherenceResult.generatedTokens.slice(0, 5).join(", ")}\n` +
+      `  Overlap: ${coherenceResult.overlapCount}/${coherenceResult.requestedTokens.length}`
+    );
+    // Non-fatal warning — log but don't abort (the build may still be usable)
+    // The user can see the mismatch in the build summary
+  } else {
+    cloudLog.info(`Domain coherence passed: ${coherenceResult.reason}`, "compiler");
+    console.log(`[Compiler] ✅ Domain coherence: ${coherenceResult.reason}`);
+  }
+
   // ── Phase 6: Completion ────────────────────────────────────────────
 
   callbacks.onPhase("complete", "Build complete.");
