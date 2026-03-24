@@ -1,132 +1,18 @@
-/**
- * Code Merger — intelligently merges React files across sequential build tasks.
- *
- * Key capabilities:
- * 1. diff-match-patch for general files — preserves user edits, applies only changes
- * 2. AST-level merging for App.jsx — combines routes, imports, nav without conflicts
- * 3. Backend-protected paths — prevents frontend tasks from overwriting data/hooks
- * 4. CSS smart merge — overlap detection with @import deduplication
- */
-
 import diff_match_patch from "diff-match-patch";
+import { parse } from "@babel/parser";
+import traverse, { NodePath } from "@babel/traverse";
+import generate from "@babel/generator";
+import * as t from "@babel/types";
+import postcss, { Root as PostCSSRoot } from "postcss";
 
 export interface MergeResult {
   files: Record<string, string>;
   conflicts: string[];
 }
 
-// ─── diff-match-patch instance ────────────────────────────────────────────
-
 const dmp = new diff_match_patch();
-// Increase match distance for better fuzzy matching in large files
 dmp.Match_Distance = 2000;
 dmp.Patch_DeleteThreshold = 0.6;
-
-// ─── Import Utilities ─────────────────────────────────────────────────────
-
-function extractImports(code: string): { imports: string[]; body: string } {
-  const lines = code.split("\n");
-  const imports: string[] = [];
-  const bodyLines: string[] = [];
-  let pastImports = false;
-
-  for (const line of lines) {
-    const trimmed = line.trim();
-    if (!pastImports && (trimmed.startsWith("import ") || trimmed.startsWith("// ") || trimmed === "")) {
-      if (trimmed.startsWith("import ")) imports.push(trimmed);
-    } else {
-      pastImports = true;
-      bodyLines.push(line);
-    }
-  }
-
-  return { imports, body: bodyLines.join("\n") };
-}
-
-function extractRoutes(code: string): string[] {
-  const routeRegex = /<Route\s+[^>]*?(?:path=["'][^"']+["']|index)[^>]*?\/?>/g;
-  return code.match(routeRegex) || [];
-}
-
-function extractNavItems(code: string): string[] {
-  // Match nav item object literals: { to: "...", icon: ..., label: "..." }
-  const navRegex = /\{\s*to:\s*["'][^"']+["'],\s*icon:\s*\w+,\s*label:\s*["'][^"']+["']\s*\}/g;
-  return code.match(navRegex) || [];
-}
-
-function deduplicateImports(imports: string[]): string[] {
-  const seen = new Map<string, string>();
-  const seenDefaultNames = new Map<string, string>();
-
-  for (const imp of imports) {
-    const fromMatch = imp.match(/from\s+["']([^"']+)["']/);
-    if (!fromMatch) {
-      seen.set(imp, imp);
-      continue;
-    }
-
-    const modulePath = fromMatch[1];
-    const defaultName = extractDefaultImport(imp);
-    if (defaultName) {
-      const existingPath = seenDefaultNames.get(defaultName);
-      if (existingPath && existingPath !== modulePath) {
-        if (modulePath.length > existingPath.length) {
-          seen.delete(existingPath);
-          seenDefaultNames.set(defaultName, modulePath);
-        } else {
-          continue;
-        }
-      } else {
-        seenDefaultNames.set(defaultName, modulePath);
-      }
-    }
-
-    const existing = seen.get(modulePath);
-    if (!existing) {
-      seen.set(modulePath, imp);
-      continue;
-    }
-
-    // Merge named imports from same module
-    const existingNames = extractNamedImports(existing);
-    const newNames = extractNamedImports(imp);
-    const existingDefault = extractDefaultImport(existing);
-    const newDefault = extractDefaultImport(imp);
-
-    const allNames = [...new Set([...existingNames, ...newNames])];
-    const defaultImport = newDefault || existingDefault;
-
-    let merged = "import ";
-    if (defaultImport) {
-      merged += defaultImport;
-      if (allNames.length > 0) merged += ", ";
-    }
-    if (allNames.length > 0) {
-      merged += `{ ${allNames.join(", ")} }`;
-    }
-    merged += ` from "${modulePath}";`;
-
-    seen.set(modulePath, merged);
-  }
-
-  return Array.from(seen.values());
-}
-
-function extractNamedImports(imp: string): string[] {
-  const match = imp.match(/\{([^}]+)\}/);
-  if (!match) return [];
-  return match[1].split(",").map(s => s.trim()).filter(Boolean);
-}
-
-function extractDefaultImport(imp: string): string | null {
-  const match = imp.match(/import\s+(\w+)\s*[,{]/);
-  if (match) return match[1];
-  const match2 = imp.match(/import\s+(\w+)\s+from/);
-  if (match2) return match2[1];
-  return null;
-}
-
-// ─── Backend-protected path patterns ──────────────────────────────────────
 
 const BACKEND_PROTECTED_PATTERNS = [
   /^\/data\//,
@@ -136,294 +22,432 @@ const BACKEND_PROTECTED_PATTERNS = [
   /^\/contexts\/AuthContext/,
   /^\/api\//,
   /^\/lib\/api/,
+  /^\/lib\/db/,
+  /^\/lib\/supabase/,
+  /^\/server\//,
+  /^\/services\//,
+  /^\/supabase\//,
+  /^\/migrations\//,
 ];
 
-const APPEND_ONLY_PATTERNS = [
-  /^\/data\/schema/,
-  /^\/migrations\//,
-  /^\/supabase\//,
-];
+const APPEND_ONLY_PATTERNS = [/^\/data\/schema/, /^\/migrations\//, /^\/supabase\//];
 
 export function isBackendProtected(path: string): boolean {
-  return BACKEND_PROTECTED_PATTERNS.some(p => p.test(path));
+  return BACKEND_PROTECTED_PATTERNS.some((p) => p.test(path));
 }
 
 function isAppendOnly(path: string): boolean {
-  return APPEND_ONLY_PATTERNS.some(p => p.test(path));
+  return APPEND_ONLY_PATTERNS.some((p) => p.test(path));
 }
 
-// ─── Diff-Based Merge (general files) ─────────────────────────────────────
+function parseCode(path: string, code: string): t.File {
+  return parse(code, {
+    sourceType: "module",
+    plugins: [
+      "jsx",
+      "typescript",
+      "classProperties",
+      "classPrivateProperties",
+      "classPrivateMethods",
+      "decorators-legacy",
+      "dynamicImport",
+      "exportDefaultFrom",
+      "exportNamespaceFrom",
+      "nullishCoalescingOperator",
+      "optionalChaining",
+      "objectRestSpread",
+      "topLevelAwait",
+    ],
+    sourceFilename: path,
+  });
+}
 
-/**
- * Merge a file using diff-match-patch: compute patches from base→incoming,
- * then apply those patches to the user's current version.
- *
- * This preserves user edits in areas the AI didn't change.
- *
- * @param base    - The original version (before user edits, before AI changes)
- * @param current - The user's current version (may have manual edits)
- * @param incoming - The AI's new version
- * @returns merged code and whether any hunks failed
- */
 function diffMergeFile(
   base: string,
   current: string,
-  incoming: string
+  incoming: string,
 ): { code: string; clean: boolean; failedHunks: number } {
-  // If base and current are identical, no user edits — just use incoming
   if (base === current) {
     return { code: incoming, clean: true, failedHunks: 0 };
   }
-
-  // If base and incoming are identical, no AI changes — keep current
   if (base === incoming) {
     return { code: current, clean: true, failedHunks: 0 };
   }
-
-  // Compute patches: what did the AI change from base → incoming?
   const patches = dmp.patch_make(base, incoming);
-
   if (patches.length === 0) {
     return { code: current, clean: true, failedHunks: 0 };
   }
-
-  // Apply those patches to the user's current version
   const [merged, results] = dmp.patch_apply(patches, current);
-  const failedHunks = results.filter(r => !r).length;
+  const failedHunks = results.filter((r) => !r).length;
+  return { code: merged, clean: failedHunks === 0, failedHunks };
+}
 
-  return {
-    code: merged,
-    clean: failedHunks === 0,
-    failedHunks,
+function collectImports(ast: t.File): t.ImportDeclaration[] {
+  const imports: t.ImportDeclaration[] = [];
+  ast.program.body.forEach((node) => {
+    if (t.isImportDeclaration(node)) imports.push(node);
+  });
+  return imports;
+}
+
+function normalizeImportKey(node: t.ImportDeclaration): string {
+  return node.source.value;
+}
+
+function mergeImportDeclarations(
+  existingImports: t.ImportDeclaration[],
+  incomingImports: t.ImportDeclaration[],
+): t.ImportDeclaration[] {
+  const bySource = new Map<string, t.ImportDeclaration>();
+
+  const addOrMerge = (imp: t.ImportDeclaration, incomingWins: boolean) => {
+    const key = normalizeImportKey(imp);
+    const existing = bySource.get(key);
+    if (!existing) {
+      bySource.set(key, imp);
+      return;
+    }
+
+    const existingDefault = existing.specifiers.find((s) => t.isImportDefaultSpecifier(s)) as
+      | t.ImportDefaultSpecifier
+      | undefined;
+    const incomingDefault = imp.specifiers.find((s) => t.isImportDefaultSpecifier(s)) as
+      | t.ImportDefaultSpecifier
+      | undefined;
+
+    const existingNamed = existing.specifiers.filter((s) => t.isImportSpecifier(s)) as t.ImportSpecifier[];
+    const incomingNamed = imp.specifiers.filter((s) => t.isImportSpecifier(s)) as t.ImportSpecifier[];
+
+    const namedMap = new Map<string, t.ImportSpecifier>();
+    const addNamed = (specs: t.ImportSpecifier[]) => {
+      specs.forEach((s) => {
+        const name = (s.imported as t.Identifier).name;
+        namedMap.set(name, s);
+      });
+    };
+
+    addNamed(existingNamed);
+    addNamed(incomingNamed);
+
+    const mergedNamed = Array.from(namedMap.values());
+    let finalDefault: t.ImportDefaultSpecifier | undefined;
+
+    if (incomingWins) {
+      finalDefault = incomingDefault || existingDefault || undefined;
+    } else {
+      finalDefault = existingDefault || incomingDefault || undefined;
+    }
+
+    const mergedSpecs: t.ImportSpecifier[] | (t.ImportSpecifier | t.ImportDefaultSpecifier)[] = [];
+    if (finalDefault) mergedSpecs.push(finalDefault);
+    mergedSpecs.push(...mergedNamed);
+
+    const merged = t.importDeclaration(mergedSpecs as any, existing.source);
+    bySource.set(key, merged);
   };
+
+  existingImports.forEach((imp) => addOrMerge(imp, false));
+  incomingImports.forEach((imp) => addOrMerge(imp, true));
+
+  return Array.from(bySource.values());
 }
 
-// ─── AST-Level App.jsx Merge ──────────────────────────────────────────────
-
-/**
- * Merge two App.jsx files at the structural level:
- * - Combine all imports (deduplicated)
- * - Combine all <Route> definitions (by path, no duplicates)
- * - Preserve the incoming file's structure/wrapper as authoritative
- */
-function mergeAppFile(
-  existingCode: string,
-  incomingCode: string
-): { code: string; conflicts: string[] } {
-  const conflicts: string[] = [];
-
-  const existingParsed = extractImports(existingCode);
-  const incomingParsed = extractImports(incomingCode);
-
-  // 1. Merge imports
-  const mergedImports = deduplicateImports([
-    ...existingParsed.imports,
-    ...incomingParsed.imports,
-  ]);
-
-  // 2. Extract and merge routes
-  const existingRoutes = extractRoutes(existingCode);
-  const incomingRoutes = extractRoutes(incomingCode);
-
-  const incomingPaths = new Set<string>();
-  for (const r of incomingRoutes) {
-    const m = r.match(/path=["']([^"']+)["']/);
-    if (m) incomingPaths.add(m[1]);
-    if (r.includes("index")) incomingPaths.add("__index__");
-  }
-
-  const missingRoutes = existingRoutes.filter(r => {
-    const m = r.match(/path=["']([^"']+)["']/);
-    if (m) return !incomingPaths.has(m[1]);
-    if (r.includes("index")) return !incomingPaths.has("__index__");
-    return false;
+function replaceImports(ast: t.File, newImports: t.ImportDeclaration[]): t.File {
+  const newBody: t.Statement[] = [];
+  newImports.forEach((imp) => newBody.push(imp));
+  ast.program.body.forEach((node) => {
+    if (!t.isImportDeclaration(node)) newBody.push(node);
   });
+  ast.program.body = newBody;
+  return ast;
+}
 
-  let finalBody = incomingParsed.body;
+type RouteKey = string;
 
-  if (missingRoutes.length > 0) {
-    const routesCloseIdx = finalBody.lastIndexOf("</Routes>");
-    if (routesCloseIdx !== -1) {
-      const routeInsert = missingRoutes
-        .map(r => `              ${r}`)
-        .join("\n");
-      finalBody =
-        finalBody.slice(0, routesCloseIdx) +
-        routeInsert +
-        "\n            " +
-        finalBody.slice(routesCloseIdx);
-      conflicts.push(
-        `App.jsx: merged ${missingRoutes.length} route(s) from previous tasks`
-      );
+function getRouteKey(node: t.JSXElement): RouteKey | null {
+  const opening = node.openingElement;
+  if (!t.isJSXIdentifier(opening.name) || opening.name.name !== "Route") return null;
+
+  let pathValue: string | null = null;
+  let isIndex = false;
+
+  opening.attributes.forEach((attr) => {
+    if (!t.isJSXAttribute(attr) || !t.isJSXIdentifier(attr.name)) return;
+    if (attr.name.name === "path" && attr.value && t.isStringLiteral(attr.value)) {
+      pathValue = attr.value.value;
     }
-  }
-
-  const code = mergedImports.join("\n") + "\n\n" + finalBody;
-  return { code, conflicts };
-}
-
-/**
- * Merge Sidebar.jsx: combine nav items from both versions without duplicates.
- */
-function mergeSidebarFile(
-  existing: string,
-  incoming: string
-): { code: string; conflicts: string[] } {
-  const conflicts: string[] = [];
-
-  const existingNavItems = extractNavItems(existing);
-  const incomingNavItems = extractNavItems(incoming);
-
-  // Extract 'to' paths from incoming
-  const incomingPaths = new Set<string>();
-  for (const item of incomingNavItems) {
-    const m = item.match(/to:\s*["']([^"']+)["']/);
-    if (m) incomingPaths.add(m[1]);
-  }
-
-  // Find nav items in existing that aren't in incoming
-  const missingItems = existingNavItems.filter(item => {
-    const m = item.match(/to:\s*["']([^"']+)["']/);
-    return m && !incomingPaths.has(m[1]);
+    if (attr.name.name === "index") {
+      isIndex = true;
+    }
   });
 
-  if (missingItems.length === 0) {
-    return { code: incoming, conflicts };
+  if (pathValue) return `path:${pathValue}`;
+  if (isIndex) return "index";
+  return null;
+}
+
+function collectRoutes(ast: t.File): { routes: t.JSXElement[]; parentByRoute: Map<t.JSXElement, t.JSXElement> } {
+  const routes: t.JSXElement[] = [];
+  const parentByRoute = new Map<t.JSXElement, t.JSXElement>();
+
+  traverse(ast, {
+    JSXElement(path) {
+      const node = path.node;
+      if (!t.isJSXIdentifier(node.openingElement.name)) return;
+      if (node.openingElement.name.name !== "Routes") return;
+
+      node.children.forEach((child) => {
+        if (!t.isJSXElement(child)) return;
+        if (!t.isJSXIdentifier(child.openingElement.name)) return;
+        if (child.openingElement.name.name !== "Route") return;
+        routes.push(child);
+        parentByRoute.set(child, node);
+      });
+    },
+  });
+
+  return { routes, parentByRoute };
+}
+
+function mergeRoutes(existingAst: t.File, incomingAst: t.File): t.File {
+  const existing = collectRoutes(existingAst);
+  const incoming = collectRoutes(incomingAst);
+
+  const existingMap = new Map<RouteKey, t.JSXElement>();
+  existing.routes.forEach((r) => {
+    const key = getRouteKey(r);
+    if (key) existingMap.set(key, r);
+  });
+
+  const incomingMap = new Map<RouteKey, t.JSXElement>();
+  incoming.routes.forEach((r) => {
+    const key = getRouteKey(r);
+    if (key) incomingMap.set(key, r);
+  });
+
+  const finalMap = new Map<RouteKey, t.JSXElement>();
+
+  existingMap.forEach((route, key) => {
+    if (!incomingMap.has(key)) finalMap.set(key, route);
+  });
+
+  incomingMap.forEach((route, key) => {
+    finalMap.set(key, route);
+  });
+
+  const routesByParent = new Map<t.JSXElement, t.JSXElement[]>();
+  incoming.routes.forEach((r) => {
+    const parent = incoming.parentByRoute.get(r);
+    if (!parent) return;
+    if (!routesByParent.has(parent)) routesByParent.set(parent, []);
+  });
+
+  const firstRoutesParent = incoming.routes.length > 0 ? incoming.parentByRoute.get(incoming.routes[0]) || null : null;
+
+  if (firstRoutesParent) {
+    const orderedRoutes: t.JSXElement[] = [];
+    finalMap.forEach((route) => orderedRoutes.push(route));
+    firstRoutesParent.children = orderedRoutes;
   }
 
-  // Inject missing items into the incoming navItems array
-  const navArrayEnd = incoming.lastIndexOf("];");
-  if (navArrayEnd !== -1) {
-    // Find the navItems array specifically
-    const navItemsStart = incoming.indexOf("const navItems");
-    if (navItemsStart !== -1) {
-      const arrayEnd = incoming.indexOf("];", navItemsStart);
-      if (arrayEnd !== -1) {
-        const insertStr = missingItems.map(item => `  ${item},`).join("\n");
-        const merged =
-          incoming.slice(0, arrayEnd) +
-          "\n" +
-          insertStr +
-          "\n" +
-          incoming.slice(arrayEnd);
-        conflicts.push(
-          `Sidebar: merged ${missingItems.length} nav item(s) from previous tasks`
-        );
+  return incomingAst;
+}
 
-        // Also merge imports for icons
-        const existingParsed = extractImports(existing);
-        const incomingParsed = extractImports(incoming);
-        const mergedImports = deduplicateImports([
-          ...existingParsed.imports,
-          ...incomingParsed.imports,
-        ]);
+type NavKey = string;
 
-        const firstImportLine = merged.indexOf("import ");
-        const lastImportEnd = merged.lastIndexOf(
-          "\n",
-          merged.indexOf("\n\n", firstImportLine)
-        );
-        if (firstImportLine !== -1 && lastImportEnd !== -1) {
-          const bodyAfterImports = extractImports(merged).body;
-          return {
-            code: mergedImports.join("\n") + "\n\n" + bodyAfterImports,
-            conflicts,
-          };
+function getNavKey(obj: t.ObjectExpression): NavKey | null {
+  let toValue: string | null = null;
+  obj.properties.forEach((prop) => {
+    if (!t.isObjectProperty(prop)) return;
+    if (!t.isIdentifier(prop.key)) return;
+    if (prop.key.name !== "to") return;
+    if (t.isStringLiteral(prop.value)) {
+      toValue = prop.value.value;
+    }
+  });
+  return toValue ? `to:${toValue}` : null;
+}
+
+function collectNavItems(ast: t.File): {
+  arrayPath: NodePath<t.VariableDeclarator> | null;
+  items: t.ObjectExpression[];
+} {
+  let arrayPath: NodePath<t.VariableDeclarator> | null = null;
+  const items: t.ObjectExpression[] = [];
+
+  traverse(ast, {
+    VariableDeclarator(path) {
+      const node = path.node;
+      if (!t.isIdentifier(node.id)) return;
+      if (node.id.name !== "navItems") return;
+      if (!t.isArrayExpression(node.init)) return;
+      arrayPath = path;
+      node.init.elements.forEach((el) => {
+        if (t.isObjectExpression(el)) items.push(el);
+      });
+    },
+  });
+
+  return { arrayPath, items };
+}
+
+function mergeSidebarAst(existingAst: t.File, incomingAst: t.File): t.File {
+  const existing = collectNavItems(existingAst);
+  const incoming = collectNavItems(incomingAst);
+
+  if (!incoming.arrayPath || !incoming.arrayPath.node.init || !t.isArrayExpression(incoming.arrayPath.node.init)) {
+    return incomingAst;
+  }
+
+  const existingMap = new Map<NavKey, t.ObjectExpression>();
+  existing.items.forEach((obj) => {
+    const key = getNavKey(obj);
+    if (key) existingMap.set(key, obj);
+  });
+
+  const incomingMap = new Map<NavKey, t.ObjectExpression>();
+  incoming.items.forEach((obj) => {
+    const key = getNavKey(obj);
+    if (key) incomingMap.set(key, obj);
+  });
+
+  const finalMap = new Map<NavKey, t.ObjectExpression>();
+
+  existingMap.forEach((obj, key) => {
+    if (!incomingMap.has(key)) finalMap.set(key, obj);
+  });
+
+  incomingMap.forEach((obj, key) => {
+    finalMap.set(key, obj);
+  });
+
+  const finalItems: t.ObjectExpression[] = [];
+  finalMap.forEach((obj) => finalItems.push(obj));
+
+  incoming.arrayPath.node.init.elements = finalItems;
+
+  return incomingAst;
+}
+
+function mergeBackendAst(existingCode: string, incomingCode: string, path: string): string {
+  let existingAst: t.File;
+  let incomingAst: t.File;
+  try {
+    existingAst = parseCode(path, existingCode);
+    incomingAst = parseCode(path, incomingCode);
+  } catch {
+    return incomingCode;
+  }
+
+  const existingExports = new Map<string, t.Statement>();
+  const incomingExports = new Map<string, t.Statement>();
+
+  const collect = (ast: t.File, map: Map<string, t.Statement>) => {
+    ast.program.body.forEach((node) => {
+      if (t.isExportNamedDeclaration(node) && node.declaration) {
+        if (t.isFunctionDeclaration(node.declaration) && node.declaration.id) {
+          map.set(node.declaration.id.name, node);
+        } else if (t.isVariableDeclaration(node.declaration)) {
+          node.declaration.declarations.forEach((d) => {
+            if (t.isIdentifier(d.id)) map.set(d.id.name, node);
+          });
         }
-
-        return { code: merged, conflicts };
+      } else if (t.isExportDefaultDeclaration(node)) {
+        map.set("default", node);
+      } else if (t.isExportNamedDeclaration(node) && node.specifiers.length > 0) {
+        node.specifiers.forEach((s) => {
+          if (t.isExportSpecifier(s) && t.isIdentifier(s.exported)) {
+            map.set(s.exported.name, node);
+          }
+        });
       }
-    }
-  }
+    });
+  };
 
-  return { code: incoming, conflicts };
+  collect(existingAst, existingExports);
+  collect(incomingAst, incomingExports);
+
+  const finalExports = new Map<string, t.Statement>();
+
+  existingExports.forEach((stmt, name) => {
+    if (!incomingExports.has(name)) finalExports.set(name, stmt);
+  });
+
+  incomingExports.forEach((stmt, name) => {
+    finalExports.set(name, stmt);
+  });
+
+  const otherIncoming: t.Statement[] = [];
+  incomingAst.program.body.forEach((node) => {
+    if (!t.isExportNamedDeclaration(node) && !t.isExportDefaultDeclaration(node)) {
+      otherIncoming.push(node);
+    }
+  });
+
+  const newBody: t.Statement[] = [];
+  otherIncoming.forEach((n) => newBody.push(n));
+  finalExports.forEach((stmt) => newBody.push(stmt));
+
+  incomingAst.program.body = newBody;
+
+  return generate(incomingAst, { retainLines: true }).code;
 }
 
-// ─── Backend File Merge ───────────────────────────────────────────────────
-
-function mergeBackendFiles(
-  existing: string,
-  incoming: string,
-  _path: string
-): string {
-  const existingParsed = extractImports(existing);
-  const incomingParsed = extractImports(incoming);
-
-  const existingExports =
-    existing.match(/export\s+(function|const|default)\s+(\w+)/g) || [];
-  const incomingExports =
-    incoming.match(/export\s+(function|const|default)\s+(\w+)/g) || [];
-
-  const existingNames = new Set(
-    existingExports.map(e => e.match(/(\w+)$/)?.[1]).filter(Boolean)
-  );
-  const incomingNames = new Set(
-    incomingExports.map(e => e.match(/(\w+)$/)?.[1]).filter(Boolean)
-  );
-
-  // CRITICAL: Check for duplicate declarations (e.g., AuthContext defined in both).
-  // If both files export the same names, the incoming version replaces entirely
-  // to avoid "Identifier has already been declared" errors.
-  const hasDuplicateExports = [...incomingNames].some(name => name && existingNames.has(name));
-  if (hasDuplicateExports) {
-    console.log(`[CodeMerger] Backend file has overlapping exports — using incoming version to avoid duplicates`);
+function mergeCss(existing: string, incoming: string): string {
+  let existingAst: PostCSSRoot;
+  let incomingAst: PostCSSRoot;
+  try {
+    existingAst = postcss.parse(existing);
+    incomingAst = postcss.parse(incoming);
+  } catch {
     return incoming;
   }
 
-  const hasNewExports = [...incomingNames].some(name => name && !existingNames.has(name));
+  const existingImports = new Set<string>();
+  existingAst.nodes.forEach((node) => {
+    if (node.type === "atrule" && node.name === "import") {
+      existingImports.add(node.params);
+    }
+  });
 
-  if (hasNewExports) {
-    const mergedImports = deduplicateImports([
-      ...existingParsed.imports,
-      ...incomingParsed.imports,
-    ]);
-    return (
-      mergedImports.join("\n") +
-      "\n\n" +
-      existingParsed.body +
-      "\n\n// ── Added by backend task ──\n\n" +
-      incomingParsed.body
-    );
-  }
+  const newNodes: typeof incomingAst.nodes = [];
+  incomingAst.nodes.forEach((node) => {
+    if (node.type === "atrule" && node.name === "import") {
+      if (!existingImports.has(node.params)) {
+        newNodes.push(node);
+      }
+    } else {
+      newNodes.push(node);
+    }
+  });
 
-  return incoming;
+  incomingAst.nodes = newNodes;
+
+  return incomingAst.toString();
 }
 
-// ─── Main Merge ───────────────────────────────────────────────────────────
-
-/**
- * Merge two sets of React files intelligently.
- *
- * @param existing - Current file state (user's version)
- * @param incoming - AI-generated new/updated files
- * @param protectBackend - If true, frontend tasks can't overwrite backend files
- * @param base - Optional base version for 3-way diff merge
- */
 export function mergeFiles(
   existing: Record<string, string>,
   incoming: Record<string, string>,
   protectBackend = false,
-  base?: Record<string, string>
+  base?: Record<string, string>,
 ): MergeResult {
-  const result = { ...existing };
+  const result: Record<string, string> = { ...existing };
   const conflicts: string[] = [];
 
   for (const [path, code] of Object.entries(incoming)) {
     if (code.trim().length === 0) continue;
 
-    // New file — just add it
     if (!result[path]) {
       result[path] = code;
       continue;
     }
 
-    // Protected backend files
     if (protectBackend && isBackendProtected(path)) {
       conflicts.push(`${path}: protected — skipped frontend overwrite`);
       continue;
     }
 
-    // Append-only files
     if (isAppendOnly(path)) {
       if (!result[path].includes(code.trim())) {
         result[path] = result[path] + "\n\n" + code;
@@ -432,118 +456,103 @@ export function mergeFiles(
       continue;
     }
 
-    // Backend-to-backend merge
     if (!protectBackend && isBackendProtected(path)) {
-      result[path] = mergeBackendFiles(result[path], code, path);
-      conflicts.push(`${path}: backend files merged`);
+      const merged = mergeBackendAst(result[path], code, path);
+      result[path] = merged;
+      conflicts.push(`${path}: backend files merged (incoming wins on conflicts)`);
       continue;
     }
 
-    // App.jsx — AST-level route/import merge
     if (path === "/App.jsx" || path === "/App.tsx") {
-      const merged = mergeAppFile(result[path], code);
-      result[path] = merged.code;
-      conflicts.push(...merged.conflicts);
-      continue;
-    }
+      try {
+        const existingAst = parseCode(path, result[path]);
+        const incomingAst = parseCode(path, code);
 
-    // Sidebar — nav item merge
-    if (path.includes("Sidebar") && path.match(/\.(jsx?|tsx?)$/)) {
-      const merged = mergeSidebarFile(result[path], code);
-      result[path] = merged.code;
-      conflicts.push(...merged.conflicts);
-      continue;
-    }
+        const existingImports = collectImports(existingAst);
+        const incomingImports = collectImports(incomingAst);
+        const mergedImports = mergeImportDeclarations(existingImports, incomingImports);
+        const withMergedImports = replaceImports(incomingAst, mergedImports);
 
-    // CSS files — overlap-aware merge
-    if (path.endsWith(".css")) {
-      const existingLines = new Set(
-        result[path]
-          .split("\n")
-          .map(l => l.trim())
-          .filter(Boolean)
-      );
-      const incomingLines = code
-        .split("\n")
-        .map(l => l.trim())
-        .filter(Boolean);
-      const overlapCount = incomingLines.filter(l =>
-        existingLines.has(l)
-      ).length;
-      const overlapRatio =
-        incomingLines.length > 0 ? overlapCount / incomingLines.length : 0;
-
-      if (overlapRatio > 0.3) {
+        const mergedRoutesAst = mergeRoutes(existingAst, withMergedImports);
+        result[path] = generate(mergedRoutesAst, { retainLines: true }).code;
+        conflicts.push(`${path}: AST-merged (imports + routes, incoming wins on conflicts)`);
+      } catch {
         result[path] = code;
-      } else {
-        const existingImports = new Set(
-          result[path]
-            .split("\n")
-            .filter(l => l.trim().startsWith("@import"))
-            .map(l => l.trim())
-        );
-        const dedupedIncoming = code
-          .split("\n")
-          .filter(l => {
-            const trimmed = l.trim();
-            return !trimmed.startsWith("@import") || !existingImports.has(trimmed);
-          })
-          .join("\n");
-        result[path] = result[path] + "\n\n" + dedupedIncoming;
+        conflicts.push(`${path}: AST merge failed — incoming overwritten`);
       }
       continue;
     }
 
-    // General JS/JSX/TS/TSX files — use diff-match-patch if we have a base
-    if (base && base[path] && path.match(/\.(jsx?|tsx?)$/)) {
-      const { code: merged, clean, failedHunks } = diffMergeFile(
-        base[path],
-        result[path],
-        code
-      );
+    if (path.includes("Sidebar") && path.match(/\.(jsx?|tsx?)$/)) {
+      try {
+        const existingAst = parseCode(path, result[path]);
+        const incomingAst = parseCode(path, code);
+
+        const existingImports = collectImports(existingAst);
+        const incomingImports = collectImports(incomingAst);
+        const mergedImports = mergeImportDeclarations(existingImports, incomingImports);
+        const withMergedImports = replaceImports(incomingAst, mergedImports);
+
+        const mergedSidebarAst = mergeSidebarAst(existingAst, withMergedImports);
+        result[path] = generate(mergedSidebarAst, { retainLines: true }).code;
+        conflicts.push(`${path}: AST-merged (imports + nav, incoming wins on conflicts)`);
+      } catch {
+        result[path] = code;
+        conflicts.push(`${path}: Sidebar AST merge failed — incoming overwritten`);
+      }
+      continue;
+    }
+
+    if (path.endsWith(".css")) {
+      try {
+        const mergedCss = mergeCss(result[path], code);
+        result[path] = mergedCss;
+        conflicts.push(`${path}: CSS merged (incoming wins, @import deduped)`);
+      } catch {
+        result[path] = code;
+        conflicts.push(`${path}: CSS merge failed — incoming overwritten`);
+      }
+      continue;
+    }
+
+    if (base && base[path] && path.match(/\.(jsx?|tsx?|ts|js)$/)) {
+      const { code: merged, clean, failedHunks } = diffMergeFile(base[path], result[path], code);
       result[path] = merged;
       if (!clean) {
-        conflicts.push(
-          `${path}: diff merge had ${failedHunks} failed hunk(s) — some changes may be lost`
-        );
+        conflicts.push(`${path}: diff merge had ${failedHunks} failed hunk(s) — some changes may be lost`);
       } else if (base[path] !== code) {
-        conflicts.push(`${path}: diff-merged (user edits preserved)`);
+        conflicts.push(`${path}: diff-merged (user edits preserved, incoming wins on conflicts)`);
       }
       continue;
     }
 
-    // Fallback: later wins, but try import deduplication for JS files
-    if (path.match(/\.(jsx?|tsx?)$/) && result[path]) {
-      const existingParsed = extractImports(result[path]);
-      const incomingParsed = extractImports(code);
+    if (path.match(/\.(jsx?|tsx?|ts|js)$/) && result[path]) {
+      try {
+        const existingAst = parseCode(path, result[path]);
+        const incomingAst = parseCode(path, code);
 
-      // If both files have the same structure, use incoming
-      // but deduplicate imports to avoid breaking
-      const mergedImports = deduplicateImports([
-        ...existingParsed.imports,
-        ...incomingParsed.imports,
-      ]);
+        const existingImports = collectImports(existingAst);
+        const incomingImports = collectImports(incomingAst);
+        const mergedImports = mergeImportDeclarations(existingImports, incomingImports);
+        const withMergedImports = replaceImports(incomingAst, mergedImports);
 
-      // Use incoming body (authoritative) with merged imports
-      result[path] = mergedImports.join("\n") + "\n\n" + incomingParsed.body;
-      conflicts.push(`${path}: overwritten with import dedup`);
+        result[path] = generate(withMergedImports, { retainLines: true }).code;
+        conflicts.push(`${path}: overwritten with AST import merge (incoming wins)`);
+      } catch {
+        result[path] = code;
+        conflicts.push(`${path}: AST merge failed — incoming overwritten`);
+      }
       continue;
     }
 
-    // Non-JS files — later wins
-    conflicts.push(`${path}: overwritten by later task`);
+    conflicts.push(`${path}: overwritten by later task (incoming wins)`);
     result[path] = code;
   }
 
   return { files: result, conflicts };
 }
 
-// ─── Code Context Builder ─────────────────────────────────────────────────
-
-export function buildFullCodeContext(
-  files: Record<string, string>,
-  budgetChars = 32000
-): string {
+export function buildFullCodeContext(files: Record<string, string>, budgetChars = 32000): string {
   const entries = Object.entries(files);
   if (entries.length === 0) return "";
 
@@ -557,13 +566,10 @@ export function buildFullCodeContext(
   const NAV_PATTERNS = ["/Sidebar", "/Navigation", "/Nav", "/Layout"];
 
   const priorityFiles = entries.filter(
-    ([p]) =>
-      PRIORITY.some(k => p.endsWith(k)) || NAV_PATTERNS.some(k => p.includes(k))
+    ([p]) => PRIORITY.some((k) => p.endsWith(k)) || NAV_PATTERNS.some((k) => p.includes(k)),
   );
   const otherFiles = entries.filter(
-    ([p]) =>
-      !PRIORITY.some(k => p.endsWith(k)) &&
-      !NAV_PATTERNS.some(k => p.includes(k))
+    ([p]) => !PRIORITY.some((k) => p.endsWith(k)) && !NAV_PATTERNS.some((k) => p.includes(k)),
   );
 
   let result = "";
