@@ -65,6 +65,10 @@ export function verifyWorkspace(
   const exportConventionResults = checkExportConventions(workspace);
   issues.push(...exportConventionResults.issues);
 
+  // 13. Backend schema/migration presence check
+  const migrationResults = checkMigrationPresence(workspace, taskGraph);
+  issues.push(...migrationResults.issues);
+
   // Stats
   const files = workspace.listFiles();
   const jsFiles = files.filter(f => /\.(jsx?|tsx?)$/.test(f));
@@ -765,3 +769,41 @@ function checkExportConventions(workspace: Workspace): { issues: VerificationIss
 
   return { issues };
 }
+
+// ─── Migration/Schema Presence Check ──────────────────────────────────────
+
+function checkMigrationPresence(
+  workspace: Workspace,
+  taskGraph: TaskGraph,
+): { issues: VerificationIssue[] } {
+  const issues: VerificationIssue[] = [];
+
+  // Check if any task mentions schema/database/migration/backend
+  const needsBackend = taskGraph.tasks.some(
+    (t) =>
+      /schema|database|migration|backend|auth|supabase/i.test(t.label) ||
+      t.produces.some((p) => /migration|schema|\.sql/i.test(p)),
+  );
+
+  if (!needsBackend) return { issues };
+
+  // Check if migration/schema files exist in workspace
+  const hasMigrations = workspace
+    .listFiles()
+    .some((f) => /migration.*\.sql|schema.*\.sql|\.sql$/i.test(f));
+
+  if (!hasMigrations) {
+    issues.push({
+      category: "missing_file" as IssueCategory,
+      severity: "warning",
+      file: "/migrations/",
+      message:
+        "Backend tasks detected but no SQL migration files were generated — database schema may be missing",
+      suggestedFix:
+        "Generate SQL migration files for database schema and RLS policies",
+    });
+  }
+
+  return { issues };
+}
+

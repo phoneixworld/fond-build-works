@@ -16,10 +16,6 @@
 
 import { useState, useRef, useEffect, useCallback } from "react";
 import {
-  streamBuildAgent,
-  validateReactCode,
-  formatRetryContext,
-  MAX_BUILD_RETRIES,
   type AgentIntent,
   type PipelineStep,
 } from "@/lib/agentPipeline";
@@ -31,8 +27,7 @@ import { clientRouteModel } from "@/lib/costRouter";
 import { supabase } from "@/integrations/supabase/client";
 import { toExportPath } from "@/lib/pathNormalizer";
 import { StreamingPreviewController } from "@/lib/streamingPreview";
-import { type MsgContent, getTextContent, parseResponse, parseReactFiles, postProcessHtml } from "@/lib/codeParser";
-import { parseMultiFileOutput } from "@/contexts/VirtualFSContext";
+import { type MsgContent, getTextContent } from "@/lib/codeParser";
 import { useChatAgent, type ChatAgentConfig } from "@/hooks/useChatAgent";
 import { useInstantBuild, type InstantBuildConfig } from "@/hooks/useInstantBuild";
 
@@ -530,24 +525,6 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
 
   const { tryInstantBuild } = useInstantBuild({
     currentProject,
-    saveProject,
-    setSandpackFiles,
-    setSandpackDeps,
-    setPreviewMode,
-    setIsBuilding,
-    setBuildStep,
-    setIsLoading,
-    setMessages,
-    setPipelineStep,
-    setCurrentAgent,
-    setBuildRetryCount,
-    setBuildStreamContent,
-    messagesRef,
-    isSendingRef,
-    selectedModel,
-    selectedTheme,
-    syncSandpackToVirtualFS,
-    handleOnError,
   } as InstantBuildConfig);
 
   const sendMessage = useCallback(
@@ -618,56 +595,6 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
       const abortController = new AbortController();
       abortControllerRef.current = abortController;
 
-      let fullResponse = "";
-      let hasSetAnalyzing = false;
-      let hasSetBuilding = false;
-      let streamParseCount = 0;
-
-      const upsert = (chunk: string) => {
-        if (abortController.signal.aborted) return;
-        resetBuildSafetyTimeout();
-        fullResponse += chunk;
-        setBuildStreamContent(fullResponse);
-
-        const reactResult = parseReactFiles(fullResponse);
-        const [chatText, htmlCode] = reactResult.files ? [reactResult.chatText, null] : parseResponse(fullResponse);
-        const displayChat = reactResult.files ? reactResult.chatText : chatText;
-
-        if (!hasSetAnalyzing && fullResponse.length > 20) {
-          setBuildStep("🔨 Build agent: generating components...");
-          setPipelineStep("generating");
-          hasSetAnalyzing = true;
-        }
-
-        if (reactResult.files) {
-          if (!hasSetBuilding) {
-            const fileNames = Object.keys(reactResult.files);
-            const totalChars = Object.values(reactResult.files).join("").length;
-            console.log(`[upsert] ✅ First React parse success: files=${fileNames.join(",")}, chars=${totalChars}`);
-            setBuildStep("📦 Bundling & validating...");
-            setPipelineStep("bundling");
-            hasSetBuilding = true;
-          }
-          streamParseCount++;
-          setPreviewMode("sandpack");
-        } else if (htmlCode) {
-          if (!hasSetBuilding) {
-            setBuildStep("Building your app...");
-            hasSetBuilding = true;
-          }
-          setPreviewMode("html");
-        }
-
-        setMessages((prev) => {
-          const t = displayChat || "Building...";
-          const last = prev[prev.length - 1];
-          if (last?.role === "assistant") {
-            return prev.map((m, i) => (i === prev.length - 1 ? { ...m, content: t } : m));
-          }
-          return [...prev, { role: "assistant", content: t, timestamp: Date.now() }];
-        });
-      };
-
       try {
         const { schemas, knowledge, irContext } = await fetchProjectContext(currentProject.id);
 
@@ -693,18 +620,6 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
 
         const currentMessages = messagesRef.current;
 
-        const apiMessages: any[] = [
-          {
-            role: "system" as const,
-            content:
-              "You are a deterministic build agent. You generate React code ONLY from the provided requirements, IR, and workspace summary. Do NOT use prior conversation. Do NOT treat error logs or status messages as requirements. Do NOT infer new features.",
-          },
-          {
-            role: "user" as const,
-            content,
-          },
-        ];
-
         const themeInfo = DESIGN_THEMES.find((t) => t.id === selectedTheme);
         const userText = typeof text === "string" ? text : "";
         const snippetsContext = getSnippetsPromptContext(userText);
@@ -715,444 +630,6 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
           console.log(`[Template Matched] ${template.emoji} ${template.name}`);
           setSelectedTemplate(null);
         }
-
-        const handleOnDone = async (responseText: string) => {
-          if (abortController.signal.aborted) return;
-          fullResponse = responseText;
-          console.log(`[BuildOrch:onDone] Response length: ${fullResponse.length}`);
-
-          const reactResult = parseReactFiles(fullResponse);
-          let finalHtml: string | null = null;
-
-          if (reactResult.files) {
-            setPipelineStep("validating");
-            setBuildStep("✅ Validating code...");
-            const validation = validateReactCode(reactResult.files);
-            const currentRetryCount = buildRetryCountRef.current;
-
-            if (!validation.valid && currentRetryCount < MAX_BUILD_RETRIES) {
-              console.warn(
-                `[BuildOrch:onDone] Validation failed (attempt ${currentRetryCount + 1}):`,
-                validation.errors,
-              );
-              setPipelineStep("retrying");
-              setBuildStep(`🔄 Auto-fixing ${validation.errors.length} issue(s)...`);
-              setBuildRetryCount((prev) => prev + 1);
-
-              setMessages((prev) => {
-                const retryMsg = `⚠️ Found ${validation.errors.length} issue(s), auto-fixing...`;
-                const last = prev[prev.length - 1];
-                if (last?.role === "assistant") {
-                  return prev.map((m, i) => (i === prev.length - 1 ? { ...m, content: retryMsg } : m));
-                }
-                return [...prev, { role: "assistant", content: retryMsg, timestamp: Date.now() }];
-              });
-
-              const retryContext = formatRetryContext(validation.errors, currentRetryCount + 1);
-              let retryFullResponse = "";
-
-              await streamBuildAgent({
-                messages: apiMessages,
-                projectId: currentProject.id,
-                techStack: currentProject.tech_stack || "react-cdn",
-                schemas,
-                model: selectedModel,
-                designTheme: themeInfo?.prompt,
-                knowledge,
-                currentCode: currentCodeSummary || undefined,
-                snippetsContext: snippetsContext || undefined,
-                irContext: irContext || undefined,
-                retryContext,
-                onDelta: (chunk) => {
-                  retryFullResponse += chunk;
-                  setBuildStreamContent(retryFullResponse);
-                },
-                onDone: async (retryText) => {
-                  const retryResult = parseReactFiles(retryText);
-                  if (retryResult.files) {
-                    const retryValidation = validateReactCode(retryResult.files);
-                    const retryCountNow = buildRetryCountRef.current + 1;
-
-                    if (!retryValidation.valid && retryCountNow < MAX_BUILD_RETRIES) {
-                      console.warn(
-                        `[BuildOrch:retry] Retry ${retryCountNow} still has ${retryValidation.errors.length} error(s), retrying again...`,
-                      );
-                      setBuildRetryCount(retryCountNow + 1);
-                      setBuildStep(`🔄 Auto-fixing (attempt ${retryCountNow + 1}/${MAX_BUILD_RETRIES + 1})...`);
-
-                      const nextRetryContext = formatRetryContext(
-                        retryValidation.errors,
-                        retryCountNow + 1,
-                        retryResult.files,
-                      );
-                      let nextRetryResponse = "";
-
-                      await streamBuildAgent({
-                        messages: apiMessages,
-                        projectId: currentProject.id,
-                        techStack: currentProject.tech_stack || "react-cdn",
-                        schemas,
-                        model: selectedModel,
-                        designTheme: themeInfo?.prompt,
-                        knowledge,
-                        currentCode: Object.entries(retryResult.files)
-                          .map(([p, c]) => `--- ${p}\n${c}`)
-                          .join("\n\n"),
-                        retryContext: nextRetryContext,
-                        onDelta: (chunk) => {
-                          nextRetryResponse += chunk;
-                          setBuildStreamContent(nextRetryResponse);
-                        },
-                        onDone: (finalRetryText) => {
-                          const finalResult = parseReactFiles(finalRetryText);
-                          const filesToUse = finalResult.files || retryResult.files;
-                          setSandpackFiles(filesToUse);
-                          syncSandpackToVirtualFS(filesToUse);
-                          const deps = finalResult.files ? finalResult.deps : retryResult.deps;
-                          if (Object.keys(deps).length > 0) setSandpackDeps(deps);
-                          setPreviewMode("sandpack");
-
-                          const chatText =
-                            finalResult.chatText || retryResult.chatText || "✅ Fixed and rebuilt successfully";
-                          setMessages((prev) => {
-                            const last = prev[prev.length - 1];
-                            if (last?.role === "assistant") {
-                              return prev.map((m, i) => (i === prev.length - 1 ? { ...m, content: chatText } : m));
-                            }
-                            return prev;
-                          });
-
-                          setIsLoading(false);
-                          setIsBuilding(false);
-                          setBuildStep("");
-                          setPipelineStep("complete");
-                          setCurrentAgent(null);
-                          setBuildRetryCount(0);
-                          isSendingRef.current = false;
-                          setTimeout(() => setBuildStreamContent(""), 3000);
-                          saveProject({
-                            chat_history: messagesRef.current.map((m) => ({
-                              role: m.role,
-                              content: typeof m.content === "string" ? m.content : getTextContent(m.content),
-                            })),
-                          });
-                        },
-                        onError: (err) => {
-                          console.error("[BuildOrch:retry2] Final retry failed:", err);
-                          setSandpackFiles(retryResult.files!);
-                          syncSandpackToVirtualFS(retryResult.files!);
-                          if (Object.keys(retryResult.deps).length > 0) setSandpackDeps(retryResult.deps);
-                          setPreviewMode("sandpack");
-                          setIsLoading(false);
-                          setIsBuilding(false);
-                          setBuildStep("");
-                          setPipelineStep("complete");
-                          setCurrentAgent(null);
-                          setBuildRetryCount(0);
-                          isSendingRef.current = false;
-                        },
-                      });
-                      return;
-                    }
-
-                    if (!retryValidation.valid) {
-                      console.warn(
-                        "[BuildOrch:retry] Max retries reached, using best result with warnings:",
-                        retryValidation.errors,
-                      );
-                    }
-
-                    setSandpackFiles(retryResult.files);
-                    syncSandpackToVirtualFS(retryResult.files);
-                    if (Object.keys(retryResult.deps).length > 0) setSandpackDeps(retryResult.deps);
-                    setPreviewMode("sandpack");
-
-                    const retryChatText = retryResult.chatText || "✅ Fixed and rebuilt successfully";
-                    setMessages((prev) => {
-                      const last = prev[prev.length - 1];
-                      if (last?.role === "assistant") {
-                        return prev.map((m, i) => (i === prev.length - 1 ? { ...m, content: retryChatText } : m));
-                      }
-                      return prev;
-                    });
-                  }
-
-                  setIsLoading(false);
-                  setIsBuilding(false);
-                  setBuildStep("");
-                  setPipelineStep("complete");
-                  setCurrentAgent(null);
-                  setBuildRetryCount(0);
-                  isSendingRef.current = false;
-                  setTimeout(() => setBuildStreamContent(""), 3000);
-
-                  const persistMessages = messagesRef.current.map((m) => ({
-                    role: m.role,
-                    content: typeof m.content === "string" ? m.content : getTextContent(m.content),
-                  }));
-                  saveProject({ chat_history: persistMessages });
-                },
-                onError: (err) => {
-                  console.error("[BuildOrch:retry] Retry failed:", err);
-                  setSandpackFiles(reactResult.files!);
-                  syncSandpackToVirtualFS(reactResult.files!);
-                  if (Object.keys(reactResult.deps).length > 0) setSandpackDeps(reactResult.deps);
-                  setPreviewMode("sandpack");
-                  setIsLoading(false);
-                  setIsBuilding(false);
-                  setBuildStep("");
-                  setPipelineStep("complete");
-                  setCurrentAgent(null);
-                  setBuildRetryCount(0);
-                  isSendingRef.current = false;
-                },
-              });
-              return;
-            }
-
-            if (!validation.valid) {
-              console.warn("[BuildOrch:onDone] Validation warnings (max retries reached):", validation.errors);
-            }
-
-            const fileNames = Object.keys(reactResult.files);
-            console.log(`[BuildOrch:onDone] ✅ React files:`, fileNames);
-            setSandpackFiles(reactResult.files);
-            syncSandpackToVirtualFS(reactResult.files);
-            if (Object.keys(reactResult.deps).length > 0) setSandpackDeps(reactResult.deps);
-            setPreviewMode("sandpack");
-            setBuildRetryCount(0);
-          } else {
-            console.log("[BuildOrch:onDone] No React files — falling back to HTML");
-            const { files: parsedFiles, html: htmlCode, chatText } = parseMultiFileOutput(fullResponse);
-
-            if (Object.keys(parsedFiles).length > 0) setVirtualFiles(parsedFiles);
-            if (htmlCode) setPreviewHtml(postProcessHtml(htmlCode));
-            finalHtml = htmlCode;
-
-            const currentRetryCount = buildRetryCountRef.current;
-
-            if (!htmlCode && currentRetryCount < MAX_BUILD_RETRIES) {
-              console.warn("[BuildOrch:onDone] No code in response — auto-retrying with code generation instruction");
-              setBuildStep("🔄 Re-generating with code output...");
-              setBuildRetryCount((prev) => prev + 1);
-
-              setMessages((prev) => {
-                const last = prev[prev.length - 1];
-                if (last?.role === "assistant") {
-                  return prev.map((m, i) =>
-                    i === prev.length - 1 ? { ...m, content: "⏳ Generating code... (retry)" } : m,
-                  );
-                }
-                return prev;
-              });
-
-              const retryMessages = [
-                ...apiMessages,
-                { role: "assistant" as const, content: fullResponse },
-                {
-                  role: "user" as const,
-                  content:
-                    "Your previous response did not contain any code. You MUST output complete working React code inside ```react-preview fences with --- /App.jsx file markers. Generate the full application code NOW. Do not describe what you plan to build — just output the code.",
-                },
-              ];
-
-              let retryFullResponse = "";
-              await streamBuildAgent({
-                messages: retryMessages,
-                projectId: currentProject.id,
-                techStack: currentProject.tech_stack || "react-cdn",
-                schemas,
-                model: selectedModel,
-                designTheme: themeInfo?.prompt,
-                knowledge,
-                currentCode: currentCodeSummary || undefined,
-                snippetsContext: snippetsContext || undefined,
-                irContext: irContext || undefined,
-                onDelta: (chunk) => {
-                  retryFullResponse += chunk;
-                  setBuildStreamContent(retryFullResponse);
-                },
-                onDone: (retryText) => {
-                  const retryResult = parseReactFiles(retryText);
-                  if (retryResult.files) {
-                    setSandpackFiles(retryResult.files);
-                    syncSandpackToVirtualFS(retryResult.files);
-                    if (Object.keys(retryResult.deps).length > 0) setSandpackDeps(retryResult.deps);
-                    setPreviewMode("sandpack");
-
-                    const retryChatText = retryResult.chatText || "✅ Code generated successfully";
-                    setMessages((prev) => {
-                      const last = prev[prev.length - 1];
-                      if (last?.role === "assistant") {
-                        return prev.map((m, i) => (i === prev.length - 1 ? { ...m, content: retryChatText } : m));
-                      }
-                      return prev;
-                    });
-                  } else {
-                    setMessages((prev) => {
-                      const last = prev[prev.length - 1];
-                      const msg =
-                        '⚠️ The AI returned a planning response instead of code. Please try a more specific request like: "Build the Dashboard and Student Management modules with sidebar navigation"';
-                      if (last?.role === "assistant") {
-                        return prev.map((m, i) => (i === prev.length - 1 ? { ...m, content: msg } : m));
-                      }
-                      return [...prev, { role: "assistant" as const, content: msg, timestamp: Date.now() }];
-                    });
-                  }
-
-                  setIsLoading(false);
-                  setIsBuilding(false);
-                  setBuildStep("");
-                  setPipelineStep("complete");
-                  setCurrentAgent(null);
-                  setBuildRetryCount(0);
-                  isSendingRef.current = false;
-                  setTimeout(() => setBuildStreamContent(""), 3000);
-
-                  const persistMessages = messagesRef.current.map((m) => ({
-                    role: m.role,
-                    content: typeof m.content === "string" ? m.content : getTextContent(m.content),
-                  }));
-                  saveProject({ chat_history: persistMessages });
-                },
-                onError: (err) => {
-                  console.error("[BuildOrch:code-retry] Retry failed:", err);
-                  setIsLoading(false);
-                  setIsBuilding(false);
-                  setBuildStep("");
-                  setPipelineStep("complete");
-                  setCurrentAgent(null);
-                  setBuildRetryCount(0);
-                  isSendingRef.current = false;
-                },
-              });
-              return;
-            }
-
-            if (htmlCode && htmlCode.length > 200 && currentMessages.length === 0) {
-              setBuildStep("Reviewing & polishing...");
-              try {
-                const reviewResp = await fetch(`${SUPABASE_URL}/functions/v1/review-code`, {
-                  method: "POST",
-                  headers: {
-                    "Content-Type": "application/json",
-                    Authorization: `Bearer ${SUPABASE_KEY}`,
-                  },
-                  body: JSON.stringify({ html: htmlCode }),
-                });
-                if (reviewResp.ok) {
-                  const reviewData = await reviewResp.json();
-                  if (reviewData.reviewed && reviewData.html && reviewData.html.length > 200) {
-                    finalHtml = reviewData.html;
-                    setPreviewHtml(postProcessHtml(finalHtml));
-                  }
-                }
-              } catch (e) {
-                console.warn("[Phase 3] Review pass skipped:", e);
-              }
-            }
-          }
-
-          setIsLoading(false);
-          setIsBuilding(false);
-          setBuildStep("");
-          setPipelineStep("complete");
-          setCurrentAgent(null);
-          isSendingRef.current = false;
-          setTimeout(() => setBuildStreamContent(""), 3000);
-
-          const processedHtml = finalHtml ? postProcessHtml(finalHtml) : null;
-
-          if (processedHtml && currentProject?.id) {
-            supabase
-              .from("project_environments" as any)
-              .update({
-                html_snapshot: processedHtml,
-                status: "active",
-                updated_at: new Date().toISOString(),
-              } as any)
-              .eq("project_id", currentProject.id)
-              .eq("name", "development")
-              .then(() => {});
-          }
-
-          if (processedHtml && onVersionCreated) {
-            onVersionCreated({
-              id: crypto.randomUUID(),
-              timestamp: Date.now(),
-              label: getTextContent(userMsg.content).slice(0, 60) || "Build update",
-              html: processedHtml,
-              messageIndex: currentMessages.length,
-            });
-          }
-
-          const finalChatText = reactResult.files
-            ? reactResult.chatText
-            : (() => {
-                const { chatText: ct } = parseMultiFileOutput(fullResponse);
-                return ct;
-              })();
-
-          setMessages((prev) => {
-            const final = finalChatText
-              ? prev.map((m, i) =>
-                  i === prev.length - 1 && m.role === "assistant" ? { ...m, content: finalChatText } : m,
-                )
-              : prev;
-
-            const persistMessages = final.map((m) => ({
-              role: m.role,
-              content: typeof m.content === "string" ? m.content : getTextContent(m.content),
-            }));
-
-            const isFirstMessagePersist = persistMessages.filter((m) => m.role === "user").length === 1;
-            if (isFirstMessagePersist && currentProject.name === "Untitled Project") {
-              const userPromptText = persistMessages[0]?.content || "";
-              fetch(`${SUPABASE_URL}/functions/v1/project-name`, {
-                method: "POST",
-                headers: {
-                  "Content-Type": "application/json",
-                  Authorization: `Bearer ${SUPABASE_KEY}`,
-                },
-                body: JSON.stringify({ prompt: userPromptText }),
-              })
-                .then((r) => r.json())
-                .then(({ name, emoji }) => {
-                  const fullName = emoji ? `${emoji} ${name}` : name;
-                  supabase
-                    .from("projects")
-                    .update({ name: fullName, updated_at: new Date().toISOString() } as any)
-                    .eq("id", currentProject.id)
-                    .then(() => saveProject({ name: fullName } as any));
-                })
-                .catch(() => {});
-            }
-
-            saveProject({
-              chat_history: persistMessages,
-              html_content: finalHtml || currentProject.html_content || "",
-            });
-
-            if (reactResult.files && Object.keys(reactResult.files).length > 0) {
-              const payload = { files: reactResult.files, deps: reactResult.deps || {} };
-              supabase
-                .from("project_data")
-                .upsert(
-                  {
-                    project_id: currentProject.id,
-                    collection: "sandpack_state",
-                    data: payload as any,
-                  },
-                  { onConflict: "project_id,collection" },
-                )
-                .then(({ error }) => {
-                  if (error) console.warn("[BuildOrch] Failed to persist sandpack state:", error);
-                });
-            }
-
-            return final;
-          });
-        };
 
         setCurrentAgent("build");
         setPipelineStep("planning");
@@ -1171,18 +648,28 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
         }
 
         const isSimpleBuild = isFirstBuild && !!template;
+        let templateFiles: Record<string, string> | null = null;
+        let templateName = "";
 
         if (isSimpleBuild || isFirstBuild) {
-          const handled = await tryInstantBuild(
-            template,
-            userText,
-            schemas,
-            irContext,
-            templateCtx,
-            buildProjectId,
-            upsert,
-          );
-          if (handled) return;
+          const instantResult = await tryInstantBuild(template, userText);
+          if (instantResult) {
+            templateFiles = instantResult.files;
+            templateName = instantResult.templateName;
+            // Show instant preview while compile() runs full pipeline
+            setSandpackFiles(instantResult.files);
+            syncSandpackToVirtualFS(instantResult.files);
+            if (Object.keys(instantResult.deps).length > 0) setSandpackDeps(instantResult.deps);
+            setPreviewMode("sandpack");
+            setMessages((prev) => {
+              const msg = `⚡ **Instant Preview** — ${Object.keys(instantResult.files).length} files rendered!\nRunning full build pipeline for verification and polish...`;
+              const last = prev[prev.length - 1];
+              if (last?.role === "assistant") {
+                return prev.map((m, i) => (i === prev.length - 1 ? { ...m, content: msg } : m));
+              }
+              return [...prev, { role: "assistant", content: msg, timestamp: Date.now() }];
+            });
+          }
         }
 
         let domainModel: any = null;
@@ -1279,8 +766,10 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
 
         // Single build path: compile() handles IR extraction, planning, and execution
         const compileOptions: CompileOptions = {
-          rawRequirements: userText,
-          existingWorkspace: safeExistingFiles || {},
+          rawRequirements: templateFiles
+            ? `${userText}\n\n## TEMPLATE CONTEXT\n${templateCtx}\nCustomize the existing ${templateName} template files based on the user request above.`
+            : userText,
+          existingWorkspace: templateFiles || safeExistingFiles || {},
           projectId: buildProjectId,
           techStack: currentProject.tech_stack || "react-cdn",
           schemas: schemas.length > 0 ? schemas : undefined,
