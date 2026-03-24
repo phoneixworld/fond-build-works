@@ -983,7 +983,57 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
                   else console.log("[Compiler] ✅ Sandpack state persisted");
                 });
 
-              // Server-side build removed — compile() is the single build path
+              // ── Record build in build_jobs table ──────────────────────────
+              const buildDurationMs = result.trace?.totalDurationMs ?? null;
+              const totalSizeBytes = Object.values(finalWorkspace).reduce((sum, code) => sum + (code?.length || 0), 0);
+              const validationResults = {
+                valid: result.verification.ok,
+                errors: result.verification.issues
+                  .filter((i) => i.severity === "error")
+                  .map((i) => ({ file: i.file || "", message: i.message, severity: i.severity })),
+                warnings: result.verification.issues
+                  .filter((i) => i.severity === "warning")
+                  .map((i) => ({ file: i.file || "", message: i.message, severity: i.severity })),
+              };
+
+              supabase.auth.getUser().then(({ data: authData }) => {
+                const userId = authData?.user?.id;
+                if (!userId) {
+                  console.warn("[Compiler] No authenticated user — skipping build_jobs insert");
+                  return;
+                }
+
+                supabase
+                  .from("build_jobs")
+                  .insert({
+                    project_id: currentProject.id,
+                    user_id: userId,
+                    status: result.status === "success" ? "complete" : result.status === "partial" ? "complete" : "failed",
+                    file_count: Object.keys(finalWorkspace).length,
+                    total_size_bytes: totalSizeBytes,
+                    build_duration_ms: buildDurationMs,
+                    build_config: { model: routedModel, techStack: currentProject.tech_stack || "react-cdn" } as any,
+                    validation_results: validationResults as any,
+                    build_log: [
+                      `Build started: ${new Date().toISOString()}`,
+                      `Tasks: ${result.trace?.context?.taskCount ?? "?"} across ${result.trace?.context?.passCount ?? "?"} passes`,
+                      `Files: ${Object.keys(finalWorkspace).length} (${Math.round(totalSizeBytes / 1024)}KB)`,
+                      `Status: ${result.status}`,
+                      `Verification: ${result.verification.ok ? "passed" : "issues found"}`,
+                      ...(result.knownIssues.length > 0 ? [`Known issues: ${result.knownIssues.join("; ")}`] : []),
+                    ],
+                    source_files: {} as any,
+                    output_files: {} as any,
+                    dependencies: {} as any,
+                    error: result.status === "failed" ? result.knownIssues.join("; ") : null,
+                    started_at: new Date(Date.now() - (buildDurationMs || 0)).toISOString(),
+                    completed_at: new Date().toISOString(),
+                  })
+                  .then(({ data: buildRow, error: buildErr }) => {
+                    if (buildErr) console.warn("[Compiler] Failed to insert build_jobs record:", buildErr.message);
+                    else console.log("[Compiler] ✅ Build recorded in build_jobs");
+                  });
+              });
             }
 
             if (onVersionCreated) {
