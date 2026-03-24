@@ -30,14 +30,14 @@ const RuntimeBadge = React.forwardRef<HTMLDivElement, { status: RuntimeStatus; s
   switch (status) {
     case "passed":
       return (
-        <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-100 text-emerald-700">
+        <div ref={ref} className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-100 text-emerald-700">
           <ShieldCheck className="w-3 h-3" />
           <span className="text-[10px] font-semibold">Runtime Verified</span>
         </div>
       );
     case "failed":
       return (
-        <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-destructive/10 text-destructive">
+        <div ref={ref} className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-destructive/10 text-destructive">
           <XCircle className="w-3 h-3" />
           <span className="text-[10px] font-semibold">Runtime Failed</span>
         </div>
@@ -45,13 +45,13 @@ const RuntimeBadge = React.forwardRef<HTMLDivElement, { status: RuntimeStatus; s
     case "pending":
     default:
       return (
-        <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-amber-100 text-amber-700">
+        <div ref={ref} className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-amber-100 text-amber-700">
           <Clock className="w-3 h-3" />
           <span className="text-[10px] font-semibold">Runtime Pending</span>
         </div>
       );
   }
-}
+});
 
 export default function BuildCompletionCard({ result, phases, onViewPreview }: BuildCompletionCardProps) {
   const { filesChanged, totalFiles, chatSummary } = result;
