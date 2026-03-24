@@ -1,4 +1,4 @@
-/**
+  /**
  * Build Engine — the core orchestrator for reliable code generation.
  * 
  * Pipeline: Classify → Plan → Execute Tasks → Merge → Validate → Assemble → Preview
@@ -57,6 +57,11 @@ import {
   stubBrokenFiles,
 } from "@/lib/buildValidator";
 
+// ─── Shared Supabase env constants ────────────────────────────────────────
+
+const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
+const SUPABASE_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+
 // ─── Auto-Schema Detection ────────────────────────────────────────────────
 
 async function autoDetectAndCreateSchemas(files: Record<string, string>, projectId: string): Promise<void> {
@@ -87,7 +92,9 @@ async function autoDetectAndCreateSchemas(files: Record<string, string>, project
       const pageEntity = filePath.match(/\/pages\/(\w+)\//)?.[1]?.toLowerCase();
       if (!pageEntity || ['dashboard', 'home', 'settings'].includes(pageEntity)) continue;
       
-      const arrayPatterns = code.matchAll(/(?:const|let)\s+\w+\s*=\s*\[[\s\S]*?\{([^}]{10,300})\}/g);
+      const arrayPatterns = code.matchAll(/(?:const|let)\s+\w+\s*=\s*
+
+\[[\s\S]*?\{([^}]{10,300})\}/g);
       for (const m of arrayPatterns) {
         const objBlock = m[1];
         const keyMatches = objBlock.matchAll(/(\w+)\s*:/g);
@@ -274,23 +281,18 @@ export interface EngineResult {
  * as page content instead of building the actual functional app.
  */
 function detectPromptEcho(files: Record<string, string>, userPrompt: string): boolean {
-  if (userPrompt.length < 80) return false; // Short prompts won't false-positive
+  if (userPrompt.length < 80) return false;
 
-  // Extract significant phrases from the user's prompt (4+ words)
   const words = userPrompt.split(/\s+/).filter(w => w.length > 2);
   if (words.length < 10) return false;
 
-  // Check consecutive word sequences from the prompt appearing in JSX string literals
   const codeContent = Object.values(files).join("\n");
-  
-  // Look for long verbatim substrings of the prompt in the generated code
-  // (excluding comments and import lines)
   const codeLines = codeContent.split("\n").filter(l => 
     !l.trim().startsWith("//") && !l.trim().startsWith("*") && !l.trim().startsWith("import")
   ).join("\n");
 
   let echoScore = 0;
-  const chunkSize = 8; // Check 8-word sequences
+  const chunkSize = 8;
   for (let i = 0; i <= words.length - chunkSize; i += 3) {
     const phrase = words.slice(i, i + chunkSize).join(" ").toLowerCase();
     if (codeLines.toLowerCase().includes(phrase)) {
@@ -298,7 +300,6 @@ function detectPromptEcho(files: Record<string, string>, userPrompt: string): bo
     }
   }
 
-  // If 3+ distinct 8-word sequences from the prompt appear verbatim in code, it's an echo
   if (echoScore >= 3) {
     console.warn(`[BuildEngine] ⚠️ Prompt echo detected (score: ${echoScore}) — AI is rendering requirements as content`);
     return true;
@@ -311,7 +312,7 @@ function formatBackendValidationFailure(input: {
   forbidden: Array<{ file: string; line: number; pattern: string }>;
   missing: string[];
   authErrors: string[];
-}): string {
+}: string {
   const parts: string[] = ["Backend validation failed after retry."];
 
   if (input.schemaErrors.length > 0) {
@@ -436,7 +437,8 @@ async function executeSingleTask(
               onDelta,
               retryCount + 1,
               maxTokens,
-              taskType
+              taskType,
+              originalUserPrompt
             ).then(continuationResult => {
               const mergedFiles = { ...parsed.files!, ...continuationResult.files };
               const mergedDeps = { ...parsed.deps, ...continuationResult.deps };
@@ -445,7 +447,6 @@ async function executeSingleTask(
             return;
           }
 
-          // Prompt echo detection — reject code that just renders the requirements as content
           const echoCheckText = originalUserPrompt || prompt;
           if (detectPromptEcho(parsed.files, echoCheckText) && retryCount < 2) {
             console.warn(`[BuildEngine] Prompt echo detected — AI rendered requirements as content. Retrying...`);
@@ -458,7 +459,7 @@ async function executeSingleTask(
               retryCount + 1,
               maxTokens,
               taskType,
-              originalUserPrompt
+              originalUserPrompt || prompt
             ).then(resolve).catch(reject);
             return;
           }
@@ -476,7 +477,8 @@ async function executeSingleTask(
               onDelta,
               retryCount + 1,
               maxTokens,
-              taskType
+              taskType,
+              originalUserPrompt
             ).then(resolve).catch(reject);
           } else {
             let finalFiles = parsed.files;
@@ -508,13 +510,12 @@ async function executeSingleTask(
               onDelta,
               retryCount + 1,
               maxTokens,
-              taskType
+              taskType,
+              originalUserPrompt
             ).then(resolve).catch(reject);
             return;
           }
 
-          // Check if the prompt is conversational/phased — if so, the AI was RIGHT
-          // to respond without code. Don't force a retry.
           const promptLower = prompt.toLowerCase();
           const isConversationalPrompt = /\b(phase by phase|step by step|i'll give you|ill give you|these are|here are|here is|let me explain|before you start|i'll share|ill share)\b/i.test(promptLower);
           
@@ -525,7 +526,6 @@ async function executeSingleTask(
           }
 
           console.warn(`[BuildEngine] No code in response (${responseText.length} chars), retrying (attempt ${retryCount + 1}). First 300 chars: ${responseText.slice(0, 300)}`);
-          // If response contains an AI error message, surface it
           if (responseText.includes("[AI Error:")) {
             console.error(`[BuildEngine] AI gateway error detected in response`);
           }
@@ -536,7 +536,8 @@ async function executeSingleTask(
             onDelta,
             retryCount + 1,
             maxTokens,
-            taskType
+            taskType,
+            originalUserPrompt
           ).then(resolve).catch(reject);
         } else {
           console.error("[BuildEngine] No code after retries");
@@ -552,7 +553,7 @@ async function executeSingleTask(
         if (retryCount < 1) {
           console.warn(`[BuildEngine] Task error, retrying: ${err}`);
           setTimeout(() => {
-            executeSingleTask(prompt, config, accumulatedCode, onDelta, retryCount + 1, maxTokens, taskType)
+            executeSingleTask(prompt, config, accumulatedCode, onDelta, retryCount + 1, maxTokens, taskType, originalUserPrompt)
               .then(resolve).catch(reject);
           }, 1000);
         } else {
@@ -565,9 +566,6 @@ async function executeSingleTask(
 
 // ─── Parallel Task Scheduler ──────────────────────────────────────────────
 
-/**
- * Group sorted tasks into parallel execution groups.
- */
 function buildParallelGroups(sortedTasks: PlanTask[]): PlanTask[][] {
   const groups: PlanTask[][] = [];
   const completed = new Set<string>();
@@ -649,7 +647,7 @@ Keep ALL existing routes and imports intact. Only ADD the missing ones.
 ${buildFullCodeContext(files, 24000)}`;
 
   try {
-    const result = await executeSingleTask(assemblyPrompt, config, buildFullCodeContext(files), onDelta, 0, 12000);
+    const result = await executeSingleTask(assemblyPrompt, config, buildFullCodeContext(files), onDelta, 0, 12000, "frontend", assemblyPrompt);
     if (result.files["/App.jsx"] || result.files["/App.tsx"]) {
       const appKey = result.files["/App.jsx"] ? "/App.jsx" : "/App.tsx";
       return { ...files, [appKey]: result.files[appKey] };
@@ -674,8 +672,8 @@ async function executeBackendTask(
   onDelta(`\n[Backend Agent] Generating ${taskType} layer...\n`);
 
   try {
-    const BASE_URL = import.meta.env.VITE_SUPABASE_URL;
-    const AUTH_HEADER = `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`;
+    const BASE_URL = SUPABASE_URL;
+    const AUTH_HEADER = `Bearer ${SUPABASE_KEY}`;
 
     const resp = await fetch(`${BASE_URL}/functions/v1/backend-agent`, {
       method: "POST",
@@ -701,8 +699,8 @@ async function executeBackendTask(
   } catch (err) {
     console.warn(`[BuildEngine] Backend Agent failed, using local generator:`, err);
     if (config.domainModel) {
-      const apiBase = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1`;
-      const anonKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+      const apiBase = `${SUPABASE_URL}/functions/v1`;
+      const anonKey = SUPABASE_KEY;
       const generatedFiles = generateMockLayer(config.domainModel, config.projectId, apiBase, anonKey);
       const modelMs = modelT.elapsed();
       onDelta(`\n[Local Generator] Generated ${Object.keys(generatedFiles).length} mock layer files\n`);
@@ -712,6 +710,43 @@ async function executeBackendTask(
   }
 }
 
+// ─── Finalizer Helper ─────────────────────────────────────────────────────
+
+interface FinalizeOptions {
+  files: Record<string, string>;
+  deps: Record<string, string>;
+  projectId: string;
+  callbacks: EngineCallbacks;
+  metrics?: BuildMetrics | null;
+  mergeConflicts: string[];
+  chatText: string;
+  plan?: BuildPlan;
+}
+
+async function finalizeBuildResult(opts: FinalizeOptions): Promise<void> {
+  const { files, deps, projectId, callbacks, metrics, mergeConflicts, chatText, plan } = opts;
+
+  const lintResult = lintDesignTokens(files);
+  let finalFiles = lintResult.files;
+  if (lintResult.replacements > 0) {
+    console.log(`[BuildEngine:finalize] Design lint: ${lintResult.replacements} raw color(s) → semantic tokens`);
+  }
+
+  await autoDetectAndCreateSchemas(finalFiles, projectId);
+
+  callbacks.onProgress({ phase: "complete", message: "Build complete" });
+  const finalMetrics = finishBuild();
+
+  callbacks.onComplete({
+    files: finalFiles,
+    deps,
+    plan,
+    chatText,
+    mergeConflicts,
+    metrics: finalMetrics || metrics || undefined,
+  });
+}
+
 // ─── Main Engine ───────────────────────────────────────────────────────────
 
 export async function runBuildEngine(
@@ -719,21 +754,17 @@ export async function runBuildEngine(
   config: EngineConfig,
   callbacks: EngineCallbacks
 ): Promise<void> {
-  // FIX 2: Detect complex builds from accumulated requirements
   const promptLength = userPrompt.length;
   const hasMultiplePhases = /Phase \d+/gi.test(userPrompt) && (userPrompt.match(/Phase \d+/gi) || []).length >= 2;
   const hasModulePlan = /MODULE PLAN|BUILD CHECKLIST|BUILD ORDER|AI-EXTRACTED/i.test(userPrompt);
   const hasChatContext = /APPLICATION REQUIREMENTS.*from conversation/i.test(userPrompt);
   const hasExistingCode = config.existingFiles && Object.keys(config.existingFiles).length > 0;
   
-  // FIX: If there's existing code AND the prompt is a fix/iteration (error reports, 
-  // "fix this", "update that"), use direct build — planned builds are overkill for fixes.
   const isFixIteration = hasExistingCode && (
     /\b(fix|error|bug|broken|crash|blank|not working|doesn't work|issue|problem)\b/i.test(userPrompt) ||
     /Something went wrong|SyntaxError|TypeError|ReferenceError|is not a function|has already been declared|has already been exported/i.test(userPrompt)
   );
   
-  // A build is complex if it has substantial NEW requirements (not fix iterations)
   const isComplex = !isFixIteration && (
     promptLength > 5000 || hasMultiplePhases || hasModulePlan || (hasChatContext && promptLength > 2000)
   );
@@ -758,6 +789,8 @@ export async function runBuildEngine(
     callbacks.onError(errMsg);
   }
 }
+
+// ─── Direct Build Path ────────────────────────────────────────────────────
 
 async function runDirectBuild(
   prompt: string,
@@ -803,19 +836,15 @@ async function runDirectBuild(
     finalFiles = stubBrokenFiles(finalFiles, postMergeErrors);
   }
 
-  // ── BACKEND VALIDATION WITH RETRY ──────────────────────────────────────
-  // If backend intent is detected and validation fails, retry the build with
-  // the validation error context so the agent fixes forbidden patterns.
   const hasBackendIntent = detectBackendIntent(finalFiles, prompt);
   
   if (hasBackendIntent) {
     let retryAttempt = 0;
-    const MAX_VALIDATION_RETRIES = 1; // One retry to fix violations
+    const MAX_VALIDATION_RETRIES = 1;
 
     while (retryAttempt <= MAX_VALIDATION_RETRIES) {
       let schemaErrors: string[] = [];
 
-      // Schema-first validation
       if (requiresSchemaValidation(finalFiles)) {
         const schemaArtifacts = extractSchemaArtifacts(finalFiles);
         const schemaValidation = validateSchemaArtifacts(schemaArtifacts);
@@ -827,10 +856,7 @@ async function runDirectBuild(
         }
       }
 
-      // Backend output validation
       const backendValidation = validateBuildOutput(finalFiles, prompt);
-      
-      // Auth conformance validation
       const authValidation = validateAuthConformance(finalFiles, prompt);
 
       const hasForbidden = backendValidation.forbiddenViolations.length > 0;
@@ -840,7 +866,7 @@ async function runDirectBuild(
 
       if (!hasForbidden && !hasMissing && !hasAuthIssues && !hasSchemaIssues) {
         console.log(`[BuildEngine:direct] ✅ Backend validation passed (score: ${backendValidation.score}/100)`);
-        break; // All good
+        break;
       }
 
       if (retryAttempt >= MAX_VALIDATION_RETRIES) {
@@ -869,7 +895,6 @@ async function runDirectBuild(
         return;
       }
 
-      // ── RETRY: Re-run build agent with validation failure context ──
       console.warn(`[BuildEngine:direct] 🔄 Backend validation failed (score: ${backendValidation.score}/100) — retrying with fix context...`);
       callbacks.onProgress({ phase: "validating", message: "Fixing backend violations..." });
 
@@ -886,12 +911,10 @@ async function runDirectBuild(
       try {
         const retryResult = await executeSingleTask(retryPrompt, config, existingCode, callbacks.onDelta, 0, undefined, undefined, prompt);
         if (Object.keys(retryResult.files).length > 0) {
-          // Re-merge retry output
           const retryMerged = mergeFiles(baseOrExisting, retryResult.files, false, config.existingFiles ? baseOrExisting : undefined);
           finalFiles = retryMerged.files;
           conflicts = retryMerged.conflicts;
           
-          // Re-validate syntax
           const retryErrors = validateAllFiles(finalFiles);
           if (retryErrors.length > 0) {
             finalFiles = stubBrokenFiles(finalFiles, retryErrors);
@@ -904,7 +927,6 @@ async function runDirectBuild(
       retryAttempt++;
     }
   } else {
-    // No backend intent — just log schema/validation status
     if (requiresSchemaValidation(finalFiles)) {
       const schemaArtifacts = extractSchemaArtifacts(finalFiles);
       const schemaValidation = validateSchemaArtifacts(schemaArtifacts);
@@ -915,6 +937,7 @@ async function runDirectBuild(
       }
     }
   }
+
   const valMs = valTimer.elapsed();
 
   const totalSize = Object.values(finalFiles).reduce((s, c) => s + c.length, 0);
@@ -928,26 +951,21 @@ async function runDirectBuild(
     cached: result.cached,
     status: postMergeErrors.length > 0 ? "stubbed" : "success",
   });
-  
-  const linted = lintDesignTokens(finalFiles);
-  finalFiles = linted.files;
-  if (linted.replacements > 0) {
-    console.log(`[BuildEngine:direct] Design lint: ${linted.replacements} raw color(s) → semantic tokens`);
-  }
 
   callbacks.onFilesReady(finalFiles, result.deps);
-  autoDetectAndCreateSchemas(finalFiles, config.projectId);
-  
-  callbacks.onProgress({ phase: "complete", message: "Build complete" });
-  const finalMetrics = finishBuild();
-  callbacks.onComplete({
+
+  await finalizeBuildResult({
     files: finalFiles,
     deps: result.deps,
-    chatText: result.chatText || "✅ App generated successfully",
+    projectId: config.projectId,
+    callbacks,
+    metrics,
     mergeConflicts: conflicts,
-    metrics: finalMetrics || undefined,
+    chatText: result.chatText || "✅ App generated successfully",
   });
 }
+
+// ─── Planned Build Path ───────────────────────────────────────────────────
 
 async function runPlannedBuild(
   prompt: string,
@@ -996,11 +1014,9 @@ async function runPlannedBuild(
   const sortedTasks = topologicalSort(plan.tasks);
   const executableTasks = sortedTasks.filter(t => !t.needsUserInput);
   
-  // FIX 2: For complex builds (many phases), force sequential execution
-  // so each module sees the full workspace from prior modules
   const isEnterpriseBuild = plan.tasks.length >= 6 || plan.overallComplexity === "complex";
   const parallelGroups = isEnterpriseBuild 
-    ? executableTasks.map(t => [t]) // Sequential: one task per group
+    ? executableTasks.map(t => [t])
     : buildParallelGroups(executableTasks);
   
   const metrics = startBuild(executableTasks.length);
@@ -1058,7 +1074,6 @@ async function runPlannedBuild(
         }
       }
 
-      // FIX 3: Show task what exists in the workspace so it can import from prior modules
       const existingFileList = Object.keys(accumulatedFiles).join("\n");
       const taskPrompt = `## TASK: ${task.title}
 ## TASK TYPE: ${taskType}
@@ -1087,11 +1102,9 @@ ${existingFileList}
 - NEVER render the requirements text as page content — IMPLEMENT the features instead`;
 
       try {
-        // FIX 3: Pass full accumulated code (with increased 48KB budget) so task sees prior modules
         const codeContext = buildIncrementalContext(task, accumulatedFiles);
         const { reductionPercent } = contextReductionRatio(task, accumulatedFiles);
         if (reductionPercent > 0) console.log(`[BuildEngine] Task "${task.title}" context reduced by ${reductionPercent}% (budget: 48KB)`);
-        // Scale max tokens based on task complexity — complex tasks need more output room
         const taskMaxTokens = taskType === "frontend" ? 24000 : 16000;
         const taskResult = await executeSingleTask(taskPrompt, config, codeContext, callbacks.onDelta, 0, taskMaxTokens, taskType, prompt);
         
@@ -1104,7 +1117,7 @@ ${existingFileList}
           mergeLatencyMs: 0,
           retryCount: 0,
           cached: taskResult.cached,
-          status: Object.keys(taskResult.files).length > 0 ? "success" : "failed",
+          status: taskResult.files && Object.keys(taskResult.files).length > 0 ? "success" : "failed",
         });
 
         return { task, result: taskResult };
@@ -1159,7 +1172,6 @@ ${existingFileList}
     accumulatedFiles = stubBrokenFiles(accumulatedFiles, finalErrors);
   }
 
-  // ── BACKEND VALIDATION WITH RETRY (planned builds) ─────────────────────
   const hasBackendIntent = detectBackendIntent(accumulatedFiles, prompt);
   
   if (hasBackendIntent) {
@@ -1206,7 +1218,6 @@ ${existingFileList}
         return;
       }
 
-      // ── RETRY: Run a fix-up task against the accumulated files ──
       console.warn(`[BuildEngine:planned] 🔄 Backend validation failed (score: ${backendValidation.score}/100) — running fix-up task...`);
       callbacks.onProgress({ phase: "validating", message: "Fixing backend violations..." });
 
@@ -1266,19 +1277,17 @@ ${existingFileList}
     callbacks.onFilesReady(accumulatedFiles, allDeps);
   }
   
-  autoDetectAndCreateSchemas(accumulatedFiles, config.projectId);
-  
   const taskSummary = executableTasks.map((t, i) => `✅ ${i + 1}. ${t.title}`).join("\n");
   const chatText = `✅ **Build Complete** — ${executableTasks.length} tasks in ${parallelGroups.length} parallel groups\n\n${plan.summary}\n\n${taskSummary}`;
 
-  callbacks.onProgress({ phase: "complete", message: "Build complete" });
-  const finalMetrics = finishBuild();
-  callbacks.onComplete({
+  await finalizeBuildResult({
     files: accumulatedFiles,
     deps: allDeps,
-    plan,
-    chatText,
+    projectId: config.projectId,
+    callbacks,
+    metrics,
     mergeConflicts: allConflicts,
-    metrics: finalMetrics || undefined,
+    chatText,
+    plan,
   });
 }
