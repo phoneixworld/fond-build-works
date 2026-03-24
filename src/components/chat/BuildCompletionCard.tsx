@@ -26,7 +26,7 @@ interface BuildCompletionCardProps {
   onViewPreview?: () => void;
 }
 
-function RuntimeBadge({ status, summary }: { status: RuntimeStatus; summary: string }) {
+const RuntimeBadge = React.forwardRef<HTMLDivElement, { status: RuntimeStatus; summary: string }>(function RuntimeBadge({ status, summary }, ref) {
   switch (status) {
     case "passed":
       return (
