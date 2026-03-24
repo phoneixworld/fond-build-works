@@ -382,6 +382,10 @@ export function useConversationState() {
     }
   }, []);
 
+  const updateBuildPreviewUrl = useCallback((url: string) => {
+    setLastBuildResult(prev => prev ? { ...prev, previewUrl: url } : prev);
+  }, []);
+
   const reset = useCallback(async () => {
     setMode("idle");
     setPhases([]);
