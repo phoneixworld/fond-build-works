@@ -527,16 +527,21 @@ export default function App() {
 }
 `;
 
-function buildIndexJs(projectId: string, supabaseUrl: string, supabaseKey: string): string {
-  return `import React, { StrictMode, Component } from "react";
-import { createRoot } from "react-dom/client";
-import App from "./App";
-import "./styles.css";
-
-// Inject project globals for generated auth/data hooks
+function buildBootstrapJs(projectId: string, supabaseUrl: string, supabaseKey: string): string {
+  return `// Phoenix Runtime Bootstrap — sets globals BEFORE any app code evaluates
 window.__PROJECT_ID__ = "${projectId}";
 window.__SUPABASE_URL__ = "${supabaseUrl}";
 window.__SUPABASE_KEY__ = "${supabaseKey}";
+window.__PHOENIX_PREVIEW__ = true;
+`;
+}
+
+function buildIndexJs(projectId: string, supabaseUrl: string, supabaseKey: string): string {
+  return `import "./_bootstrap"; // MUST be first — sets globals before App imports evaluate
+import React, { StrictMode, Component } from "react";
+import { createRoot } from "react-dom/client";
+import App from "./App";
+import "./styles.css";
 
 // Runtime error boundary to prevent blank screens
 class AppErrorBoundary extends Component {
@@ -951,6 +956,7 @@ function buildSandpackFiles(files: SandpackFileSet | null, projectId: string, su
   }
 
   const base: Record<string, string> = {
+    "/_bootstrap.js": buildBootstrapJs(projectId, supabaseUrl, supabaseKey),
     "/index.js": indexJs,
     "/styles.css": DEFAULT_STYLES,
     "/public/index.html": DEFAULT_INDEX_HTML,
