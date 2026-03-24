@@ -124,7 +124,3 @@ export function contractReductionStats(
   const reductionPercent = fullSize > 0 ? Math.round((1 - contractSize / fullSize) * 100) : 0;
   return { fullSize, contractSize, reductionPercent };
 }
-  const contractSize = serializeContracts(contracts).length;
-  const reductionPercent = fullSize > 0 ? Math.round((1 - contractSize / fullSize) * 100) : 0;
-  return { fullSize, contractSize, reductionPercent };
-}
