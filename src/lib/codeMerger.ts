@@ -4,11 +4,11 @@ import traverse, { NodePath } from "@babel/traverse";
 import generate from "@babel/generator";
 import * as t from "@babel/types";
 import postcss, { Root as PostCSSRoot } from "postcss";
+import { createEmptyTelemetry, type MergeTelemetry } from "./codeMerger/types";
+import { recordMergeTelemetry } from "./codeMerger/telemetry";
 
-export interface MergeResult {
-  files: Record<string, string>;
-  conflicts: string[];
-}
+export type { MergeResult, MergeTelemetry } from "./codeMerger/types";
+export { getRecentMergeTelemetry, getLastMergeTelemetry, clearMergeTelemetry } from "./codeMerger/telemetry";
 
 const dmp = new diff_match_patch();
 dmp.Match_Distance = 2000;
