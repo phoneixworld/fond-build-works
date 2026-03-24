@@ -310,7 +310,7 @@ function formatBackendValidationFailure(input: {
   forbidden: Array<{ file: string; line: number; pattern: string }>;
   missing: string[];
   authErrors: string[];
-): string {
+}): string {
   const parts: string[] = ["Backend validation failed after retry."];
 
   if (input.schemaErrors.length > 0) {
