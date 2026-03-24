@@ -150,43 +150,73 @@ export async function compile(
     console.warn("[Compiler] Pre-build agents failed (non-fatal):", err.message);
   }
 
-  // ── Phase 1.8: AI-Powered IR Extraction ──────────────────────────────
+  // ── Phase 1.8: Server-Side Planning (plan-agent) ─────────────────────────
+  // Try server-side plan-agent first — it produces contract-driven task graphs
+  // with interface contracts and dependency declarations. Falls back to client-side
+  // IR extraction + planning if server call fails.
 
-  callbacks.onPhase("ir-extraction", "Extracting structured IR from requirements...");
+  callbacks.onPhase("planning", "Planning build with server-side agent...");
 
   let structuredIR: IR | undefined = options.structuredIR;
+  let taskGraph: TaskGraph;
+  let usedServerPlan = false;
 
-  if (!structuredIR) {
+  if (ctx.buildIntent === "new_app" && !structuredIR) {
     try {
-      structuredIR = await extractIRWithModel(ctx.rawRequirements, {
-        projectId: options.projectId,
+      const serverPlan = await fetchServerPlan({
+        prompt: ctx.rawRequirements,
+        existingFiles: Object.keys(options.existingWorkspace),
         techStack: options.techStack,
-        model: options.model,
+        schemas: options.schemas,
+        knowledge: options.knowledge,
       });
-      cloudLog.info(`[Compiler] IR extracted: ${Object.keys(structuredIR.entities).length} entities, ${structuredIR.pages.length} pages`, "compiler");
+
+      if (serverPlan && serverPlan.tasks.length > 0) {
+        taskGraph = serverPlanToTaskGraph(serverPlan);
+        usedServerPlan = true;
+        cloudLog.info(`[Compiler] Using server plan: ${serverPlan.mode}, ${taskGraph.tasks.length} tasks`, "compiler");
+        console.log(`[Compiler] ✅ Server plan-agent: ${serverPlan.mode}, ${taskGraph.tasks.length} tasks, complexity=${serverPlan.overallComplexity}`);
+      }
     } catch (err: any) {
-      console.warn("[Compiler] IR extraction failed (non-fatal):", err.message);
+      console.warn("[Compiler] Server plan-agent failed (falling back to client):", err.message);
     }
   }
 
-  // Attach structured IR to context for downstream consumption
-  (ctx as any).structuredIR = structuredIR;
+  // Fallback: client-side IR extraction + planning
+  if (!usedServerPlan) {
+    if (!structuredIR) {
+      callbacks.onPhase("ir-extraction", "Extracting structured IR from requirements...");
+      try {
+        structuredIR = await extractIRWithModel(ctx.rawRequirements, {
+          projectId: options.projectId,
+          techStack: options.techStack,
+          model: options.model,
+        });
+        cloudLog.info(`[Compiler] IR extracted: ${Object.keys(structuredIR.entities).length} entities, ${structuredIR.pages.length} pages`, "compiler");
+      } catch (err: any) {
+        console.warn("[Compiler] IR extraction failed (non-fatal):", err.message);
+      }
+    }
 
-  // ── Phase 2: Planning ──────────────────────────────────────────────
+    // Attach structured IR to context for downstream consumption
+    (ctx as any).structuredIR = structuredIR;
 
-  callbacks.onPhase("planning", "Building task graph...");
+    callbacks.onPhase("planning", "Building task graph...");
+    taskGraph = planTaskGraph(ctx, structuredIR);
+  }
 
-  const taskGraph = planTaskGraph(ctx, structuredIR);
+  // @ts-ignore — taskGraph is always assigned by this point
+  const finalTaskGraph: TaskGraph = taskGraph!;
 
-  cloudLog.info(`Task graph: ${taskGraph.tasks.length} tasks across ${taskGraph.passes.length} passes`, "compiler");
-  console.log(`[Compiler] Task graph: ${taskGraph.tasks.length} tasks, ${taskGraph.passes.length} passes`);
+  cloudLog.info(`Task graph: ${finalTaskGraph.tasks.length} tasks across ${finalTaskGraph.passes.length} passes`, "compiler");
+  console.log(`[Compiler] Task graph: ${finalTaskGraph.tasks.length} tasks, ${finalTaskGraph.passes.length} passes (server=${usedServerPlan})`);
   
   // Notify UI with all task labels upfront
-  callbacks.onPlanReady?.(taskGraph.tasks);
+  callbacks.onPlanReady?.(finalTaskGraph.tasks);
   
-  for (let i = 0; i < taskGraph.passes.length; i++) {
-    const passTaskLabels = taskGraph.passes[i].map(id =>
-      taskGraph.tasks.find(t => t.id === id)?.label || id
+  for (let i = 0; i < finalTaskGraph.passes.length; i++) {
+    const passTaskLabels = finalTaskGraph.passes[i].map(id =>
+      finalTaskGraph.tasks.find(t => t.id === id)?.label || id
     );
     console.log(`[Compiler]   Pass ${i + 1}: ${passTaskLabels.join(", ")}`);
   }
