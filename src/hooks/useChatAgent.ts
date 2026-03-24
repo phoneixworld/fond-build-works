@@ -287,11 +287,9 @@ export function useChatAgent(config: ChatAgentConfig) {
         knowledge,
         workspaceFiles: workspaceFiles.length > 0 ? workspaceFiles : undefined,
         recentErrors: recentErrors.length > 0 ? recentErrors : undefined,
-        // NEW: richer context for chat-agent
-      bypassCache,
+        bypassCache,
         cacheIntent,
         requirementsSnippet,
-        signal: abortController.signal,
         onCacheHit: (result) => {
           if (!isMountedRef.current) {
             isSendingRef.current = false;
