@@ -125,7 +125,13 @@ export function useConversationState() {
     try {
       const result = await callEngine({ action: "get_state", projectId });
       const cs = result.conversationState;
-      setMode(cs.mode as ConversationMode);
+      // If server says we're "building" but there's no active build in progress,
+      // it's a stale state from a crashed/timed-out session — reset to idle
+      const restoredMode = (cs.mode === "building" || cs.mode === "editing") ? "idle" : cs.mode;
+      if (restoredMode !== cs.mode) {
+        console.warn(`[ConvState] Resetting stale mode "${cs.mode}" → "idle" on restore`);
+      }
+      setMode(restoredMode as ConversationMode);
       setPhases((cs.phases || []).map((p: any, i: number) => ({
         id: p.id || i + 1,
         summary: p.summary || "",
@@ -136,7 +142,14 @@ export function useConversationState() {
       setAgentStates(cs.agent_states || {});
       setServerVersion(cs.version || 1);
       if (result.buildReadiness) syncReadiness(result.buildReadiness);
-      console.log(`[ConvState] Restored: mode=${cs.mode}, phases=${(cs.phases || []).length}, v=${cs.version}`);
+      console.log(`[ConvState] Restored: mode=${restoredMode}, phases=${(cs.phases || []).length}, v=${cs.version}`);
+
+      // If we detected a stale building/editing mode, also reset on server
+      if (restoredMode !== cs.mode) {
+        try {
+          await callEngine({ action: "build_complete", projectId, message: { filesChanged: [], totalFiles: 0, chatSummary: "Stale build state reset", timestamp: Date.now(), verificationOk: false } });
+        } catch {}
+      }
     } catch (err) {
       console.warn("[ConvState] Restore failed, using defaults:", err);
     } finally {
