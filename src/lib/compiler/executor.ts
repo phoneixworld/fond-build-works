@@ -80,14 +80,14 @@ ${workspaceContext ? `### Current code (scoped):\n${workspaceContext}` : ""}
 3. Import from existing workspace files — do NOT recreate them.
 4. NEVER write to /components/ui/** — those are pre-scaffolded UI primitives.
 5. **CRITICAL FILE STRUCTURE**:
-   - /components/ui/ — pre-scaffolded shadcn-compatible UI components (do not modify).
-   - /components/ — reusable DOMAIN components (StatCard, StatusBadge, PageHeader, SearchFilterBar, ActivityFeed, QuickActions, NotificationBell, ChartCard, FormModal).
+   - /components/ui/ — pre-scaffolded shadcn-compatible UI components (do not modify). These use NAMED exports (e.g. import { Card, CardHeader } from "./ui/Card").
+   - /components/ — reusable DOMAIN components (StatCard, StatusBadge, PageHeader, SearchFilterBar, ActivityFeed, QuickActions, NotificationBell, ChartCard, FormModal). These use DEFAULT exports.
    - /contexts/ — React contexts (AuthContext, etc.).
-   - /pages/ModuleName/ — page components in named directories (e.g. /pages/Dashboard/DashboardPage.jsx).
+   - /pages/ModuleName/ — page components in named directories (e.g. /pages/Dashboard/DashboardPage.jsx). These use DEFAULT exports.
    - /hooks/ — custom hooks.
    - /services/ — API services.
    - /styles/ — CSS files.
-   - /layout/ — layout wrappers (AppLayout.jsx, Sidebar.jsx).
+   - /layout/ — layout wrappers (AppLayout.jsx, Sidebar.jsx). These use DEFAULT exports.
    When importing, always use correct relative paths from the file's location.
    Import cn from "./ui/utils" in component files, or from "../ui/utils" from page files.
 6. **COMPONENT DECOMPOSITION (CRITICAL)**: Pages must NOT be monolithic. Every page MUST import and use components from /components/ui/:
@@ -98,20 +98,36 @@ ${workspaceContext ? `### Current code (scoped):\n${workspaceContext}` : ""}
    - Use Button for all actions, Input/Label/Textarea for forms, Checkbox/Switch for toggles.
    - Use Progress for progress bars, Skeleton for loading states, Separator for dividers.
    - If a domain component doesn't exist yet, create it in /components/ using /components/ui/ primitives.
-7. **DATA ACCESS (CRITICAL)**: Use Supabase client directly for ALL data operations:
-   - Create a /services/supabase.js file that exports a configured client:
-     import { createClient } from "@supabase/supabase-js";
-     const supabaseUrl = window.__SUPABASE_URL__ || "https://oyjwexbyxggotuuxxisq.supabase.co";
-     const supabaseKey = window.__SUPABASE_KEY__ || "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im95andleGJ5eGdnb3R1dXh4aXNxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzI5MDk5NDcsImV4cCI6MjA4ODQ4NTk0N30.JQKI55nRaQtQjokXR-Lbol6-59HmwhAS7PzE9_Wx78I";
-     export const supabase = createClient(supabaseUrl, supabaseKey);
-     export const PROJECT_ID = window.__PROJECT_ID__;
-   - For CRUD operations use supabase.from("TABLE_NAME").select/insert/update/delete.
-   - Always filter by project_id in queries: .eq("project_id", PROJECT_ID).
-8. For auth, use the AuthContext pattern. AuthContext must NOT import or call useNavigate().
-9. Output complete, working code — no placeholders, no TODOs, no stubs.
-10. Every file MUST import ALL identifiers it uses.
-11. Every function called in a component MUST be defined in that component, imported, or destructured from a hook/context.
-12. When using useEffect, ensure ALL dependencies referenced inside the effect are either defined above or listed in the dependency array.
+7. **DATA ACCESS (CRITICAL — MUST MATCH BUILD-AGENT PATTERN)**:
+   - Use the project Data API for ALL CRUD operations via fetch():
+     \`\`\`
+     const projectId = window.__PROJECT_ID__;
+     const apiBase = window.__SUPABASE_URL__;
+     const apiKey = window.__SUPABASE_KEY__;
+     fetch(\`\${apiBase}/functions/v1/project-api\`, {
+       method: "POST",
+       headers: { "Content-Type": "application/json", "Authorization": \`Bearer \${apiKey}\` },
+       body: JSON.stringify({ project_id: projectId, collection: "employees", action: "list" })
+     }).then(r => r.json()).then(d => setData(d.data || []));
+     \`\`\`
+   - NEVER use supabase.from() directly — always go through project-api.
+   - NEVER use inline sample/mock data arrays as the primary data source.
+   - Show loading skeleton while fetching, empty state with CTA when data is empty.
+8. **BACKEND ARTIFACTS (CRITICAL — REQUIRED FOR DATA FEATURES)**:
+   - When the task involves schema/database/backend, you MUST generate:
+     - /migrations/001_schema.sql — CREATE TABLE statements
+     - /migrations/002_rls.sql — RLS policies for each table
+     - /schema.json — JSON schema describing entities
+   - Without these files, the build will be REJECTED.
+9. For auth, use the AuthContext pattern with project-auth API. AuthContext must NOT import or call useNavigate().
+10. **EXPORT RULES**:
+    - /components/ui/ files: use NAMED exports (export function Button, export function Card, etc.)
+    - ALL other files (pages, domain components, layout, hooks): use DEFAULT export only.
+    - NEVER add \`export { X }\` alongside \`export default X\` for the same symbol.
+11. Output complete, working code — no placeholders, no TODOs, no stubs.
+12. Every file MUST import ALL identifiers it uses.
+13. Every function called in a component MUST be defined in that component, imported, or destructured from a hook/context.
+14. When using useEffect, ensure ALL dependencies referenced inside the effect are either defined above or listed in the dependency array.
 `;
 }
 
