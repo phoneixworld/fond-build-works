@@ -382,6 +382,10 @@ function extractFilesFromOutput(text: string): Record<string, string> | null {
     "```react",
     "```jsx",
     "```javascript",
+    "```sql",
+    "```json",
+    "```css",
+    "```html",
   ];
 
   let fenceStart = -1;
@@ -389,6 +393,13 @@ function extractFilesFromOutput(text: string): Record<string, string> | null {
     fenceStart = text.indexOf(pattern);
     if (fenceStart !== -1) break;
   }
+
+  // If no typed fence found, try generic triple-backtick fence with file headers
+  if (fenceStart === -1) {
+    const genericFence = text.indexOf("```\n---");
+    if (genericFence !== -1) fenceStart = genericFence;
+  }
+
   if (fenceStart === -1) return null;
 
   const codeStart = text.indexOf("\n", fenceStart) + 1;

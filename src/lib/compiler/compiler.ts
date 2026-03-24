@@ -162,8 +162,11 @@ export async function compile(
   let taskGraph: TaskGraph;
   let usedServerPlan = false;
 
+  console.log(`[Compiler] 🔍 Server plan gate: buildIntent=${ctx.buildIntent}, structuredIR=${!!structuredIR}, existingFiles=${Object.keys(options.existingWorkspace).length}`);
+
   if (ctx.buildIntent === "new_app" && !structuredIR) {
     try {
+      console.log("[Compiler] 📡 Invoking plan-agent...");
       const serverPlan = await fetchServerPlan({
         prompt: ctx.rawRequirements,
         existingFiles: Object.keys(options.existingWorkspace),
@@ -177,10 +180,14 @@ export async function compile(
         usedServerPlan = true;
         cloudLog.info(`[Compiler] Using server plan: ${serverPlan.mode}, ${taskGraph.tasks.length} tasks`, "compiler");
         console.log(`[Compiler] ✅ Server plan-agent: ${serverPlan.mode}, ${taskGraph.tasks.length} tasks, complexity=${serverPlan.overallComplexity}`);
+      } else {
+        console.warn("[Compiler] ⚠️ Server plan returned null/empty, falling back to client planner");
       }
     } catch (err: any) {
-      console.warn("[Compiler] Server plan-agent failed (falling back to client):", err.message);
+      console.warn("[Compiler] ❌ Server plan-agent failed (falling back to client):", err.message);
     }
+  } else {
+    console.log(`[Compiler] ⏭️ Skipping plan-agent: buildIntent=${ctx.buildIntent}, structuredIR=${!!structuredIR}`);
   }
 
   // Fallback: client-side IR extraction + planning
