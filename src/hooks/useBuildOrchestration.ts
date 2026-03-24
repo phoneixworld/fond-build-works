@@ -407,12 +407,36 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
       const buildPrompt = pendingBuildPrompt;
       setPendingBuildPrompt(null);
 
-      // Assemble requirements from conversation history
+      // Assemble requirements from conversation history — aggressive noise filtering
+      const NOISE = /^(yes|yep|yeah|go ahead|proceed|do it|ok|okay|sure|continue|start|build it|just do it|fuck off|go away|rubbish|on)\b/i;
+      const COMPLAINT_NOISE = /\b(what happened|still blank|blank screen|not working|doesn't work|don't see|i don't see|nothing in the preview|nothing showing|still nothing|where is|why is it|is it broken|it's broken|same error|try again|timeout|timed out)\b/i;
+      const META_NOISE = /^(what was built|what happened|what's wrong|why|how|when|who|can you|could you|please|help|thanks|thank you)\b/i;
+      const DUPLICATE_TRIGGER = /^(build|create|generate|scaffold)\s+(a\s+)?(hr|crm|erp|portal|app|dashboard|system)\b/i;
+
+      // Track the first actual build request to deduplicate
+      let firstBuildRequest: string | null = null;
+
       const relevantMessages = messagesRef.current.filter(m => {
-        const msgText = getTextContent(m.content);
+        const msgText = getTextContent(m.content).trim();
         if (m.role !== "user") return false;
-        const NOISE = /^(yes|yep|yeah|go ahead|proceed|do it|ok|okay|sure|continue|start|build it|just do it|fuck off|go away)\b/i;
-        return !NOISE.test(msgText.trim().toLowerCase()) && msgText.trim().length > 10;
+        if (msgText.length <= 10) return false;
+        if (NOISE.test(msgText.toLowerCase())) return false;
+        if (COMPLAINT_NOISE.test(msgText.toLowerCase())) return false;
+        if (META_NOISE.test(msgText.toLowerCase())) return false;
+
+        // Deduplicate repeated build triggers (e.g., "Build a HR portal" said 3 times)
+        if (DUPLICATE_TRIGGER.test(msgText)) {
+          if (!firstBuildRequest) {
+            firstBuildRequest = msgText;
+            return true;
+          }
+          return false; // Skip duplicate triggers
+        }
+
+        // Skip messages that look like assembled build prompts (from previous failed builds)
+        if (msgText.includes("# APPLICATION REQUIREMENTS") || msgText.includes("## BUILD TRIGGER")) return false;
+
+        return true;
       });
 
       const userRequirements = relevantMessages
