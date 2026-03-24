@@ -233,6 +233,7 @@ export async function streamThroughCacheProxy({
         "Content-Type": "application/json",
         Authorization: AUTH_HEADER,
       },
+      signal,
       body: JSON.stringify({
         messages,
         project_id: projectId,
@@ -240,6 +241,8 @@ export async function streamThroughCacheProxy({
         knowledge,
         workspace_files: workspaceFiles,
         recent_errors: recentErrors,
+        contracts: contracts ? contracts.slice(0, 8192) : undefined,
+        workspace_summary: workspaceSummary ? workspaceSummary.slice(0, 8192) : undefined,
         bypass_cache: shouldBypassCache,
         cache_intent: cacheIntent || "actionable",
         requirements_snippet: (requirementsSnippet || "").slice(0, 1200),

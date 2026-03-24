@@ -20,7 +20,7 @@ import { type MsgContent, getTextContent } from "@/lib/codeParser";
 import { streamThroughCacheProxy, type CacheHitResult } from "@/lib/semanticCache";
 import { TokenBuffer } from "@/lib/tokenBuffer";
 
-// NEW: Interface contracts + workspace summary
+// Interface contracts + workspace summary
 import { getInterfaceContractsSnapshot } from "@/lib/codeMerger/interfaceContracts";
 import { buildWorkspaceSummary } from "@/lib/workspaceSummary";
 
@@ -128,13 +128,21 @@ export function useChatAgent(config: ChatAgentConfig) {
     isLoadingRef,
     buildMessageContent,
     sandpackFilesRef,
-    previewErrors,
   } = config;
   const setPendingBuildPrompt = config.setPendingBuildPrompt;
 
   const abortControllerRef = useRef<AbortController | null>(null);
   const tokenBufferRef = useRef<TokenBuffer | null>(null);
   const isMountedRef = useRef(true);
+
+  // Avoid stale closure on streaming text
+  const fullChatResponseRef = useRef<string>("");
+
+  // Avoid previewErrors array identity in deps causing re-renders
+  const previewErrorsRef = useRef<string[]>([]);
+  useEffect(() => {
+    previewErrorsRef.current = config.previewErrors;
+  }, [config.previewErrors]);
 
   useEffect(() => {
     return () => {
@@ -163,7 +171,7 @@ export function useChatAgent(config: ChatAgentConfig) {
       setBuildStep("Thinking...");
       const chatStartTime = Date.now();
       let tokenCount = 0;
-      let fullChatResponse = "";
+      fullChatResponseRef.current = "";
       const currentMessages = messagesRef.current;
       const apiMessages = [...currentMessages, userMsg].map((m) => ({
         role: m.role,
@@ -198,14 +206,15 @@ export function useChatAgent(config: ChatAgentConfig) {
       }
 
       // Recent preview errors for chat-agent context
-      const recentErrors = previewErrors.slice(-10);
+      const recentErrors = previewErrorsRef.current.slice(-10);
 
-      // NEW: Interface contracts snapshot
-      const contractSnapshot = getInterfaceContractsSnapshot ? getInterfaceContractsSnapshot() : undefined;
+      // Interface contracts snapshot
+      const contractSnapshot = getInterfaceContractsSnapshot();
 
-      // NEW: Workspace summary (compressed manifest of files/exports/routes)
-      const workspaceSummary =
-        workspaceFileMap && buildWorkspaceSummary ? buildWorkspaceSummary(workspaceFileMap) : undefined;
+      // Workspace summary (compressed manifest of files/exports/routes)
+      const workspaceSummary = workspaceFileMap
+        ? buildWorkspaceSummary(workspaceFileMap)
+        : undefined;
 
       const finalize = (responseText: string, isCached: boolean, cacheInfo?: CacheHitResult) => {
         if (!isMountedRef.current) {
@@ -214,8 +223,13 @@ export function useChatAgent(config: ChatAgentConfig) {
         }
 
         const durationMs = Date.now() - chatStartTime;
-        const estimatedTokens = tokenCount > 0 ? tokenCount : Math.ceil(responseText.length / 4);
-        const meta: MsgMeta = { tokens: estimatedTokens, durationMs, model: "claude-sonnet-4" };
+        const estimatedTokens =
+          tokenCount > 0 ? tokenCount : Math.ceil(responseText.length / 4);
+        const meta: MsgMeta = {
+          tokens: estimatedTokens,
+          durationMs,
+          model: "chat-agent",
+        };
 
         setIsLoading(false);
         setBuildStep("");
@@ -223,9 +237,11 @@ export function useChatAgent(config: ChatAgentConfig) {
         setCurrentAgent(null);
         isSendingRef.current = false;
 
-        // NEW: Structured BUILD_CONFIRMED handoff
+        // Structured BUILD_CONFIRMED handoff
         if (hasBuildConfirmation(responseText) && setPendingBuildPrompt) {
-          console.log("[ChatAgent] BUILD_CONFIRMED detected in chat response — signaling build pipeline");
+          console.log(
+            "[ChatAgent] BUILD_CONFIRMED detected — signaling build pipeline",
+          );
 
           const buildEnvelope = {
             kind: "chat_build",
@@ -236,7 +252,6 @@ export function useChatAgent(config: ChatAgentConfig) {
             workspaceSummary,
             contracts: contractSnapshot,
             recentErrors,
-            // room for future: inferred intent, suggested filesAffected, etc.
           };
 
           setPendingBuildPrompt(JSON.stringify(buildEnvelope));
@@ -245,9 +260,9 @@ export function useChatAgent(config: ChatAgentConfig) {
         const displayText = stripBuildMarker(responseText);
         const cacheTag =
           isCached && cacheInfo
-            ? `\n\n_⚡ ${cacheInfo.layer} cache ${cacheInfo.matchType} hit (${(cacheInfo.similarity * 100).toFixed(
-                0,
-              )}% match)_`
+            ? `\n\n_⚡ ${cacheInfo.layer} cache ${cacheInfo.matchType} hit (${(
+                cacheInfo.similarity * 100
+              ).toFixed(0)}% match)_`
             : "";
 
         setMessages((prev) => {
@@ -270,7 +285,8 @@ export function useChatAgent(config: ChatAgentConfig) {
 
           const persistMessages = withResponse.map((m) => ({
             role: m.role,
-            content: typeof m.content === "string" ? m.content : getTextContent(m.content),
+            content:
+              typeof m.content === "string" ? m.content : getTextContent(m.content),
           }));
           saveProject({ chat_history: persistMessages });
           return withResponse;
@@ -287,16 +303,21 @@ export function useChatAgent(config: ChatAgentConfig) {
         knowledge,
         workspaceFiles: workspaceFiles.length > 0 ? workspaceFiles : undefined,
         recentErrors: recentErrors.length > 0 ? recentErrors : undefined,
+        contracts: contractSnapshot,
+        workspaceSummary,
         bypassCache,
         cacheIntent,
         requirementsSnippet,
+        signal: abortController.signal,
         onCacheHit: (result) => {
           if (!isMountedRef.current) {
             isSendingRef.current = false;
             return;
           }
           console.log(
-            `[ChatAgent] Cache hit: ${result.layer} ${result.matchType} (${(result.similarity * 100).toFixed(1)}%)`,
+            `[ChatAgent] Cache hit: ${result.layer} ${result.matchType} (${(
+              result.similarity * 100
+            ).toFixed(1)}%)`,
           );
           setBuildStep(`⚡ ${result.layer} cache hit`);
           if (result.response) {
@@ -311,14 +332,20 @@ export function useChatAgent(config: ChatAgentConfig) {
               tokenDelay: 8,
               onToken: (token) => {
                 if (!isMountedRef.current) return;
-                fullChatResponse += token;
+                fullChatResponseRef.current += token;
                 tokenCount += Math.ceil(token.length / 4);
-                const displayText = stripBuildMarker(fullChatResponse);
+                const displayText = stripBuildMarker(fullChatResponseRef.current);
                 setMessages((prev) => {
                   const last = prev[prev.length - 1];
                   if (last?.role === "assistant") {
                     return prev.map((m, i) =>
-                      i === prev.length - 1 ? { ...m, content: displayText, meta: { isStreaming: true } as any } : m,
+                      i === prev.length - 1
+                        ? {
+                            ...m,
+                            content: displayText,
+                            meta: { isStreaming: true } as any,
+                          }
+                        : m,
                     );
                   }
                   return [
@@ -347,10 +374,9 @@ export function useChatAgent(config: ChatAgentConfig) {
             return;
           }
 
-          if (fullChatResponse) {
-            finalize(finalText || fullChatResponse, false);
+          if (fullChatResponseRef.current) {
+            finalize(finalText || fullChatResponseRef.current, false);
           } else {
-            // Cache-hit path already finalized; ensure lock and loading state are clean
             setIsLoading(false);
             setBuildStep("");
             setPipelineStep(null);
@@ -367,7 +393,10 @@ export function useChatAgent(config: ChatAgentConfig) {
             isSendingRef.current = false;
             return;
           }
-          setMessages((prev) => [...prev, { role: "assistant", content: `⚠️ ${err}`, timestamp: Date.now() }]);
+          setMessages((prev) => [
+            ...prev,
+            { role: "assistant", content: `⚠️ ${err}`, timestamp: Date.now() },
+          ]);
           setIsLoading(false);
           setBuildStep("");
           setPipelineStep(null);
@@ -385,7 +414,6 @@ export function useChatAgent(config: ChatAgentConfig) {
       setAttachedImages,
       setMessages,
       sandpackFilesRef,
-      previewErrors,
       setIsLoading,
       setPipelineStep,
       setCurrentAgent,
