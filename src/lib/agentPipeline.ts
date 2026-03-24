@@ -292,10 +292,12 @@ async function readSSEStream(
           done = true;
           break;
         }
+        // Phase 4: Treat ANY valid SSE event as a heartbeat (including empty reasoning chunks)
+        hasReceivedSSEData = true;
+        lastDataTime = Date.now();
+
         const content = parsed.choices?.[0]?.delta?.content;
         if (content) {
-          hasReceivedSSEData = true;
-          lastDataTime = Date.now();
           fullText += content;
           onDelta(content);
         }

@@ -18,10 +18,18 @@ const EXTEND_PATTERNS = /\b(add|extend|integrate|include|implement|create new|bu
 const NEW_APP_PATTERNS = /\b(build\s+(?:a|an|the|me|my)\s+\w|create\s+(?:a|an|the|me|my)\s+\w|School\s+ERP|CRM|e-?commerce|dashboard|management\s+system|admin\s+panel|project\s+manager|task\s+board|inventory|booking|scheduling)\b/i;
 const BUILD_TRIGGER_PATTERNS = /\b(build\s+it|generate|start\s+building|create\s+the\s+app)\b/i;
 
+// Phase 2: Explicit rebuild patterns — force new_app even with existing workspace
+const EXPLICIT_REBUILD_PATTERNS = /\b(rebuild|from scratch|start over|regenerate|new app|new project)\b/i;
+const BROAD_BUILD_PATTERNS = /\b(build|create|generate)\s+(?:a|an|the|me|my)\s+(?:\w+\s+)?(portal|system|app|application|dashboard|platform|erp|crm|panel|hub|suite|tool|manager|tracker)\b/i;
+
 export function detectBuildIntent(
   rawRequirements: string,
   hasExistingWorkspace: boolean
 ): BuildIntent {
+  // Phase 2: Explicit new-app language ALWAYS forces new_app, even with existing workspace
+  if (EXPLICIT_REBUILD_PATTERNS.test(rawRequirements) || BROAD_BUILD_PATTERNS.test(rawRequirements)) {
+    return "new_app";
+  }
   // "Build it" or "build me a School ERP" is always new_app regardless of other words
   if (!hasExistingWorkspace && (BUILD_TRIGGER_PATTERNS.test(rawRequirements) || NEW_APP_PATTERNS.test(rawRequirements))) {
     return "new_app";

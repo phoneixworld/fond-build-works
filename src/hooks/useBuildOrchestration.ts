@@ -50,6 +50,38 @@ import { extractUrlFromMessage, analyzeUrl } from "@/lib/urlAnalyzer";
 type MsgMeta = { tokens?: number; durationMs?: number; model?: string };
 type Msg = { role: "user" | "assistant"; content: MsgContent; timestamp?: number; meta?: MsgMeta };
 
+// Phase 3: Canonical task label mapping — prevents generic "Task N" placeholders
+const TASK_LABEL_MAP: Record<string, string> = {
+  infra: "Infrastructure",
+  auth: "Authentication",
+  "domain:components": "Domain Components",
+  "domain:layout": "Application Layout",
+  "model:project": "Data Models",
+  "sidebar:verify-and-stub": "Sidebar & Navigation",
+  "app:routing": "App Routing",
+  "verify-and-stub": "Verify & Stub Missing",
+};
+
+function canonicalizeTaskLabel(raw: string): string {
+  if (!raw || raw.trim() === "") return "Build Step";
+  const lower = raw.toLowerCase().trim();
+  // Direct map match
+  if (TASK_LABEL_MAP[lower]) return TASK_LABEL_MAP[lower];
+  // page:XYZ → "XYZ Page"
+  const pageMatch = raw.match(/^page[:/](.+)$/i);
+  if (pageMatch) return `${pageMatch[1].trim()} Page`;
+  // model:XYZ → "XYZ Model"
+  const modelMatch = raw.match(/^model[:/](.+)$/i);
+  if (modelMatch) return `${modelMatch[1].trim()} Model`;
+  // domain:XYZ → capitalize
+  const domainMatch = raw.match(/^domain[:/](.+)$/i);
+  if (domainMatch) return domainMatch[1].trim().replace(/^\w/, c => c.toUpperCase());
+  // Fallback: if it looks like "Task N", replace with ordinal
+  if (/^task\s*\d+$/i.test(raw)) return `Build Step ${raw.replace(/\D/g, "")}`;
+  // Otherwise capitalize first letter
+  return raw.charAt(0).toUpperCase() + raw.slice(1);
+}
+
 type PendingExecutionRequest = {
   prompt: string;
   images: string[];
@@ -471,7 +503,14 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
       setHealAttempts(0);
     }
 
-    const content = buildMessageContent(text, images);
+    // ── Phase 1: Prompt Pollution Prevention ──
+    // displayUserText is the clean user-facing text persisted to chat history.
+    // The full `text` (which may contain compiled requirements) is only sent to the build agent.
+    const displayUserText = (text.includes("# APPLICATION REQUIREMENTS") || text.includes("## BUILD TRIGGER"))
+      ? (text.match(/## BUILD TRIGGER\n(.+)/)?.[1]?.trim() || text.split("\n").filter(l => l.trim() && !l.startsWith("#") && !l.startsWith("Build EXACTLY") && !l.startsWith("Do NOT add")).pop()?.trim() || "Build request")
+      : text;
+
+    const content = buildMessageContent(displayUserText, images);
     const userMsg: Msg = { role: "user", content, timestamp: Date.now() };
     setInput("");
     setAttachedImages([]);
@@ -1035,19 +1074,27 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
       const liveSandpackFiles = sandpackFilesRef.current;
       const isFirstBuild = !liveSandpackFiles || Object.keys(liveSandpackFiles).length === 0;
 
+      // ── Phase 2: Check for explicit rebuild intent ──
+      const EXPLICIT_REBUILD = /\b(rebuild|from scratch|start over|regenerate|new app|new project)\b/i;
+      const BROAD_BUILD = /\b(build|create|generate)\s+(?:a|an|the|me|my)\s+(?:\w+\s+)?(portal|system|app|application|dashboard|platform|erp|crm|panel|hub|suite|tool|manager|tracker)\b/i;
+      const isExplicitRebuild = EXPLICIT_REBUILD.test(text) || BROAD_BUILD.test(text);
+
       // ── ITERATIVE BUILD GUARD ──
-      // If workspace already has files, this is an iteration, not a fresh build.
-      // Route to edit pipeline instead of regenerating from scratch.
-      if (!isFirstBuild && !text.startsWith("🔧 AUTO-FIX") && !text.includes("# APPLICATION REQUIREMENTS")) {
+      // If workspace already has files AND this is NOT an explicit rebuild request,
+      // route to edit pipeline instead of regenerating from scratch.
+      if (!isFirstBuild && !isExplicitRebuild && !text.startsWith("🔧 AUTO-FIX") && !text.includes("# APPLICATION REQUIREMENTS")) {
         console.log(`[BuildOrch] Workspace has ${Object.keys(liveSandpackFiles!).length} files — routing to edit pipeline instead of rebuild`);
         setCurrentAgent("edit");
         setPipelineStep("resolving");
-        // Release the sending lock so sendEditMessage can acquire it
         isSendingRef.current = false;
         setIsLoading(false);
         setIsBuilding(false);
         await sendEditMessage(text, images);
         return;
+      }
+      // If explicit rebuild with existing workspace, clear workspace for fresh build
+      if (!isFirstBuild && isExplicitRebuild) {
+        console.log(`[BuildOrch] Explicit rebuild detected — clearing workspace for fresh build`);
       }
 
       // ─── INSTANT PATH (delegated to useInstantBuild) ───
@@ -1233,9 +1280,10 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
           else if (phase === "complete") setPipelineStep("complete");
         },
         onPlanReady: (tasks) => {
-          // Store all task labels upfront so pipeline card shows real names
-          planLabelsRef.current = tasks.map(t => t.label);
-          setCompilerTasks(tasks.map((t, i) => ({
+          // Phase 3: Canonicalize task labels before display
+          const canonicalized = tasks.map(t => ({ ...t, label: canonicalizeTaskLabel(t.label) }));
+          planLabelsRef.current = canonicalized.map(t => t.label);
+          setCompilerTasks(canonicalized.map((t, i) => ({
             id: `task-${i}`,
             label: t.label,
             status: "pending" as const,
@@ -1245,20 +1293,21 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
           resetBuildSafetyTimeout();
           setCurrentTaskIndex(index);
           setTotalPlanTasks(total);
-          setBuildStep(`🔨 Task ${index + 1}/${total}: ${task.label}`);
+          const canonLabel = canonicalizeTaskLabel(task.label);
+          setBuildStep(`🔨 Task ${index + 1}/${total}: ${canonLabel}`);
 
           // Update task status in pipeline card
           setCompilerTasks(prev => prev.map((t, i) => ({
             ...t,
-            label: i === index ? task.label : t.label,
+            label: i === index ? canonLabel : t.label,
             status: (i < index ? "done" : i === index ? "in_progress" : t.status) as "done" | "in_progress" | "pending",
           })));
 
-          // Build progress message with real labels
+          // Build progress message with canonical labels
           const labels = planLabelsRef.current;
           const progressMsg = `📋 **Building** (${total} tasks)\n\n${Array.from({ length: total }, (_, i) => {
             const status = i < index ? "✅" : i === index ? "🔨" : "⏳";
-            const label = labels[i] || task.label;
+            const label = labels[i] || canonLabel;
             return `${status} ${i + 1}. ${label}`;
           }).join("\n")}`;
           setMessages((prev) => {
