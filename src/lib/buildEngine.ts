@@ -92,9 +92,7 @@ async function autoDetectAndCreateSchemas(files: Record<string, string>, project
       const pageEntity = filePath.match(/\/pages\/(\w+)\//)?.[1]?.toLowerCase();
       if (!pageEntity || ['dashboard', 'home', 'settings'].includes(pageEntity)) continue;
       
-      const arrayPatterns = code.matchAll(/(?:const|let)\s+\w+\s*=\s*
-
-\[[\s\S]*?\{([^}]{10,300})\}/g);
+      const arrayPatterns = code.matchAll(/(?:const|let)\s+\w+\s*=\s*\[[\s\S]*?\{([^}]{10,300})\}/g);
       for (const m of arrayPatterns) {
         const objBlock = m[1];
         const keyMatches = objBlock.matchAll(/(\w+)\s*:/g);
@@ -312,7 +310,7 @@ function formatBackendValidationFailure(input: {
   forbidden: Array<{ file: string; line: number; pattern: string }>;
   missing: string[];
   authErrors: string[];
-}: string {
+}): string {
   const parts: string[] = ["Backend validation failed after retry."];
 
   if (input.schemaErrors.length > 0) {
