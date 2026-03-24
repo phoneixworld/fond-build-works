@@ -91,8 +91,8 @@ ${routeLines.join("\n")}
 export function synthesizeAppFromIR(ir: IR): string {
   const imports = buildImports(ir);
 
-  // Pages must include importPath in IR
-  const pageImports = ir.pages.map((p) => `import ${p.name} from "${p.importPath}";`);
+  // Derive import path from page name (no importPath on IRPage)
+  const pageImports = ir.pages.map((p) => `import ${p.name} from "./pages/${p.name}/${p.name}";`);
 
   const routeLines = ir.pages.map((p) => {
     const isIndex = p.path === "/";
