@@ -53,6 +53,7 @@ export interface BuildResult {
   chatSummary: string;
   timestamp: number;
   verificationOk?: boolean;
+  previewUrl?: string | null;
 }
 
 export interface AgentState {
@@ -381,6 +382,10 @@ export function useConversationState() {
     }
   }, []);
 
+  const updateBuildPreviewUrl = useCallback((url: string) => {
+    setLastBuildResult(prev => prev ? { ...prev, previewUrl: url } : prev);
+  }, []);
+
   const reset = useCallback(async () => {
     setMode("idle");
     setPhases([]);
@@ -420,7 +425,7 @@ export function useConversationState() {
     mode, setMode, phases, lastBuildResult, buildReadiness, agentStates, serverVersion, isRestoring,
     restoreFromServer, analyzeMessage, analyzeMessageSync, addPhase,
     getRequirementsContext, getRequirementsContextSync,
-    startBuilding, startEditing, completeEdit, completeBuild, reset, generateAcknowledgment,
+    startBuilding, startEditing, completeEdit, completeBuild, updateBuildPreviewUrl, reset, generateAcknowledgment,
     currentProjectId,
   };
 }

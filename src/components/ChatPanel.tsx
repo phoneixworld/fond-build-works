@@ -288,10 +288,22 @@ const ChatPanel = forwardRef<ChatPanelHandle, { initialPrompt?: string; onVersio
         chatSummary: chatSummary.replace(/```[\s\S]*?```/g, "").trim().slice(0, 150),
         timestamp: Date.now(),
         verificationOk: lastVerificationOkRef.current ?? undefined,
+        previewUrl: null, // Will be updated async via event
       });
     }
     prevPipelineStep.current = pipelineStep;
   }, [pipelineStep, createCheckpoint]);
+
+  // Listen for async preview URL from build orchestration
+  useEffect(() => {
+    const handler = (e: CustomEvent) => {
+      if (e.detail) {
+        conversationState.updateBuildPreviewUrl(e.detail);
+      }
+    };
+    window.addEventListener("build-preview-url", handler as EventListener);
+    return () => window.removeEventListener("build-preview-url", handler as EventListener);
+  }, [conversationState.updateBuildPreviewUrl]);
 
   // Keyboard shortcuts for undo/redo
   useEffect(() => {
@@ -814,6 +826,7 @@ const ChatPanel = forwardRef<ChatPanelHandle, { initialPrompt?: string; onVersio
             <BuildCompletionCard
               result={conversationState.lastBuildResult}
               phases={conversationState.phases.length > 0 ? conversationState.phases : undefined}
+              previewUrl={conversationState.lastBuildResult.previewUrl}
               onViewPreview={() => {
                 const event = new CustomEvent("switch-panel", { detail: "preview" });
                 window.dispatchEvent(event);

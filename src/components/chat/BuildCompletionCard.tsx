@@ -24,6 +24,7 @@ interface BuildCompletionCardProps {
   };
   phases?: RequirementPhase[];
   onViewPreview?: () => void;
+  previewUrl?: string | null;
 }
 
 const RuntimeBadge = React.forwardRef<HTMLDivElement, { status: RuntimeStatus; summary: string }>(function RuntimeBadge({ status, summary }, ref) {
@@ -53,7 +54,7 @@ const RuntimeBadge = React.forwardRef<HTMLDivElement, { status: RuntimeStatus; s
   }
 });
 
-const BuildCompletionCard = React.forwardRef<HTMLDivElement, BuildCompletionCardProps>(function BuildCompletionCard({ result, phases, onViewPreview }, ref) {
+const BuildCompletionCard = React.forwardRef<HTMLDivElement, BuildCompletionCardProps>(function BuildCompletionCard({ result, phases, onViewPreview, previewUrl }, ref) {
   const { filesChanged, totalFiles, chatSummary } = result;
   const runtimeStatus: RuntimeStatus = result.runtimeStatus || "pending";
   const runtimeChecks = result.runtimeChecks || [];
@@ -171,14 +172,25 @@ const BuildCompletionCard = React.forwardRef<HTMLDivElement, BuildCompletionCard
 
       {/* Actions */}
       <div className="pl-8 flex items-center gap-2 pt-1">
-        {onViewPreview && (
-          <button
-            onClick={onViewPreview}
+        {previewUrl && (
+          <a
+            href={previewUrl}
+            target="_blank"
+            rel="noopener noreferrer"
             className="inline-flex items-center gap-1.5 text-[11px] font-medium text-primary hover:text-primary/80 transition-colors"
           >
             <Eye className="w-3 h-3" />
-            View Preview
+            Open Preview
             <ArrowRight className="w-3 h-3" />
+          </a>
+        )}
+        {onViewPreview && (
+          <button
+            onClick={onViewPreview}
+            className="inline-flex items-center gap-1.5 text-[11px] font-medium text-muted-foreground hover:text-foreground transition-colors"
+          >
+            <Eye className="w-3 h-3" />
+            View Preview
           </button>
         )}
       </div>
