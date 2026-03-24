@@ -7,11 +7,13 @@
  *   2. Files imported by those files (direct dependencies)
  *   3. Shared layout/types files (App.jsx, types, utils)
  *   4. Sibling components in the same directory
+ *   5. Interface contracts for distant files (compact summaries of exports)
  * 
  * Reduces prompt size by 80–95% for large projects.
  */
 
 import type { PlanTask } from "@/lib/planningAgent";
+import { extractFileContracts, serializeContracts } from "@/lib/codeMerger/interfaceContracts";
 
 // ─── Import extraction ───────────────────────────────────────────────────
 
@@ -175,6 +177,15 @@ export function buildIncrementalContext(
     // Also add a file manifest for files NOT included
     const omitted = allPaths.filter(p => !relevantPaths.has(p));
     if (omitted.length > 0) {
+      // Use interface contracts for omitted files instead of just listing names
+      const omittedFiles: Record<string, string> = {};
+      for (const p of omitted) {
+        if (accumulatedFiles[p]) omittedFiles[p] = accumulatedFiles[p];
+      }
+      const contracts = extractFileContracts(omittedFiles);
+      if (contracts.length > 0) {
+        return contextStr + `\n\n${serializeContracts(contracts)}`;
+      }
       return contextStr + `\n\n## Other files in the project (not shown):\n${omitted.map(p => `- ${p}`).join("\n")}`;
     }
     return contextStr;
