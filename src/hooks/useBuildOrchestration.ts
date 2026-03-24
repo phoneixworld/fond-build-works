@@ -1593,10 +1593,9 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
   }, [currentProject, selectedModel, selectedTheme, previewErrors, sendMessage, buildMessageContent, setInput, setAttachedImages, setMessages, saveProject, setSandpackFiles, syncSandpackToVirtualFS, setPreviewMode, setIsBuilding, setBuildStep, saveSnapshot, conversationStartEditing, conversationCompleteEdit]);
 
   // ── RULES ──
-  // 1. ALL messages go through conversation state machine FIRST
-  // 2. Client NEVER builds unless server FSM mode permits it
-  // 3. No legacy client heuristics (no regex build triggers, no task-list generators)
-  // 4. Images are passed to server for vision extraction
+  // 1. Server conversation engine remains the source of truth for gather/build/edit routing
+  // 2. Confirmation-only replies must never trigger fresh builds without compiled requirements
+  // 3. Fallback path defaults to chat (not implicit build) to prevent domain drift
   const handleSmartSend = useCallback(async (text: string, images: string[] = []) => {
     if (!text && images.length === 0) return;
     if (isSendingRef.current || isLoadingRef.current) return;
@@ -1605,56 +1604,32 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
     const isSmartSendStale = () => !smartSendProjectId || (lastProjectIdRef.current !== null && lastProjectIdRef.current !== smartSendProjectId);
 
     const hasImages = images.length > 0;
-    const finalText = text || (hasImages ? "" : "");
+    const finalText = (text || "").trim();
     if (!finalText && !hasImages) return;
 
     const hasExistingCode = !!(sandpackFilesRef.current && Object.keys(sandpackFilesRef.current).length > 0);
+    const CONFIRM_ONLY = /^(yes|yep|yeah|go ahead|proceed|do it|ok|okay|sure|continue|start|build it|just do it)\s*[.!]?$/i;
+    const NON_ACTIONABLE = /^[\s!?.,:;\-—…'"()*#@&^%$~`]+$|^(fuck|shit|damn|hell|wtf|omg|ugh|lol|hmm|huh|meh|bruh|stop|quit|bye|go away|leave|shut up|whatever|forget it|never ?mind|screw|crap|bloody|idiot|stupid|dumb|rubbish|useless|hate|sucks?|annoying|terrible|horrible|awful|worst|lame|pathetic)\b/i;
 
     const buildRequirementsPayload = async (triggerText: string) => {
-      // Priority 1: Server-compiled requirements from conversation-engine FSM
-      const requirements = await Promise.resolve(conversationGetRequirements?.() || "");
-      let assembledRequirements = requirements;
-
-      // Priority 2: Fall back to USER chat history only if FSM requirements are empty
-      if (!assembledRequirements || assembledRequirements.length <= 50) {
-        const ERROR_NOISE = /\b(element type is invalid|unclosed block|unclosed bracket|is not a function|is not defined|something went wrong|syntax error|check the render|you likely forgot|mixed up default|module not found|cannot find module|auto-fix|auto fix|✅ Fixed|⚠️ Found|⚠️ Build)\b/i;
-        const FRUSTRATION_NOISE = /^(stupid|idiot|bloody|damn|hell|wtf|omg|ugh|\?{2,}|\.{3,}|!{2,}|rubbish|fuck off)$/i;
-        const BUILD_CONTEXT_NOISE = /^(yes|yep|yeah|go ahead|proceed|do it|ok|okay|sure|continue|start|build it|just do it|what happened)$/i;
-
-        const relevantUserMessages = messagesRef.current.filter((m) => {
-          if (m.role !== "user") return false;
-          const msgText = getTextContent(m.content).trim();
-          if (!msgText || msgText.length < 6) return false;
-          if (ERROR_NOISE.test(msgText)) return false;
-          if (FRUSTRATION_NOISE.test(msgText.toLowerCase())) return false;
-          if (BUILD_CONTEXT_NOISE.test(msgText.toLowerCase())) return false;
-          return true;
-        });
-
-        const userRequirements = relevantUserMessages
-          .map((m) => `- ${getTextContent(m.content).trim()}`)
-          .join("\n");
-
-        if (userRequirements.length > 30) {
-          assembledRequirements = `# APPLICATION REQUIREMENTS (from user conversation)\n\n## USER REQUIREMENTS\n${userRequirements}\n\n## BUILD INSTRUCTION\nBuild EXACTLY what the user requested above. Stay focused on the same domain and do NOT drift to unrelated features.`;
-        }
-      }
-
-      if (assembledRequirements && assembledRequirements.length > 50) {
-        return `${assembledRequirements}\n\n## BUILD TRIGGER\n${triggerText}`;
-      }
-
-      // Final fallback: promote concise domain request into build-safe requirements
+      const compiled = await Promise.resolve(conversationGetRequirements?.() || "");
       const normalizedTrigger = triggerText.trim();
-      if (!normalizedTrigger) return triggerText;
+
+      if (compiled && compiled.length > 50) {
+        return `${compiled}\n\n## BUILD TRIGGER\n${normalizedTrigger}`;
+      }
+
+      if (!normalizedTrigger || CONFIRM_ONLY.test(normalizedTrigger)) {
+        return "";
+      }
 
       return [
         "# APPLICATION REQUIREMENTS",
         "",
         normalizedTrigger,
         "",
-        "Build a complete, production-ready application for this domain request with sensible defaults.",
-        "Include core modules, sidebar navigation, realistic entities, and end-to-end CRUD workflows.",
+        "Build EXACTLY what the user requested above.",
+        "Do NOT add unrelated features.",
       ].join("\n");
     };
 
@@ -1671,11 +1646,8 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
       }
 
       if (reply === "unclear") {
-        // Not a yes/no — cancel the pending request and process as a fresh message
         setPendingExecution(null);
-        // Fall through to normal classification below
       } else {
-        // reply === "confirm"
         if (pendingExecution.needsHighImpactConfirm && !pendingExecution.awaitingHighImpactConfirm) {
           setPendingExecution({ ...pendingExecution, awaitingHighImpactConfirm: true });
           appendConversationTurn(finalText, images, "This will modify core application files.\nProceed?");
@@ -1694,8 +1666,12 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
         }
 
         const approvedBuildPrompt = await buildRequirementsPayload(approved.prompt);
-        if (isSmartSendStale()) {
-          console.warn("[SmartSend] Project switched during confirmation build assembly, aborting");
+        if (isSmartSendStale()) return;
+
+        if (!approvedBuildPrompt) {
+          setCurrentAgent("chat");
+          setPipelineStep("chatting");
+          setMessages((prev) => [...prev, { role: "assistant", content: "Please share one concrete build request (not just confirmation), then I’ll run it.", timestamp: Date.now() }]);
           return;
         }
 
@@ -1706,31 +1682,7 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
       }
     }
 
-    // ── Bare confirmation with no pendingExecution: user said "go ahead" / "yes" / "do it"
-    // after the chat agent proposed a plan. Detect and trigger build from conversation context.
-    const BARE_BUILD_CONFIRM = /^(yes|yep|yeah|go ahead|proceed|do it|build it|just do it|start|begin|execute|generate|now build|let'?s go|lets go|start building|go|ok build|okay build)\b/i;
-    if (!pendingExecution && BARE_BUILD_CONFIRM.test(finalText.trim().toLowerCase())) {
-      // Check if the last assistant message looks like a plan/proposal
-      const lastAssistant = [...messagesRef.current].reverse().find(m => m.role === "assistant");
-      const lastAssistantText = lastAssistant ? getTextContent(lastAssistant.content) : "";
-      const looksLikePlan = /\b(go ahead|ready to build|shall i proceed|want me to|i can generate|do you want me to proceed|say.*go ahead|employee directory|leave management|dashboard|portal|system|module)\b/i.test(lastAssistantText);
-
-      if (looksLikePlan && !hasExistingCode) {
-        console.log("[SmartSend] Bare confirmation after plan proposal → triggering build");
-        const buildPrompt = await buildRequirementsPayload(finalText);
-        if (isSmartSendStale()) return;
-
-        appendConversationTurn(finalText, images, "Building now.");
-        setCurrentAgent("build");
-        setPipelineStep("planning");
-        sendMessage(buildPrompt, []);
-        return;
-      }
-    }
-
     const isAutoFix = finalText.startsWith("🔧");
-
-    // ── Step 0: Auto-fix bypass (self-healing, not user intent) ──
     if (isAutoFix) {
       setCurrentAgent("build");
       setPipelineStep("planning");
@@ -1738,7 +1690,6 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
       return;
     }
 
-    // ── Step 0.5: URL Analysis — detect URLs and run UFM+/WPA+/BSAG pipeline ──
     const detectedUrl = extractUrlFromMessage(finalText);
     if (detectedUrl) {
       const content = buildMessageContent(finalText, images);
@@ -1757,7 +1708,6 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
         setBuildStep("");
 
         if (result.success && result.confirmationMessage && result.buildPrompt) {
-          // Store the build prompt for when user confirms
           setPendingExecution({
             prompt: result.buildPrompt,
             images: [],
@@ -1798,16 +1748,7 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
     }
 
     const guardedIntent = classifyIntentGate(finalText, hasExistingCode);
-
-    // Ambiguous messages (no action verb) → route to chat naturally, don't block
-    if (guardedIntent.isAmbiguous) {
-      setCurrentAgent("chat");
-      setPipelineStep("chatting");
-      sendChatMessage(finalText, images);
-      return;
-    }
-
-    if (guardedIntent.routeHint === "chat") {
+    if (guardedIntent.isAmbiguous || guardedIntent.routeHint === "chat") {
       setCurrentAgent("chat");
       setPipelineStep("chatting");
       sendChatMessage(finalText, images);
@@ -1828,25 +1769,22 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
       return;
     }
 
-    // ── Step 1: Route through async server conversation analyzer ──
     const normalizedText = finalText.toLowerCase();
     const explicitRebuildRequest = /\b(rebuild|from scratch|start over|regenerate app|new app|new project)\b/i.test(normalizedText);
-    const isQuestionOnly = finalText.trim().endsWith("?") || /^(why|what|where|who|how)\b/i.test(finalText.trim());
     const explicitEditVerb = /\b(fix|change|update|modify|refactor|patch|repair|replace|add|remove|delete)\b/i.test(normalizedText);
+    const explicitBuildVerb = /\b(build|create|generate|scaffold|implement|develop|make)\b/i.test(normalizedText);
     const hasRuntimeSignal = /\b(bug|error|not working|doesn't work|doesnt work|broken|crash|failed|fails|preview|runtime|problem|issue)\b/i.test(normalizedText);
+    const isQuestionOnly = finalText.endsWith("?") || /^(why|what|where|who|how)\b/i.test(finalText);
     const stopOrExplainOnly = /\b(do not build|don't build|dont build|do not edit|don't edit|dont edit|just explain|only explain|root cause only|without fixing)\b/i.test(normalizedText);
 
-    if (stopOrExplainOnly || (isQuestionOnly && !explicitEditVerb)) {
+    if (stopOrExplainOnly || NON_ACTIONABLE.test(finalText) || (isQuestionOnly && !explicitEditVerb && !explicitBuildVerb)) {
       setCurrentAgent("chat");
       setPipelineStep("chatting");
       sendChatMessage(finalText, images);
       return;
     }
 
-    const looksLikeRuntimeFixRequest = hasExistingCode && !hasImages && explicitEditVerb && hasRuntimeSignal && !isQuestionOnly;
-
-    if (looksLikeRuntimeFixRequest && !explicitRebuildRequest) {
-      console.log("[SmartSend] Runtime fix request → edit pipeline");
+    if (hasExistingCode && explicitEditVerb && hasRuntimeSignal && !explicitRebuildRequest) {
       setCurrentAgent("edit");
       setPipelineStep("resolving");
       sendEditMessage(finalText, images);
@@ -1854,144 +1792,17 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
     }
 
     let convResult: { action: string; reason: string } | null = null;
-
     if (conversationAnalyzeAsync) {
       try {
         convResult = await conversationAnalyzeAsync(finalText, hasImages, hasExistingCode);
-        if (isSmartSendStale()) {
-          console.warn("[SmartSend] Project switched during analysis, aborting");
-          return;
-        }
+        if (isSmartSendStale()) return;
         console.log(`[SmartSend] Server analysis: mode=${conversationMode}, action=${convResult.action}, reason=${convResult.reason}`);
       } catch (err) {
-        console.warn("[SmartSend] Server analysis failed, falling back to local classifier:", err);
+        console.warn("[SmartSend] Server analysis failed, falling back to safe chat route:", err);
       }
     }
 
-    // If server returned a definitive action, route it
-    if (convResult && convResult.action !== "continue") {
-      // ── GATHER: User is providing requirements ──
-      if (convResult.action === "gather") {
-        const phase = conversationAddPhase?.(finalText, hasImages, images);
-        const ackText = conversationGenerateAck?.(phase) || "✅ Got it! Send the next phase when ready, or say **\"build it\"** to start.";
-
-        const content = buildMessageContent(finalText, images);
-        const userMsg: Msg = { role: "user", content, timestamp: Date.now() };
-        setInput("");
-        setAttachedImages([]);
-        setMessages((prev) => [...prev, userMsg]);
-
-        const assistantMsg: Msg = { role: "assistant", content: ackText, timestamp: Date.now() };
-        setMessages((prev) => [...prev, assistantMsg]);
-
-        const updatedMessages = [...messagesRef.current, userMsg, assistantMsg];
-        saveProject({ chat_history: updatedMessages.map(m => ({ role: m.role, content: m.content })) });
-        return;
-      }
-
-      // ── EDIT: Route through FSM-wired edit pipeline ──
-      if (convResult.action === "edit") {
-        const hasExplicitEditVerb = /\b(fix|change|update|modify|refactor|patch|repair|replace|add|remove|delete)\b/i.test(finalText);
-        const isQuestionOnlyEdit = finalText.trim().endsWith("?") || /^(why|what|where|who|how)\b/i.test(finalText.trim());
-        if (isQuestionOnlyEdit && !hasExplicitEditVerb) {
-          setCurrentAgent("chat");
-          setPipelineStep("chatting");
-          sendChatMessage(finalText, images);
-          return;
-        }
-        setCurrentAgent("edit");
-        setPipelineStep("resolving");
-        sendEditMessage(finalText, images);
-        return;
-      }
-
-      // ── BUILD: Include accumulated requirements if any phases exist ──
-      if (convResult.action === "build") {
-        console.log(`[SmartSend] Build requested, mode=${conversationMode}`);
-
-        // CRITICAL FIX: If workspace already has files, this is an iterative change
-        // (e.g. "change color to gold"), NOT a fresh build. Route to edit pipeline.
-        if (hasExistingCode && !explicitRebuildRequest) {
-          console.log("[SmartSend] Workspace has existing code — routing 'build' to edit pipeline instead of full rebuild");
-          setCurrentAgent("edit");
-          setPipelineStep("resolving");
-          sendEditMessage(finalText, images);
-          return;
-        }
-
-        conversationStartBuilding?.();
-        const buildPrompt = await buildRequirementsPayload(finalText);
-
-        if (isSmartSendStale()) {
-          console.warn("[SmartSend] Project switched during requirements fetch, aborting");
-          return;
-        }
-
-        console.log(`[SmartSend] Build prompt length: ${buildPrompt.length} chars`);
-        setCurrentAgent("build");
-        setPipelineStep("planning");
-        sendMessage(buildPrompt, images);
-        return;
-      }
-
-      // ── CHAT: Route to chat agent (unless this is clearly a runtime fix request) ──
-      if (convResult.action === "chat") {
-        if (looksLikeRuntimeFixRequest) {
-          console.log("[SmartSend] Overriding chat → edit for runtime fix request");
-          setCurrentAgent("edit");
-          setPipelineStep("resolving");
-          sendEditMessage(finalText, images);
-          return;
-        }
-
-        setCurrentAgent("chat");
-        setPipelineStep("chatting");
-        sendChatMessage(finalText, images);
-        return;
-      }
-    }
-
-    // ── Step 2: Fallback when server returned "continue" or failed ──
-    // FIX #2: Simplified — no more dual client/server classification race.
-    // Only use conversation-engine as fallback classifier via a simple heuristic.
-    const hasExistingCodeFallback = !!(sandpackFilesRef.current && Object.keys(sandpackFilesRef.current).length > 0);
-    
-    // FIX: Catch non-actionable short messages (frustration, gibberish, profanity)
-    // These should NEVER trigger a build or edit — route to chat.
-    const NON_ACTIONABLE = /^[\s!?.,:;\-—…'"()*#@&^%$~`]+$|^(fuck|shit|damn|hell|wtf|omg|ugh|lol|ok|okay|no|nah|nope|hmm|huh|meh|bruh|stop|quit|bye|go away|leave|shut up|whatever|forget it|never ?mind|screw|crap|bloody|idiot|stupid|dumb|rubbish|useless|hate|sucks?|annoying|terrible|horrible|awful|worst|lame|pathetic)\b/i;
-    const isNonActionable = finalText.trim().length < 30 && NON_ACTIONABLE.test(finalText.trim());
-    
-    if (isNonActionable) {
-      setCurrentAgent("chat");
-      setPipelineStep("chatting");
-      sendChatMessage(finalText, images);
-      return;
-    }
-
-    if (finalText.length > 15) {
-      // Simple heuristic: questions → chat, everything else → build/edit
-      const isQuestion = /^(what|how|why|can you|could you|should|is it|tell me|explain|help me|describe|when|where|who)\b/i.test(finalText.trim());
-      const isConversational = /^(thanks|thank you|got it|i see|okay|cool|great|nice|awesome|perfect)\b/i.test(finalText.trim());
-      
-      if (isQuestion || isConversational) {
-        setCurrentAgent("chat");
-        setPipelineStep("chatting");
-        sendChatMessage(finalText, images);
-        return;
-      }
-      
-      // If existing code but no explicit command, stay in chat mode (no implicit edits)
-      if (hasExistingCodeFallback) {
-        setCurrentAgent("chat");
-        setPipelineStep("chatting");
-        sendChatMessage(finalText, images);
-        return;
-      }
-    }
-
-    // ── Step 3: Default to build ──
-    // GATE: If server FSM is in "gathering" mode, DO NOT build — gather instead
-    if (conversationMode === "gathering") {
+    if (convResult?.action === "gather") {
       const phase = conversationAddPhase?.(finalText, hasImages, images);
       const ackText = conversationGenerateAck?.(phase) || "✅ Got it! Send the next phase when ready, or say **\"build it\"** to start.";
 
@@ -1999,26 +1810,78 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
       const userMsg: Msg = { role: "user", content, timestamp: Date.now() };
       setInput("");
       setAttachedImages([]);
-      setMessages((prev) => [...prev, userMsg]);
-      const assistantMsg: Msg = { role: "assistant", content: ackText, timestamp: Date.now() };
-      setMessages((prev) => [...prev, assistantMsg]);
-      const updatedMessages = [...messagesRef.current, userMsg, assistantMsg];
-      saveProject({ chat_history: updatedMessages.map(m => ({ role: m.role, content: m.content })) });
+      setMessages((prev) => [...prev, userMsg, { role: "assistant", content: ackText, timestamp: Date.now() }]);
       return;
     }
 
-    // GATE: Very short messages (< 15 chars) with no clear build keywords should NOT trigger builds
-    const SHORT_BUILD_KEYWORDS = /\b(build|create|make|add|generate|scaffold|app|website|page|dashboard)\b/i;
-    if (finalText.trim().length < 15 && !SHORT_BUILD_KEYWORDS.test(finalText)) {
+    if (convResult?.action === "edit") {
+      setCurrentAgent("edit");
+      setPipelineStep("resolving");
+      sendEditMessage(finalText, images);
+      return;
+    }
+
+    if (convResult?.action === "build") {
+      if (hasExistingCode && !explicitRebuildRequest) {
+        setCurrentAgent("edit");
+        setPipelineStep("resolving");
+        sendEditMessage(finalText, images);
+        return;
+      }
+
+      conversationStartBuilding?.();
+      const buildPrompt = await buildRequirementsPayload(finalText);
+      if (isSmartSendStale()) return;
+
+      if (!buildPrompt) {
+        setCurrentAgent("chat");
+        setPipelineStep("chatting");
+        setMessages((prev) => [...prev, { role: "assistant", content: "I need a concrete requirement to build from (not only confirmation).", timestamp: Date.now() }]);
+        return;
+      }
+
+      setCurrentAgent("build");
+      setPipelineStep("planning");
+      sendMessage(buildPrompt, images);
+      return;
+    }
+
+    if (convResult?.action === "chat") {
       setCurrentAgent("chat");
       setPipelineStep("chatting");
       sendChatMessage(finalText, images);
       return;
     }
 
-    setCurrentAgent("build");
-    setPipelineStep("planning");
-    sendMessage(finalText, images);
+    // Safe fallback: never implicit-build on unknown classification
+    if (conversationMode === "gathering" && finalText.length > 10 && !CONFIRM_ONLY.test(finalText)) {
+      const phase = conversationAddPhase?.(finalText, hasImages, images);
+      const ackText = conversationGenerateAck?.(phase) || "✅ Got it! Send the next phase when ready, or say **\"build it\"** to start.";
+      const content = buildMessageContent(finalText, images);
+      const userMsg: Msg = { role: "user", content, timestamp: Date.now() };
+      setInput("");
+      setAttachedImages([]);
+      setMessages((prev) => [...prev, userMsg, { role: "assistant", content: ackText, timestamp: Date.now() }]);
+      return;
+    }
+
+    if (!hasExistingCode && explicitBuildVerb && !CONFIRM_ONLY.test(finalText)) {
+      setPendingExecution({
+        prompt: finalText,
+        images,
+        routeHint: "build",
+        needsHighImpactConfirm: false,
+        awaitingHighImpactConfirm: false,
+      });
+      setCurrentAgent("chat");
+      setPipelineStep("chatting");
+      appendConversationTurn(finalText, images, "I can generate this.\nDo you want me to proceed?");
+      return;
+    }
+
+    setCurrentAgent("chat");
+    setPipelineStep("chatting");
+    sendChatMessage(finalText, images);
   }, [
     currentProject,
     pendingExecution,
