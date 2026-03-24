@@ -613,56 +613,6 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
       const abortController = new AbortController();
       abortControllerRef.current = abortController;
 
-      let fullResponse = "";
-      let hasSetAnalyzing = false;
-      let hasSetBuilding = false;
-      let streamParseCount = 0;
-
-      const upsert = (chunk: string) => {
-        if (abortController.signal.aborted) return;
-        resetBuildSafetyTimeout();
-        fullResponse += chunk;
-        setBuildStreamContent(fullResponse);
-
-        const reactResult = parseReactFiles(fullResponse);
-        const [chatText, htmlCode] = reactResult.files ? [reactResult.chatText, null] : parseResponse(fullResponse);
-        const displayChat = reactResult.files ? reactResult.chatText : chatText;
-
-        if (!hasSetAnalyzing && fullResponse.length > 20) {
-          setBuildStep("🔨 Build agent: generating components...");
-          setPipelineStep("generating");
-          hasSetAnalyzing = true;
-        }
-
-        if (reactResult.files) {
-          if (!hasSetBuilding) {
-            const fileNames = Object.keys(reactResult.files);
-            const totalChars = Object.values(reactResult.files).join("").length;
-            console.log(`[upsert] ✅ First React parse success: files=${fileNames.join(",")}, chars=${totalChars}`);
-            setBuildStep("📦 Bundling & validating...");
-            setPipelineStep("bundling");
-            hasSetBuilding = true;
-          }
-          streamParseCount++;
-          setPreviewMode("sandpack");
-        } else if (htmlCode) {
-          if (!hasSetBuilding) {
-            setBuildStep("Building your app...");
-            hasSetBuilding = true;
-          }
-          setPreviewMode("html");
-        }
-
-        setMessages((prev) => {
-          const t = displayChat || "Building...";
-          const last = prev[prev.length - 1];
-          if (last?.role === "assistant") {
-            return prev.map((m, i) => (i === prev.length - 1 ? { ...m, content: t } : m));
-          }
-          return [...prev, { role: "assistant", content: t, timestamp: Date.now() }];
-        });
-      };
-
       try {
         const { schemas, knowledge, irContext } = await fetchProjectContext(currentProject.id);
 
@@ -687,18 +637,6 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
         );
 
         const currentMessages = messagesRef.current;
-
-        const apiMessages: any[] = [
-          {
-            role: "system" as const,
-            content:
-              "You are a deterministic build agent. You generate React code ONLY from the provided requirements, IR, and workspace summary. Do NOT use prior conversation. Do NOT treat error logs or status messages as requirements. Do NOT infer new features.",
-          },
-          {
-            role: "user" as const,
-            content,
-          },
-        ];
 
         const themeInfo = DESIGN_THEMES.find((t) => t.id === selectedTheme);
         const userText = typeof text === "string" ? text : "";
