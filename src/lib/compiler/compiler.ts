@@ -721,13 +721,14 @@ export async function compile(
   finalizeTrace(trace, workspace.fileCount());
   printTrace(trace);
 
-  // Determine build status
   const errorCount = verification.issues.filter(i => i.severity === "error").length;
   const doneTasks = taskGraph.tasks.filter(t => t.status === "done").length;
   const totalTasks = taskGraph.tasks.length;
+  const runtime = deriveRuntimeVerification(orchestratorResult);
 
+  // Determine build status (static + runtime)
   let status: BuildStatus;
-  if (errorCount === 0 && doneTasks === totalTasks) {
+  if (errorCount === 0 && doneTasks === totalTasks && runtime.runtimeStatus !== "failed") {
     status = "success";
   } else if (doneTasks > 0) {
     status = "partial";
@@ -743,7 +744,6 @@ export async function compile(
     const testResults = orchestratorResult.testResults || [];
     const violations = orchestratorResult.violations || [];
     const testsPassed = testResults.filter(t => t.passed).length;
-    const testsFailed = testResults.filter(t => !t.passed).length;
     if (testResults.length > 0) {
       agentSummaryParts.push(`Smoke tests: ${testsPassed}/${testResults.length} passed`);
     }
@@ -757,22 +757,25 @@ export async function compile(
     `Build ${status}: ${doneTasks}/${totalTasks} tasks completed`,
     `${workspace.fileCount()} files in workspace (${(workspace.totalSize() / 1024).toFixed(1)}KB)`,
     verification.ok ? "Static checks passed ✅" : `${errorCount} errors, ${verification.issues.length - errorCount} warnings`,
+    runtime.runtimeStatus === "passed"
+      ? "Runtime checks passed ✅"
+      : runtime.runtimeStatus === "failed"
+        ? runtime.runtimeSummary
+        : "",
     repairRound > 0 ? buildRepairSummary(repairRound, totalRepairActions, verification.issues) : "",
     ...agentSummaryParts,
   ].filter(Boolean).join("\n");
 
-  const knownIssues = verification.issues
-    .filter(i => i.severity === "error")
-    .map(i => `${i.file}: ${i.message}`);
+  const knownIssues = [
+    ...verification.issues
+      .filter(i => i.severity === "error")
+      .map(i => `${i.file}: ${i.message}`),
+    ...runtime.runtimeChecks
+      .filter(check => !check.passed)
+      .map(check => `runtime: ${check.name} — ${check.details}`),
+  ];
 
-  const nextActions = buildNextActions(verification, taskGraph);
-
-  // Runtime verification: always starts as pending — no runtime checks ran during build
-  const runtime: RuntimeVerification = {
-    runtimeStatus: "pending",
-    runtimeChecks: [],
-    runtimeSummary: "Runtime checks not run yet.",
-  };
+  const nextActions = buildNextActions(verification, taskGraph, runtime);
 
   const result: BuildResult = {
     status,
@@ -789,11 +792,46 @@ export async function compile(
   return result;
 }
 
+function deriveRuntimeVerification(orchestratorResult: OrchestratorResult | null): RuntimeVerification {
+  const testResults = orchestratorResult?.testResults || [];
+
+  if (testResults.length === 0) {
+    return {
+      runtimeStatus: "pending",
+      runtimeChecks: [],
+      runtimeSummary: "Runtime checks not run yet.",
+    };
+  }
+
+  const runtimeChecks = testResults.map((test) => ({
+    name: test.name,
+    passed: test.passed,
+    details: test.details,
+  }));
+
+  const failedCount = runtimeChecks.filter((check) => !check.passed).length;
+
+  if (failedCount === 0) {
+    return {
+      runtimeStatus: "passed",
+      runtimeChecks,
+      runtimeSummary: `Runtime smoke checks passed (${runtimeChecks.length}/${runtimeChecks.length}).`,
+    };
+  }
+
+  return {
+    runtimeStatus: "failed",
+    runtimeChecks,
+    runtimeSummary: `Runtime checks found issues (${failedCount}/${runtimeChecks.length} failed).`,
+  };
+}
+
 // ─── Next Actions ─────────────────────────────────────────────────────────
 
 function buildNextActions(
   verification: VerificationResult,
-  taskGraph: TaskGraph
+  taskGraph: TaskGraph,
+  runtime: RuntimeVerification
 ): string[] {
   const actions: string[] = [];
 
@@ -812,8 +850,23 @@ function buildNextActions(
     actions.push(`Retry failed tasks: ${failedTasks.map(t => t.label).join(", ")}`);
   }
 
+  if (runtime.runtimeStatus === "failed") {
+    const failingRuntimeChecks = runtime.runtimeChecks
+      .filter((check) => !check.passed)
+      .slice(0, 3)
+      .map((check) => check.name);
+
+    actions.push(
+      failingRuntimeChecks.length > 0
+        ? `Fix runtime issues: ${failingRuntimeChecks.join(", ")}`
+        : "Address runtime smoke test failures"
+    );
+  }
+
   if (actions.length === 0) {
-    actions.push("Test the application — runtime checks have not been executed yet");
+    if (runtime.runtimeStatus === "pending") {
+      actions.push("Test the application — runtime checks have not been executed yet");
+    }
     actions.push("Add more features");
   }
 
