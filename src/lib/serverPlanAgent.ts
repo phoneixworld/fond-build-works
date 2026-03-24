@@ -1,6 +1,6 @@
 /**
  * Server-side Plan Agent client.
- * 
+ *
  * Calls the plan-agent edge function to generate a contract-driven
  * task graph with interface contracts and dependency declarations.
  * This replaces client-only planning for new_app builds.
@@ -62,7 +62,12 @@ export async function fetchServerPlan(options: {
   knowledge?: string[];
   domainModel?: any;
 }): Promise<ServerPlanResult | null> {
-  console.log(`[ServerPlan] 🚀 Calling plan-agent: prompt="${options.prompt.slice(0, 80)}...", ${options.existingFiles?.length || 0} existing files`);
+  console.log(
+    `[ServerPlan] 🚀 Calling plan-agent: prompt="${options.prompt.slice(
+      0,
+      80,
+    )}...", ${options.existingFiles?.length || 0} existing files`,
+  );
   try {
     const resp = await fetch(`${BASE_URL}/functions/v1/plan-agent`, {
       method: "POST",
@@ -96,11 +101,11 @@ export async function fetchServerPlan(options: {
     }
 
     console.log(
-      `[ServerPlan] ✅ Server plan: mode=${plan.mode}, ${plan.tasks.length} tasks, complexity=${plan.overallComplexity}`
+      `[ServerPlan] ✅ Server plan: mode=${plan.mode}, ${plan.tasks.length} tasks, complexity=${plan.overallComplexity}`,
     );
     cloudLog.info(
       `[ServerPlan] Server plan: mode=${plan.mode}, ${plan.tasks.length} tasks, complexity=${plan.overallComplexity}`,
-      "planner"
+      "planner",
     );
 
     return plan;
@@ -109,6 +114,26 @@ export async function fetchServerPlan(options: {
     cloudLog.warn(`[ServerPlan] Failed to call plan-agent: ${err.message}`, "planner");
     return null;
   }
+}
+
+/**
+ * Normalize file paths coming from plan-agent so they match
+ * the actual generator/scaffolder conventions.
+ *
+ * Example:
+ *   /pages/Contacts/Contacts.jsx   → /pages/Contacts/ContactsPage.jsx
+ *   /pages/Deals/Deals.jsx         → /pages/Deals/DealsPage.jsx
+ *   /pages/Tasks/Tasks.jsx         → /pages/Tasks/TasksPage.jsx
+ */
+function normalizePlannedPath(path: string): string {
+  // Only touch page files that follow /pages/Name/Name.jsx
+  const pageMatch = path.match(/^\/pages\/([^/]+)\/\1\.(jsx|tsx)$/);
+  if (pageMatch) {
+    const name = pageMatch[1];
+    const ext = pageMatch[2];
+    return `/pages/${name}/${name}Page.${ext}`;
+  }
+  return path;
 }
 
 /**
@@ -126,26 +151,40 @@ export function serverPlanToTaskGraph(plan: ServerPlanResult): TaskGraph {
     "schema.migration": "backend",
     "schema.rls": "backend",
     "backend.api": "backend",
-    "backend.auth": "frontend", // auth UI is frontend
+    "backend.auth": "backend",
     "frontend.layout": "frontend",
     "frontend.routing": "frontend",
     "frontend.page": "frontend",
     "frontend.module": "frontend",
   };
 
-  const tasks: CompilerTask[] = plan.tasks.map((t) => ({
-    id: t.id,
-    label: t.title,
-    type: profileToType[t.profile] || taskTypeMap[t.taskType] || "frontend",
-    description: t.buildPrompt || t.description,
-    buildPrompt: t.buildPrompt || t.description,
-    dependsOn: t.dependsOn || [],
-    produces: t.filesAffected || [],
-    touches: [],
-    priority: t.taskType === "schema" ? 0 : t.taskType === "backend" ? 1 : 2,
-    status: "pending" as const,
-    retries: 0,
-  }));
+  const tasks: CompilerTask[] = plan.tasks.map((t) => {
+    const type: TaskType = profileToType[t.profile] || taskTypeMap[t.taskType] || "frontend";
+
+    const normalizedProduces = (t.filesAffected || []).map((p) => normalizePlannedPath(p));
+
+    return {
+      id: t.id,
+      label: t.title,
+      type,
+      description: t.buildPrompt || t.description,
+      buildPrompt: t.buildPrompt || t.description,
+      dependsOn: t.dependsOn || [],
+      produces: normalizedProduces,
+      touches: [],
+      priority: t.taskType === "schema" ? 0 : t.taskType === "backend" ? 1 : 2,
+      status: "pending" as const,
+      retries: 0,
+    };
+  });
+
+  // Log if we have no schema/backend tasks at all — this is why
+  // you see "no schema, no migrations, no backend".
+  const hasSchemaOrBackend = tasks.some((t) => t.type === "backend" && /schema|migration|api|auth/i.test(t.label));
+  if (!hasSchemaOrBackend) {
+    cloudLog.warn(`[ServerPlan] TaskGraph has no schema/backend tasks — build will be UI-only`, "planner");
+    console.warn("[ServerPlan] ⚠️ TaskGraph has no schema/backend tasks — result will be frontend-only");
+  }
 
   // Build pass ordering: group by priority (schema → backend → frontend)
   const passes: string[][] = [];
