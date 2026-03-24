@@ -1617,6 +1617,48 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
     ],
   );
 
+  useEffect(() => {
+    if (pendingBuildPrompt && !isSendingRef.current && !isLoadingRef.current) {
+      console.log("[BuildOrch] BUILD_CONFIRMED marker detected — triggering build pipeline");
+      const buildPrompt = pendingBuildPrompt;
+      setPendingBuildPrompt(null);
+
+      let firstBuildRequest: string | null = null;
+
+      const relevantMessages = messagesRef.current.filter((m) => {
+        const msgText = getTextContent(m.content).trim();
+        if (m.role !== "user") return false;
+        if (msgText.length <= 10) return false;
+        if (NOISE.test(msgText.toLowerCase())) return false;
+        if (COMPLAINT_NOISE.test(msgText.toLowerCase())) return false;
+        if (META_NOISE.test(msgText.toLowerCase())) return false;
+
+        if (DUPLICATE_TRIGGER.test(msgText)) {
+          if (!firstBuildRequest) {
+            firstBuildRequest = msgText;
+            return true;
+          }
+          return false;
+        }
+
+        if (msgText.includes("# APPLICATION REQUIREMENTS") || msgText.includes("## BUILD TRIGGER")) return false;
+
+        return true;
+      });
+
+      const userRequirements = relevantMessages.map((m) => getTextContent(m.content)).join("\n\n");
+
+      const finalPrompt =
+        userRequirements.length > 50
+          ? `# APPLICATION REQUIREMENTS\n\n${userRequirements}\n\nBuild a complete, production-ready application for this domain request.`
+          : buildPrompt;
+
+      setCurrentAgent("build");
+      setPipelineStep("planning");
+      setTimeout(() => sendMessage(finalPrompt, []), 0);
+    }
+  }, [pendingBuildPrompt, sendMessage]);
+
   const sendEditMessage = useCallback(
     async (text: string, images: string[] = []) => {
       if (!currentProject) return;
