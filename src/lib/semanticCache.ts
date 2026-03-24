@@ -157,9 +157,12 @@ export async function streamThroughCacheProxy({
   knowledge,
   workspaceFiles,
   recentErrors,
+  contracts,
+  workspaceSummary,
   bypassCache,
   cacheIntent,
   requirementsSnippet,
+  signal,
   onCacheHit,
   onDelta,
   onDone,
@@ -171,9 +174,15 @@ export async function streamThroughCacheProxy({
   knowledge?: string[];
   workspaceFiles?: string[];
   recentErrors?: string[];
+  /** Interface contracts snapshot for workspace-aware responses */
+  contracts?: string;
+  /** Compressed workspace manifest */
+  workspaceSummary?: string;
   bypassCache?: boolean;
   cacheIntent?: "read_only_qa" | "actionable";
   requirementsSnippet?: string;
+  /** AbortSignal for cancellation */
+  signal?: AbortSignal;
   onCacheHit?: (result: CacheHitResult) => void;
   onDelta: (text: string) => void;
   onDone: (fullText: string) => void;
