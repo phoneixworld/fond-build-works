@@ -65,6 +65,10 @@ export function verifyWorkspace(
   const exportConventionResults = checkExportConventions(workspace);
   issues.push(...exportConventionResults.issues);
 
+  // 13. Backend schema/migration presence check
+  const migrationResults = checkMigrationPresence(workspace, taskGraph);
+  issues.push(...migrationResults.issues);
+
   // Stats
   const files = workspace.listFiles();
   const jsFiles = files.filter(f => /\.(jsx?|tsx?)$/.test(f));
