@@ -228,9 +228,17 @@ export async function streamBuildAgent({
     return;
   }
 
-  const fullText = await readSSEStream(resp.body, onDelta);
-  onDone(fullText);
-}
+  try {
+    const fullText = await readSSEStream(resp.body, onDelta);
+    if (fullText.length === 0) {
+      onError("Empty response from build agent — connection may have dropped.");
+      return;
+    }
+    onDone(fullText);
+  } catch (streamErr) {
+    console.error("[buildAgent] Stream reading failed:", streamErr);
+    onError("Connection lost during build. The build agent response was interrupted (QUIC protocol error). Please retry.");
+  }
 
 /**
  * Shared SSE stream reader
