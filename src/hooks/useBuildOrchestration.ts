@@ -1016,7 +1016,7 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
                     validation_results: validationResults as any,
                     build_log: [
                       `Build started: ${new Date().toISOString()}`,
-                      `Tasks: ${taskGraph!.tasks.length} across ${taskGraph!.passes.length} passes`,
+                      `Tasks: ${result.trace?.context?.taskCount ?? "?"} across ${result.trace?.context?.passCount ?? "?"} passes`,
                       `Files: ${Object.keys(finalWorkspace).length} (${Math.round(totalSizeBytes / 1024)}KB)`,
                       `Status: ${result.status}`,
                       `Verification: ${result.verification.ok ? "passed" : "issues found"}`,
@@ -1031,7 +1031,7 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
                   })
                   .then(({ data: buildRow, error: buildErr }) => {
                     if (buildErr) console.warn("[Compiler] Failed to insert build_jobs record:", buildErr.message);
-                    else console.log("[Compiler] ✅ Build recorded in build_jobs:", buildRow?.[0]?.id || "ok");
+                    else console.log("[Compiler] ✅ Build recorded in build_jobs");
                   });
               });
             }
