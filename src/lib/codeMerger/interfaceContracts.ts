@@ -99,6 +99,22 @@ export function serializeContracts(contracts: FileContract[]): string {
 /**
  * Estimate the size reduction from using contracts vs full source.
  */
+// In-memory snapshot for cross-module access
+let _lastSnapshot: string | undefined;
+
+/** Store a contracts snapshot for retrieval by other modules (e.g. chat agent) */
+export function setInterfaceContractsSnapshot(snapshot: string): void {
+  _lastSnapshot = snapshot;
+}
+
+/** Retrieve the last stored contracts snapshot */
+export function getInterfaceContractsSnapshot(): string | undefined {
+  return _lastSnapshot;
+}
+
+/**
+ * Estimate the size reduction from using contracts vs full source.
+ */
 export function contractReductionStats(
   files: Record<string, string>,
   contracts: FileContract[]
