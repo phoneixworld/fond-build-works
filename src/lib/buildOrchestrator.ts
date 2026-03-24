@@ -7,7 +7,8 @@ import { generateMockApiFiles } from "./mockApiGenerator";
 import { generateContextFiles } from "./contextGenerator";
 import { generateLayoutFiles } from "./layoutGenerator";
 import { generateSupabaseEntityFiles } from "./supabaseEntityGenerator";
-import { synthesizeAppFromIR } from "./compiler/appSynthesizer";
+import { synthesizeAppJsx } from "./compiler/appSynthesizer";
+import { Workspace } from "./compiler/workspace";
 import { generateAuthContext } from "./templates/scaffoldTemplates";
 import { generateSkeletonFiles } from "./skeletonGenerator";
 import { generateRouteWrappers } from "./twoPhaseRenderer";
@@ -104,8 +105,9 @@ export async function orchestrateBuild(options: {
     Object.assign(files, generateSupabaseEntityFiles(ir));
   }
 
-  // 8. APP.JSX (uses route wrappers for optimistic rendering)
-  files["/App.jsx"] = synthesizeAppFromIR(ir);
+  // 8. APP.JSX — workspace-driven synthesis (imports only verified files)
+  const ws = new Workspace(files);
+  files["/App.jsx"] = synthesizeAppJsx(ws);
 
   // 9. POST-BUILD DOMAIN COHERENCE CHECK
   // Verify that the generated IR actually reflects the requested domain.

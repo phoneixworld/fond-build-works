@@ -11,7 +11,6 @@
 import type { IR } from "@/lib/ir";
 import { scaffoldPagesFromIR } from "@/lib/pageScaffolder";
 import { scaffoldEntitiesFromIR } from "@/lib/entityScaffolder";
-import { synthesizeAppFromIR } from "./appSynthesizer";
 import type {
   BuildContext, BuildResult, BuildStatus,
   CompilerTask, TaskGraph, VerificationResult, RuntimeVerification,
@@ -294,12 +293,9 @@ export async function compile(
       }
     }
 
-    // Seed App.jsx from IR so routing is deterministic
-    if (!workspace.hasFile("/App.jsx")) {
-      const appFromIR = synthesizeAppFromIR(structuredIR);
-      workspace.addFile("/App.jsx", appFromIR);
-      irScaffoldCount++;
-    }
+    // App.jsx will be synthesized AFTER task execution in Phase 3.10
+    // using workspace-driven synthesizeAppJsx — NOT IR-based synthesis.
+    // This ensures imports match actual generated files.
 
     if (irScaffoldCount > 0) {
       cloudLog.info(`IR scaffolder: seeded ${irScaffoldCount} files (entities + pages + App.jsx) from structured IR`, "compiler");

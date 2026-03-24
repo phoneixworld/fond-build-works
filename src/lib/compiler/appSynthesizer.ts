@@ -1,6 +1,5 @@
 // src/lib/compiler/appSynthesizer.ts
 
-import type { IR } from "../ir";
 import type { Workspace } from "./workspace";
 
 /**
@@ -78,115 +77,6 @@ ${routeLines.join("\n")}
 `.trim();
 }
 
-/**
- * IR-based synthesizer — now corrected.
- *
- * This version:
- * - DOES NOT import route wrappers
- * - DOES NOT import warmers
- * - DOES NOT assume AppLayout exists unless IR explicitly requires it
- * - Imports pages directly
- * - Uses real Toast/Auth providers
- */
-export function synthesizeAppFromIR(ir: IR): string {
-  const imports = buildImports(ir);
-
-  // Derive import path from page name (no importPath on IRPage)
-  const pageImports = ir.pages.map((p) => `import ${p.name} from "./pages/${p.name}/${p.name}";`);
-
-  const routeLines = ir.pages.map((p) => {
-    const isIndex = p.path === "/";
-    const pathAttr = isIndex ? "" : ` path="${p.path.replace(/^\//, "")}"`;
-    const indexAttr = isIndex ? " index" : "";
-    return `            <Route${indexAttr}${pathAttr} element={<${p.name} />} />`;
-  });
-
-  const providersOpen = buildProvidersOpen(ir);
-  const providersClose = buildProvidersClose(ir);
-
-  // Optional layout
-  const hasLayout = ir.pages.some((p) => p.type !== "custom");
-  const layoutImport = hasLayout ? `import AppLayout from "./layout/AppLayout";` : "";
-  const layoutOpen = hasLayout
-    ? `<AppLayout navigation={${JSON.stringify(ir.navigation, null, 2)}}>`
-    : `<React.Fragment>`;
-  const layoutClose = hasLayout ? `</AppLayout>` : `</React.Fragment>`;
-
-  return `
-import React from "react";
-import { HashRouter, Routes, Route, Navigate } from "react-router-dom";
-${imports.join("\n")}
-${pageImports.join("\n")}
-${layoutImport}
-
-export default function App() {
-  return (
-${providersOpen}
-      <HashRouter>
-        <Routes>
-          <Route
-            path="/"
-            element={
-              ${layoutOpen}
-                {/* App Shell */}
-              ${layoutClose}
-            }
-          >
-${routeLines.join("\n")}
-          </Route>
-
-          <Route path="*" element={<Navigate to="/" replace />} />
-        </Routes>
-      </HashRouter>
-${providersClose}
-  );
-}
-`.trim();
-}
-
-/**
- * Build import statements for contexts + Toast/Auth providers.
- */
-function buildImports(ir: IR): string[] {
-  const contextImports = ir.contexts.map((c) => {
-    if (c.name === "AuthContext") {
-      return `import { AuthProvider } from "./contexts/AuthContext";`;
-    }
-    return `import { ${c.name} } from "./contexts/${c.name}";`;
-  });
-
-  const toastImport = ir.components.includes("Toast")
-    ? `import { ToastProvider } from "./contexts/ToastContext.jsx";`
-    : "";
-
-  return [...contextImports, toastImport].filter(Boolean);
-}
-
-/**
- * Provider wrappers
- */
-function buildProvidersOpen(ir: IR): string {
-  const lines: string[] = [];
-
-  if (ir.components.includes("Toast")) lines.push(`<ToastProvider>`);
-
-  const hasAuth = ir.contexts.some((c) => c.name === "AuthContext");
-  if (hasAuth) lines.push(`  <AuthProvider>`);
-
-  if (ir.contexts.some((c) => c.name === "AppContext")) lines.push(`    <AppContext>`);
-
-  return lines.map((l) => "  " + l).join("\n");
-}
-
-function buildProvidersClose(ir: IR): string {
-  const lines: string[] = [];
-
-  if (ir.contexts.some((c) => c.name === "AppContext")) lines.push(`    </AppContext>`);
-
-  const hasAuth = ir.contexts.some((c) => c.name === "AuthContext");
-  if (hasAuth) lines.push(`  </AuthProvider>`);
-
-  if (ir.components.includes("Toast")) lines.push(`</ToastProvider>`);
-
-  return lines.map((l) => "  " + l).join("\n");
-}
+// IR-based synthesizeAppFromIR has been REMOVED.
+// All App.jsx generation now goes through workspace-driven synthesizeAppJsx()
+// which only imports components verified to exist in the workspace.
