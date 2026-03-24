@@ -441,6 +441,7 @@ export function mergeFiles(
 
   for (const [path, code] of Object.entries(incoming)) {
     if (code.trim().length === 0) continue;
+    telemetry.mergedFiles++;
 
     if (!result[path]) {
       result[path] = code;
@@ -448,6 +449,7 @@ export function mergeFiles(
     }
 
     if (protectBackend && isBackendProtected(path)) {
+      telemetry.skippedProtected++;
       conflicts.push(`${path}: protected — skipped frontend overwrite`);
       continue;
     }
@@ -455,6 +457,7 @@ export function mergeFiles(
     if (isAppendOnly(path)) {
       if (!result[path].includes(code.trim())) {
         result[path] = result[path] + "\n\n" + code;
+        telemetry.appendOnly++;
         conflicts.push(`${path}: append-only — content appended`);
       }
       continue;
@@ -463,6 +466,7 @@ export function mergeFiles(
     if (!protectBackend && isBackendProtected(path)) {
       const merged = mergeBackendAst(result[path], code, path);
       result[path] = merged;
+      telemetry.astMerged++;
       conflicts.push(`${path}: backend files merged (incoming wins on conflicts)`);
       continue;
     }
@@ -479,9 +483,12 @@ export function mergeFiles(
 
         const mergedRoutesAst = mergeRoutes(existingAst, withMergedImports);
         result[path] = generate(mergedRoutesAst, { retainLines: true }).code;
+        telemetry.astMerged++;
         conflicts.push(`${path}: AST-merged (imports + routes, incoming wins on conflicts)`);
       } catch {
         result[path] = code;
+        telemetry.failedAstMerges.push(path);
+        telemetry.overwritten++;
         conflicts.push(`${path}: AST merge failed — incoming overwritten`);
       }
       continue;
@@ -499,9 +506,12 @@ export function mergeFiles(
 
         const mergedSidebarAst = mergeSidebarAst(existingAst, withMergedImports);
         result[path] = generate(mergedSidebarAst, { retainLines: true }).code;
+        telemetry.astMerged++;
         conflicts.push(`${path}: AST-merged (imports + nav, incoming wins on conflicts)`);
       } catch {
         result[path] = code;
+        telemetry.failedAstMerges.push(path);
+        telemetry.overwritten++;
         conflicts.push(`${path}: Sidebar AST merge failed — incoming overwritten`);
       }
       continue;
@@ -511,9 +521,11 @@ export function mergeFiles(
       try {
         const mergedCss = mergeCss(result[path], code);
         result[path] = mergedCss;
+        telemetry.astMerged++;
         conflicts.push(`${path}: CSS merged (incoming wins, @import deduped)`);
       } catch {
         result[path] = code;
+        telemetry.overwritten++;
         conflicts.push(`${path}: CSS merge failed — incoming overwritten`);
       }
       continue;
@@ -522,7 +534,9 @@ export function mergeFiles(
     if (base && base[path] && path.match(/\.(jsx?|tsx?|ts|js)$/)) {
       const { code: merged, clean, failedHunks } = diffMergeFile(base[path], result[path], code);
       result[path] = merged;
+      telemetry.diffMerged++;
       if (!clean) {
+        telemetry.failedHunks.push({ file: path, count: failedHunks });
         conflicts.push(`${path}: diff merge had ${failedHunks} failed hunk(s) — some changes may be lost`);
       } else if (base[path] !== code) {
         conflicts.push(`${path}: diff-merged (user edits preserved, incoming wins on conflicts)`);
@@ -541,17 +555,24 @@ export function mergeFiles(
         const withMergedImports = replaceImports(incomingAst, mergedImports);
 
         result[path] = generate(withMergedImports, { retainLines: true }).code;
+        telemetry.astMerged++;
         conflicts.push(`${path}: overwritten with AST import merge (incoming wins)`);
       } catch {
         result[path] = code;
+        telemetry.failedAstMerges.push(path);
+        telemetry.overwritten++;
         conflicts.push(`${path}: AST merge failed — incoming overwritten`);
       }
       continue;
     }
 
+    telemetry.overwritten++;
     conflicts.push(`${path}: overwritten by later task (incoming wins)`);
     result[path] = code;
   }
+
+  telemetry.conflicts = conflicts;
+  recordMergeTelemetry(telemetry);
 
   return { files: result, conflicts };
 }
