@@ -1075,6 +1075,7 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
                 .catch((err) => {
                   console.error("[Compiler] getUser() promise rejected:", err);
                 });
+            }
 
             if (onVersionCreated) {
               onVersionCreated({
