@@ -124,10 +124,6 @@ export function contractReductionStats(
   const reductionPercent = fullSize > 0 ? Math.round((1 - contractSize / fullSize) * 100) : 0;
   return { fullSize, contractSize, reductionPercent };
 }
-  files: Record<string, string>,
-  contracts: FileContract[]
-): { fullSize: number; contractSize: number; reductionPercent: number } {
-  const fullSize = Object.values(files).reduce((s, c) => s + c.length, 0);
   const contractSize = serializeContracts(contracts).length;
   const reductionPercent = fullSize > 0 ? Math.round((1 - contractSize / fullSize) * 100) : 0;
   return { fullSize, contractSize, reductionPercent };
