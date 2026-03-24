@@ -1248,9 +1248,10 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
           else if (phase === "complete") setPipelineStep("complete");
         },
         onPlanReady: (tasks) => {
-          // Store all task labels upfront so pipeline card shows real names
-          planLabelsRef.current = tasks.map(t => t.label);
-          setCompilerTasks(tasks.map((t, i) => ({
+          // Phase 3: Canonicalize task labels before display
+          const canonicalized = tasks.map(t => ({ ...t, label: canonicalizeTaskLabel(t.label) }));
+          planLabelsRef.current = canonicalized.map(t => t.label);
+          setCompilerTasks(canonicalized.map((t, i) => ({
             id: `task-${i}`,
             label: t.label,
             status: "pending" as const,
@@ -1260,20 +1261,21 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
           resetBuildSafetyTimeout();
           setCurrentTaskIndex(index);
           setTotalPlanTasks(total);
-          setBuildStep(`🔨 Task ${index + 1}/${total}: ${task.label}`);
+          const canonLabel = canonicalizeTaskLabel(task.label);
+          setBuildStep(`🔨 Task ${index + 1}/${total}: ${canonLabel}`);
 
           // Update task status in pipeline card
           setCompilerTasks(prev => prev.map((t, i) => ({
             ...t,
-            label: i === index ? task.label : t.label,
+            label: i === index ? canonLabel : t.label,
             status: (i < index ? "done" : i === index ? "in_progress" : t.status) as "done" | "in_progress" | "pending",
           })));
 
-          // Build progress message with real labels
+          // Build progress message with canonical labels
           const labels = planLabelsRef.current;
           const progressMsg = `📋 **Building** (${total} tasks)\n\n${Array.from({ length: total }, (_, i) => {
             const status = i < index ? "✅" : i === index ? "🔨" : "⏳";
-            const label = labels[i] || task.label;
+            const label = labels[i] || canonLabel;
             return `${status} ${i + 1}. ${label}`;
           }).join("\n")}`;
           setMessages((prev) => {
