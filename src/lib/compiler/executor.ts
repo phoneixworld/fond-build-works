@@ -360,7 +360,7 @@ function extractFilesFromOutput(text: string): Record<string, string> | null {
       return { type: "deps" };
     }
 
-    const pathMatch = cleaned.match(/\/?.+?\.(?:jsx?|tsx?|css|js|ts|sql|json|md|html|toml|yaml|yml|env|txt)\b/i);
+    const pathMatch = cleaned.match(/\/?[A-Za-z0-9._/-]+\.[A-Za-z0-9]+/);
     if (!pathMatch) return null;
 
     let path = pathMatch[0].trim();
