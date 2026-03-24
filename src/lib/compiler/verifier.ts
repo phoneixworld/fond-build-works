@@ -268,6 +268,54 @@ function checkImports(workspace: Workspace): {
 
 // ─── Produced Files Check ─────────────────────────────────────────────────
 
+function getProducedFileCandidates(expectedFile: string): string[] {
+  const normalized = expectedFile
+    .replace(/\\/g, "/")
+    .replace(/^src\//, "/")
+    .replace(/^\/?/, "/")
+    .replace(/[?#].*$/, "");
+
+  const candidates = new Set<string>([normalized]);
+  const extensionVariants = [".jsx", ".tsx", ".js", ".ts", ".sql", ".json", ".css"];
+
+  const extMatch = normalized.match(/\.[a-z0-9]+$/i);
+  if (extMatch) {
+    const ext = extMatch[0];
+    const base = normalized.slice(0, -ext.length);
+    for (const variant of extensionVariants) {
+      candidates.add(`${base}${variant}`);
+    }
+  } else {
+    for (const variant of extensionVariants) {
+      candidates.add(`${normalized}${variant}`);
+      candidates.add(`${normalized}/index${variant}`);
+    }
+  }
+
+  // Known plan-agent aliases (path convention drift)
+  if (/^\/contexts\/AuthContext\.(js|ts|tsx)$/i.test(normalized)) {
+    candidates.add("/contexts/AuthContext.jsx");
+  }
+  if (/^\/components\/ProtectedRoute\.(js|ts|tsx)$/i.test(normalized)) {
+    candidates.add("/components/ProtectedRoute.jsx");
+  }
+
+  const topLevelAuthPage = normalized.match(/^\/pages\/(Login|Signup)(Page)?\.(jsx|tsx|js|ts)$/i);
+  if (topLevelAuthPage) {
+    const page = topLevelAuthPage[1].toLowerCase() === "login" ? "LoginPage" : "SignupPage";
+    candidates.add(`/pages/Auth/${page}.jsx`);
+  }
+
+  if (/^\/pages\/Auth\/Login\.(jsx|tsx|js|ts)$/i.test(normalized)) {
+    candidates.add("/pages/Auth/LoginPage.jsx");
+  }
+  if (/^\/pages\/Auth\/Signup\.(jsx|tsx|js|ts)$/i.test(normalized)) {
+    candidates.add("/pages/Auth/SignupPage.jsx");
+  }
+
+  return [...candidates];
+}
+
 function checkProducedFiles(
   workspace: Workspace,
   taskGraph: TaskGraph
@@ -278,11 +326,8 @@ function checkProducedFiles(
     if (task.status === "skipped") continue;
 
     for (const expectedFile of task.produces) {
-      // Try with and without extensions
-      const exists = workspace.hasFile(expectedFile) ||
-        workspace.hasFile(expectedFile + ".jsx") ||
-        workspace.hasFile(expectedFile + ".tsx") ||
-        workspace.hasFile(expectedFile + ".js");
+      const candidates = getProducedFileCandidates(expectedFile);
+      const exists = candidates.some((candidate) => workspace.hasFile(candidate));
 
       if (!exists) {
         issues.push({
@@ -290,7 +335,7 @@ function checkProducedFiles(
           severity: "error",
           file: expectedFile,
           message: `Task '${task.label}' was expected to produce '${expectedFile}' but it doesn't exist`,
-          suggestedFix: `Generate ${expectedFile} with the required exports`,
+          suggestedFix: `Generate one of: ${candidates.slice(0, 5).join(", ")}${candidates.length > 5 ? "..." : ""}`,
         });
       }
     }

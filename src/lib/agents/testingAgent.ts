@@ -113,12 +113,27 @@ function testComponentCompleteness(workspace: Record<string, string>): TestResul
   for (const [path, content] of componentFiles) {
     const lines = content.split("\n").filter(l => l.trim() && !l.trim().startsWith("//") && !l.trim().startsWith("import"));
 
-    // Check for stub/placeholder content
-    const isStub = lines.length < 5 ||
-      content.includes("TODO") ||
-      content.includes("Coming soon") ||
-      content.includes("placeholder") ||
-      (content.includes("Loading") && !content.includes("useState"));
+    // Check for stub/placeholder content (avoid false positives from input placeholder="...")
+    const contentForStubCheck = content.replace(
+      /\bplaceholder\s*=\s*\{?\s*["'`][^"'`]*["'`]\s*\}?/gi,
+      "",
+    );
+
+    const hasStubLanguage =
+      /\bTODO\b/i.test(contentForStubCheck) ||
+      /\bcoming soon\b/i.test(contentForStubCheck) ||
+      /\bstub\b/i.test(contentForStubCheck) ||
+      /\bplaceholder\b/i.test(contentForStubCheck);
+
+    const hasOnlyBareScaffold =
+      lines.length < 5 &&
+      !/return\s*\(/.test(content) &&
+      !/use(State|Effect|Memo|Callback|Ref)\b/.test(content);
+
+    const hasLoadingOnlyShell =
+      /\bLoading\b/i.test(contentForStubCheck) && !/use(State|Effect|Memo|Callback|Ref)\b/.test(content);
+
+    const isStub = hasOnlyBareScaffold || hasStubLanguage || hasLoadingOnlyShell;
 
     if (isStub) {
       results.push({
