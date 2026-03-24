@@ -1344,6 +1344,13 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
           isSendingRef.current = false;
           setBuildRetryCount(0);
           if (result.trace) setBuildMetrics(result.trace);
+          void conversationCompleteBuild?.({
+            filesChanged: Object.keys(finalWorkspace),
+            totalFiles: Object.keys(finalWorkspace).length,
+            chatSummary: result.summary,
+            timestamp: Date.now(),
+            verificationOk: result.verification.ok,
+          });
           setTimeout(() => setBuildStreamContent(""), 3000);
 
           // Persist
