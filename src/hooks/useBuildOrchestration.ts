@@ -374,7 +374,14 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
     setPipelineStep("error");
     setCurrentAgent(null);
     isSendingRef.current = false;
-  }, [setMessages, setIsBuilding, setBuildStep]);
+    void conversationCompleteBuild?.({
+      filesChanged: [],
+      totalFiles: 0,
+      chatSummary: `Build failed: ${err}`,
+      timestamp: Date.now(),
+      verificationOk: false,
+    });
+  }, [setMessages, setIsBuilding, setBuildStep, conversationCompleteBuild]);
 
   // ─── Sub-hooks ───
   const { sendChatMessage } = useChatAgent({
@@ -465,6 +472,13 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
         setPipelineStep(null);
         setCurrentAgent(null);
         isSendingRef.current = false;
+        void conversationCompleteBuild?.({
+          filesChanged: [],
+          totalFiles: 0,
+          chatSummary: "Build timed out after 10 minutes",
+          timestamp: Date.now(),
+          verificationOk: false,
+        });
         setMessages((prev) => {
           const msg = "⚠️ Build timed out after 10 minutes without progress. The AI model may be under heavy load — please try again, or break the request into smaller steps.";
           const last = prev[prev.length - 1];
@@ -1330,6 +1344,13 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
           isSendingRef.current = false;
           setBuildRetryCount(0);
           if (result.trace) setBuildMetrics(result.trace);
+          void conversationCompleteBuild?.({
+            filesChanged: Object.keys(finalWorkspace),
+            totalFiles: Object.keys(finalWorkspace).length,
+            chatSummary: result.summary,
+            timestamp: Date.now(),
+            verificationOk: result.verification.ok,
+          });
           setTimeout(() => setBuildStreamContent(""), 3000);
 
           // Persist
@@ -1388,7 +1409,7 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
       setBuildStep("");
       isSendingRef.current = false;
     }
-  }, [currentProject, saveProject, setPreviewHtml, setIsBuilding, setBuildStep, selectedModel, selectedTheme, onVersionCreated, setVirtualFiles, fetchProjectContext, syncSandpackToVirtualFS, sanitizeWorkspaceForPreview, buildMessageContent, currentPreviewHtml, setMessages, setInput, setAttachedImages, setPreviewErrors, setHealAttempts, setSandpackFiles, setSandpackDeps, setPreviewMode, setBuildMetrics, saveSnapshot, selectedTemplate, tryInstantBuild, handleOnError]);
+  }, [currentProject, saveProject, setPreviewHtml, setIsBuilding, setBuildStep, selectedModel, selectedTheme, onVersionCreated, setVirtualFiles, fetchProjectContext, syncSandpackToVirtualFS, sanitizeWorkspaceForPreview, buildMessageContent, currentPreviewHtml, setMessages, setInput, setAttachedImages, setPreviewErrors, setHealAttempts, setSandpackFiles, setSandpackDeps, setPreviewMode, setBuildMetrics, saveSnapshot, selectedTemplate, tryInstantBuild, handleOnError, conversationCompleteBuild]);
 
   // ── Edit Mode: Surgical file editing (wired through FSM) ──────────────────
   const sendEditMessage = useCallback(async (text: string, images: string[] = []) => {
@@ -1594,28 +1615,28 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
       const requirements = await Promise.resolve(conversationGetRequirements?.() || "");
       let assembledRequirements = requirements;
 
-      // Priority 2: Fall back to chat history mining if FSM requirements are empty
+      // Priority 2: Fall back to USER chat history only if FSM requirements are empty
       if (!assembledRequirements || assembledRequirements.length <= 50) {
         const ERROR_NOISE = /\b(element type is invalid|unclosed block|unclosed bracket|is not a function|is not defined|something went wrong|syntax error|check the render|you likely forgot|mixed up default|module not found|cannot find module|auto-fix|auto fix|✅ Fixed|⚠️ Found|⚠️ Build)\b/i;
-        const FRUSTRATION_NOISE = /^(stupid|idiot|bloody|damn|hell|wtf|omg|ugh|why|\?{2,}|\.{3,}|!{2,})$/i;
-        const STATUS_MSG = /^(✅|⚠️|🔧|🔄|Building|Processing|Thinking|Generating)/;
+        const FRUSTRATION_NOISE = /^(stupid|idiot|bloody|damn|hell|wtf|omg|ugh|\?{2,}|\.{3,}|!{2,}|rubbish|fuck off)$/i;
+        const BUILD_CONTEXT_NOISE = /^(yes|yep|yeah|go ahead|proceed|do it|ok|okay|sure|continue|start|build it|just do it|what happened)$/i;
 
-        const relevantMessages = messagesRef.current.filter(m => {
-          const msgText = getTextContent(m.content);
+        const relevantUserMessages = messagesRef.current.filter((m) => {
+          if (m.role !== "user") return false;
+          const msgText = getTextContent(m.content).trim();
+          if (!msgText || msgText.length < 6) return false;
           if (ERROR_NOISE.test(msgText)) return false;
-          if (FRUSTRATION_NOISE.test(msgText.trim())) return false;
-          if (m.role === "assistant" && STATUS_MSG.test(msgText.trim())) return false;
-          if (m.role === "user") return true;
-          if (m.role === "assistant" && msgText.length > 50) return true;
-          return false;
+          if (FRUSTRATION_NOISE.test(msgText.toLowerCase())) return false;
+          if (BUILD_CONTEXT_NOISE.test(msgText.toLowerCase())) return false;
+          return true;
         });
 
-        const chatContext = relevantMessages
-          .map(m => `**${m.role === "user" ? "User" : "Assistant"}:**\n${getTextContent(m.content)}`)
-          .join("\n\n");
+        const userRequirements = relevantUserMessages
+          .map((m) => `- ${getTextContent(m.content).trim()}`)
+          .join("\n");
 
-        if (chatContext.length > 100) {
-          assembledRequirements = `# APPLICATION REQUIREMENTS (from conversation)\n\n${chatContext}\n\n--- END REQUIREMENTS ---\nBuild the COMPLETE application incorporating ALL above requirements.`;
+        if (userRequirements.length > 30) {
+          assembledRequirements = `# APPLICATION REQUIREMENTS (from user conversation)\n\n## USER REQUIREMENTS\n${userRequirements}\n\n## BUILD INSTRUCTION\nBuild EXACTLY what the user requested above. Stay focused on the same domain and do NOT drift to unrelated features.`;
         }
       }
 
