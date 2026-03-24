@@ -239,8 +239,8 @@ export async function streamBuildAgent({
     console.error("[buildAgent] Stream reading failed:", streamErr);
     onError("Connection lost during build. The build agent response was interrupted (QUIC protocol error). Please retry.");
   }
+}
 
-/**
  * Shared SSE stream reader
  */
 async function readSSEStream(
