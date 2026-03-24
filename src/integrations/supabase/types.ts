@@ -2143,6 +2143,36 @@ export type Database = {
         }
         Relationships: []
       }
+      pd_c577748f0230_crm: {
+        Row: {
+          created_at: string
+          description: string | null
+          id: string
+          name: string
+          project_id: string
+          status: string | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          name: string
+          project_id?: string
+          status?: string | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          name?: string
+          project_id?: string
+          status?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       pd_f89d62a84faa_category: {
         Row: {
           created_at: string
@@ -3522,6 +3552,10 @@ export type Database = {
     Functions: {
       cleanup_expired_cache: { Args: never; Returns: number }
       exec_ddl: { Args: { ddl_sql: string }; Returns: undefined }
+      execute_sql: {
+        Args: { project_id: string; sql: string }
+        Returns: undefined
+      }
     }
     Enums: {
       [_ in never]: never
