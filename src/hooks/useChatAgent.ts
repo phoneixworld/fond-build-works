@@ -244,7 +244,6 @@ export function useChatAgent(config: ChatAgentConfig) {
         bypassCache,
         cacheIntent,
         requirementsSnippet,
-        signal: abortController.signal,
         onCacheHit: (result) => {
           if (!isMountedRef.current) {
             isSendingRef.current = false;
