@@ -763,10 +763,17 @@ export async function runBuildEngine(
     /Something went wrong|SyntaxError|TypeError|ReferenceError|is not a function|has already been declared|has already been exported/i.test(userPrompt)
   );
   
-  const isComplex = !isFixIteration && (
+  // Single-shot threshold: prompts under 3000 chars without explicit multi-phase
+  // markers get direct build (like Lovable does) to avoid multi-task merge failures
+  const isSingleShotCandidate = !isFixIteration && !hasMultiplePhases && !hasModulePlan && promptLength < 3000;
+  
+  const isComplex = !isFixIteration && !isSingleShotCandidate && (
     promptLength > 5000 || hasMultiplePhases || hasModulePlan || (hasChatContext && promptLength > 2000)
   );
   
+  if (isSingleShotCandidate) {
+    console.log(`[BuildEngine] Single-shot build: prompt is ${promptLength} chars with no multi-phase markers — using direct build for reliability`);
+  }
   if (isComplex) {
     console.log(`[BuildEngine] Complex build detected: length=${promptLength}, phases=${hasMultiplePhases}, modulePlan=${hasModulePlan}, chatContext=${hasChatContext}, existingFiles=${hasExistingCode}`);
   }
