@@ -2,28 +2,37 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
+  "Access-Control-Allow-Headers":
+    "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
 function repairTruncatedJson(json: string): string {
-  // Try to close any open arrays/objects
-  let openBraces = 0, openBrackets = 0;
-  let inString = false, escaped = false;
+  let openBraces = 0,
+    openBrackets = 0;
+  let inString = false,
+    escaped = false;
   for (const ch of json) {
-    if (escaped) { escaped = false; continue; }
-    if (ch === '\\') { escaped = true; continue; }
-    if (ch === '"') { inString = !inString; continue; }
+    if (escaped) {
+      escaped = false;
+      continue;
+    }
+    if (ch === "\\") {
+      escaped = true;
+      continue;
+    }
+    if (ch === '"') {
+      inString = !inString;
+      continue;
+    }
     if (inString) continue;
-    if (ch === '{') openBraces++;
-    if (ch === '}') openBraces--;
-    if (ch === '[') openBrackets++;
-    if (ch === ']') openBrackets--;
+    if (ch === "{") openBraces++;
+    if (ch === "}") openBraces--;
+    if (ch === "[") openBrackets++;
+    if (ch === "]") openBrackets--;
   }
-  // If we're inside a string, close it
   if (inString) json += '"';
-  // Close any open structures
-  for (let i = 0; i < openBrackets; i++) json += ']';
-  for (let i = 0; i < openBraces; i++) json += '}';
+  for (let i = 0; i < openBrackets; i++) json += "]";
+  for (let i = 0; i < openBraces; i++) json += "}";
   return json;
 }
 
@@ -35,7 +44,8 @@ serve(async (req) => {
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY not configured");
 
-    const domainContext = domainModel ? `
+    const domainContext = domainModel
+      ? `
 ## DOMAIN MODEL (from Requirements Agent)
 Template: ${domainModel.templateName}
 Auth: ${domainModel.requiresAuth}
@@ -44,93 +54,205 @@ Pages: ${domainModel.suggestedPages?.map((p: any) => `${p.path} (${p.type})`).jo
 Nav: ${domainModel.suggestedNavItems?.map((n: any) => n.label).join(", ")}
 
 ### ENTITIES
-${domainModel.entities?.map((e: any) => {
-  const fields = e.fields?.map((f: any) => `  - ${f.name}: ${f.type}${f.required ? ' (req)' : ''}${f.options ? ` [${f.options.join(',')}]` : ''}`).join('\n') || '';
-  const rels = e.relationships?.map((r: any) => `  - ${r.type} ${r.target}`).join('\n') || '';
-  return `#### ${e.name} (collection: "${e.pluralName}", seed: ${e.seedCount || 0})
-${fields}${rels ? `\nRelationships:\n${rels}` : ''}`;
-}).join('\n\n') || 'No entities'}
-` : "";
+${
+  domainModel.entities
+    ?.map((e: any) => {
+      const fields =
+        e.fields
+          ?.map(
+            (f: any) =>
+              `  - ${f.name}: ${f.type}${f.required ? " (req)" : ""}${f.options ? ` [${f.options.join(",")}]` : ""}`,
+          )
+          .join("\n") || "";
+      const rels = e.relationships?.map((r: any) => `  - ${r.type} ${r.target}`).join("\n") || "";
+      return `#### ${e.name} (collection: "${e.pluralName}", seed: ${e.seedCount || 0})
+${fields}${rels ? `\nRelationships:\n${rels}` : ""}`;
+    })
+    .join("\n\n") || "No entities"
+}
+`
+      : "";
 
-    const systemPrompt = `You are Phoneix Planning Agent. Decompose complex feature requests into atomic, sequenced build tasks.
+    const systemPrompt = `You are Phoenix Planning Agent. Decompose complex feature requests into a small number of **contract-driven, sequenced build tasks**.
+
+Your goal is to produce a plan that:
+- Minimizes the number of tasks (coarse-grained, not micro-tasks)
+- Defines clear **interface contracts** between tasks
+- Declares explicit **dependencies** between tasks
+- Enables **context-light** execution (each task only needs contracts, not full source)
+- Enforces the canonical order: schema → backend → frontend
+
+---
+
+## MODES
+
+You must choose one of:
+
+- "single_shot"
+  - For small apps (≈ ≤ 15 files, ≤ 3 routes, ≤ 3 modules)
+  - The build engine will generate the entire app in one pass
+- "multi_task"
+  - For larger or more complex apps
+  - Use contract-driven tasks with explicit dependencies
+
+Return this as \`mode\` at the top level.
+
+---
 
 ## TASK TYPES (CRITICAL — determines execution order)
+
 - "schema": Data layer — SQL migrations, RLS policies, schema.json, /hooks/ for data access. NO dependencies.
 - "backend": API/auth/contexts — depends on schema tasks.
-- "frontend": UI pages/components — depends on backend tasks.
+- "frontend": UI pages/components/layout/routing — depends on backend tasks.
 
-## ORDERING: schema → backend → frontend (ALWAYS)
+Order is ALWAYS:
 
-${domainContext ? `## DOMAIN MODEL AVAILABLE\n${domainContext}` : ''}
+1. schema
+2. backend
+3. frontend
 
-## TASK QUALITY RULES
-1. Each task = independently buildable + testable
-2. Small enough for one AI build step (1-5 files per task)
-3. File paths use proper nesting: /pages/Module/Page.jsx, /components/ui/Widget.jsx
-4. buildPrompt MUST be specific and actionable — not vague
-5. EVERY buildPrompt must include: "Build a FULLY FUNCTIONAL page — NOT a placeholder"
-6. Schema tasks MUST generate: /migrations/001_schema.sql + /migrations/002_rls.sql + /schema.json + /hooks/use<Entity>.js
-7. Backend tasks MUST generate: contexts (Auth, Data) + API hooks that use project-api/project-auth
-8. Frontend tasks IMPORT from hooks/data — NEVER hardcode mock data
+---
+
+## TASK PROFILES
+
+Each task MUST have a \`profile\`:
+
+- "schema.migration"   — migrations + schema.json
+- "schema.rls"         — RLS policies
+- "backend.api"        — API routes, data access
+- "backend.auth"       — AuthContext, session handling
+- "frontend.layout"    — App shell, layout, sidebar
+- "frontend.routing"   — App router, route definitions
+- "frontend.page"      — Feature page(s)
+- "frontend.module"    — Shared UI module (components/hooks)
+
+Profiles define what the task produces and what it needs.
+
+---
+
+## INTERFACE CONTRACTS (CRITICAL)
+
+Each task MUST define a \`contractShape\` object describing what it will export:
+
+- \`exports\`: string[] — exported symbols (functions, components, hooks)
+- \`components\`: string[] — React components (by name)
+- \`routes\`: string[] — route paths ("/users", "/settings/:id")
+- \`types\`: string[] — TypeScript types/interfaces
+- \`api\`: string[] — API endpoints or hook names
+
+Example:
+
+\`\`\`json
+"contractShape": {
+  "exports": ["UsersPage", "useUsers"],
+  "components": ["UsersPage", "UserTable"],
+  "routes": ["/users"],
+  "types": ["User", "UserFilters"],
+  "api": ["useUsers", "createUser", "updateUser"]
+}
+\`\`\`
+
+Later tasks will see ONLY these contracts, not full source.
+
+---
+
+## DEPENDENCY DECLARATIONS
+
+Each task MUST declare a \`requires\` object describing what it depends on:
+
+- \`components\`: string[] — component names it needs
+- \`hooks\`: string[] — hook names it needs
+- \`backend\`: string[] — backend modules or contexts it needs
+- \`schemas\`: string[] — schema entities/tables it needs
+
+Example:
+
+\`\`\`json
+"requires": {
+  "components": ["AppLayout", "Sidebar"],
+  "hooks": ["useUsers"],
+  "backend": ["AuthContext", "DataContext"],
+  "schemas": ["users", "roles"]
+}
+\`\`\`
+
+This is used to build a minimal, task-scoped context.
+
+---
+
+## TASK SIZE & GROUPING
+
+- Prefer **coarse tasks** over micro-tasks.
+- Each task should typically touch **1–5 files**, but group by feature/module:
+  - "Generate Users module (table, hooks, page, filters)"
+  - "Generate Settings module"
+  - "Generate Auth + Layout + Routing"
+
+Avoid plans with 10–20 tiny tasks unless absolutely necessary.
+
+---
 
 ## BACKEND GENERATION RULES (MANDATORY)
 
-### REQUIRED for schema tasks:
+### Schema tasks ("schema.migration", "schema.rls"):
+
 - ALWAYS include SQL migration files with CREATE TABLE statements
 - ALWAYS include RLS policies for every table
 - ALWAYS include a schema.json describing the data model
 - ALWAYS generate hooks that use real Supabase/Data API calls
 
-### REQUIRED for backend tasks:
-- ALWAYS use project-auth for authentication — NEVER generate ad-hoc auth
-- ALWAYS use project-api for CRUD — NEVER use in-memory arrays
+### Backend tasks ("backend.api", "backend.auth"):
 
-### FORBIDDEN across ALL task types:
-- NEVER use localStorage for auth or data persistence
-- NEVER use mock data arrays as primary data source
-- NEVER generate frontend CRUD without backend schema
-- NEVER generate fake UUID-only persistence
-- NEVER generate ad-hoc auth implementations
+- ALWAYS use project-auth for authentication — NEVER ad-hoc auth
+- ALWAYS use project-api for CRUD — NEVER in-memory arrays
 
-## PATTERN FOR TYPICAL APPS
-1. Schema tasks: SQL migrations + RLS + /schema.json + /hooks/ for CRUD (taskType: "schema")
-2. Backend tasks: AuthContext + API integration using project-auth/project-api (taskType: "backend")
-3. Layout task: /layout/AppLayout.jsx + /layout/Sidebar.jsx (taskType: "frontend")
-4. Page tasks: Feature pages importing from hooks/data (taskType: "frontend")
+### Frontend tasks ("frontend.*"):
+
+- MUST import from hooks/data — NEVER hardcode mock data
+- MUST produce fully functional pages, NOT placeholders
+
+---
 
 ## ABSOLUTE BANS
-❌ "Coming Soon" / placeholder tasks
-❌ Tasks that produce stub/empty components
-❌ Every nav item MUST have a fully implemented page
-❌ Schema tasks without SQL migrations
-❌ Backend tasks using localStorage or mock data
+
+- "Coming Soon" / placeholder tasks
+- Stub/empty components
+- Nav items without fully implemented pages
+- Schema tasks without SQL migrations
+- Backend tasks using localStorage or mock data
+- Frontend CRUD without backend schema
+
+---
+
+## ORDERING ENFORCEMENT (CRITICAL)
+
+If the user's intent includes ANY of: auth, CRUD, data, roles, storage, database, users, contacts, CRM, login, signup, permissions, backend, schema, migration, persist, save, store:
+
+You MUST:
+
+1. Emit one or more schema tasks (taskType: "schema", profiles "schema.migration" and/or "schema.rls")
+2. Emit backend tasks (taskType: "backend", profiles "backend.api" and/or "backend.auth")
+3. Emit frontend tasks (taskType: "frontend", profiles "frontend.layout", "frontend.routing", "frontend.page", "frontend.module")
+
+Dependencies:
+
+- All backend tasks MUST depend on ALL schema tasks.
+- All frontend tasks MUST depend on ALL backend tasks (and schema tasks if needed).
+- Use \`dependsOn\` to enforce this.
+
+---
 
 ## CONTEXT
+
 Tech Stack: ${techStack || "react"}
 ${existingFiles ? `Existing files: ${existingFiles.join(", ")}` : "New project"}
 ${schemas?.length ? `DB schemas: ${JSON.stringify(schemas)}` : ""}
 ${knowledge?.length ? `Knowledge:\n${knowledge.join("\n")}` : ""}
+${domainContext ? `\n## DOMAIN MODEL AVAILABLE\n${domainContext}` : ""}
 
-## TASK ORDERING ENFORCEMENT (CRITICAL)
-If the user's intent includes ANY of: auth, CRUD, data, roles, storage, database, users, contacts, CRM, login, signup, permissions, backend, schema, migration, persist, save, store:
-→ The plan MUST emit tasks in this EXACT order:
-  1. create_or_update_schema (taskType: "schema") — SQL migrations + RLS + schema.json + hooks
-  2. create_or_update_migrations (taskType: "schema") — if separate migration tasks needed
-  3. create_or_update_rls (taskType: "schema") — if separate RLS tasks needed
-  4. generate_backend (taskType: "backend") — Auth contexts + API integration
-  5. generate_frontend (taskType: "frontend") — UI pages/components
-→ Frontend tasks MUST have dependsOn referencing ALL schema + backend tasks
-→ Backend tasks MUST have dependsOn referencing ALL schema tasks
-→ This is NON-NEGOTIABLE. Frontend code CANNOT run before schema is validated.
+---
 
-## MIGRATION ARTIFACT FORMAT
-Schema tasks MUST output files in this structure:
-- /phoenix/migrations/{timestamp}_{table}.sql — CREATE TABLE + columns
-- /phoenix/migrations/metadata.json — { tables, columns, relations, rls, hash }
-- /migrations/001_schema.sql — Combined schema migration
-- /migrations/002_rls.sql — RLS policies for all tables
-
-Use the create_plan tool to return your structured plan.`;
+Use the \`create_plan\` tool to return your structured plan.`;
 
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
@@ -144,19 +266,33 @@ Use the create_plan tool to return your structured plan.`;
         max_tokens: 16384,
         messages: [
           { role: "system", content: systemPrompt },
-          { role: "user", content: prompt.length > 30000 ? prompt.slice(0, 30000) + "\n\n[TRUNCATED — focus on the key entities, roles, and pages listed above]" : prompt },
+          {
+            role: "user",
+            content:
+              prompt.length > 30000
+                ? prompt.slice(0, 30000) + "\n\n[TRUNCATED — focus on the key entities, roles, and pages listed above]"
+                : prompt,
+          },
         ],
         tools: [
           {
             type: "function",
             function: {
               name: "create_plan",
-              description: "Create a structured build plan with sequenced tasks",
+              description: "Create a structured, contract-driven build plan with sequenced tasks",
               parameters: {
                 type: "object",
                 properties: {
+                  mode: {
+                    type: "string",
+                    enum: ["single_shot", "multi_task"],
+                    description: '"single_shot" for small apps (one-pass build), "multi_task" for larger apps',
+                  },
                   summary: { type: "string", description: "1-2 sentence plan summary" },
-                  overallComplexity: { type: "string", enum: ["trivial", "simple", "medium", "complex"] },
+                  overallComplexity: {
+                    type: "string",
+                    enum: ["trivial", "simple", "medium", "complex"],
+                  },
                   estimatedSteps: { type: "number" },
                   risks: { type: "array", items: { type: "string" } },
                   tasks: {
@@ -167,20 +303,80 @@ Use the create_plan tool to return your structured plan.`;
                         id: { type: "string" },
                         title: { type: "string" },
                         description: { type: "string" },
-                        buildPrompt: { type: "string", description: "Exact prompt for build agent — must be specific and complete" },
-                        complexity: { type: "string", enum: ["trivial", "simple", "medium", "complex"] },
-                        taskType: { type: "string", enum: ["schema", "backend", "frontend"] },
+                        buildPrompt: {
+                          type: "string",
+                          description:
+                            "Exact prompt for build agent — must be specific, complete, and describe all files to generate",
+                        },
+                        complexity: {
+                          type: "string",
+                          enum: ["trivial", "simple", "medium", "complex"],
+                        },
+                        taskType: {
+                          type: "string",
+                          enum: ["schema", "backend", "frontend"],
+                        },
+                        profile: {
+                          type: "string",
+                          enum: [
+                            "schema.migration",
+                            "schema.rls",
+                            "backend.api",
+                            "backend.auth",
+                            "frontend.layout",
+                            "frontend.routing",
+                            "frontend.page",
+                            "frontend.module",
+                          ],
+                        },
                         dependsOn: { type: "array", items: { type: "string" } },
                         filesAffected: { type: "array", items: { type: "string" } },
                         needsUserInput: { type: "boolean" },
                         userQuestion: { type: "string" },
-                        category: { type: "string", enum: ["ui", "backend", "auth", "data", "styling", "testing", "config"] },
+                        category: {
+                          type: "string",
+                          enum: ["ui", "backend", "auth", "data", "styling", "testing", "config"],
+                        },
+                        contractShape: {
+                          type: "object",
+                          properties: {
+                            exports: { type: "array", items: { type: "string" } },
+                            components: { type: "array", items: { type: "string" } },
+                            routes: { type: "array", items: { type: "string" } },
+                            types: { type: "array", items: { type: "string" } },
+                            api: { type: "array", items: { type: "string" } },
+                          },
+                          required: ["exports"],
+                          additionalProperties: false,
+                        },
+                        requires: {
+                          type: "object",
+                          properties: {
+                            components: { type: "array", items: { type: "string" } },
+                            hooks: { type: "array", items: { type: "string" } },
+                            backend: { type: "array", items: { type: "string" } },
+                            schemas: { type: "array", items: { type: "string" } },
+                          },
+                          additionalProperties: false,
+                        },
                       },
-                      required: ["id", "title", "description", "buildPrompt", "complexity", "taskType", "dependsOn", "filesAffected", "category"],
+                      required: [
+                        "id",
+                        "title",
+                        "description",
+                        "buildPrompt",
+                        "complexity",
+                        "taskType",
+                        "profile",
+                        "dependsOn",
+                        "filesAffected",
+                        "category",
+                        "contractShape",
+                      ],
                     },
                   },
                 },
-                required: ["summary", "overallComplexity", "estimatedSteps", "tasks"],
+                required: ["mode", "summary", "overallComplexity", "estimatedSteps", "tasks"],
                 additionalProperties: false,
               },
             },
@@ -193,12 +389,14 @@ Use the create_plan tool to return your structured plan.`;
     if (!response.ok) {
       if (response.status === 429) {
         return new Response(JSON.stringify({ error: "Rate limit exceeded." }), {
-          status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" },
+          status: 429,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
       if (response.status === 402) {
         return new Response(JSON.stringify({ error: "Usage limit reached." }), {
-          status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" },
+          status: 402,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
       const t = await response.text();
@@ -215,6 +413,7 @@ Use the create_plan tool to return your structured plan.`;
       const repaired = repairTruncatedJson(rawText);
       data = JSON.parse(repaired);
     }
+
     const toolCall = data.choices?.[0]?.message?.tool_calls?.[0];
 
     if (toolCall?.function?.arguments) {
@@ -232,7 +431,6 @@ Use the create_plan tool to return your structured plan.`;
       });
     }
 
-    // Fallback: check if content has JSON directly
     const content = data.choices?.[0]?.message?.content;
     if (content) {
       const jsonMatch = content.match(/\{[\s\S]*\}/);
@@ -245,11 +443,11 @@ Use the create_plan tool to return your structured plan.`;
     }
 
     throw new Error("No plan generated");
-  } catch (e) {
+  } catch (e: any) {
     console.error("plan-agent error:", e);
-    return new Response(
-      JSON.stringify({ error: e.message || "Failed to generate plan" }),
-      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-    );
+    return new Response(JSON.stringify({ error: e.message || "Failed to generate plan" }), {
+      status: 500,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
   }
 });
