@@ -13,6 +13,10 @@
     "test:watch": "vitest"
   },
   "dependencies": {
+    "@babel/generator": "^7.29.1",
+    "@babel/parser": "^7.29.2",
+    "@babel/traverse": "^7.29.0",
+    "@babel/types": "^7.29.0",
     "@codesandbox/sandpack-react": "^2.20.0",
     "@hookform/resolvers": "^3.10.0",
     "@monaco-editor/react": "^4.7.0",
