@@ -425,7 +425,7 @@ export function useConversationState() {
     mode, setMode, phases, lastBuildResult, buildReadiness, agentStates, serverVersion, isRestoring,
     restoreFromServer, analyzeMessage, analyzeMessageSync, addPhase,
     getRequirementsContext, getRequirementsContextSync,
-    startBuilding, startEditing, completeEdit, completeBuild, reset, generateAcknowledgment,
+    startBuilding, startEditing, completeEdit, completeBuild, updateBuildPreviewUrl, reset, generateAcknowledgment,
     currentProjectId,
   };
 }
