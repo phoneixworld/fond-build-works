@@ -50,6 +50,38 @@ import { extractUrlFromMessage, analyzeUrl } from "@/lib/urlAnalyzer";
 type MsgMeta = { tokens?: number; durationMs?: number; model?: string };
 type Msg = { role: "user" | "assistant"; content: MsgContent; timestamp?: number; meta?: MsgMeta };
 
+// Phase 3: Canonical task label mapping — prevents generic "Task N" placeholders
+const TASK_LABEL_MAP: Record<string, string> = {
+  infra: "Infrastructure",
+  auth: "Authentication",
+  "domain:components": "Domain Components",
+  "domain:layout": "Application Layout",
+  "model:project": "Data Models",
+  "sidebar:verify-and-stub": "Sidebar & Navigation",
+  "app:routing": "App Routing",
+  "verify-and-stub": "Verify & Stub Missing",
+};
+
+function canonicalizeTaskLabel(raw: string): string {
+  if (!raw || raw.trim() === "") return "Build Step";
+  const lower = raw.toLowerCase().trim();
+  // Direct map match
+  if (TASK_LABEL_MAP[lower]) return TASK_LABEL_MAP[lower];
+  // page:XYZ → "XYZ Page"
+  const pageMatch = raw.match(/^page[:/](.+)$/i);
+  if (pageMatch) return `${pageMatch[1].trim()} Page`;
+  // model:XYZ → "XYZ Model"
+  const modelMatch = raw.match(/^model[:/](.+)$/i);
+  if (modelMatch) return `${modelMatch[1].trim()} Model`;
+  // domain:XYZ → capitalize
+  const domainMatch = raw.match(/^domain[:/](.+)$/i);
+  if (domainMatch) return domainMatch[1].trim().replace(/^\w/, c => c.toUpperCase());
+  // Fallback: if it looks like "Task N", replace with ordinal
+  if (/^task\s*\d+$/i.test(raw)) return `Build Step ${raw.replace(/\D/g, "")}`;
+  // Otherwise capitalize first letter
+  return raw.charAt(0).toUpperCase() + raw.slice(1);
+}
+
 type PendingExecutionRequest = {
   prompt: string;
   images: string[];
