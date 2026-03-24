@@ -471,7 +471,14 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
       setHealAttempts(0);
     }
 
-    const content = buildMessageContent(text, images);
+    // ── Phase 1: Prompt Pollution Prevention ──
+    // displayUserText is the clean user-facing text persisted to chat history.
+    // The full `text` (which may contain compiled requirements) is only sent to the build agent.
+    const displayUserText = (text.includes("# APPLICATION REQUIREMENTS") || text.includes("## BUILD TRIGGER"))
+      ? (text.match(/## BUILD TRIGGER\n(.+)/)?.[1]?.trim() || text.split("\n").filter(l => l.trim() && !l.startsWith("#") && !l.startsWith("Build EXACTLY") && !l.startsWith("Do NOT add")).pop()?.trim() || "Build request")
+      : text;
+
+    const content = buildMessageContent(displayUserText, images);
     const userMsg: Msg = { role: "user", content, timestamp: Date.now() };
     setInput("");
     setAttachedImages([]);
