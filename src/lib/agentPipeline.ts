@@ -241,6 +241,7 @@ export async function streamBuildAgent({
   }
 }
 
+/**
  * Shared SSE stream reader
  */
 async function readSSEStream(
