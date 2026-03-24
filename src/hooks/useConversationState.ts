@@ -53,6 +53,7 @@ export interface BuildResult {
   chatSummary: string;
   timestamp: number;
   verificationOk?: boolean;
+  previewUrl?: string | null;
 }
 
 export interface AgentState {

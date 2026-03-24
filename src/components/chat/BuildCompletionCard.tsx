@@ -24,6 +24,7 @@ interface BuildCompletionCardProps {
   };
   phases?: RequirementPhase[];
   onViewPreview?: () => void;
+  previewUrl?: string | null;
 }
 
 const RuntimeBadge = React.forwardRef<HTMLDivElement, { status: RuntimeStatus; summary: string }>(function RuntimeBadge({ status, summary }, ref) {

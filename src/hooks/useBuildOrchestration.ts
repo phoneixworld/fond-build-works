@@ -1138,7 +1138,13 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
                     .then(({ data: buildRow, error: buildErr }) => {
                       if (buildErr)
                         console.error("[Compiler] Failed to insert build_jobs record:", buildErr.message, buildErr);
-                      else console.log("[Compiler] ✅ Build recorded in build_jobs:", buildRow?.[0]?.id, "preview:", previewUrl);
+                      else {
+                        console.log("[Compiler] ✅ Build recorded in build_jobs:", buildRow?.[0]?.id, "preview:", previewUrl);
+                        // Emit event so ChatPanel can update the build result with preview URL
+                        if (previewUrl) {
+                          window.dispatchEvent(new CustomEvent("build-preview-url", { detail: previewUrl }));
+                        }
+                      }
                     });
                 })
                 .catch((err) => {

@@ -288,6 +288,7 @@ const ChatPanel = forwardRef<ChatPanelHandle, { initialPrompt?: string; onVersio
         chatSummary: chatSummary.replace(/```[\s\S]*?```/g, "").trim().slice(0, 150),
         timestamp: Date.now(),
         verificationOk: lastVerificationOkRef.current ?? undefined,
+        previewUrl: null, // Will be updated async via event
       });
     }
     prevPipelineStep.current = pipelineStep;
