@@ -996,12 +996,16 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
                   .map((i) => ({ file: i.file || "", message: i.message, severity: i.severity })),
               };
 
-              supabase.auth.getUser().then(({ data: authData }) => {
+              supabase.auth.getUser().then(({ data: authData, error: authErr }) => {
+                if (authErr) {
+                  console.error("[Compiler] auth.getUser() failed:", authErr.message);
+                }
                 const userId = authData?.user?.id;
                 if (!userId) {
                   console.warn("[Compiler] No authenticated user — skipping build_jobs insert");
                   return;
                 }
+                console.log("[Compiler] Inserting build_jobs record for user:", userId, "project:", currentProject.id);
 
                 supabase
                   .from("build_jobs")
@@ -1015,12 +1019,12 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
                     build_config: { model: routedModel, techStack: currentProject.tech_stack || "react-cdn" } as any,
                     validation_results: validationResults as any,
                     build_log: [
-                      `Build started: ${new Date().toISOString()}`,
-                      `Tasks: ${result.trace?.context?.taskCount ?? "?"} across ${result.trace?.context?.passCount ?? "?"} passes`,
-                      `Files: ${Object.keys(finalWorkspace).length} (${Math.round(totalSizeBytes / 1024)}KB)`,
-                      `Status: ${result.status}`,
-                      `Verification: ${result.verification.ok ? "passed" : "issues found"}`,
-                      ...(result.knownIssues.length > 0 ? [`Known issues: ${result.knownIssues.join("; ")}`] : []),
+                      `[${new Date().toISOString()}] Build started`,
+                      `[${new Date().toISOString()}] Files: ${Object.keys(finalWorkspace).length}`,
+                      `[${new Date().toISOString()}] Validating ${Object.keys(finalWorkspace).length} files...`,
+                      `[${new Date().toISOString()}] Validation: ${validationResults.errors.length} errors, ${validationResults.warnings.length} warnings`,
+                      `[${new Date().toISOString()}] Storing build artifacts...`,
+                      `[${new Date().toISOString()}] Build complete in ${buildDurationMs ?? "?"}ms`,
                     ],
                     source_files: {} as any,
                     output_files: {} as any,
@@ -1029,10 +1033,13 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
                     started_at: new Date(Date.now() - (buildDurationMs || 0)).toISOString(),
                     completed_at: new Date().toISOString(),
                   })
+                  .select()
                   .then(({ data: buildRow, error: buildErr }) => {
-                    if (buildErr) console.warn("[Compiler] Failed to insert build_jobs record:", buildErr.message);
-                    else console.log("[Compiler] ✅ Build recorded in build_jobs");
+                    if (buildErr) console.error("[Compiler] Failed to insert build_jobs record:", buildErr.message, buildErr);
+                    else console.log("[Compiler] ✅ Build recorded in build_jobs:", buildRow?.[0]?.id);
                   });
+              }).catch((err) => {
+                console.error("[Compiler] getUser() promise rejected:", err);
               });
             }
 
