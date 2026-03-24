@@ -140,10 +140,13 @@ export function runPostBuildAgents(
   let finalWorkspace = { ...builtWorkspace };
 
   // Testing Agent
-  if (ctx.agentPlan.includes("testing")) {
+  // Run when explicitly requested OR when a runnable app shell exists.
+  // This prevents Runtime Pending for normal app builds while avoiding noise on non-app tasks.
+  const hasRunnableApp = Boolean(builtWorkspace["/App.jsx"] || builtWorkspace["/App.tsx"]);
+  if (ctx.agentPlan.includes("testing") || hasRunnableApp) {
     callbacks.onAgentStart("testing");
     callbacks.onAgentProgress("testing", "Running smoke tests...");
-    
+
     const testResult = runTestingAgent(enrichedCtx);
     enrichedCtx.results.set("testing", testResult);
     callbacks.onAgentDone("testing", testResult);
