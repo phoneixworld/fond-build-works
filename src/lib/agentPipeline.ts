@@ -265,7 +265,16 @@ async function readSSEStream(
       console.warn(`[readSSEStream] Idle timeout — no data for 180s`);
       break;
     }
-    const { done: rd, value } = await reader.read();
+    let rd: boolean;
+    let value: Uint8Array | undefined;
+    try {
+      ({ done: rd, value } = await reader.read());
+    } catch (streamErr) {
+      // QUIC_PROTOCOL_ERROR or network disconnect mid-stream
+      console.warn(`[readSSEStream] Stream read error after ${chunkCount} chunks, ${fullText.length} chars accumulated:`, streamErr);
+      // Return whatever we've accumulated so far instead of crashing
+      break;
+    }
     if (rd) break;
     const chunk = decoder.decode(value, { stream: true });
     buf += chunk;
