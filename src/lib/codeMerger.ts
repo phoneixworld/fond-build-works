@@ -138,7 +138,7 @@ function mergeImportDeclarations(
       finalDefault = existingDefault || incomingDefault || undefined;
     }
 
-    const mergedSpecs: t.ImportSpecifier[] | (t.ImportSpecifier | t.ImportDefaultSpecifier)[] = [];
+    const mergedSpecs: (t.ImportSpecifier | t.ImportDefaultSpecifier)[] = [];
     if (finalDefault) mergedSpecs.push(finalDefault);
     mergedSpecs.push(...mergedNamed);
 
