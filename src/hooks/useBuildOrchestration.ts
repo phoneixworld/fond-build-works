@@ -23,8 +23,6 @@ import {
   type AgentIntent,
   type PipelineStep,
 } from "@/lib/agentPipeline";
-import { orchestrateBuild } from "@/lib/buildOrchestrator";
-import { runBuildEngine, type EngineConfig, type EngineProgress } from "@/lib/buildEngine";
 import { compile, type CompileOptions, type CompileCallbacks, type BuildResult } from "@/lib/compiler";
 import { matchTemplate, type PageTemplate } from "@/lib/pageTemplates";
 import { getSnippetsPromptContext } from "@/lib/componentSnippets";
@@ -37,7 +35,7 @@ import { type MsgContent, getTextContent, parseResponse, parseReactFiles, postPr
 import { parseMultiFileOutput } from "@/contexts/VirtualFSContext";
 import { useChatAgent, type ChatAgentConfig } from "@/hooks/useChatAgent";
 import { useInstantBuild, type InstantBuildConfig } from "@/hooks/useInstantBuild";
-import { triggerBuild } from "@/lib/buildPipelineService";
+
 import { executeEdit, type EditResult } from "@/lib/editEngine";
 import { Workspace } from "@/lib/compiler/workspace";
 import { repairMissingModules } from "@/lib/compiler/missingModuleGen";
@@ -1277,67 +1275,12 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
           );
         }
 
-        const engineConfig: EngineConfig = {
-          projectId: buildProjectId,
-          techStack: currentProject.tech_stack || "react-cdn",
-          schemas: schemas.length > 0 ? schemas : undefined,
-          model: routedModel,
-          designTheme: themeInfo?.prompt,
-          knowledge: knowledge.length > 0 ? knowledge : undefined,
-          snippetsContext: snippetsContext || undefined,
-          existingFiles: safeExistingFiles,
-          templateContext: templateCtx || undefined,
-          chatHistory: currentMessages.map((m) => ({
-            role: m.role,
-            content: typeof m.content === "string" ? m.content : getTextContent(m.content),
-          })),
-          domainModel,
-        };
-
         saveSnapshot(`Pre-build: ${userText.slice(0, 50)}`);
 
-        let irScaffoldFiles: Record<string, string> = {};
-        if (isFirstBuild) {
-          try {
-            setBuildStep("🧠 Planning IR scaffolds...");
-            const callLLM = async (opts: { system: string; user: string }) => {
-              const resp = await fetch(`${SUPABASE_URL}/functions/v1/chat`, {
-                method: "POST",
-                headers: {
-                  "Content-Type": "application/json",
-                  Authorization: `Bearer ${SUPABASE_KEY}`,
-                },
-                body: JSON.stringify({
-                  messages: [
-                    { role: "system", content: opts.system },
-                    { role: "user", content: opts.user },
-                  ],
-                }),
-              });
-              if (!resp.ok) throw new Error(`LLM call failed: ${resp.status}`);
-              const data = await resp.json();
-              return data.choices?.[0]?.message?.content || (await resp.text());
-            };
-
-            irScaffoldFiles = await orchestrateBuild({
-              rawRequirements: userText,
-              callLLM,
-            });
-
-            if (irScaffoldFiles["/App.jsx"]) {
-              console.log(`[BuildOrch] ✅ IR scaffold generated: ${Object.keys(irScaffoldFiles).length} files`);
-            }
-          } catch (err) {
-            console.warn("[BuildOrch] IR orchestrator failed, proceeding without scaffolds:", err);
-            irScaffoldFiles = {};
-          }
-        }
-
-        const seededWorkspace = { ...irScaffoldFiles, ...(safeExistingFiles || {}) };
-
+        // Single build path: compile() handles IR extraction, planning, and execution
         const compileOptions: CompileOptions = {
           rawRequirements: userText,
-          existingWorkspace: seededWorkspace,
+          existingWorkspace: safeExistingFiles || {},
           projectId: buildProjectId,
           techStack: currentProject.tech_stack || "react-cdn",
           schemas: schemas.length > 0 ? schemas : undefined,
@@ -1551,13 +1494,7 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
                   else console.log("[Compiler] ✅ Sandpack state persisted");
                 });
 
-              triggerBuild(currentProject.id, finalWorkspace, {}, { model: selectedModel, theme: selectedTheme })
-                .then((buildResult) => {
-                  console.log(`[Compiler] ✅ Server build ${buildResult.build_id}: ${buildResult.status}`);
-                })
-                .catch((err) => {
-                  console.warn("[Compiler] Server-side build failed (non-blocking):", err);
-                });
+              // Server-side build removed — compile() is the single build path
             }
 
             if (onVersionCreated) {
