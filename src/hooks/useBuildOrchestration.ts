@@ -1409,7 +1409,7 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
       setBuildStep("");
       isSendingRef.current = false;
     }
-  }, [currentProject, saveProject, setPreviewHtml, setIsBuilding, setBuildStep, selectedModel, selectedTheme, onVersionCreated, setVirtualFiles, fetchProjectContext, syncSandpackToVirtualFS, sanitizeWorkspaceForPreview, buildMessageContent, currentPreviewHtml, setMessages, setInput, setAttachedImages, setPreviewErrors, setHealAttempts, setSandpackFiles, setSandpackDeps, setPreviewMode, setBuildMetrics, saveSnapshot, selectedTemplate, tryInstantBuild, handleOnError]);
+  }, [currentProject, saveProject, setPreviewHtml, setIsBuilding, setBuildStep, selectedModel, selectedTheme, onVersionCreated, setVirtualFiles, fetchProjectContext, syncSandpackToVirtualFS, sanitizeWorkspaceForPreview, buildMessageContent, currentPreviewHtml, setMessages, setInput, setAttachedImages, setPreviewErrors, setHealAttempts, setSandpackFiles, setSandpackDeps, setPreviewMode, setBuildMetrics, saveSnapshot, selectedTemplate, tryInstantBuild, handleOnError, conversationCompleteBuild]);
 
   // ── Edit Mode: Surgical file editing (wired through FSM) ──────────────────
   const sendEditMessage = useCallback(async (text: string, images: string[] = []) => {
