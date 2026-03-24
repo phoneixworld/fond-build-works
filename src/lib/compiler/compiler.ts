@@ -207,7 +207,8 @@ export async function compile(
   }
 
   // @ts-ignore — taskGraph is always assigned by this point
-  const finalTaskGraph: TaskGraph = taskGraph!;
+  // Alias for downstream references
+  const taskGraph: TaskGraph = finalTaskGraph;
 
   cloudLog.info(`Task graph: ${finalTaskGraph.tasks.length} tasks across ${finalTaskGraph.passes.length} passes`, "compiler");
   console.log(`[Compiler] Task graph: ${finalTaskGraph.tasks.length} tasks, ${finalTaskGraph.passes.length} passes (server=${usedServerPlan})`);
