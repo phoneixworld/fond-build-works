@@ -62,6 +62,7 @@ export async function fetchServerPlan(options: {
   knowledge?: string[];
   domainModel?: any;
 }): Promise<ServerPlanResult | null> {
+  console.log(`[ServerPlan] 🚀 Calling plan-agent: prompt="${options.prompt.slice(0, 80)}...", ${options.existingFiles?.length || 0} existing files`);
   try {
     const resp = await fetch(`${BASE_URL}/functions/v1/plan-agent`, {
       method: "POST",
@@ -81,6 +82,7 @@ export async function fetchServerPlan(options: {
 
     if (!resp.ok) {
       const errorText = await resp.text().catch(() => "");
+      console.warn(`[ServerPlan] ❌ plan-agent returned ${resp.status}: ${errorText.slice(0, 200)}`);
       cloudLog.warn(`[ServerPlan] plan-agent returned ${resp.status}: ${errorText.slice(0, 200)}`, "planner");
       return null;
     }
@@ -88,10 +90,14 @@ export async function fetchServerPlan(options: {
     const plan: ServerPlanResult = await resp.json();
 
     if (!plan.tasks || plan.tasks.length === 0) {
+      console.warn("[ServerPlan] ⚠️ plan-agent returned empty task list");
       cloudLog.warn("[ServerPlan] plan-agent returned empty task list", "planner");
       return null;
     }
 
+    console.log(
+      `[ServerPlan] ✅ Server plan: mode=${plan.mode}, ${plan.tasks.length} tasks, complexity=${plan.overallComplexity}`
+    );
     cloudLog.info(
       `[ServerPlan] Server plan: mode=${plan.mode}, ${plan.tasks.length} tasks, complexity=${plan.overallComplexity}`,
       "planner"
@@ -99,6 +105,7 @@ export async function fetchServerPlan(options: {
 
     return plan;
   } catch (err: any) {
+    console.error(`[ServerPlan] ❌ Failed to call plan-agent: ${err.message}`);
     cloudLog.warn(`[ServerPlan] Failed to call plan-agent: ${err.message}`, "planner");
     return null;
   }
