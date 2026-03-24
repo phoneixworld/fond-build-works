@@ -206,19 +206,15 @@ export async function compile(
     taskGraph = planTaskGraph(ctx, structuredIR);
   }
 
-  // @ts-ignore — taskGraph is always assigned by this point
-  // Alias for downstream references
-  const taskGraph: TaskGraph = finalTaskGraph;
-
-  cloudLog.info(`Task graph: ${finalTaskGraph.tasks.length} tasks across ${finalTaskGraph.passes.length} passes`, "compiler");
-  console.log(`[Compiler] Task graph: ${finalTaskGraph.tasks.length} tasks, ${finalTaskGraph.passes.length} passes (server=${usedServerPlan})`);
+  cloudLog.info(`Task graph: ${taskGraph!.tasks.length} tasks across ${taskGraph!.passes.length} passes`, "compiler");
+  console.log(`[Compiler] Task graph: ${taskGraph!.tasks.length} tasks, ${taskGraph!.passes.length} passes (server=${usedServerPlan})`);
   
   // Notify UI with all task labels upfront
-  callbacks.onPlanReady?.(finalTaskGraph.tasks);
+  callbacks.onPlanReady?.(taskGraph!.tasks);
   
-  for (let i = 0; i < finalTaskGraph.passes.length; i++) {
-    const passTaskLabels = finalTaskGraph.passes[i].map(id =>
-      finalTaskGraph.tasks.find(t => t.id === id)?.label || id
+  for (let i = 0; i < taskGraph!.passes.length; i++) {
+    const passTaskLabels = taskGraph!.passes[i].map(id =>
+      taskGraph!.tasks.find(t => t.id === id)?.label || id
     );
     console.log(`[Compiler]   Pass ${i + 1}: ${passTaskLabels.join(", ")}`);
   }
