@@ -956,6 +956,7 @@ function buildSandpackFiles(files: SandpackFileSet | null, projectId: string, su
   }
 
   const base: Record<string, string> = {
+    "/_bootstrap.js": buildBootstrapJs(projectId, supabaseUrl, supabaseKey),
     "/index.js": indexJs,
     "/styles.css": DEFAULT_STYLES,
     "/public/index.html": DEFAULT_INDEX_HTML,
