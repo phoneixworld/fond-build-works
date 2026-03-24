@@ -1,9 +1,15 @@
 /**
- * useChatAgent — Chat-only agent flow (no code generation).
+ * useChatAgent — Chat-only agent flow (no direct code generation).
  * Extracted from useBuildOrchestration to reduce monolith complexity.
  *
- * FIX #1: Now sends workspace file list + recent preview errors to chat-agent
+ * FIX #1: Sends workspace file list + recent preview errors to chat-agent
  * so Phoenix can actually diagnose issues instead of bluffing.
+ *
+ * FIX #2: Feeds interface contracts + workspace summary into chat-agent context
+ * so answers are grounded in the real workspace shape.
+ *
+ * FIX #3: Tightens BUILD_CONFIRMED handoff by sending a structured build envelope
+ * instead of a raw string, so the build pipeline can pick it up with full context.
  */
 
 import { useCallback, useEffect, useRef } from "react";
@@ -13,6 +19,10 @@ import { supabase } from "@/integrations/supabase/client";
 import { type MsgContent, getTextContent } from "@/lib/codeParser";
 import { streamThroughCacheProxy, type CacheHitResult } from "@/lib/semanticCache";
 import { TokenBuffer } from "@/lib/tokenBuffer";
+
+// NEW: Interface contracts + workspace summary
+import { getInterfaceContractsSnapshot } from "@/lib/codeMerger/interfaceContracts";
+import { buildWorkspaceSummary } from "@/lib/workspaceSummary";
 
 type MsgMeta = { tokens?: number; durationMs?: number; model?: string };
 type Msg = { role: "user" | "assistant"; content: MsgContent; timestamp?: number; meta?: MsgMeta };
@@ -97,7 +107,7 @@ export interface ChatAgentConfig {
   isSendingRef: React.MutableRefObject<boolean>;
   isLoadingRef: React.MutableRefObject<boolean>;
   buildMessageContent: (text: string, images: string[]) => MsgContent;
-  // FIX #1: Workspace context for chat-agent
+  // Workspace context for chat-agent
   sandpackFilesRef: React.RefObject<Record<string, string> | null>;
   previewErrors: string[];
 }
@@ -168,23 +178,34 @@ export function useChatAgent(config: ChatAgentConfig) {
           .eq("project_id", currentProject.id)
           .eq("is_active", true);
         knowledge = (data || []).map((k: any) => `[${k.title}]: ${k.content}`);
-      } catch {}
+      } catch {
+        // ignore knowledge failures
+      }
 
       const userText = typeof text === "string" ? text : "";
       const cacheIntent = inferCacheIntent(userText);
       const bypassCache = cacheIntent !== "read_only_qa";
       const requirementsSnippet = buildRequirementsSnippet(apiMessages);
 
-      // FIX #1: Collect workspace file list for chat-agent context
+      // Workspace file list for chat-agent context
       const workspaceFiles: string[] = [];
+      let workspaceFileMap: Record<string, string> | null = null;
       if (sandpackFilesRef.current) {
+        workspaceFileMap = sandpackFilesRef.current;
         for (const path of Object.keys(sandpackFilesRef.current)) {
           workspaceFiles.push(path);
         }
       }
 
-      // FIX #1: Collect recent preview errors for chat-agent context
+      // Recent preview errors for chat-agent context
       const recentErrors = previewErrors.slice(-10);
+
+      // NEW: Interface contracts snapshot
+      const contractSnapshot = getInterfaceContractsSnapshot ? getInterfaceContractsSnapshot() : undefined;
+
+      // NEW: Workspace summary (compressed manifest of files/exports/routes)
+      const workspaceSummary =
+        workspaceFileMap && buildWorkspaceSummary ? buildWorkspaceSummary(workspaceFileMap) : undefined;
 
       const finalize = (responseText: string, isCached: boolean, cacheInfo?: CacheHitResult) => {
         if (!isMountedRef.current) {
@@ -202,24 +223,49 @@ export function useChatAgent(config: ChatAgentConfig) {
         setCurrentAgent(null);
         isSendingRef.current = false;
 
+        // NEW: Structured BUILD_CONFIRMED handoff
         if (hasBuildConfirmation(responseText) && setPendingBuildPrompt) {
           console.log("[ChatAgent] BUILD_CONFIRMED detected in chat response — signaling build pipeline");
-          setPendingBuildPrompt(responseText);
+
+          const buildEnvelope = {
+            kind: "chat_build",
+            source: "chat-agent",
+            prompt: responseText,
+            projectId: currentProject.id,
+            workspaceFiles,
+            workspaceSummary,
+            contracts: contractSnapshot,
+            recentErrors,
+            // room for future: inferred intent, suggested filesAffected, etc.
+          };
+
+          setPendingBuildPrompt(JSON.stringify(buildEnvelope));
         }
 
         const displayText = stripBuildMarker(responseText);
         const cacheTag =
           isCached && cacheInfo
-            ? `\n\n_⚡ ${cacheInfo.layer} cache ${cacheInfo.matchType} hit (${(cacheInfo.similarity * 100).toFixed(0)}% match)_`
+            ? `\n\n_⚡ ${cacheInfo.layer} cache ${cacheInfo.matchType} hit (${(cacheInfo.similarity * 100).toFixed(
+                0,
+              )}% match)_`
             : "";
 
         setMessages((prev) => {
           const withResponse = [...prev];
           const lastIdx = withResponse.length - 1;
           if (lastIdx >= 0 && withResponse[lastIdx].role === "assistant") {
-            withResponse[lastIdx] = { ...withResponse[lastIdx], content: displayText + cacheTag, meta };
+            withResponse[lastIdx] = {
+              ...withResponse[lastIdx],
+              content: displayText + cacheTag,
+              meta,
+            };
           } else {
-            withResponse.push({ role: "assistant", content: displayText + cacheTag, timestamp: Date.now(), meta });
+            withResponse.push({
+              role: "assistant",
+              content: displayText + cacheTag,
+              timestamp: Date.now(),
+              meta,
+            });
           }
 
           const persistMessages = withResponse.map((m) => ({
@@ -241,9 +287,13 @@ export function useChatAgent(config: ChatAgentConfig) {
         knowledge,
         workspaceFiles: workspaceFiles.length > 0 ? workspaceFiles : undefined,
         recentErrors: recentErrors.length > 0 ? recentErrors : undefined,
+        // NEW: richer context for chat-agent
+        contracts: contractSnapshot,
+        workspaceSummary,
         bypassCache,
         cacheIntent,
         requirementsSnippet,
+        signal: abortController.signal,
         onCacheHit: (result) => {
           if (!isMountedRef.current) {
             isSendingRef.current = false;
