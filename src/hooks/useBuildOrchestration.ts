@@ -1096,7 +1096,6 @@ supabase.auth
     console.error("[Compiler] getUser() promise rejected:", err);
   });
 
-
             if (onVersionCreated) {
               onVersionCreated({
                 id: crypto.randomUUID(),
