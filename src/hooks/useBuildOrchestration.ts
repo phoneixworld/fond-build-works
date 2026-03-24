@@ -28,6 +28,53 @@ import { supabase } from "@/integrations/supabase/client";
 import { toExportPath } from "@/lib/pathNormalizer";
 import { StreamingPreviewController } from "@/lib/streamingPreview";
 import { type MsgContent, getTextContent } from "@/lib/codeParser";
+
+/** Generate a self-contained preview HTML from workspace files */
+function generatePreviewHtmlForBuild(files: Record<string, string>): string {
+  const cssFiles = Object.entries(files)
+    .filter(([p]) => p.endsWith(".css"))
+    .map(([, c]) => c)
+    .join("\n");
+
+  const componentCode = Object.entries(files)
+    .filter(([p]) => p.match(/\.(jsx|tsx|js|ts)$/) && !p.includes("vite.config"))
+    .sort(([a], [b]) => {
+      if (a.includes("App.")) return 1;
+      if (b.includes("App.")) return -1;
+      return a.localeCompare(b);
+    })
+    .map(([path, code]) => {
+      const cleaned = code
+        .replace(/^import\s+.*$/gm, "// [import removed]")
+        .replace(/^export\s+default\s+/gm, "window.__default_export__ = ")
+        .replace(/^export\s+/gm, "");
+      return `// === ${path} ===\n${cleaned}`;
+    })
+    .join("\n\n");
+
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Build Preview</title>
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js"><\/script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"><\/script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"><\/script>
+  <script src="https://cdn.tailwindcss.com"><\/script>
+  <style>${cssFiles}</style>
+</head>
+<body>
+  <div id="root"></div>
+  <script type="text/babel">
+    ${componentCode}
+    const rootEl = document.getElementById('root');
+    const AppComponent = typeof App !== 'undefined' ? App : (window.__default_export__ || (() => React.createElement('div', null, 'Preview')));
+    ReactDOM.createRoot(rootEl).render(React.createElement(AppComponent));
+  <\/script>
+</body>
+</html>`;
+}
 import { useChatAgent, type ChatAgentConfig } from "@/hooks/useChatAgent";
 import { useInstantBuild, type InstantBuildConfig } from "@/hooks/useInstantBuild";
 
