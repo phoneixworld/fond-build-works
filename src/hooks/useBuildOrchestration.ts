@@ -766,8 +766,10 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
 
         // Single build path: compile() handles IR extraction, planning, and execution
         const compileOptions: CompileOptions = {
-          rawRequirements: userText,
-          existingWorkspace: safeExistingFiles || {},
+          rawRequirements: templateFiles
+            ? `${userText}\n\n## TEMPLATE CONTEXT\n${templateCtx}\nCustomize the existing ${templateName} template files based on the user request above.`
+            : userText,
+          existingWorkspace: templateFiles || safeExistingFiles || {},
           projectId: buildProjectId,
           techStack: currentProject.tech_stack || "react-cdn",
           schemas: schemas.length > 0 ? schemas : undefined,
