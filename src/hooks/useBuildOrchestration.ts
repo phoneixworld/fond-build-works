@@ -1598,6 +1598,19 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
   // 3. Fallback path defaults to chat (not implicit build) to prevent domain drift
   const handleSmartSend = useCallback(async (text: string, images: string[] = []) => {
     if (!text && images.length === 0) return;
+
+    // ── Stale state recovery ──
+    // If isSendingRef/isLoadingRef are stuck from a previous crashed build, reset them
+    // so new user input is not silently blocked.
+    if (isSendingRef.current && !isLoading) {
+      console.warn("[SmartSend] Resetting stale isSendingRef (was true but isLoading=false)");
+      isSendingRef.current = false;
+    }
+    if (isLoadingRef.current && !isLoading) {
+      console.warn("[SmartSend] Resetting stale isLoadingRef (was true but isLoading=false)");
+      isLoadingRef.current = false;
+    }
+
     if (isSendingRef.current || isLoadingRef.current) return;
 
     const smartSendProjectId = currentProject?.id;
