@@ -53,7 +53,7 @@ const RuntimeBadge = React.forwardRef<HTMLDivElement, { status: RuntimeStatus; s
   }
 });
 
-export default function BuildCompletionCard({ result, phases, onViewPreview }: BuildCompletionCardProps) {
+const BuildCompletionCard = React.forwardRef<HTMLDivElement, BuildCompletionCardProps>(function BuildCompletionCard({ result, phases, onViewPreview }, ref) {
   const { filesChanged, totalFiles, chatSummary } = result;
   const runtimeStatus: RuntimeStatus = result.runtimeStatus || "pending";
   const runtimeChecks = result.runtimeChecks || [];
