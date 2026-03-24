@@ -153,15 +153,7 @@ export function useConversationState() {
     const trimmed = text.trim();
     const lower = trimmed.toLowerCase();
 
-    // Client-side fast path for obvious signals
-    if (META_CHAT_SIGNALS.test(lower)) {
-      return { action: "chat", reason: "Meta conversation question detected" };
-    }
-    if (BUILD_NOW_SIGNALS.test(lower)) {
-      return { action: "build", reason: "User explicitly requested build" };
-    }
-
-    // Server analysis
+    // Server-first analysis (authoritative)
     if (projectId) {
       try {
         const result = await callEngine({ action: "analyze_message", projectId, message: text, hasImages });
@@ -169,6 +161,14 @@ export function useConversationState() {
       } catch {
         console.warn("[ConvState] Server analysis failed, client fallback");
       }
+    }
+
+    // Client-side fallback only when server is unavailable
+    if (META_CHAT_SIGNALS.test(lower)) {
+      return { action: "chat", reason: "Meta conversation question detected" };
+    }
+    if (BUILD_NOW_SIGNALS.test(lower)) {
+      return { action: "build", reason: "User explicitly requested build (fallback)" };
     }
 
     // Client fallback
