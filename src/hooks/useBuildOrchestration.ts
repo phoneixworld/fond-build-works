@@ -374,7 +374,14 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
     setPipelineStep("error");
     setCurrentAgent(null);
     isSendingRef.current = false;
-  }, [setMessages, setIsBuilding, setBuildStep]);
+    void conversationCompleteBuild?.({
+      filesChanged: [],
+      totalFiles: 0,
+      chatSummary: `Build failed: ${err}`,
+      timestamp: Date.now(),
+      verificationOk: false,
+    });
+  }, [setMessages, setIsBuilding, setBuildStep, conversationCompleteBuild]);
 
   // ─── Sub-hooks ───
   const { sendChatMessage } = useChatAgent({
