@@ -7,11 +7,13 @@
  *   2. Files imported by those files (direct dependencies)
  *   3. Shared layout/types files (App.jsx, types, utils)
  *   4. Sibling components in the same directory
+ *   5. Interface contracts for distant files (compact summaries of exports)
  * 
  * Reduces prompt size by 80–95% for large projects.
  */
 
 import type { PlanTask } from "@/lib/planningAgent";
+import { extractFileContracts, serializeContracts } from "@/lib/codeMerger/interfaceContracts";
 
 // ─── Import extraction ───────────────────────────────────────────────────
 
