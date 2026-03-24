@@ -142,7 +142,14 @@ export function useConversationState() {
       setAgentStates(cs.agent_states || {});
       setServerVersion(cs.version || 1);
       if (result.buildReadiness) syncReadiness(result.buildReadiness);
-      console.log(`[ConvState] Restored: mode=${cs.mode}, phases=${(cs.phases || []).length}, v=${cs.version}`);
+      console.log(`[ConvState] Restored: mode=${restoredMode}, phases=${(cs.phases || []).length}, v=${cs.version}`);
+
+      // If we detected a stale building/editing mode, also reset on server
+      if (restoredMode !== cs.mode) {
+        try {
+          await callEngine({ action: "build_complete", projectId, message: { filesChanged: [], totalFiles: 0, chatSummary: "Stale build state reset", timestamp: Date.now(), verificationOk: false } });
+        } catch {}
+      }
     } catch (err) {
       console.warn("[ConvState] Restore failed, using defaults:", err);
     } finally {
