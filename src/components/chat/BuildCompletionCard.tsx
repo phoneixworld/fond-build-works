@@ -182,5 +182,6 @@ const BuildCompletionCard = React.forwardRef<HTMLDivElement, BuildCompletionCard
         )}
       </div>
     </motion.div>
-  );
-}
+});
+
+export default BuildCompletionCard;
