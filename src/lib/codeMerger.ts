@@ -431,7 +431,11 @@ export function mergeFiles(
   incoming: Record<string, string>,
   protectBackend = false,
   base?: Record<string, string>,
-): MergeResult {
+): { files: Record<string, string>; conflicts: string[] } {
+  const telemetry = createEmptyTelemetry();
+  telemetry.totalIncoming = Object.keys(incoming).length;
+  telemetry.totalExisting = Object.keys(existing).length;
+
   const result: Record<string, string> = { ...existing };
   const conflicts: string[] = [];
 
