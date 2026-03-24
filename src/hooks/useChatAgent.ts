@@ -288,9 +288,7 @@ export function useChatAgent(config: ChatAgentConfig) {
         workspaceFiles: workspaceFiles.length > 0 ? workspaceFiles : undefined,
         recentErrors: recentErrors.length > 0 ? recentErrors : undefined,
         // NEW: richer context for chat-agent
-        contracts: contractSnapshot,
-        workspaceSummary,
-        bypassCache,
+      bypassCache,
         cacheIntent,
         requirementsSnippet,
         signal: abortController.signal,
