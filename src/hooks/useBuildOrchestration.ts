@@ -984,117 +984,97 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
                 });
 
               // ── Record build in build_jobs table ──────────────────────────
-const buildDurationMs = result.trace?.totalDurationMs ?? null;
-const totalSizeBytes = Object.values(finalWorkspace).reduce(
-  (sum, code) => sum + (code?.length || 0),
-  0
-);
+              const buildDurationMs = result.trace?.totalDurationMs ?? null;
+              const totalSizeBytes = Object.values(finalWorkspace).reduce(
+                (sum, code) => sum + (code?.length || 0),
+                0
+              );
 
-const validationResults = {
-  valid: result.verification.ok,
-  errors: result.verification.issues
-    .filter((i) => i.severity === "error")
-    .map((i) => ({ file: i.file || "", message: i.message, severity: i.severity })),
-  warnings: result.verification.issues
-    .filter((i) => i.severity === "warning")
-    .map((i) => ({ file: i.file || "", message: i.message, severity: i.severity })),
-};
+              const validationResults = {
+                valid: result.verification.ok,
+                errors: result.verification.issues
+                  .filter((i) => i.severity === "error")
+                  .map((i) => ({ file: i.file || "", message: i.message, severity: i.severity })),
+                warnings: result.verification.issues
+                  .filter((i) => i.severity === "warning")
+                  .map((i) => ({ file: i.file || "", message: i.message, severity: i.severity })),
+              };
 
-supabase.auth
-  .getUser()
-  .then(async ({ data: authData, error: authErr }) => {
-    if (authErr) {
-      console.error("[Compiler] auth.getUser() failed:", authErr.message);
-      return;
-    }
+              supabase.auth
+                .getUser()
+                .then(async ({ data: authData, error: authErr }) => {
+                  if (authErr) {
+                    console.error("[Compiler] auth.getUser() failed:", authErr.message);
+                    return;
+                  }
 
-    const userId = authData?.user?.id;
-    if (!userId) {
-      console.warn("[Compiler] No authenticated user — skipping build_jobs insert");
-      return;
-    }
+                  const userId = authData?.user?.id;
+                  if (!userId) {
+                    console.warn("[Compiler] No authenticated user — skipping build_jobs insert");
+                    return;
+                  }
 
-    console.log("[Compiler] Inserting build_jobs record for user:", userId, "project:", currentProject.id);
+                  console.log("[Compiler] Inserting build_jobs record for user:", userId, "project:", currentProject.id);
 
-    // ───────────────────────────────────────────────────────────────
-    // 1️⃣ Upload artifacts to Supabase Storage
-    // ───────────────────────────────────────────────────────────────
-    const buildId = crypto.randomUUID();
-    const storagePath = `artifacts/${currentProject.id}/${buildId}/`;
+                  const buildId = crypto.randomUUID();
+                  const storagePath = `artifacts/${currentProject.id}/${buildId}/`;
 
-    await Promise.all(
-      Object.entries(finalWorkspace).map(async ([path, code]) => {
-        await supabase.storage
-          .from("project_artifacts")
-          .upload(`${storagePath}${path}`, new Blob([code], { type: "text/plain" }), {
-            upsert: true,
-          });
-      })
-    );
+                  await Promise.all(
+                    Object.entries(finalWorkspace).map(async ([path, code]) => {
+                      await supabase.storage
+                        .from("project_artifacts")
+                        .upload(`${storagePath}${path}`, new Blob([code], { type: "text/plain" }), {
+                          upsert: true,
+                        });
+                    })
+                  );
 
-    // ───────────────────────────────────────────────────────────────
-    // 2️⃣ Build file maps for orchestrator
-    // ───────────────────────────────────────────────────────────────
-    const sourceFiles = Object.fromEntries(
-      Object.keys(finalWorkspace).map((path) => [path, `${storagePath}${path}`])
-    );
+                  const sourceFiles = Object.fromEntries(
+                    Object.keys(finalWorkspace).map((path) => [path, `${storagePath}${path}`])
+                  );
 
-    // ───────────────────────────────────────────────────────────────
-    // 3️⃣ Insert build_jobs row with real artifacts
-    // ───────────────────────────────────────────────────────────────
-    supabase
-      .from("build_jobs")
-      .insert({
-        project_id: currentProject.id,
-        user_id: userId,
-        status:
-          result.status === "success"
-            ? "complete"
-            : result.status === "partial"
-            ? "complete"
-            : "failed",
-
-        file_count: Object.keys(finalWorkspace).length,
-        total_size_bytes: totalSizeBytes,
-        build_duration_ms: buildDurationMs,
-
-        build_config: {
-          model: routedModel,
-          techStack: currentProject.tech_stack || "react-cdn",
-        } as any,
-
-        validation_results: validationResults as any,
-
-        build_log: [
-          `[${new Date().toISOString()}] Build started`,
-          `[${new Date().toISOString()}] Files: ${Object.keys(finalWorkspace).length}`,
-          `[${new Date().toISOString()}] Validating ${Object.keys(finalWorkspace).length} files...`,
-          `[${new Date().toISOString()}] Validation: ${validationResults.errors.length} errors, ${validationResults.warnings.length} warnings`,
-          `[${new Date().toISOString()}] Storing build artifacts...`,
-          `[${new Date().toISOString()}] Build complete in ${buildDurationMs ?? "?"}ms`,
-        ],
-
-        // ⭐ The critical fix:
-        source_files: sourceFiles,
-        output_files: sourceFiles,
-        dependencies: {},
-        artifact_path: storagePath,
-
-        error: result.status === "failed" ? result.knownIssues.join("; ") : null,
-
-        started_at: new Date(Date.now() - (buildDurationMs || 0)).toISOString(),
-        completed_at: new Date().toISOString(),
-      })
-      .select()
-      .then(({ data: buildRow, error: buildErr }) => {
-        if (buildErr)
-          console.error("[Compiler] Failed to insert build_jobs record:", buildErr.message, buildErr);
-        else console.log("[Compiler] ✅ Build recorded in build_jobs:", buildRow?.[0]?.id);
-      });
-  })
-  .catch((err) => {
-    console.error("[Compiler] getUser() promise rejected:", err);
-  });
+                  supabase
+                    .from("build_jobs")
+                    .insert({
+                      project_id: currentProject.id,
+                      user_id: userId,
+                      status:
+                        result.status === "success"
+                          ? "complete"
+                          : result.status === "partial"
+                          ? "complete"
+                          : "failed",
+                      file_count: Object.keys(finalWorkspace).length,
+                      total_size_bytes: totalSizeBytes,
+                      build_duration_ms: buildDurationMs,
+                      build_config: {
+                        model: routedModel,
+                        techStack: currentProject.tech_stack || "react-cdn",
+                      } as any,
+                      validation_results: validationResults as any,
+                      build_log: [
+                        `[${new Date().toISOString()}] Build started`,
+                        `[${new Date().toISOString()}] Files: ${Object.keys(finalWorkspace).length}`,
+                        `[${new Date().toISOString()}] Build complete in ${buildDurationMs ?? "?"}ms`,
+                      ],
+                      source_files: sourceFiles,
+                      output_files: sourceFiles,
+                      dependencies: {},
+                      artifact_path: storagePath,
+                      error: result.status === "failed" ? result.knownIssues.join("; ") : null,
+                      started_at: new Date(Date.now() - (buildDurationMs || 0)).toISOString(),
+                      completed_at: new Date().toISOString(),
+                    })
+                    .select()
+                    .then(({ data: buildRow, error: buildErr }) => {
+                      if (buildErr)
+                        console.error("[Compiler] Failed to insert build_jobs record:", buildErr.message, buildErr);
+                      else console.log("[Compiler] ✅ Build recorded in build_jobs:", buildRow?.[0]?.id);
+                    });
+                })
+                .catch((err) => {
+                  console.error("[Compiler] getUser() promise rejected:", err);
+                });
 
             if (onVersionCreated) {
               onVersionCreated({
