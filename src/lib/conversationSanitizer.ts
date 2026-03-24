@@ -35,6 +35,16 @@ const META_PATTERNS = [
   /it's not working/i,
   /it is not working/i,
   /fix this/i,
+  // Phase 3: Filter meta-conversation Q&A (non-domain content)
+  /what are your (?:qualities|capabilities|features|skills)/i,
+  /how can you help/i,
+  /what can you do/i,
+  /tell me about yourself/i,
+  /who are you/i,
+  /introduce yourself/i,
+  /what are you/i,
+  /how do you work/i,
+  /what do you know/i,
 ];
 
 export function sanitizeRequirements(raw: string): string {
