@@ -16,10 +16,6 @@
 
 import { useState, useRef, useEffect, useCallback } from "react";
 import {
-  streamBuildAgent,
-  validateReactCode,
-  formatRetryContext,
-  MAX_BUILD_RETRIES,
   type AgentIntent,
   type PipelineStep,
 } from "@/lib/agentPipeline";
@@ -31,8 +27,7 @@ import { clientRouteModel } from "@/lib/costRouter";
 import { supabase } from "@/integrations/supabase/client";
 import { toExportPath } from "@/lib/pathNormalizer";
 import { StreamingPreviewController } from "@/lib/streamingPreview";
-import { type MsgContent, getTextContent, parseResponse, parseReactFiles, postProcessHtml } from "@/lib/codeParser";
-import { parseMultiFileOutput } from "@/contexts/VirtualFSContext";
+import { type MsgContent, getTextContent } from "@/lib/codeParser";
 import { useChatAgent, type ChatAgentConfig } from "@/hooks/useChatAgent";
 import { useInstantBuild, type InstantBuildConfig } from "@/hooks/useInstantBuild";
 
