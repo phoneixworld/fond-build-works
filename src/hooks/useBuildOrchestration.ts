@@ -472,6 +472,13 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
         setPipelineStep(null);
         setCurrentAgent(null);
         isSendingRef.current = false;
+        void conversationCompleteBuild?.({
+          filesChanged: [],
+          totalFiles: 0,
+          chatSummary: "Build timed out after 10 minutes",
+          timestamp: Date.now(),
+          verificationOk: false,
+        });
         setMessages((prev) => {
           const msg = "⚠️ Build timed out after 10 minutes without progress. The AI model may be under heavy load — please try again, or break the request into smaller steps.";
           const last = prev[prev.length - 1];
