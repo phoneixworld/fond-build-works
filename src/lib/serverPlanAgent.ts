@@ -125,14 +125,41 @@ export async function fetchServerPlan(options: {
  *   /pages/Contacts/Contacts.jsx → /pages/Contacts/ContactsPage.jsx
  */
 function normalizePlannedPath(path: string): string {
-  // Only touch page files that follow /pages/Name/Name.jsx or .tsx
-  const pageMatch = path.match(/^\/pages\/([^/]+)\/\1\.(jsx|tsx)$/);
+  const normalized = path
+    .replace(/\\/g, "/")
+    .replace(/^src\//i, "/")
+    .replace(/^\/?/, "/");
+
+  // Normalize /pages/Name/Name.jsx -> /pages/Name/NamePage.jsx
+  const pageMatch = normalized.match(/^\/pages\/([^/]+)\/\1\.(jsx|tsx|js|ts)$/i);
   if (pageMatch) {
     const name = pageMatch[1];
-    const ext = pageMatch[2];
+    const ext = pageMatch[2].toLowerCase() === "tsx" || pageMatch[2].toLowerCase() === "ts" ? "tsx" : "jsx";
     return `/pages/${name}/${name}Page.${ext}`;
   }
-  return path;
+
+  // Auth contract aliases from older plans
+  if (/^\/contexts\/AuthContext\.(js|ts|tsx)$/i.test(normalized)) {
+    return "/contexts/AuthContext.jsx";
+  }
+  if (/^\/components\/ProtectedRoute\.(js|ts|tsx)$/i.test(normalized)) {
+    return "/components/ProtectedRoute.jsx";
+  }
+  if (/^\/pages\/Auth\/Login\.(jsx|tsx|js|ts)$/i.test(normalized)) {
+    return "/pages/Auth/LoginPage.jsx";
+  }
+  if (/^\/pages\/Auth\/Signup\.(jsx|tsx|js|ts)$/i.test(normalized)) {
+    return "/pages/Auth/SignupPage.jsx";
+  }
+
+  const topLevelAuthPage = normalized.match(/^\/pages\/(Login|Signup)(Page)?\.(jsx|tsx|js|ts)$/i);
+  if (topLevelAuthPage) {
+    return topLevelAuthPage[1].toLowerCase() === "login"
+      ? "/pages/Auth/LoginPage.jsx"
+      : "/pages/Auth/SignupPage.jsx";
+  }
+
+  return normalized;
 }
 
 /**
