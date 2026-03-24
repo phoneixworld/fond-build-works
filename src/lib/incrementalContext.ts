@@ -177,6 +177,15 @@ export function buildIncrementalContext(
     // Also add a file manifest for files NOT included
     const omitted = allPaths.filter(p => !relevantPaths.has(p));
     if (omitted.length > 0) {
+      // Use interface contracts for omitted files instead of just listing names
+      const omittedFiles: Record<string, string> = {};
+      for (const p of omitted) {
+        if (accumulatedFiles[p]) omittedFiles[p] = accumulatedFiles[p];
+      }
+      const contracts = extractFileContracts(omittedFiles);
+      if (contracts.length > 0) {
+        return contextStr + `\n\n${serializeContracts(contracts)}`;
+      }
       return contextStr + `\n\n## Other files in the project (not shown):\n${omitted.map(p => `- ${p}`).join("\n")}`;
     }
     return contextStr;
