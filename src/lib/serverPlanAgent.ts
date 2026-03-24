@@ -131,18 +131,13 @@ export function serverPlanToTaskGraph(plan: ServerPlanResult): TaskGraph {
     label: t.title,
     type: profileToType[t.profile] || taskTypeMap[t.taskType] || "frontend",
     description: t.buildPrompt || t.description,
+    buildPrompt: t.buildPrompt || t.description,
     dependsOn: t.dependsOn || [],
     produces: t.filesAffected || [],
+    touches: [],
     priority: t.taskType === "schema" ? 0 : t.taskType === "backend" ? 1 : 2,
-    status: "pending",
-    // Preserve contract metadata for context-light execution
-    metadata: {
-      contractShape: t.contractShape,
-      requires: t.requires,
-      profile: t.profile,
-      serverTaskType: t.taskType,
-      category: t.category,
-    },
+    status: "pending" as const,
+    retries: 0,
   }));
 
   // Build pass ordering: group by priority (schema → backend → frontend)
