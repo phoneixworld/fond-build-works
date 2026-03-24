@@ -26,18 +26,18 @@ interface BuildCompletionCardProps {
   onViewPreview?: () => void;
 }
 
-function RuntimeBadge({ status, summary }: { status: RuntimeStatus; summary: string }) {
+const RuntimeBadge = React.forwardRef<HTMLDivElement, { status: RuntimeStatus; summary: string }>(function RuntimeBadge({ status, summary }, ref) {
   switch (status) {
     case "passed":
       return (
-        <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-100 text-emerald-700">
+        <div ref={ref} className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-100 text-emerald-700">
           <ShieldCheck className="w-3 h-3" />
           <span className="text-[10px] font-semibold">Runtime Verified</span>
         </div>
       );
     case "failed":
       return (
-        <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-destructive/10 text-destructive">
+        <div ref={ref} className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-destructive/10 text-destructive">
           <XCircle className="w-3 h-3" />
           <span className="text-[10px] font-semibold">Runtime Failed</span>
         </div>
@@ -45,15 +45,15 @@ function RuntimeBadge({ status, summary }: { status: RuntimeStatus; summary: str
     case "pending":
     default:
       return (
-        <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-amber-100 text-amber-700">
+        <div ref={ref} className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-amber-100 text-amber-700">
           <Clock className="w-3 h-3" />
           <span className="text-[10px] font-semibold">Runtime Pending</span>
         </div>
       );
   }
-}
+});
 
-export default function BuildCompletionCard({ result, phases, onViewPreview }: BuildCompletionCardProps) {
+const BuildCompletionCard = React.forwardRef<HTMLDivElement, BuildCompletionCardProps>(function BuildCompletionCard({ result, phases, onViewPreview }, ref) {
   const { filesChanged, totalFiles, chatSummary } = result;
   const runtimeStatus: RuntimeStatus = result.runtimeStatus || "pending";
   const runtimeChecks = result.runtimeChecks || [];
@@ -66,6 +66,7 @@ export default function BuildCompletionCard({ result, phases, onViewPreview }: B
 
   return (
     <motion.div
+      ref={ref}
       initial={{ opacity: 0, y: 12 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.3, ease: "easeOut" }}
@@ -183,4 +184,6 @@ export default function BuildCompletionCard({ result, phases, onViewPreview }: B
       </div>
     </motion.div>
   );
-}
+});
+
+export default BuildCompletionCard;
