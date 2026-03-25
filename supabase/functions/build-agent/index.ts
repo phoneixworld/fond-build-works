@@ -189,7 +189,7 @@ fetch(\`\${apiBase}/functions/v1/project-auth\`, {
 - EVERY list/dashboard page MUST fetch from project-api with proper loading skeleton + empty state UI.
 - Data hooks pattern (MANDATORY):
 \`\`\`
-// hooks/useContacts.js — CORRECT pattern
+// hooks/useContacts.ts — CORRECT pattern
 const [data, setData] = useState([]);
 const [loading, setLoading] = useState(true);
 useEffect(() => {
@@ -212,11 +212,11 @@ ${schemas && schemas.length > 0 ? `## DATA MODELS\n${schemas.map((s: any) => {
 ## ROUTING
 - ALWAYS HashRouter (NOT BrowserRouter) — required for iframe sandbox
 - Nested: <Route path="/" element={<AppLayout />}> with <Outlet />
-- /layout/Sidebar.jsx: NavLink with isActive styling
+- /layout/Sidebar.tsx: NavLink with isActive styling
 - NEVER dump all features on single page — use ROUTES for each module
 
 ## AUTH PATTERN (when needed)
-/components/AuthContext.jsx: login/signup/logout + /components/LoginPage.jsx
+/contexts/AuthContext.tsx: login/signup/logout + /pages/Auth/LoginPage.tsx
 ProtectedRoute wrapper. Login MUST call auth API.
 
 ## COMPLETENESS CHECKLIST
@@ -264,8 +264,8 @@ ProtectedRoute wrapper. Login MUST call auth API.
 - \`--- /migrations/001_schema.sql\` — CREATE TABLE statements
 - \`--- /migrations/002_rls.sql\` — RLS policies for each table
 - \`--- /schema.json\` — JSON schema describing entities
-- Backend hooks (\`/hooks/use<Entity>.js\`) that call the Data API
-- Auth context (\`/contexts/AuthContext.jsx\`) if auth is needed
+- Backend hooks (\`/hooks/use<Entity>.ts\`) that call the Data API
+- Auth context (\`/contexts/AuthContext.tsx\`) if auth is needed
 
 If ANY of these artifacts is missing for a backend feature, the build will be REJECTED.
 
@@ -339,7 +339,7 @@ serve(async (req) => {
 ${retry_context}
 
 FIX CHECKLIST:
-1. /App.jsx MUST have default export
+1. /App.tsx MUST have default export
 2. Close ALL JSX tags — every <Tag> needs </Tag> or />
 3. NO bracket notation in JSX (<arr[i].icon/> is INVALID — use const Icon = arr[i].icon; <Icon />)
 4. ES6 imports ONLY — no require()
