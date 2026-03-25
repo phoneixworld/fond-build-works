@@ -9,6 +9,7 @@ import { usePreview, SandpackFileSet } from "@/contexts/PreviewContext";
 import { AlertTriangle, RefreshCw } from "lucide-react";
 import { transform } from "sucrase";
 import { DEFAULT_SANDPACK_DEPENDENCIES } from "@/lib/preview/defaultSandpackDependencies";
+import { normalizeSandpackFileMap } from "@/lib/preview/normalizeFileMap";
 
 // ─── Error Boundary ───────────────────────────────────────────────────────────
 interface ErrorBoundaryState {
