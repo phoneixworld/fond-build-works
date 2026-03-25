@@ -6,6 +6,7 @@
 import { streamBuildAgent } from "@/lib/agentPipeline";
 import type { BuildPlan, PlanTask, TaskStatus } from "@/lib/planningAgent";
 import { updateTaskStatus } from "@/lib/planningAgent";
+import { validateAllFiles, buildFileRetryPrompt } from "@/lib/compiler/syntaxValidator";
 
 export interface TaskExecutionCallbacks {
   onTaskStart: (task: PlanTask, index: number, total: number) => void;
@@ -224,10 +225,19 @@ ${task.filesAffected.map(f => `- ${f}`).join("\n")}
           onDone: (responseText) => {
             const extracted = extractFilesFromOutput(responseText);
             if (extracted) {
-              callbacks.onTaskDone(task, responseText, extracted);
-              resolve(extracted);
+              // Pre-commit syntax validation (Babel parse gate)
+              const { valid, invalid } = validateAllFiles(extracted);
+              if (invalid.length > 0) {
+                console.warn(`[TaskExecutor] ${invalid.length} file(s) failed syntax validation in task '${task.title}'`);
+                for (const parseErr of invalid) {
+                  console.warn(`[TaskExecutor] ❌ ${parseErr.path}: ${parseErr.error}`);
+                }
+              }
+              // Use only valid files (drop unparseable ones)
+              const safeFiles = Object.keys(valid).length > 0 ? valid : extracted;
+              callbacks.onTaskDone(task, responseText, safeFiles);
+              resolve(safeFiles);
             } else {
-              // No files extracted — treat as a chat-only response, continue
               callbacks.onTaskDone(task, responseText, {});
               resolve({});
             }
