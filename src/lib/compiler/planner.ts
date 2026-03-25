@@ -191,13 +191,13 @@ export function planTaskGraph(ctx: BuildContext, structuredIR?: IR): TaskGraph {
 
 Pre-built components are already scaffolded in the workspace — do NOT regenerate them.
 The following shadcn-compatible components are available for import from /components/ui/:
-- utils.js: cn() class-merge helper — import { cn } from "./ui/utils"
-- Button.jsx, Card.jsx (+ CardHeader/Title/Description/Content/Footer), Input.jsx, Label.jsx, Badge.jsx,
-  Separator.jsx, Skeleton.jsx, Checkbox.jsx, Dialog.jsx (+ DialogContent/Header/Title/Description/Footer),
-  Table.jsx (+ TableHeader/Body/Footer/Head/Row/Cell/Caption), Textarea.jsx, Select.jsx (+ Trigger/Value/Content/Item/Group/Label),
-  Tabs.jsx (+ TabsList/Trigger/Content), Alert.jsx (+ AlertTitle/AlertDescription), Avatar.jsx (+ AvatarImage/AvatarFallback),
-  Progress.jsx, Switch.jsx, Tooltip.jsx, ScrollArea.jsx, DropdownMenu.jsx, Sheet.jsx, Popover.jsx, Accordion.jsx,
-  Modal.jsx, DataTable.jsx, Toast.jsx, Spinner.jsx.
+- utils.ts: cn() class-merge helper — import { cn } from "./ui/utils"
+- Button.tsx, Card.tsx (+ CardHeader/Title/Description/Content/Footer), Input.tsx, Label.tsx, Badge.tsx,
+  Separator.tsx, Skeleton.tsx, Checkbox.tsx, Dialog.tsx (+ DialogContent/Header/Title/Description/Footer),
+  Table.tsx (+ TableHeader/Body/Footer/Head/Row/Cell/Caption), Textarea.tsx, Select.tsx (+ Trigger/Value/Content/Item/Group/Label),
+  Tabs.tsx (+ TabsList/Trigger/Content), Alert.tsx (+ AlertTitle/AlertDescription), Avatar.tsx (+ AvatarImage/AvatarFallback),
+  Progress.tsx, Switch.tsx, Tooltip.tsx, ScrollArea.tsx, DropdownMenu.tsx, Sheet.tsx, Popover.tsx, Accordion.tsx,
+  Modal.tsx, DataTable.tsx, Toast.tsx, Spinner.tsx.
 
 Only generate globals.css with design tokens. All UI components are pre-scaffolded.`,
     produces: ["/styles/globals.css"],
@@ -216,10 +216,10 @@ Only generate globals.css with design tokens. All UI components are pre-scaffold
 Must create AuthContext, LoginPage, SignupPage, and ProtectedRoute.
 Login/Signup routes must stay public (never wrapped in ProtectedRoute).`,
       produces: [
-        "/contexts/AuthContext.jsx",
-        "/pages/Auth/LoginPage.jsx",
-        "/pages/Auth/SignupPage.jsx",
-        "/components/ProtectedRoute.jsx",
+        "/contexts/AuthContext.tsx",
+        "/pages/Auth/LoginPage.tsx",
+        "/pages/Auth/SignupPage.tsx",
+        "/components/ProtectedRoute.tsx",
       ],
       dependsOn: [infraTask.id],
       priority: 1,
@@ -237,8 +237,8 @@ Login/Signup routes must stay public (never wrapped in ProtectedRoute).`,
       type: "backend",
       description: `Data model, hooks, and API service for ${entity.name} (fields: ${entity.fields.map(f => f.name).join(", ")})`,
       produces: [
-        `/hooks/use${entity.name}.jsx`,
-        `/services/${entity.name.toLowerCase()}Service.js`,
+        `/hooks/use${entity.name}.ts`,
+        `/services/${entity.name.toLowerCase()}Service.ts`,
       ],
       dependsOn: [infraTask.id, ...(authTaskId ? [authTaskId] : [])],
       priority: 2,
@@ -264,7 +264,7 @@ Login/Signup routes must stay public (never wrapped in ProtectedRoute).`,
         description: `Generate layout components for a landing page/website: "${ctx.rawRequirements.slice(0, 1500)}"
 
 Create THESE files:
-1. /components/Navbar.jsx — Sticky top navbar with:
+1. /components/Navbar.tsx — Sticky top navbar with:
    - Logo/brand name on the left
    - Navigation links derived from the page sections (DO NOT hardcode generic items like "Features, How It Works, Pricing, Testimonials, Contact" — use section names that match the actual content)
    - Mobile hamburger menu with slide-down
@@ -272,15 +272,15 @@ Create THESE files:
    - Transparent → solid bg on scroll
    - Import { Menu, X } from lucide-react
 
-2. /components/Footer.jsx — Professional footer with:
+2. /components/Footer.tsx — Professional footer with:
    - Brand logo + tagline
    - 4 link columns (Product, Resources, Company, Legal)
    - Social media icons
    - Copyright line
    - Responsive grid layout`,
         produces: [
-          "/components/Navbar.jsx",
-          "/components/Footer.jsx",
+          "/components/Navbar.tsx",
+          "/components/Footer.tsx",
         ],
         dependsOn: [infraTask.id],
         priority: 3,
@@ -293,22 +293,22 @@ Create THESE files:
         description: `Generate Hero and Stats sections for: "${ctx.rawRequirements.slice(0, 1200)}"
 
 Create THESE files:
-1. /components/HeroSection.jsx — Full-width hero with:
+1. /components/HeroSection.tsx — Full-width hero with:
    - Badge/chip at top
    - Large bold headline
    - Subtitle paragraph
    - Two CTA buttons
    - Decorative gradient background or pattern
 
-2. /components/StatsSection.jsx — Social proof numbers:
+2. /components/StatsSection.tsx — Social proof numbers:
    - 4 key metrics in a grid
    - Dark background for contrast
    - Domain-relevant numbers based on the user's requirements
 
 Each component must export default and use lucide-react for icons.`,
         produces: [
-          "/components/HeroSection.jsx",
-          "/components/StatsSection.jsx",
+          "/components/HeroSection.tsx",
+          "/components/StatsSection.tsx",
         ],
         dependsOn: [infraTask.id],
         priority: 3,
