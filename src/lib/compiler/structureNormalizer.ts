@@ -5,14 +5,17 @@ const CODE_FILE_RE = /\.(jsx?|tsx?)$/;
 
 export function normalizeGeneratedStructure(workspace: Workspace): number {
   let fixed = 0;
+  fixed += normalizeFileExtensions(workspace);
   fixed += normalizeMirroredFiles(workspace);
   fixed += normalizeUtilityModules(workspace);
+  fixed += normalizeDomainComponentPlacement(workspace);
   fixed += normalizeHookDefaultImports(workspace);
   fixed += normalizeToastWiring(workspace);
   fixed += normalizeDomainComponentSafety(workspace);
   fixed += normalizeContextReferences(workspace);
   fixed += normalizeExportDuplication(workspace);
   fixed += normalizeComponentExportConventions(workspace);
+  fixed += normalizeBarrelExports(workspace);
   return fixed;
 }
 
