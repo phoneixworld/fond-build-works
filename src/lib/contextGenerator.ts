@@ -10,7 +10,7 @@ export function generateContextFiles(ir: IR): Record<string, string> {
   const files: Record<string, string> = {};
 
   for (const entityName of Object.keys(ir.entities)) {
-    const filePath = `/contexts/${entityName}Context.jsx`;
+    const filePath = `/contexts/${entityName}Context.tsx`;
     files[filePath] = generateContext(entityName);
   }
 

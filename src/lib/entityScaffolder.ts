@@ -12,15 +12,15 @@ export function scaffoldEntitiesFromIR(ir: IR): Record<string, string> {
     const fields = Object.keys(entityDef.fields);
 
     // Mock API
-    files[`/lib/mockApi/${lower}.js`] = generateMockApi(entityName, entityDef, fields);
+    files[`/lib/mockApi/${lower}.ts`] = generateMockApi(entityName, entityDef, fields);
 
     // Context + Provider + hook
-    files[`/contexts/${entityName}Context.jsx`] = generateContext(entityName, lower);
+    files[`/contexts/${entityName}Context.tsx`] = generateContext(entityName, lower);
   }
 
   // Domain provider that wraps all entity providers
   if (Object.keys(ir.entities).length > 0) {
-    files["/contexts/DomainProvider.jsx"] = generateDomainProvider(Object.keys(ir.entities));
+    files["/contexts/DomainProvider.tsx"] = generateDomainProvider(Object.keys(ir.entities));
   }
 
   return files;

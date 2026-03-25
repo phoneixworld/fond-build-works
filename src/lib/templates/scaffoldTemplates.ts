@@ -1,18 +1,20 @@
 /**
- * Scaffold Templates — JSX template generators for new project builds.
+ * Scaffold Templates — TSX template generators for new project builds.
  * 
  * Extracted from buildEngine.ts. These generate the initial file structure
- * (App.jsx, layout, pages, hooks, UI components) for both generic and
+ * (App.tsx, layout, pages, hooks, UI components) for both generic and
  * domain-specific scaffolds.
  * 
  * PATH CONVENTION:
- * All generated files use bare "/" paths (e.g., /App.jsx, /components/Hero.jsx).
+ * All generated files use bare "/" paths (e.g., /App.tsx, /components/Hero.tsx).
  * This is required by Sandpack which expects files at root.
  * The pathNormalizer module handles mapping to src/ for:
- *   - VirtualFS display (file tree shows src/App.jsx)
- *   - GitHub push/pull (exports as src/App.jsx)
+ *   - VirtualFS display (file tree shows src/App.tsx)
+ *   - GitHub push/pull (exports as src/App.tsx)
  *   - Android/ZIP export (bundles under src/)
  * DO NOT change these paths to src/ — it will break preview rendering.
+ * 
+ * All generated code files use .tsx/.ts extensions for TypeScript support.
  */
 
 import { type DomainModel } from "@/lib/domainTemplates";
@@ -28,10 +30,12 @@ import { getAllUIComponents, UI_ANIMATIONS_CSS } from "@/lib/templates/uiCompone
  * structure from the start instead of a generic Dashboard shell.
  */
 export function getBaseTemplate(domainModel?: DomainModel | null): Record<string, string> {
-  if (!domainModel) {
-    return getGenericScaffold();
-  }
-  return buildDomainScaffold(domainModel);
+  const scaffold = domainModel ? buildDomainScaffold(domainModel) : getGenericScaffold();
+  
+  // Add project config files (package.json, vite.config.ts, tsconfig.json)
+  Object.assign(scaffold, getProjectConfigFiles(domainModel));
+  
+  return scaffold;
 }
 
 // ─── Domain Scaffold ──────────────────────────────────────────────────────
@@ -59,7 +63,7 @@ function buildDomainScaffold(model: DomainModel): Record<string, string> {
 
     const dirName = pageName;
     const fileName = pageName;
-    const filePath = `/pages/${dirName}/${fileName}.jsx`;
+    const filePath = `/pages/${dirName}/${fileName}.tsx`;
 
     if (page.type === "dashboard") {
       files[filePath] = generateDashboardPage(pageName, model.templateName, entities);
@@ -88,7 +92,7 @@ function buildDomainScaffold(model: DomainModel): Record<string, string> {
     if (generatedPageComponents.has(detailName)) continue;
     generatedPageComponents.add(detailName);
 
-    const filePath = `/pages/${entityName}/${detailName}.jsx`;
+    const filePath = `/pages/${entityName}/${detailName}.tsx`;
     files[filePath] = generateDetailPage(detailName, entityName);
 
     const routePath = page.path.replace(/^\//, "");
@@ -100,7 +104,7 @@ function buildDomainScaffold(model: DomainModel): Record<string, string> {
   const authWrapOpen = model.requiresAuth ? `        <AuthProvider>\n` : "";
   const authWrapClose = model.requiresAuth ? `        </AuthProvider>\n` : "";
 
-  files["/App.jsx"] = `import React from "react";
+  files["/App.tsx"] = `import React from "react";
 import { HashRouter, Routes, Route, Navigate } from "react-router-dom";
 import AppLayout from "./layout/AppLayout";
 ${authImport}${routeImports.join("\n")}
@@ -128,7 +132,7 @@ ${authWrapClose}    </HashRouter>
     `  { to: "${nav.path}", icon: ${nav.icon || "LayoutDashboard"}, label: "${nav.label}" },`
   ).join("\n");
 
-  files["/layout/Sidebar.jsx"] = `import React from "react";
+  files["/layout/Sidebar.tsx"] = `import React from "react";
 import { NavLink } from "react-router-dom";
 import { ${[...iconImports].join(", ")} } from "lucide-react";
 
@@ -164,20 +168,20 @@ export default function Sidebar() {
 }
 `;
 
-  files["/layout/AppLayout.jsx"] = generateAppLayout();
+  files["/layout/AppLayout.tsx"] = generateAppLayout();
 
   for (const entity of entities) {
     const hookName = `use${entity.name}`;
-    files[`/hooks/${hookName}.js`] = generateEntityHook(entity.name, entity.pluralName);
+    files[`/hooks/${hookName}.ts`] = generateEntityHook(entity.name, entity.pluralName);
   }
 
   if (model.requiresAuth) {
-    files["/contexts/AuthContext.jsx"] = generateAuthContext();
+    files["/contexts/AuthContext.tsx"] = generateAuthContext();
   }
 
   Object.assign(files, getSharedUIComponents());
   Object.assign(files, getDomainComponents());
-  files["/hooks/useApi.js"] = getUseApiHook();
+  files["/hooks/useApi.ts"] = getUseApiHook();
   files["/styles/globals.css"] = getGlobalStyles();
 
   return files;
@@ -1105,13 +1109,121 @@ export default function NotificationBell({ count = 3 }) {
 
 export function getDomainComponents(): Record<string, string> {
   return {
-    "/components/StatCard.jsx": STAT_CARD_COMPONENT,
-    "/components/StatusBadge.jsx": STATUS_BADGE_COMPONENT,
-    "/components/PageHeader.jsx": PAGE_HEADER_COMPONENT,
-    "/components/SearchFilterBar.jsx": SEARCH_FILTER_BAR_COMPONENT,
-    "/components/ActivityFeed.jsx": ACTIVITY_FEED_COMPONENT,
-    "/components/QuickActions.jsx": QUICK_ACTIONS_COMPONENT,
-    "/components/NotificationBell.jsx": NOTIFICATION_BELL_COMPONENT,
+    "/components/StatCard.tsx": STAT_CARD_COMPONENT,
+    "/components/StatusBadge.tsx": STATUS_BADGE_COMPONENT,
+    "/components/PageHeader.tsx": PAGE_HEADER_COMPONENT,
+    "/components/SearchFilterBar.tsx": SEARCH_FILTER_BAR_COMPONENT,
+    "/components/ActivityFeed.tsx": ACTIVITY_FEED_COMPONENT,
+    "/components/QuickActions.tsx": QUICK_ACTIONS_COMPONENT,
+    "/components/NotificationBell.tsx": NOTIFICATION_BELL_COMPONENT,
+  };
+}
+
+// ─── Project Config Files ─────────────────────────────────────────────────
+
+function getProjectConfigFiles(domainModel?: DomainModel | null): Record<string, string> {
+  const projectName = domainModel?.templateName
+    ?.toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-|-$/g, "") || "phoenix-app";
+
+  return {
+    "/package.json": JSON.stringify({
+      name: projectName,
+      private: true,
+      version: "0.1.0",
+      type: "module",
+      scripts: {
+        dev: "vite",
+        build: "tsc && vite build",
+        preview: "vite preview",
+      },
+      dependencies: {
+        react: "^18.3.1",
+        "react-dom": "^18.3.1",
+        "react-router-dom": "^6.30.0",
+        "lucide-react": "^0.462.0",
+      },
+      devDependencies: {
+        "@types/react": "^18.3.0",
+        "@types/react-dom": "^18.3.0",
+        "@vitejs/plugin-react": "^4.3.0",
+        typescript: "^5.5.0",
+        vite: "^5.4.0",
+      },
+    }, null, 2),
+
+    "/vite.config.ts": `import { defineConfig } from "vite";
+import react from "@vitejs/plugin-react";
+import path from "path";
+
+export default defineConfig({
+  plugins: [react()],
+  resolve: {
+    alias: {
+      "@": path.resolve(__dirname, "./src"),
+    },
+  },
+  server: {
+    port: 3000,
+    open: true,
+  },
+  build: {
+    outDir: "dist",
+    sourcemap: true,
+  },
+});
+`,
+
+    "/tsconfig.json": JSON.stringify({
+      compilerOptions: {
+        target: "ES2020",
+        useDefineForClassFields: true,
+        lib: ["ES2020", "DOM", "DOM.Iterable"],
+        module: "ESNext",
+        skipLibCheck: true,
+        moduleResolution: "bundler",
+        allowImportingTsExtensions: true,
+        isolatedModules: true,
+        moduleDetection: "force",
+        noEmit: true,
+        jsx: "react-jsx",
+        strict: false,
+        noUnusedLocals: false,
+        noUnusedParameters: false,
+        noFallthroughCasesInSwitch: true,
+        baseUrl: ".",
+        paths: { "@/*": ["./src/*"] },
+      },
+      include: ["src"],
+    }, null, 2),
+
+    "/index.html": `<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>${domainModel?.templateName || "App"}</title>
+    <script src="https://cdn.tailwindcss.com"><\/script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"><\/script>
+  </body>
+</html>
+`,
+
+    "/main.tsx": `import React from "react";
+import ReactDOM from "react-dom/client";
+import App from "./App";
+import "./styles/globals.css";
+
+ReactDOM.createRoot(document.getElementById("root")!).render(
+  <React.StrictMode>
+    <App />
+  </React.StrictMode>
+);
+`,
   };
 }
 
@@ -1188,7 +1300,7 @@ export default function AppLayout() {
 function getGenericScaffold(): Record<string, string> {
   const files: Record<string, string> = {};
 
-  files["/App.jsx"] = `import React from "react";
+  files["/App.tsx"] = `import React from "react";
 import { HashRouter, Routes, Route, Navigate } from "react-router-dom";
 import AppLayout from "./layout/AppLayout";
 import Dashboard from "./pages/Dashboard/Dashboard";
@@ -1207,9 +1319,9 @@ export default function App() {
 }
 `;
 
-  files["/layout/AppLayout.jsx"] = generateAppLayout();
+  files["/layout/AppLayout.tsx"] = generateAppLayout();
 
-  files["/layout/Sidebar.jsx"] = `import React from "react";
+  files["/layout/Sidebar.tsx"] = `import React from "react";
 import { NavLink } from "react-router-dom";
 import { LayoutDashboard } from "lucide-react";
 
@@ -1245,7 +1357,7 @@ export default function Sidebar() {
 }
 `;
 
-  files["/pages/Dashboard/Dashboard.jsx"] = `import React from "react";
+  files["/pages/Dashboard/Dashboard.tsx"] = `import React from "react";
 
 export default function Dashboard() {
   return (
@@ -1258,7 +1370,7 @@ export default function Dashboard() {
 `;
 
   Object.assign(files, getSharedUIComponents());
-  files["/hooks/useApi.js"] = getUseApiHook();
+  files["/hooks/useApi.ts"] = getUseApiHook();
   files["/styles/globals.css"] = getGlobalStyles();
 
   return files;

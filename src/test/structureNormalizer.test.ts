@@ -84,7 +84,7 @@ export default function App(){
     });
 
     const fixed = normalizeGeneratedStructure(ws);
-    const statCard = ws.getFile("/components/StatCard.jsx") || "";
+    const statCard = ws.getFile("/components/StatCard.tsx") || "";
 
     expect(fixed).toBeGreaterThan(0);
     expect(statCard).toContain("export default StatCard");

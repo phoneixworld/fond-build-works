@@ -11,7 +11,7 @@ export function synthesizeAppJsx(
   ws: Workspace,
   routes?: Array<{ path: string; component: string; file: string }>,
 ): string {
-  const pageFiles = ws.listFiles().filter((f) => f.startsWith("/pages/") && f.endsWith(".jsx"));
+  const pageFiles = ws.listFiles().filter((f) => f.startsWith("/pages/") && /\.(jsx|tsx)$/.test(f));
 
   const pageImports: string[] = [];
   const routeLines: string[] = [];
@@ -20,15 +20,15 @@ export function synthesizeAppJsx(
     const content = ws.getFile(file) || "";
 
     // Derive component name from filename
-    const raw = file.match(/\/([^/]+)\.jsx$/)?.[1] || "Page";
+    const raw = file.match(/\/([^/]+)\.(jsx|tsx)$/)?.[1] || "Page";
     const componentName = raw.replace(/[^a-zA-Z0-9]/g, "");
 
     // Import the page
     const hasDefault = /export\s+default/.test(content);
     if (hasDefault) {
-      pageImports.push(`import ${componentName} from "${file.replace(/\.jsx$/, "")}";`);
+      pageImports.push(`import ${componentName} from "${file.replace(/\.(jsx|tsx)$/, "")}";`);
     } else {
-      pageImports.push(`import { ${componentName} } from "${file.replace(/\.jsx$/, "")}";`);
+      pageImports.push(`import { ${componentName} } from "${file.replace(/\.(jsx|tsx)$/, "")}";`);
     }
 
     // Route path
@@ -47,14 +47,14 @@ export function synthesizeAppJsx(
   }
 
   // Context providers
-  const contextFiles = ws.listFiles().filter((f) => f.startsWith("/contexts/") && f.endsWith(".jsx"));
+  const contextFiles = ws.listFiles().filter((f) => f.startsWith("/contexts/") && /\.(jsx|tsx)$/.test(f));
 
   const contextImports: string[] = [];
   for (const file of contextFiles) {
     const content = ws.getFile(file) || "";
     const providerMatch = content.match(/export\s+(?:function|const)\s+(\w+Provider)/);
     if (providerMatch) {
-      contextImports.push(`import { ${providerMatch[1]} } from "${file.replace(/\.jsx$/, "")}";`);
+      contextImports.push(`import { ${providerMatch[1]} } from "${file.replace(/\.(jsx|tsx)$/, "")}";`);
     }
   }
 

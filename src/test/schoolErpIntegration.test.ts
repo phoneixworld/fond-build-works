@@ -115,9 +115,9 @@ export default function AttendancePage() { return <div>Attendance</div>; }`,
     }
   });
 
-  it("utils.js should always export cn as a function", () => {
+  it("utils.ts should always export cn as a function", () => {
     const ws = buildSchoolErpWorkspace();
-    const utils = ws.getFile("/components/ui/utils.js");
+    const utils = ws.getFile("/components/ui/utils.ts") || ws.getFile("/components/ui/utils.js");
     expect(utils).toBeDefined();
     expect(utils).toContain("export function cn");
   });
@@ -147,13 +147,13 @@ export default function AttendancePage() { return <div>Attendance</div>; }`,
     const ui = getAllUIComponents();
 
     // Verify core components exist and have proper exports
-    expect(ui["/components/ui/Card.jsx"]).toContain("export function Card");
-    expect(ui["/components/ui/Button.jsx"]).toContain("export default");
-    expect(ui["/components/ui/Table.jsx"]).toContain("export function Table");
-    expect(ui["/components/ui/utils.js"]).toContain("export function cn");
+    expect(ui["/components/ui/Card.tsx"]).toContain("export function Card");
+    expect(ui["/components/ui/Button.tsx"]).toContain("export default");
+    expect(ui["/components/ui/Table.tsx"]).toContain("export function Table");
+    expect(ui["/components/ui/utils.ts"]).toContain("export function cn");
 
     // Verify cn is actually a function definition, not a React component
-    expect(ui["/components/ui/utils.js"]).not.toContain("React");
-    expect(ui["/components/ui/utils.js"]).toMatch(/function cn\(/);
+    expect(ui["/components/ui/utils.ts"]).not.toContain("React");
+    expect(ui["/components/ui/utils.ts"]).toMatch(/function cn\(/);
   });
 });

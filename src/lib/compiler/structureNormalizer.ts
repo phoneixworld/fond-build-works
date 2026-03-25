@@ -423,7 +423,19 @@ function normalizeDomainComponentSafety(workspace: Workspace): number {
   const fallbackComponents = getDomainComponents();
 
   for (const [filePath, fallbackSource] of Object.entries(fallbackComponents)) {
+    // Also check for legacy .jsx/.js variant of the same file
+    const legacyPath = filePath.replace(/\.tsx$/, ".jsx").replace(/\.ts$/, ".js");
     const current = workspace.getFile(filePath);
+    const legacyCurrent = filePath !== legacyPath ? workspace.getFile(legacyPath) : undefined;
+
+    // If legacy variant exists and is malformed, replace it with the .tsx fallback
+    if (legacyCurrent && !isRenderableComponent(legacyCurrent)) {
+      workspace.deleteFile(legacyPath);
+      workspace.addFile(filePath, fallbackSource);
+      fixed++;
+      console.log(`[StructureNormalizer] Replaced malformed ${legacyPath} with fallback: ${filePath}`);
+      continue;
+    }
 
     if (!current) {
       workspace.addFile(filePath, fallbackSource);

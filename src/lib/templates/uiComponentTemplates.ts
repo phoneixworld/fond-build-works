@@ -1187,42 +1187,42 @@ export const UI_ANIMATIONS_CSS = `
 export function getAllUIComponents(): Record<string, string> {
   return {
     // Core utils
-    "/components/ui/utils.js": UTILS_COMPONENT,
+    "/components/ui/utils.ts": UTILS_COMPONENT,
     // 22 shadcn-compatible components
-    "/components/ui/Button.jsx": BUTTON_COMPONENT,
-    "/components/ui/Card.jsx": CARD_COMPONENT,
-    "/components/ui/Input.jsx": INPUT_COMPONENT,
-    "/components/ui/Label.jsx": LABEL_COMPONENT,
-    "/components/ui/Badge.jsx": BADGE_COMPONENT,
-    "/components/ui/Separator.jsx": SEPARATOR_COMPONENT,
-    "/components/ui/Skeleton.jsx": SKELETON_COMPONENT,
-    "/components/ui/Checkbox.jsx": CHECKBOX_COMPONENT,
-    "/components/ui/Dialog.jsx": DIALOG_COMPONENT,
-    "/components/ui/Table.jsx": TABLE_COMPONENT,
-    "/components/ui/Textarea.jsx": TEXTAREA_COMPONENT,
-    "/components/ui/Select.jsx": SELECT_COMPONENT,
-    "/components/ui/Tabs.jsx": TABS_COMPONENT,
-    "/components/ui/Alert.jsx": ALERT_COMPONENT,
-    "/components/ui/Avatar.jsx": AVATAR_COMPONENT,
-    "/components/ui/Progress.jsx": PROGRESS_COMPONENT,
-    "/components/ui/Switch.jsx": SWITCH_COMPONENT,
-    "/components/ui/Tooltip.jsx": TOOLTIP_COMPONENT,
-    "/components/ui/ScrollArea.jsx": SCROLLAREA_COMPONENT,
-    "/components/ui/Dropdown.jsx": DROPDOWN_COMPONENT,
-    "/components/ui/Sheet.jsx": SHEET_COMPONENT,
-    "/components/ui/Popover.jsx": POPOVER_COMPONENT,
-    "/components/ui/Accordion.jsx": ACCORDION_COMPONENT,
+    "/components/ui/Button.tsx": BUTTON_COMPONENT,
+    "/components/ui/Card.tsx": CARD_COMPONENT,
+    "/components/ui/Input.tsx": INPUT_COMPONENT,
+    "/components/ui/Label.tsx": LABEL_COMPONENT,
+    "/components/ui/Badge.tsx": BADGE_COMPONENT,
+    "/components/ui/Separator.tsx": SEPARATOR_COMPONENT,
+    "/components/ui/Skeleton.tsx": SKELETON_COMPONENT,
+    "/components/ui/Checkbox.tsx": CHECKBOX_COMPONENT,
+    "/components/ui/Dialog.tsx": DIALOG_COMPONENT,
+    "/components/ui/Table.tsx": TABLE_COMPONENT,
+    "/components/ui/Textarea.tsx": TEXTAREA_COMPONENT,
+    "/components/ui/Select.tsx": SELECT_COMPONENT,
+    "/components/ui/Tabs.tsx": TABS_COMPONENT,
+    "/components/ui/Alert.tsx": ALERT_COMPONENT,
+    "/components/ui/Avatar.tsx": AVATAR_COMPONENT,
+    "/components/ui/Progress.tsx": PROGRESS_COMPONENT,
+    "/components/ui/Switch.tsx": SWITCH_COMPONENT,
+    "/components/ui/Tooltip.tsx": TOOLTIP_COMPONENT,
+    "/components/ui/ScrollArea.tsx": SCROLLAREA_COMPONENT,
+    "/components/ui/Dropdown.tsx": DROPDOWN_COMPONENT,
+    "/components/ui/Sheet.tsx": SHEET_COMPONENT,
+    "/components/ui/Popover.tsx": POPOVER_COMPONENT,
+    "/components/ui/Accordion.tsx": ACCORDION_COMPONENT,
     // Phoenix-specific higher-level components
-    "/components/ui/Modal.jsx": MODAL_COMPONENT,
-    "/components/ui/DataTable.jsx": DATATABLE_COMPONENT,
-    "/components/ui/Toast.jsx": TOAST_COMPONENT,
-    "/components/ui/Spinner.jsx": SPINNER_COMPONENT,
+    "/components/ui/Modal.tsx": MODAL_COMPONENT,
+    "/components/ui/DataTable.tsx": DATATABLE_COMPONENT,
+    "/components/ui/Toast.tsx": TOAST_COMPONENT,
+    "/components/ui/Spinner.tsx": SPINNER_COMPONENT,
   };
 }
 
 export function getShadcnUIComponents(): Record<string, string> {
   const all = getAllUIComponents();
   // Exclude Phoenix-specific components
-  const { "/components/ui/Modal.jsx": _m, "/components/ui/DataTable.jsx": _d, "/components/ui/Toast.jsx": _t, "/components/ui/Spinner.jsx": _s, ...shadcn } = all;
+  const { "/components/ui/Modal.tsx": _m, "/components/ui/DataTable.tsx": _d, "/components/ui/Toast.tsx": _t, "/components/ui/Spinner.tsx": _s, ...shadcn } = all;
   return shadcn;
 }
