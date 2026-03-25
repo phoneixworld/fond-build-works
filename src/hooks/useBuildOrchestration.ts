@@ -1187,9 +1187,11 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
         try {
           await compile(compileOptions, compileCallbacks);
         } catch (err: any) {
+          if (isStaleBuild()) return;
           handleOnError(err.message || "Compiler error");
         }
       } catch (e) {
+        if (isStaleBuild()) return;
         console.error("[BuildOrch] sendMessage error:", e);
         setIsLoading(false);
         setIsBuilding(false);
