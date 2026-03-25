@@ -583,20 +583,20 @@ Responsibilities:
     : "(infer from generated pages)";
 
   const appRoutingDescription = appType === "landing"
-    ? `App.jsx for a landing page/website.
+    ? `App.tsx for a landing page/website.
 
 CRITICAL: This is a LANDING PAGE, not a dashboard app.
-- Import the main page from /pages/Index.jsx
+- Import the main page from /pages/Index.tsx
 - Use HashRouter with a single route: "/" → Index
 - Include ToastProvider wrapper if it exists
 - Do NOT use AppLayout with sidebar — landing pages don't have sidebars
 - Do NOT include AuthContext unless auth files exist in the workspace
 - Scan workspace for actual generated files and import them correctly.`
-    : `App.jsx with routing for: ${routesList}.
+    : `App.tsx with routing for: ${routesList}.
 
 CRITICAL:
-- Import page components from their DIRECTORY structure: /pages/ModuleName/ModuleNamePage.jsx.
-- Scan the workspace for /pages/**/*.jsx and /layout/AppLayout.jsx files.
+- Import page components from their DIRECTORY structure: /pages/ModuleName/ModuleNamePage.tsx.
+- Scan the workspace for /pages/**/*.tsx and /layout/AppLayout.tsx files.
 - Use AppLayout as a parent route with <Outlet /> for nested page routes.
 - Include AuthContext provider, ToastProvider, and ProtectedRoute wrappers if they exist.
 - Do NOT regenerate pages or layout here — only wire up routing.`;
@@ -608,9 +608,9 @@ CRITICAL:
     label: "app:routing",
     type: "frontend",
     description: appRoutingDescription,
-    produces: ["/App.jsx"],
+    produces: ["/App.tsx"],
     dependsOn: appDeps,
-    touches: ["/App.jsx"],
+    touches: ["/App.tsx"],
     priority: 6,
   });
   tasks.push(appTask);
