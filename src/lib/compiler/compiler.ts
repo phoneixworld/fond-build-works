@@ -30,6 +30,7 @@ import { fixExportMismatches } from "./exportMismatchFixer";
 import { deduplicateFiles } from "./deduplicator";
 import { normalizeGeneratedStructure } from "./structureNormalizer";
 import { lintDesignQuality, formatLintSummary } from "./designLint";
+import { validateAllFiles } from "./syntaxValidator";
 import { applyPolishPass } from "./polishPass";
 import { detectDesignTheme } from "./designThemes";
 import {
