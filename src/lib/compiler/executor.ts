@@ -11,6 +11,8 @@ import type { BuildContext, CompilerTask, TaskGraph } from "./types";
 import type { Workspace } from "./workspace";
 import { getDesignThemePrompt } from "./designThemes";
 import { validateAllFiles, buildFileRetryPrompt, type ParseResult } from "./syntaxValidator";
+import { selectLayoutSnippets, formatLayoutSnippetsForPrompt } from "./layoutSnippets";
+import { ANIMATION_PROMPT_SECTION } from "./animations";
 
 // ─── Task Prompt Builder ──────────────────────────────────────────────────
 
@@ -50,12 +52,18 @@ export function buildTaskPrompt(
 
   const designThemeSection = getDesignThemePrompt(ctx.designTheme);
 
+  // Select applicable layout snippets for this task
+  const layoutSnippets = selectLayoutSnippets(task.label, task.description);
+  const layoutSection = formatLayoutSnippetsForPrompt(layoutSnippets);
+
   return `## BUILD TASK ${taskIndex + 1}/${totalTasks}: ${task.label}
 
 ### What to build:
 ${task.description}
 ${requirementsSection}
 ${designThemeSection ? `### Design Theme:\n${designThemeSection}\n` : ""}
+${layoutSection ? `${layoutSection}\n` : ""}
+${ANIMATION_PROMPT_SECTION}
 ### Files to create/modify:
 ${task.produces.map((f) => `- CREATE or UPDATE: ${f}`).join("\n")}
 ${task.touches.length > 0 ? task.touches.map((f) => `- TOUCH: ${f}`).join("\n") : ""}
