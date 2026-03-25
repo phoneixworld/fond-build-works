@@ -30,6 +30,7 @@ import { fixExportMismatches } from "./exportMismatchFixer";
 import { deduplicateFiles } from "./deduplicator";
 import { normalizeGeneratedStructure } from "./structureNormalizer";
 import { lintDesignQuality, formatLintSummary } from "./designLint";
+import { applyPolishPass } from "./polishPass";
 import { detectDesignTheme } from "./designThemes";
 import {
   createTrace, startPass, endPass,
@@ -522,7 +523,6 @@ export async function compile(
 
   const designLintResult = lintDesignQuality(workspace.toRecord());
   if (designLintResult.autoFixCount > 0) {
-    // Apply auto-fixed files back to workspace
     for (const [path, content] of Object.entries(designLintResult.files)) {
       if (workspace.hasFile(path) && workspace.getFile(path) !== content) {
         workspace.updateFile(path, content);
@@ -537,6 +537,17 @@ export async function compile(
     if (warnings.length > 0) {
       console.log(`[Compiler] 🎨 Design warnings: ${warnings.map(w => `${w.file}: ${w.message}`).join("; ")}`);
     }
+  }
+
+  // ── Phase 3.98: Two-Pass Polish ─────────────────────────────────────
+  // Pass 2: Automated polish — animations, responsive, hover effects
+
+  callbacks.onPhase("polishing", "Applying Pass 2 polish (animations, responsive, hover effects)...");
+
+  const polishResult = applyPolishPass(workspace);
+  if (polishResult.filesPolished > 0) {
+    cloudLog.info(`Polish pass: ${polishResult.filesPolished} files polished (${polishResult.animationsAdded} animations, ${polishResult.responsiveFixes} responsive fixes)`, "compiler");
+    console.log(`[Compiler] ✨ Polish pass: ${polishResult.filesPolished} files — ${polishResult.animationsAdded} animations, ${polishResult.responsiveFixes} responsive fixes`);
   }
 
   // ── Phase 3.10: Ensure App.jsx exists and has valid imports ──────────
