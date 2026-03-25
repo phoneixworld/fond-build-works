@@ -291,6 +291,7 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
   const streamingControllerRef = useRef<StreamingPreviewController | null>(null);
   const lastProjectIdRef = useRef<string | null>(null);
   const deferredPreviewTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const buildRunTokenRef = useRef(0);
 
   useEffect(() => {
     buildRetryCountRef.current = buildRetryCount;
@@ -579,7 +580,10 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
       if (!text || !currentProject) return;
 
       const buildProjectId = currentProject.id;
+      const runToken = buildRunTokenRef.current + 1;
+      buildRunTokenRef.current = runToken;
       const isStaleBuild = () =>
+        runToken !== buildRunTokenRef.current ||
         !currentProject ||
         currentProject.id !== buildProjectId ||
         (lastProjectIdRef.current !== null && lastProjectIdRef.current !== buildProjectId);
@@ -611,6 +615,7 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
       const resetBuildSafetyTimeout = () => {
         if (buildSafetyTimeoutRef.current) clearTimeout(buildSafetyTimeoutRef.current);
         buildSafetyTimeoutRef.current = setTimeout(() => {
+          if (isStaleBuild()) return;
           console.warn("[BuildOrch] Build safety timeout — forcing isBuilding=false");
           setIsBuilding(false);
           setIsLoading(false);
@@ -829,6 +834,7 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
 
         const compileCallbacks: CompileCallbacks = {
           onPhase: (phase, detail) => {
+            if (isStaleBuild()) return;
             resetBuildSafetyTimeout();
             setBuildStep(detail);
             if (phase === "planning") setPipelineStep("planning");
@@ -838,6 +844,7 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
             else if (phase === "complete") setPipelineStep("complete");
           },
           onPlanReady: (tasks) => {
+            if (isStaleBuild()) return;
             planLabelsRef.current = tasks.map((t) => t.label);
             setCompilerTasks(
               tasks.map((t, i) => ({
@@ -848,6 +855,7 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
             );
           },
           onTaskStart: (task, index, total) => {
+            if (isStaleBuild()) return;
             resetBuildSafetyTimeout();
             setCurrentTaskIndex(index);
             setTotalPlanTasks(total);
@@ -876,10 +884,15 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
             });
           },
           onTaskDelta: (task, chunk) => {
+            if (isStaleBuild()) return;
             resetBuildSafetyTimeout();
             setBuildStreamContent((prev) => prev + chunk);
           },
           onTaskDone: (task, files) => {
+            if (isStaleBuild()) {
+              console.warn("[Compiler] ⛔ Ignored stale task output from cancelled/superseded build");
+              return;
+            }
             resetBuildSafetyTimeout();
             if (lastProjectIdRef.current !== null && lastProjectIdRef.current !== buildProjectId) {
               console.warn(`[Compiler] ⛔ Blocked cross-project file injection`);
@@ -925,6 +938,7 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
             }
           },
           onTaskError: (task, error) => {
+            if (isStaleBuild()) return;
             console.error(`[Compiler] Task '${task.label}' failed:`, error);
             setCompilerTasks((prev) =>
               prev.map((t) =>
@@ -933,6 +947,7 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
             );
           },
           onVerification: (result) => {
+            if (isStaleBuild()) return;
             resetBuildSafetyTimeout();
             if (result.ok) {
               setBuildStep("✅ All checks passed");
@@ -942,10 +957,15 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
             }
           },
           onRepairStart: (round, actionCount) => {
+            if (isStaleBuild()) return;
             resetBuildSafetyTimeout();
             setBuildStep(`🔧 Auto-repair round ${round}: fixing ${actionCount} issues...`);
           },
           onComplete: (result: BuildResult) => {
+            if (isStaleBuild()) {
+              console.warn("[Compiler] ⛔ Ignored stale completion from cancelled/superseded build");
+              return;
+            }
             lastVerificationOkRef.current = result.verification.ok;
 
             if (deferredPreviewTimerRef.current) {
@@ -1167,9 +1187,11 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
         try {
           await compile(compileOptions, compileCallbacks);
         } catch (err: any) {
+          if (isStaleBuild()) return;
           handleOnError(err.message || "Compiler error");
         }
       } catch (e) {
+        if (isStaleBuild()) return;
         console.error("[BuildOrch] sendMessage error:", e);
         setIsLoading(false);
         setIsBuilding(false);
@@ -1874,13 +1896,25 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
   ]);
 
   const abortBuild = useCallback(() => {
+    buildRunTokenRef.current += 1;
     abortControllerRef.current?.abort();
     abortControllerRef.current = null;
+    if (buildSafetyTimeoutRef.current) {
+      clearTimeout(buildSafetyTimeoutRef.current);
+      buildSafetyTimeoutRef.current = null;
+    }
+    sandpackFilesRef.current = null;
+    setSandpackFiles(null);
+    setSandpackDeps({});
+    syncSandpackToVirtualFS({});
+    setCompilerTasks([]);
+    setPipelineStep(null);
+    setCurrentAgent(null);
     setIsLoading(false);
     setIsBuilding(false);
     setBuildStep("");
     isSendingRef.current = false;
-  }, [setIsBuilding, setBuildStep]);
+  }, [setSandpackFiles, setSandpackDeps, syncSandpackToVirtualFS, setIsBuilding, setBuildStep]);
 
   return {
     isLoading,
