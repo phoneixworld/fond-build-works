@@ -5,14 +5,131 @@ const CODE_FILE_RE = /\.(jsx?|tsx?)$/;
 
 export function normalizeGeneratedStructure(workspace: Workspace): number {
   let fixed = 0;
+  fixed += normalizeFileExtensions(workspace);
   fixed += normalizeMirroredFiles(workspace);
   fixed += normalizeUtilityModules(workspace);
+  fixed += normalizeDomainComponentPlacement(workspace);
   fixed += normalizeHookDefaultImports(workspace);
   fixed += normalizeToastWiring(workspace);
   fixed += normalizeDomainComponentSafety(workspace);
   fixed += normalizeContextReferences(workspace);
   fixed += normalizeExportDuplication(workspace);
   fixed += normalizeComponentExportConventions(workspace);
+  fixed += normalizeBarrelExports(workspace);
+  return fixed;
+}
+
+// ─── Rename .jsx/.js → .tsx/.ts ──────────────────────────────────────────
+
+const DOMAIN_COMPONENT_NAMES = new Set([
+  "ActivityFeed", "NotificationBell", "PageHeader",
+  "QuickActions", "SearchFilterBar", "StatCard", "StatusBadge",
+]);
+
+function normalizeFileExtensions(workspace: Workspace): number {
+  let fixed = 0;
+  for (const filePath of workspace.listFiles()) {
+    if (/\.(jsx)$/.test(filePath)) {
+      const newPath = filePath.replace(/\.jsx$/, ".tsx");
+      const content = workspace.getFile(filePath) || "";
+      workspace.deleteFile(filePath);
+      workspace.addFile(newPath, content);
+      fixed += rewriteImportsToCanonical(workspace, filePath, newPath);
+      fixed++;
+      console.log(`[StructureNormalizer] Renamed ${filePath} → ${newPath}`);
+    } else if (/(?<!\.)\.js$/.test(filePath) && !filePath.includes("/node_modules/") && !filePath.endsWith("package.json")) {
+      // Only rename .js source files (not config)
+      if (filePath.startsWith("/components/") || filePath.startsWith("/pages/") || filePath.startsWith("/hooks/") || filePath.startsWith("/contexts/") || filePath.startsWith("/layout/") || filePath.startsWith("/services/")) {
+        const newPath = filePath.replace(/\.js$/, ".ts");
+        const content = workspace.getFile(filePath) || "";
+        workspace.deleteFile(filePath);
+        workspace.addFile(newPath, content);
+        fixed += rewriteImportsToCanonical(workspace, filePath, newPath);
+        fixed++;
+        console.log(`[StructureNormalizer] Renamed ${filePath} → ${newPath}`);
+      }
+    }
+  }
+  return fixed;
+}
+
+// ─── Move domain components out of /components/ui/ ───────────────────────
+
+function normalizeDomainComponentPlacement(workspace: Workspace): number {
+  let fixed = 0;
+
+  for (const filePath of workspace.listFiles()) {
+    if (!filePath.startsWith("/components/ui/")) continue;
+    const fileName = filePath.split("/").pop() || "";
+    const baseName = fileName.replace(/\.(tsx?|jsx?)$/, "");
+
+    if (DOMAIN_COMPONENT_NAMES.has(baseName)) {
+      const newPath = `/components/${fileName}`;
+      if (!workspace.hasFile(newPath)) {
+        const content = workspace.getFile(filePath) || "";
+        workspace.addFile(newPath, content);
+      }
+      workspace.deleteFile(filePath);
+      fixed += rewriteImportsToCanonical(workspace, filePath, newPath);
+      fixed++;
+      console.log(`[StructureNormalizer] Moved domain component: ${filePath} → ${newPath}`);
+    }
+  }
+
+  return fixed;
+}
+
+// ─── Generate barrel exports ─────────────────────────────────────────────
+
+function normalizeBarrelExports(workspace: Workspace): number {
+  let fixed = 0;
+
+  // components/ui/index.ts — named exports for UI primitives
+  const uiFiles = workspace.listFiles().filter(
+    f => f.startsWith("/components/ui/") && CODE_FILE_RE.test(f) && !f.endsWith("/index.ts")
+  );
+  if (uiFiles.length > 0) {
+    const lines = uiFiles.map(f => {
+      const name = f.split("/").pop()!.replace(/\.(tsx?|jsx?)$/, "");
+      return `export * from "./${name}";`;
+    });
+    workspace.updateFile("/components/ui/index.ts", lines.join("\n") + "\n");
+    fixed++;
+  }
+
+  // components/index.ts — default re-exports for domain components
+  const domainFiles = workspace.listFiles().filter(
+    f => /^\/components\/[^/]+\.(tsx?|jsx?)$/.test(f) && !f.endsWith("/index.ts")
+  );
+  if (domainFiles.length > 0) {
+    const lines = domainFiles.map(f => {
+      const name = f.split("/").pop()!.replace(/\.(tsx?|jsx?)$/, "");
+      return `export { default as ${name} } from "./${name}";`;
+    });
+    workspace.updateFile("/components/index.ts", lines.join("\n") + "\n");
+    fixed++;
+  }
+
+  // pages/index.ts
+  const pageFiles = workspace.listFiles().filter(
+    f => f.startsWith("/pages/") && CODE_FILE_RE.test(f) && !f.endsWith("/index.ts")
+  );
+  if (pageFiles.length > 0) {
+    const seen = new Set<string>();
+    const lines: string[] = [];
+    for (const f of pageFiles) {
+      const parts = f.split("/");
+      // e.g. /pages/Dashboard/DashboardPage.tsx or /pages/DashboardPage.tsx
+      const name = parts[parts.length - 1].replace(/\.(tsx?|jsx?)$/, "");
+      if (seen.has(name)) continue;
+      seen.add(name);
+      const rel = f.replace(/^\/pages\//, "./").replace(/\.(tsx?|jsx?)$/, "");
+      lines.push(`export { default as ${name} } from "${rel}";`);
+    }
+    workspace.updateFile("/pages/index.ts", lines.join("\n") + "\n");
+    fixed++;
+  }
+
   return fixed;
 }
 
@@ -237,61 +354,55 @@ function normalizeMirroredFiles(workspace: Workspace): number {
 function normalizeUtilityModules(workspace: Workspace): number {
   let fixed = 0;
 
+  // DELETE all lib/utils.* variants — these must never exist
   const libUtilVariants = workspace
     .listFiles()
     .filter((p) => /^\/lib\/utils\.(js|jsx|ts|tsx)$/.test(p));
 
-  let canonicalLibUtil = "/lib/utils.js";
-  if (!workspace.hasFile(canonicalLibUtil)) {
-    canonicalLibUtil = libUtilVariants[0] || canonicalLibUtil;
+  for (const variant of libUtilVariants) {
+    // Rewrite imports away from this file before deleting
+    fixed += rewriteImportsToCanonical(workspace, variant, "/utils/cn");
+    workspace.deleteFile(variant);
+    fixed++;
+    console.log(`[StructureNormalizer] Deleted banned file: ${variant}`);
   }
 
-  if (canonicalLibUtil && workspace.hasFile(canonicalLibUtil)) {
-    const normalized = buildCanonicalUtilsModule(workspace.getFile(canonicalLibUtil) || "");
-    if (normalized !== (workspace.getFile(canonicalLibUtil) || "")) {
-      workspace.updateFile(canonicalLibUtil, normalized);
-      fixed++;
-      console.log(`[StructureNormalizer] Normalized utility module: ${canonicalLibUtil}`);
-    }
-
-    for (const variant of libUtilVariants) {
-      if (variant === canonicalLibUtil) continue;
-      fixed += rewriteImportsToCanonical(workspace, variant, canonicalLibUtil);
-      workspace.deleteFile(variant);
-      fixed++;
-      console.log(`[StructureNormalizer] Removed duplicate util variant: ${variant}`);
-    }
-  }
-
-  // Migrate /components/ui/utils.ts → /utils/cn.ts if it still exists
-  const legacyUiUtilsPaths = ["/components/ui/utils.js", "/components/ui/utils.ts"];
+  // Migrate /components/ui/utils.* → /utils/cn.ts
+  const legacyUiUtilsPaths = ["/components/ui/utils.js", "/components/ui/utils.ts", "/components/ui/utils.jsx", "/components/ui/utils.tsx"];
   for (const legacyPath of legacyUiUtilsPaths) {
     if (workspace.hasFile(legacyPath)) {
-      const content = workspace.getFile(legacyPath) || "";
-      // Move to canonical /utils/cn.ts
-      if (!workspace.hasFile("/utils/cn.ts")) {
-        let normalized = content
-          .replace(/^import\s+\{\s*cn\s*\}\s+from\s+["'][^"']+["'];?\s*$/gm, "")
-          .trim();
-        if (!/export\s+function\s+cn\s*\(/.test(normalized)) {
-          normalized = `export function cn(...inputs) {\n  return inputs.filter(Boolean).join(" ");\n}`;
-        }
-        workspace.updateFile("/utils/cn.ts", `${normalized}\n`);
-        console.log(`[StructureNormalizer] Migrated ${legacyPath} → /utils/cn.ts`);
-      }
       workspace.deleteFile(legacyPath);
-      // Rewrite all imports from the old path to the new one
       fixed += rewriteImportsToCanonical(workspace, legacyPath, "/utils/cn");
       fixed++;
       console.log(`[StructureNormalizer] Removed legacy util: ${legacyPath}`);
     }
   }
 
-  // Ensure /utils/cn.ts exists
+  // Ensure /utils/cn.ts exists with correct content
   if (!workspace.hasFile("/utils/cn.ts")) {
     workspace.updateFile("/utils/cn.ts", `export function cn(...inputs) {\n  return inputs.filter(Boolean).join(" ");\n}\n`);
     fixed++;
     console.log(`[StructureNormalizer] Created missing /utils/cn.ts`);
+  }
+
+  // Fix all cn imports to point to /utils/cn
+  for (const filePath of workspace.listFiles()) {
+    if (!CODE_FILE_RE.test(filePath)) continue;
+    const content = workspace.getFile(filePath) || "";
+    // Match imports of cn from wrong paths (lib/utils, ./utils, ../utils, components/ui/utils, etc.)
+    const badCnImport = /^(import\s+\{\s*cn\s*\}\s+from\s+["'])([^"']+)(["'];?\s*)$/gm;
+    let updated = content;
+    updated = updated.replace(badCnImport, (full, pre, fromPath, post) => {
+      // If already pointing to utils/cn, skip
+      if (/\/utils\/cn$/.test(fromPath)) return full;
+      // Compute correct relative path to /utils/cn
+      const newSpec = toImportSpecifier(filePath, "/utils/cn.ts");
+      return `${pre}${newSpec}${post}`;
+    });
+    if (updated !== content) {
+      workspace.updateFile(filePath, updated);
+      fixed++;
+    }
   }
 
   return fixed;
