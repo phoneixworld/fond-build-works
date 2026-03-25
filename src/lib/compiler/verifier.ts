@@ -434,7 +434,7 @@ function checkRoutes(workspace: Workspace): {
 
   // ─── Nav-Route Mismatch Check ───────────────────────────────────────
   // Find sidebar/navbar NavLink paths and verify they have matching Route entries
-  for (const sidebarPath of ["/layout/Sidebar.jsx", "/layout/Sidebar.tsx", "/components/Sidebar.jsx", "/layout/Navigation.jsx"]) {
+  for (const sidebarPath of ["/layout/Sidebar.tsx", "/layout/Sidebar.jsx", "/components/Sidebar.tsx", "/components/Sidebar.jsx", "/layout/Navigation.tsx", "/layout/Navigation.jsx"]) {
     const sidebarContent = workspace.getFile(sidebarPath);
     if (!sidebarContent) continue;
 
