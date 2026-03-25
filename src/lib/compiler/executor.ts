@@ -81,16 +81,18 @@ ${workspaceContext ? `### Current code (scoped):\n${workspaceContext}` : ""}
 4. NEVER write to /components/ui/** — those are pre-scaffolded UI primitives.
 5. **CRITICAL FILE STRUCTURE**:
    - **MANDATORY: ALL source files must use .tsx (for components/JSX) or .ts (for pure logic/hooks). NEVER generate .jsx or .js files.**
+   - /utils/cn.ts — cn() class-merge utility. NEVER put utils inside /components/ui/.
    - /components/ui/ — pre-scaffolded shadcn-compatible UI components (do not modify). These use NAMED exports (e.g. import { Card, CardHeader } from "./ui/Card").
+     **UI COMPONENTS MUST BE PURE React + Tailwind CSS. NO Radix UI imports, NO class-variance-authority, NO tailwind-variants, NO external dependencies beyond React and lucide-react.**
    - /components/ — reusable DOMAIN components (StatCard, StatusBadge, PageHeader, SearchFilterBar, ActivityFeed, QuickActions, NotificationBell, ChartCard, FormModal). These use DEFAULT exports.
    - /contexts/ — React contexts (AuthContext, etc.).
    - /pages/ModuleName/ — page components in named directories (e.g. /pages/Dashboard/DashboardPage.tsx). These use DEFAULT exports.
-   - /hooks/ — custom hooks (.ts files).
+   - /hooks/ — custom hooks (.ts files). Subfolder /hooks/data/ for data-fetching hooks.
    - /services/ — API services (.ts files).
    - /styles/ — CSS files.
    - /layout/ — layout wrappers (AppLayout.tsx, Sidebar.tsx). These use DEFAULT exports.
    When importing, always use correct relative paths from the file's location.
-   Import cn from "./ui/utils" in component files, or from "../ui/utils" from page files.
+   Import cn from "../utils/cn" (adjust relative path based on file depth). NEVER import from "./ui/utils" or "./utils".
 6. **COMPONENT DECOMPOSITION (CRITICAL)**: Pages must NOT be monolithic. Every page MUST import and use components from /components/ui/:
    - Use Table + TableHeader/TableBody/TableRow/TableHead/TableCell for data lists (NOT raw <table> tags).
    - Use Tabs + TabsList/TabsTrigger/TabsContent for multi-section views.
