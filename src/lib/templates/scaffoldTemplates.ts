@@ -1,18 +1,21 @@
 /**
- * Scaffold Templates — JSX template generators for new project builds.
+ * Scaffold Templates — TSX template generators for new project builds.
  * 
  * Extracted from buildEngine.ts. These generate the initial file structure
- * (App.jsx, layout, pages, hooks, UI components) for both generic and
+ * (App.tsx, layout, pages, hooks, UI components) for both generic and
  * domain-specific scaffolds.
  * 
  * PATH CONVENTION:
- * All generated files use bare "/" paths (e.g., /App.jsx, /components/Hero.jsx).
+ * All generated files use bare "/" paths (e.g., /App.tsx, /components/Hero.tsx).
  * This is required by Sandpack which expects files at root.
  * The pathNormalizer module handles mapping to src/ for:
- *   - VirtualFS display (file tree shows src/App.jsx)
- *   - GitHub push/pull (exports as src/App.jsx)
+ *   - VirtualFS display (file tree shows src/App.tsx)
+ *   - GitHub push/pull (exports as src/App.tsx)
  *   - Android/ZIP export (bundles under src/)
  * DO NOT change these paths to src/ — it will break preview rendering.
+ * 
+ * All generated code files use .tsx/.ts extensions for TypeScript support.
+ */
  */
 
 import { type DomainModel } from "@/lib/domainTemplates";
@@ -59,7 +62,7 @@ function buildDomainScaffold(model: DomainModel): Record<string, string> {
 
     const dirName = pageName;
     const fileName = pageName;
-    const filePath = `/pages/${dirName}/${fileName}.jsx`;
+    const filePath = `/pages/${dirName}/${fileName}.tsx`;
 
     if (page.type === "dashboard") {
       files[filePath] = generateDashboardPage(pageName, model.templateName, entities);
@@ -88,7 +91,7 @@ function buildDomainScaffold(model: DomainModel): Record<string, string> {
     if (generatedPageComponents.has(detailName)) continue;
     generatedPageComponents.add(detailName);
 
-    const filePath = `/pages/${entityName}/${detailName}.jsx`;
+    const filePath = `/pages/${entityName}/${detailName}.tsx`;
     files[filePath] = generateDetailPage(detailName, entityName);
 
     const routePath = page.path.replace(/^\//, "");
@@ -100,7 +103,7 @@ function buildDomainScaffold(model: DomainModel): Record<string, string> {
   const authWrapOpen = model.requiresAuth ? `        <AuthProvider>\n` : "";
   const authWrapClose = model.requiresAuth ? `        </AuthProvider>\n` : "";
 
-  files["/App.jsx"] = `import React from "react";
+  files["/App.tsx"] = `import React from "react";
 import { HashRouter, Routes, Route, Navigate } from "react-router-dom";
 import AppLayout from "./layout/AppLayout";
 ${authImport}${routeImports.join("\n")}
@@ -128,7 +131,7 @@ ${authWrapClose}    </HashRouter>
     `  { to: "${nav.path}", icon: ${nav.icon || "LayoutDashboard"}, label: "${nav.label}" },`
   ).join("\n");
 
-  files["/layout/Sidebar.jsx"] = `import React from "react";
+  files["/layout/Sidebar.tsx"] = `import React from "react";
 import { NavLink } from "react-router-dom";
 import { ${[...iconImports].join(", ")} } from "lucide-react";
 
@@ -164,20 +167,20 @@ export default function Sidebar() {
 }
 `;
 
-  files["/layout/AppLayout.jsx"] = generateAppLayout();
+  files["/layout/AppLayout.tsx"] = generateAppLayout();
 
   for (const entity of entities) {
     const hookName = `use${entity.name}`;
-    files[`/hooks/${hookName}.js`] = generateEntityHook(entity.name, entity.pluralName);
+    files[`/hooks/${hookName}.ts`] = generateEntityHook(entity.name, entity.pluralName);
   }
 
   if (model.requiresAuth) {
-    files["/contexts/AuthContext.jsx"] = generateAuthContext();
+    files["/contexts/AuthContext.tsx"] = generateAuthContext();
   }
 
   Object.assign(files, getSharedUIComponents());
   Object.assign(files, getDomainComponents());
-  files["/hooks/useApi.js"] = getUseApiHook();
+  files["/hooks/useApi.ts"] = getUseApiHook();
   files["/styles/globals.css"] = getGlobalStyles();
 
   return files;
