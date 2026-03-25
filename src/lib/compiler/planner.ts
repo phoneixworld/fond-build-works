@@ -190,8 +190,17 @@ export function planTaskGraph(ctx: BuildContext, structuredIR?: IR): TaskGraph {
     description: `Shared UI component library with design tokens and global styles.
 
 Pre-built components are already scaffolded in the workspace — do NOT regenerate them.
+The cn() helper lives at /utils/cn.ts — NEVER put it inside /components/ui/.
+Import it as: import { cn } from "../utils/cn" (adjust relative path as needed).
+
+**CRITICAL**: All UI components MUST be pure React + Tailwind CSS.
+- NO Radix UI (@radix-ui/*) imports
+- NO class-variance-authority (cva)
+- NO tailwind-variants
+- NO external component library dependencies
+- Only React, lucide-react, and Tailwind CSS classes are allowed.
+
 The following shadcn-compatible components are available for import from /components/ui/:
-- utils.ts: cn() class-merge helper — import { cn } from "./ui/utils"
 - Button.tsx, Card.tsx (+ CardHeader/Title/Description/Content/Footer), Input.tsx, Label.tsx, Badge.tsx,
   Separator.tsx, Skeleton.tsx, Checkbox.tsx, Dialog.tsx (+ DialogContent/Header/Title/Description/Footer),
   Table.tsx (+ TableHeader/Body/Footer/Head/Row/Cell/Caption), Textarea.tsx, Select.tsx (+ Trigger/Value/Content/Item/Group/Label),

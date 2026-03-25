@@ -12,7 +12,11 @@
 
 // ─── 1. Utils (cn helper) ────────────────────────────────────────────────────
 
-export const UTILS_COMPONENT = `export function cn(...classes) {
+export const UTILS_COMPONENT = `/**
+ * Utility: class name merger (cn helper)
+ * Location: /utils/cn.ts — NOT inside /components/ui/
+ */
+export function cn(...classes) {
   return classes.filter(Boolean).join(" ");
 }
 `;
@@ -20,7 +24,7 @@ export const UTILS_COMPONENT = `export function cn(...classes) {
 // ─── 2. Button ───────────────────────────────────────────────────────────────
 
 export const BUTTON_COMPONENT = `import React from "react";
-import { cn } from "./utils";
+import { cn } from "../utils/cn";
 
 const buttonVariants = {
   variant: {
@@ -66,7 +70,7 @@ export { Button };
 // ─── 3. Card ─────────────────────────────────────────────────────────────────
 
 export const CARD_COMPONENT = `import React from "react";
-import { cn } from "./utils";
+import { cn } from "../utils/cn";
 
 export function Card({ children, className = "", ...props }) {
   return <div className={cn("rounded-lg border border-[var(--color-border)] bg-white shadow-sm", className)} {...props}>{children}</div>;
@@ -98,7 +102,7 @@ export default Card;
 // ─── 4. Input ────────────────────────────────────────────────────────────────
 
 export const INPUT_COMPONENT = `import React from "react";
-import { cn } from "./utils";
+import { cn } from "../utils/cn";
 
 const Input = React.forwardRef(({ className = "", type = "text", ...props }, ref) => {
   return (
@@ -122,7 +126,7 @@ export { Input };
 // ─── 5. Label ────────────────────────────────────────────────────────────────
 
 export const LABEL_COMPONENT = `import React from "react";
-import { cn } from "./utils";
+import { cn } from "../utils/cn";
 
 export default function Label({ children, htmlFor, className = "", ...props }) {
   return (
@@ -142,7 +146,7 @@ export { Label };
 // ─── 6. Badge ────────────────────────────────────────────────────────────────
 
 export const BADGE_COMPONENT = `import React from "react";
-import { cn } from "./utils";
+import { cn } from "../utils/cn";
 
 const badgeVariants = {
   default: "bg-[var(--color-primary)] text-white border-transparent",
@@ -173,7 +177,7 @@ export { Badge };
 // ─── 7. Separator ────────────────────────────────────────────────────────────
 
 export const SEPARATOR_COMPONENT = `import React from "react";
-import { cn } from "./utils";
+import { cn } from "../utils/cn";
 
 export default function Separator({ orientation = "horizontal", className = "", ...props }) {
   return (
@@ -195,7 +199,7 @@ export { Separator };
 // ─── 8. Skeleton ─────────────────────────────────────────────────────────────
 
 export const SKELETON_COMPONENT = `import React from "react";
-import { cn } from "./utils";
+import { cn } from "../utils/cn";
 
 export default function Skeleton({ className = "", ...props }) {
   return (
@@ -210,7 +214,7 @@ export { Skeleton };
 
 export const CHECKBOX_COMPONENT = `import React from "react";
 import { Check } from "lucide-react";
-import { cn } from "./utils";
+import { cn } from "../utils/cn";
 
 export default function Checkbox({ checked, onCheckedChange, className = "", disabled = false, id, ...props }) {
   return (
@@ -240,7 +244,7 @@ export { Checkbox };
 
 export const DIALOG_COMPONENT = `import React, { useEffect, useRef } from "react";
 import { X } from "lucide-react";
-import { cn } from "./utils";
+import { cn } from "../utils/cn";
 
 export function Dialog({ open, onOpenChange, children }) {
   useEffect(() => {
@@ -288,7 +292,7 @@ export default Dialog;
 // ─── 11. Table ───────────────────────────────────────────────────────────────
 
 export const TABLE_COMPONENT = `import React from "react";
-import { cn } from "./utils";
+import { cn } from "../utils/cn";
 
 export function Table({ children, className = "", ...props }) {
   return (
@@ -338,7 +342,7 @@ export default Table;
 // ─── 12. Textarea ────────────────────────────────────────────────────────────
 
 export const TEXTAREA_COMPONENT = `import React from "react";
-import { cn } from "./utils";
+import { cn } from "../utils/cn";
 
 const Textarea = React.forwardRef(({ className = "", ...props }, ref) => {
   return (
@@ -362,7 +366,7 @@ export { Textarea };
 
 export const SELECT_COMPONENT = `import React, { useState, useRef, useEffect, createContext, useContext } from "react";
 import { ChevronDown, Check } from "lucide-react";
-import { cn } from "./utils";
+import { cn } from "../utils/cn";
 
 const SelectContext = createContext({});
 
@@ -459,7 +463,7 @@ export default Select;
 // ─── 14. Tabs ────────────────────────────────────────────────────────────────
 
 export const TABS_COMPONENT = `import React, { useState, createContext, useContext } from "react";
-import { cn } from "./utils";
+import { cn } from "../utils/cn";
 
 const TabsContext = createContext({});
 
@@ -521,7 +525,7 @@ export default Tabs;
 // ─── 15. Alert ───────────────────────────────────────────────────────────────
 
 export const ALERT_COMPONENT = `import React from "react";
-import { cn } from "./utils";
+import { cn } from "../utils/cn";
 
 const variants = {
   default: "bg-white border-[var(--color-border)] text-[var(--color-text)]",
@@ -552,7 +556,7 @@ export default Alert;
 // ─── 16. Avatar ──────────────────────────────────────────────────────────────
 
 export const AVATAR_COMPONENT = `import React, { useState } from "react";
-import { cn } from "./utils";
+import { cn } from "../utils/cn";
 
 export function Avatar({ children, className = "" }) {
   return (
@@ -582,7 +586,7 @@ export default Avatar;
 // ─── 17. Progress ────────────────────────────────────────────────────────────
 
 export const PROGRESS_COMPONENT = `import React from "react";
-import { cn } from "./utils";
+import { cn } from "../utils/cn";
 
 export default function Progress({ value = 0, max = 100, className = "" }) {
   const pct = Math.min(100, Math.max(0, (value / max) * 100));
@@ -602,7 +606,7 @@ export { Progress };
 // ─── 18. Switch ──────────────────────────────────────────────────────────────
 
 export const SWITCH_COMPONENT = `import React from "react";
-import { cn } from "./utils";
+import { cn } from "../utils/cn";
 
 export default function Switch({ checked = false, onCheckedChange, disabled = false, className = "" }) {
   return (
@@ -632,7 +636,7 @@ export { Switch };
 // ─── 19. Tooltip ─────────────────────────────────────────────────────────────
 
 export const TOOLTIP_COMPONENT = `import React, { useState, useRef, createContext, useContext } from "react";
-import { cn } from "./utils";
+import { cn } from "../utils/cn";
 
 const TooltipProviderCtx = createContext({});
 
@@ -690,7 +694,7 @@ export default Tooltip;
 // ─── 20. ScrollArea ──────────────────────────────────────────────────────────
 
 export const SCROLLAREA_COMPONENT = `import React from "react";
-import { cn } from "./utils";
+import { cn } from "../utils/cn";
 
 export function ScrollArea({ children, className = "", style }) {
   return (
@@ -711,7 +715,7 @@ export default ScrollArea;
 // ─── 21. DropdownMenu ────────────────────────────────────────────────────────
 
 export const DROPDOWN_COMPONENT = `import React, { useState, useRef, useEffect, createContext, useContext } from "react";
-import { cn } from "./utils";
+import { cn } from "../utils/cn";
 
 const DropdownCtx = createContext({});
 
@@ -783,7 +787,7 @@ export default DropdownMenu;
 
 export const SHEET_COMPONENT = `import React, { useEffect, createContext, useContext, useState } from "react";
 import { X } from "lucide-react";
-import { cn } from "./utils";
+import { cn } from "../utils/cn";
 
 const SheetCtx = createContext({});
 
@@ -863,7 +867,7 @@ export default Sheet;
 // ─── 23. Popover ─────────────────────────────────────────────────────────────
 
 export const POPOVER_COMPONENT = `import React, { useState, useRef, useEffect, createContext, useContext } from "react";
-import { cn } from "./utils";
+import { cn } from "../utils/cn";
 
 const PopoverCtx = createContext({});
 
@@ -919,7 +923,7 @@ export default Popover;
 
 export const ACCORDION_COMPONENT = `import React, { useState, createContext, useContext } from "react";
 import { ChevronDown } from "lucide-react";
-import { cn } from "./utils";
+import { cn } from "../utils/cn";
 
 const AccordionCtx = createContext({});
 
@@ -1186,8 +1190,8 @@ export const UI_ANIMATIONS_CSS = `
 
 export function getAllUIComponents(): Record<string, string> {
   return {
-    // Core utils
-    "/components/ui/utils.ts": UTILS_COMPONENT,
+    // Core utils — lives in /utils/, NOT inside /components/ui/
+    "/utils/cn.ts": UTILS_COMPONENT,
     // 22 shadcn-compatible components
     "/components/ui/Button.tsx": BUTTON_COMPONENT,
     "/components/ui/Card.tsx": CARD_COMPONENT,
@@ -1217,7 +1221,21 @@ export function getAllUIComponents(): Record<string, string> {
     "/components/ui/DataTable.tsx": DATATABLE_COMPONENT,
     "/components/ui/Toast.tsx": TOAST_COMPONENT,
     "/components/ui/Spinner.tsx": SPINNER_COMPONENT,
+    // Barrel exports for clean imports
+    "/components/ui/index.ts": generateUIBarrelExport(),
+    "/components/index.ts": `// Domain components barrel — re-export as modules are created\n`,
+    "/pages/index.ts": `// Pages barrel — re-export as pages are created\n`,
   };
+}
+
+function generateUIBarrelExport(): string {
+  const components = [
+    "Button", "Card", "Input", "Label", "Badge", "Separator", "Skeleton",
+    "Checkbox", "Dialog", "Table", "Textarea", "Select", "Tabs", "Alert",
+    "Avatar", "Progress", "Switch", "Tooltip", "ScrollArea", "Dropdown",
+    "Sheet", "Popover", "Accordion", "Modal", "DataTable", "Toast", "Spinner",
+  ];
+  return components.map(c => `export * from "./${c}";`).join("\n") + "\n";
 }
 
 export function getShadcnUIComponents(): Record<string, string> {

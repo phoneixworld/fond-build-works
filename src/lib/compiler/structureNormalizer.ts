@@ -263,22 +263,35 @@ function normalizeUtilityModules(workspace: Workspace): number {
     }
   }
 
-  const uiUtilsPath = "/components/ui/utils.js";
-  if (workspace.hasFile(uiUtilsPath)) {
-    const current = workspace.getFile(uiUtilsPath) || "";
-    let normalized = current
-      .replace(/^import\s+\{\s*cn\s*\}\s+from\s+["'][^"']+["'];?\s*$/gm, "")
-      .trim();
-
-    if (!/export\s+function\s+cn\s*\(/.test(normalized)) {
-      normalized = `export function cn(...inputs) {\n  return inputs.filter(Boolean).join(" ");\n}`;
-    }
-
-    if (normalized !== current) {
-      workspace.updateFile(uiUtilsPath, `${normalized}\n`);
+  // Migrate /components/ui/utils.ts → /utils/cn.ts if it still exists
+  const legacyUiUtilsPaths = ["/components/ui/utils.js", "/components/ui/utils.ts"];
+  for (const legacyPath of legacyUiUtilsPaths) {
+    if (workspace.hasFile(legacyPath)) {
+      const content = workspace.getFile(legacyPath) || "";
+      // Move to canonical /utils/cn.ts
+      if (!workspace.hasFile("/utils/cn.ts")) {
+        let normalized = content
+          .replace(/^import\s+\{\s*cn\s*\}\s+from\s+["'][^"']+["'];?\s*$/gm, "")
+          .trim();
+        if (!/export\s+function\s+cn\s*\(/.test(normalized)) {
+          normalized = `export function cn(...inputs) {\n  return inputs.filter(Boolean).join(" ");\n}`;
+        }
+        workspace.updateFile("/utils/cn.ts", `${normalized}\n`);
+        console.log(`[StructureNormalizer] Migrated ${legacyPath} → /utils/cn.ts`);
+      }
+      workspace.deleteFile(legacyPath);
+      // Rewrite all imports from the old path to the new one
+      fixed += rewriteImportsToCanonical(workspace, legacyPath, "/utils/cn");
       fixed++;
-      console.log(`[StructureNormalizer] Normalized UI utils module: ${uiUtilsPath}`);
+      console.log(`[StructureNormalizer] Removed legacy util: ${legacyPath}`);
     }
+  }
+
+  // Ensure /utils/cn.ts exists
+  if (!workspace.hasFile("/utils/cn.ts")) {
+    workspace.updateFile("/utils/cn.ts", `export function cn(...inputs) {\n  return inputs.filter(Boolean).join(" ");\n}\n`);
+    fixed++;
+    console.log(`[StructureNormalizer] Created missing /utils/cn.ts`);
   }
 
   return fixed;
