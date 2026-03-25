@@ -10,8 +10,8 @@ import type { VerificationResult, VerificationIssue, RepairAction, RepairActionT
 import type { Workspace } from "./workspace";
 import { fixMissingImports, fixProviderOrdering } from "./missingImportFixer";
 
-export const MAX_REPAIR_ROUNDS = 3;
-export const MAX_REPAIR_ACTIONS_TOTAL = 10; // Cap total AI calls across all rounds
+export const MAX_REPAIR_ROUNDS = 4;
+export const MAX_REPAIR_ACTIONS_TOTAL = 20; // Cap total AI calls across all rounds
 
 // ─── Issue → RepairAction Classification ──────────────────────────────────
 
@@ -165,6 +165,9 @@ function buildFixImportPrompt(issue: VerificationIssue, workspace: Workspace): s
   const fileContent = workspace.getFile(issue.file) || "";
   const availableFiles = workspace.listFiles().filter(f => /\.(jsx?|tsx?)$/.test(f));
 
+  // Cross-file context: include contents of files this file imports from
+  const relatedFiles = getRelatedFileContents(issue.file, workspace, 3000);
+
   return `## REPAIR: Fix broken import in ${issue.file}
 
 Error: ${issue.message}
@@ -177,6 +180,8 @@ ${fileContent}
 Available files in workspace:
 ${availableFiles.map(f => `- ${f}`).join("\n")}
 
+${relatedFiles ? `### Related file contents (for correct import paths):\n${relatedFiles}\n` : ""}
+
 RULES:
 - Fix ONLY the broken import
 - Update the import path to point to an existing file
@@ -187,6 +192,9 @@ RULES:
 function buildFixSyntaxPrompt(issue: VerificationIssue, workspace: Workspace): string {
   const fileContent = workspace.getFile(issue.file) || "";
 
+  // Cross-file context: include files this component depends on
+  const relatedFiles = getRelatedFileContents(issue.file, workspace, 2000);
+
   return `## REPAIR: Fix syntax error in ${issue.file}
 
 Error: ${issue.message}${issue.line ? ` (line ${issue.line})` : ""}
@@ -196,9 +204,13 @@ Current file content:
 ${fileContent}
 \`\`\`
 
+${relatedFiles ? `### Related file contents (for correct types/imports):\n${relatedFiles}\n` : ""}
+
 RULES:
 - Fix ONLY the syntax error
 - Preserve all existing functionality
+- Ensure all JSX tags are properly opened and closed
+- Ensure all braces, brackets, and parentheses are balanced
 - Output the complete corrected file`;
 }
 
@@ -341,6 +353,48 @@ export function applyDeterministicFix(action: RepairAction, workspace: Workspace
     default:
       return false;
   }
+}
+
+// ─── Cross-File Context Helper ────────────────────────────────────────────
+
+/**
+ * Get contents of files related to the target file (imports/importers)
+ * for better repair context.
+ */
+function getRelatedFileContents(
+  targetFile: string,
+  workspace: Workspace,
+  budgetChars: number,
+): string {
+  const parts: string[] = [];
+  let remaining = budgetChars;
+  const idx = workspace.index;
+
+  // Files that the target imports from
+  const imports = idx.imports[targetFile] || [];
+  for (const imp of imports) {
+    if (remaining <= 0) break;
+    const resolved = workspace.resolveImport(targetFile, imp.from);
+    if (!resolved) continue;
+    const content = workspace.getFile(resolved);
+    if (content && content.length < remaining) {
+      parts.push(`--- ${resolved}\n${content}`);
+      remaining -= content.length + 50;
+    }
+  }
+
+  // Files that import the target (importers)
+  const importers = findImporters(targetFile, workspace);
+  for (const importer of importers.slice(0, 2)) {
+    if (remaining <= 0) break;
+    const content = workspace.getFile(importer.file);
+    if (content && content.length < remaining) {
+      parts.push(`--- ${importer.file} (imports ${importer.symbols.join(", ")})\n${content}`);
+      remaining -= content.length + 50;
+    }
+  }
+
+  return parts.join("\n\n");
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────
