@@ -73,18 +73,18 @@ describe("Auth Template Generation", () => {
     const set = generateAuthTemplateSet("email-password");
     expect(set.variant).toBe("email-password");
     expect(Object.keys(set.files).length).toBeGreaterThanOrEqual(5);
-    expect(set.files).toHaveProperty("/pages/LoginPage.jsx");
-    expect(set.files).toHaveProperty("/pages/SignupPage.jsx");
-    expect(set.files).toHaveProperty("/hooks/useSession.js");
-    expect(set.files).toHaveProperty("/auth/auth.client.js");
-    expect(set.files).toHaveProperty("/components/ProtectedRoute.jsx");
+    expect(set.files).toHaveProperty("/pages/LoginPage.tsx");
+    expect(set.files).toHaveProperty("/pages/SignupPage.tsx");
+    expect(set.files).toHaveProperty("/hooks/useSession.ts");
+    expect(set.files).toHaveProperty("/auth/auth.client.ts");
+    expect(set.files).toHaveProperty("/components/ProtectedRoute.tsx");
   });
 
   it("generates role-based template set with migrations", () => {
     const set = generateAuthTemplateSet("role-based");
     expect(set.variant).toBe("role-based");
     expect(set.migrations.length).toBeGreaterThan(0);
-    expect(set.files).toHaveProperty("/hooks/useUserRole.js");
+    expect(set.files).toHaveProperty("/hooks/useUserRole.ts");
     expect(set.files).toHaveProperty("/migrations/003_roles.sql");
   });
 
