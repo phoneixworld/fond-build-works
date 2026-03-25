@@ -358,18 +358,18 @@ export function generateImportMap(ir: IRState): string {
   const lines: string[] = [];
 
   lines.push("## IMPORT MAP (use EXACTLY these paths)");
-  lines.push('- App.jsx: import AppLayout from "./layout/AppLayout"');
-  lines.push('- AppLayout.jsx: import Sidebar from "./Sidebar", import { Outlet } from "react-router-dom"');
+  lines.push('- App.tsx: import AppLayout from "./layout/AppLayout"');
+  lines.push('- AppLayout.tsx: import Sidebar from "./Sidebar", import { Outlet } from "react-router-dom"');
 
   for (const model of ir.dataModels || []) {
     const name = toPascalCase(model.collectionName);
-    lines.push(`- ${name}List.jsx: import use${name} from "../../hooks/use${name}", import DataTable from "../../components/ui/DataTable"`);
-    lines.push(`- ${name}Form.jsx: import use${name} from "../../hooks/use${name}", import { showToast } from "../../components/ui/Toast"`);
+    lines.push(`- ${name}List.tsx: import use${name} from "../../hooks/use${name}", import DataTable from "../../components/ui/DataTable"`);
+    lines.push(`- ${name}Form.tsx: import use${name} from "../../hooks/use${name}", import { showToast } from "../../components/ui/Toast"`);
   }
 
   if (ir.auth?.enabled) {
-    lines.push('- ProtectedRoute.jsx: import { useAuth } from "../contexts/AuthContext"');
-    lines.push('- Login.jsx: import { useAuth } from "../../contexts/AuthContext"');
+    lines.push('- ProtectedRoute.tsx: import { useAuth } from "../contexts/AuthContext"');
+    lines.push('- Login.tsx: import { useAuth } from "../../contexts/AuthContext"');
   }
 
   return lines.join("\n");
