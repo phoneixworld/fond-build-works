@@ -3,13 +3,13 @@
 import type { IR } from "./ir";
 
 /**
- * Generates AppLayout.jsx + Sidebar.jsx from IR.
+ * Generates AppLayout.tsx + Sidebar.tsx from IR.
  * Now uses PreloadingSidebar for predictive component/data preloading.
  */
 export function generateLayoutFiles(ir: IR): Record<string, string> {
   return {
-    "/layout/AppLayout.jsx": generateAppLayout(ir),
-    "/layout/Sidebar.jsx": generateSidebar(ir),
+    "/layout/AppLayout.tsx": generateAppLayout(ir),
+    "/layout/Sidebar.tsx": generateSidebar(ir),
   };
 }
 

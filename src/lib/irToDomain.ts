@@ -275,44 +275,44 @@ export function generateFileManifest(ir: IRState | null | undefined): string {
   const models = ir.dataModels || [];
 
   // Entry point
-  files.push("/App.jsx");
-  files.push("/layout/AppLayout.jsx");
-  files.push("/layout/Sidebar.jsx");
+  files.push("/App.tsx");
+  files.push("/layout/AppLayout.tsx");
+  files.push("/layout/Sidebar.tsx");
 
   // Pages from routes
   for (const route of routes) {
     if (route.path.includes(":")) continue;
     const pageName = toPascalCase(route.label.replace(/[^a-zA-Z0-9\s]/g, ""));
-    files.push(`/pages/${pageName}/${pageName}.jsx`);
+    files.push(`/pages/${pageName}/${pageName}.tsx`);
   }
 
   // CRUD pages + hooks for data models
   for (const model of models) {
     const name = toPascalCase(model.collectionName);
     const plural = pluralize(name);
-    files.push(`/pages/${name}/${name}List.jsx`);
-    files.push(`/pages/${name}/${name}Detail.jsx`);
-    files.push(`/pages/${name}/${name}Form.jsx`);
-    files.push(`/hooks/use${name}.js`);
-    files.push(`/data/${toCamelCase(name)}Columns.js`);
+    files.push(`/pages/${name}/${name}List.tsx`);
+    files.push(`/pages/${name}/${name}Detail.tsx`);
+    files.push(`/pages/${name}/${name}Form.tsx`);
+    files.push(`/hooks/use${name}.ts`);
+    files.push(`/data/${toCamelCase(name)}Columns.ts`);
   }
 
   // Auth files
   if (ir.auth?.enabled) {
-    files.push("/contexts/AuthContext.jsx");
-    files.push("/components/ProtectedRoute.jsx");
-    files.push("/pages/Login/Login.jsx");
-    files.push("/pages/Signup/Signup.jsx");
+    files.push("/contexts/AuthContext.tsx");
+    files.push("/components/ProtectedRoute.tsx");
+    files.push("/pages/Login/Login.tsx");
+    files.push("/pages/Signup/Signup.tsx");
   }
 
   // Shared UI
-  files.push("/components/ui/Card.jsx");
-  files.push("/components/ui/Button.jsx");
-  files.push("/components/ui/Modal.jsx");
-  files.push("/components/ui/DataTable.jsx");
-  files.push("/components/ui/Toast.jsx");
-  files.push("/components/ui/Spinner.jsx");
-  files.push("/hooks/useApi.js");
+  files.push("/components/ui/Card.tsx");
+  files.push("/components/ui/Button.tsx");
+  files.push("/components/ui/Modal.tsx");
+  files.push("/components/ui/DataTable.tsx");
+  files.push("/components/ui/Toast.tsx");
+  files.push("/components/ui/Spinner.tsx");
+  files.push("/hooks/useApi.ts");
   files.push("/styles/globals.css");
 
   return files.join("\n");
@@ -358,18 +358,18 @@ export function generateImportMap(ir: IRState): string {
   const lines: string[] = [];
 
   lines.push("## IMPORT MAP (use EXACTLY these paths)");
-  lines.push('- App.jsx: import AppLayout from "./layout/AppLayout"');
-  lines.push('- AppLayout.jsx: import Sidebar from "./Sidebar", import { Outlet } from "react-router-dom"');
+  lines.push('- App.tsx: import AppLayout from "./layout/AppLayout"');
+  lines.push('- AppLayout.tsx: import Sidebar from "./Sidebar", import { Outlet } from "react-router-dom"');
 
   for (const model of ir.dataModels || []) {
     const name = toPascalCase(model.collectionName);
-    lines.push(`- ${name}List.jsx: import use${name} from "../../hooks/use${name}", import DataTable from "../../components/ui/DataTable"`);
-    lines.push(`- ${name}Form.jsx: import use${name} from "../../hooks/use${name}", import { showToast } from "../../components/ui/Toast"`);
+    lines.push(`- ${name}List.tsx: import use${name} from "../../hooks/use${name}", import DataTable from "../../components/ui/DataTable"`);
+    lines.push(`- ${name}Form.tsx: import use${name} from "../../hooks/use${name}", import { showToast } from "../../components/ui/Toast"`);
   }
 
   if (ir.auth?.enabled) {
-    lines.push('- ProtectedRoute.jsx: import { useAuth } from "../contexts/AuthContext"');
-    lines.push('- Login.jsx: import { useAuth } from "../../contexts/AuthContext"');
+    lines.push('- ProtectedRoute.tsx: import { useAuth } from "../contexts/AuthContext"');
+    lines.push('- Login.tsx: import { useAuth } from "../../contexts/AuthContext"');
   }
 
   return lines.join("\n");

@@ -67,7 +67,7 @@ export function checkBuildInvariants(
 function checkSidebarRouteAlignment(workspace: Workspace): InvariantViolation[] {
   const violations: InvariantViolation[] = [];
 
-  const sidebarCandidates = ["/layout/Sidebar.jsx", "/layout/Sidebar.tsx", "/components/Sidebar.jsx"];
+  const sidebarCandidates = ["/layout/Sidebar.tsx", "/layout/Sidebar.jsx", "/components/Sidebar.tsx", "/components/Sidebar.jsx"];
   const sidebarPath = sidebarCandidates.find(p => workspace.hasFile(p));
   if (!sidebarPath) return [];
 

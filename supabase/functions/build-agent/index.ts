@@ -64,24 +64,25 @@ function buildSystemPrompt(projectId: string, techStack: string, schemas?: any[]
 
 ${isReactStack ? `## OUTPUT FORMAT — MANDATORY
 \`\`\`react-preview
---- /App.jsx
+--- /App.tsx
 import React from "react";
 import { HashRouter, Routes, Route } from "react-router-dom";
 export default function App() { return <HashRouter><Routes>...</Routes></HashRouter>; }
---- /layout/AppLayout.jsx
---- /layout/Sidebar.jsx
---- /pages/Module/ModulePage.jsx
---- /components/ui/Card.jsx
---- /hooks/useFetch.js
+--- /layout/AppLayout.tsx
+--- /layout/Sidebar.tsx
+--- /pages/Module/ModulePage.tsx
+--- /components/ui/Card.tsx
+--- /hooks/useFetch.ts
 --- /styles/globals.css
 --- dependencies
 {"lucide-react":"^0.400.0"}
 \`\`\`
 
 ### File Rules
-- Paths start with / (no /src/). /App.jsx MUST export default.
-- Structure: /App.jsx → /layout/ → /pages/Module/ → /components/ui/ → /hooks/ → /styles/
-- Each page gets its OWN folder. Min 10-15 files for simple apps, 15-25 for complex.` : `## OUTPUT FORMAT
+- Paths start with / (no /src/). /App.tsx MUST export default.
+- Structure: /App.tsx → /layout/ → /pages/Module/ → /components/ui/ → /hooks/ → /styles/
+- Each page gets its OWN folder. Min 10-15 files for simple apps, 15-25 for complex.
+- **MANDATORY: ALL source files must use .tsx (for components/JSX) or .ts (for pure logic/hooks). NEVER use .jsx or .js extensions.**` : `## OUTPUT FORMAT
 Generate a SINGLE complete index.html inside a \`\`\`html-preview code fence.`}
 
 ## ITERATION RULES (CRITICAL FOR FOLLOW-UP REQUESTS)
@@ -89,16 +90,17 @@ When CURRENT CODE is provided below:
 1. Read ALL existing files carefully before generating
 2. ONLY output files you are CHANGING or ADDING — do NOT regenerate unchanged files
 3. PRESERVE all existing routes, imports, sidebar items, and navigation
-4. When adding a feature: add the new route to /App.jsx, add nav item to /layout/Sidebar.jsx
+4. When adding a feature: add the new route to /App.tsx, add nav item to /layout/Sidebar.tsx
 5. When modifying a component: output the COMPLETE modified file (no partial snippets)
 6. NEVER remove existing functionality unless explicitly asked
 
 ## CODE STANDARDS
-- Production React JSX + Tailwind CSS — zero TODOs, zero shortcuts, zero placeholders
+- Production React TypeScript + Tailwind CSS — zero TODOs, zero shortcuts, zero placeholders
+- **MANDATORY: ALL files must use .tsx or .ts extensions. NEVER generate .jsx or .js files.**
 - Icons: import { Heart } from "lucide-react" — Animations: framer-motion
 - Available packages: react, react-dom, lucide-react, framer-motion, date-fns, recharts, react-router-dom, clsx, tailwind-merge
 - NEVER: external images (use CSS/SVGs/icons), bracket notation in JSX, require(), react-hot-toast, sonner, @headlessui, @radix-ui
-- Build Toast in /components/ui/Toast.jsx instead
+- Build Toast in /components/ui/Toast.tsx instead
 - ALL <Route> elements MUST self-close. Adjacent JSX needs wrapper fragment.
 - ALL fetch calls: try/catch + loading skeleton + error state + empty state with CTA
 - Accessibility: labels, 4.5:1 contrast, focus rings, keyboard nav, semantic HTML
@@ -106,11 +108,11 @@ When CURRENT CODE is provided below:
 - **CRITICAL — COMPLETE FILES ONLY**: Every file you output MUST be syntactically complete with all braces/brackets closed, all functions finished, and a default export. NEVER output a file that ends mid-function or mid-JSX. If you are running out of space, output FEWER files but make each one 100% complete rather than outputting many truncated files.
 - **AuthContext rules**: AuthContext MUST NOT use useNavigate or any react-router-dom hooks. It must work OUTSIDE a Router. Use window.__PROJECT_ID__, window.__SUPABASE_URL__, window.__SUPABASE_KEY__ globals. Handle failed "me" calls gracefully (clear token, set user to null, set loading to false). NEVER throw from AuthContext.
 - **Toast component**: Build a simple self-contained Toast using useState + useEffect + createContext. Do NOT use window events, CustomEvent, or dispatchEvent. Keep it simple: ToastProvider wraps the app, useToast() returns { addToast }, ToastContainer renders the toasts.
-- **cn utility — CRITICAL**: If you create /lib/utils.js or /components/ui/utils.js with a \`cn\` helper, it MUST be a classname merger function, NOT a React component. Correct: \`export function cn(...inputs) { return inputs.filter(Boolean).join(" "); }\`. NEVER make cn return JSX or render a <div>.
+- **cn utility — CRITICAL**: If you create /lib/utils.ts or /components/ui/utils.ts with a \`cn\` helper, it MUST be a classname merger function, NOT a React component. Correct: \`export function cn(...inputs) { return inputs.filter(Boolean).join(" "); }\`. NEVER make cn return JSX or render a <div>.
 - **Export rules — CRITICAL**: 
   - /components/ui/ files: use NAMED exports (export function Button, export function Card, etc.) so consumers can import { Button } from "./ui/Button".
   - ALL other files (pages, domain components, layout, hooks, contexts): use \`export default X\` ONLY. NEVER add a separate \`export { X }\` for the same symbol.
-- **Nav-Route consistency — CRITICAL**: Every path listed in Sidebar/Navigation NavLink items MUST have a matching \`<Route path="..." />\` in App.jsx. Do NOT add sidebar items for pages that don't exist yet. If the sidebar has 9 items, App.jsx must have 9 corresponding routes with real page components.
+- **Nav-Route consistency — CRITICAL**: Every path listed in Sidebar/Navigation NavLink items MUST have a matching \`<Route path="..." />\` in App.tsx. Do NOT add sidebar items for pages that don't exist yet. If the sidebar has 9 items, App.tsx must have 9 corresponding routes with real page components.
 
 ## REQUIREMENTS TRANSLATION
 1. Extract EVERY noun/feature → each = at least 1 component file
@@ -187,7 +189,7 @@ fetch(\`\${apiBase}/functions/v1/project-auth\`, {
 - EVERY list/dashboard page MUST fetch from project-api with proper loading skeleton + empty state UI.
 - Data hooks pattern (MANDATORY):
 \`\`\`
-// hooks/useContacts.js — CORRECT pattern
+// hooks/useContacts.ts — CORRECT pattern
 const [data, setData] = useState([]);
 const [loading, setLoading] = useState(true);
 useEffect(() => {
@@ -210,11 +212,11 @@ ${schemas && schemas.length > 0 ? `## DATA MODELS\n${schemas.map((s: any) => {
 ## ROUTING
 - ALWAYS HashRouter (NOT BrowserRouter) — required for iframe sandbox
 - Nested: <Route path="/" element={<AppLayout />}> with <Outlet />
-- /layout/Sidebar.jsx: NavLink with isActive styling
+- /layout/Sidebar.tsx: NavLink with isActive styling
 - NEVER dump all features on single page — use ROUTES for each module
 
 ## AUTH PATTERN (when needed)
-/components/AuthContext.jsx: login/signup/logout + /components/LoginPage.jsx
+/contexts/AuthContext.tsx: login/signup/logout + /pages/Auth/LoginPage.tsx
 ProtectedRoute wrapper. Login MUST call auth API.
 
 ## COMPLETENESS CHECKLIST
@@ -262,8 +264,8 @@ ProtectedRoute wrapper. Login MUST call auth API.
 - \`--- /migrations/001_schema.sql\` — CREATE TABLE statements
 - \`--- /migrations/002_rls.sql\` — RLS policies for each table
 - \`--- /schema.json\` — JSON schema describing entities
-- Backend hooks (\`/hooks/use<Entity>.js\`) that call the Data API
-- Auth context (\`/contexts/AuthContext.jsx\`) if auth is needed
+- Backend hooks (\`/hooks/use<Entity>.ts\`) that call the Data API
+- Auth context (\`/contexts/AuthContext.tsx\`) if auth is needed
 
 If ANY of these artifacts is missing for a backend feature, the build will be REJECTED.
 
@@ -337,7 +339,7 @@ serve(async (req) => {
 ${retry_context}
 
 FIX CHECKLIST:
-1. /App.jsx MUST have default export
+1. /App.tsx MUST have default export
 2. Close ALL JSX tags — every <Tag> needs </Tag> or />
 3. NO bracket notation in JSX (<arr[i].icon/> is INVALID — use const Icon = arr[i].icon; <Icon />)
 4. ES6 imports ONLY — no require()

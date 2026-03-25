@@ -80,14 +80,15 @@ ${workspaceContext ? `### Current code (scoped):\n${workspaceContext}` : ""}
 3. Import from existing workspace files — do NOT recreate them.
 4. NEVER write to /components/ui/** — those are pre-scaffolded UI primitives.
 5. **CRITICAL FILE STRUCTURE**:
+   - **MANDATORY: ALL source files must use .tsx (for components/JSX) or .ts (for pure logic/hooks). NEVER generate .jsx or .js files.**
    - /components/ui/ — pre-scaffolded shadcn-compatible UI components (do not modify). These use NAMED exports (e.g. import { Card, CardHeader } from "./ui/Card").
    - /components/ — reusable DOMAIN components (StatCard, StatusBadge, PageHeader, SearchFilterBar, ActivityFeed, QuickActions, NotificationBell, ChartCard, FormModal). These use DEFAULT exports.
    - /contexts/ — React contexts (AuthContext, etc.).
-   - /pages/ModuleName/ — page components in named directories (e.g. /pages/Dashboard/DashboardPage.jsx). These use DEFAULT exports.
-   - /hooks/ — custom hooks.
-   - /services/ — API services.
+   - /pages/ModuleName/ — page components in named directories (e.g. /pages/Dashboard/DashboardPage.tsx). These use DEFAULT exports.
+   - /hooks/ — custom hooks (.ts files).
+   - /services/ — API services (.ts files).
    - /styles/ — CSS files.
-   - /layout/ — layout wrappers (AppLayout.jsx, Sidebar.jsx). These use DEFAULT exports.
+   - /layout/ — layout wrappers (AppLayout.tsx, Sidebar.tsx). These use DEFAULT exports.
    When importing, always use correct relative paths from the file's location.
    Import cn from "./ui/utils" in component files, or from "../ui/utils" from page files.
 6. **COMPONENT DECOMPOSITION (CRITICAL)**: Pages must NOT be monolithic. Every page MUST import and use components from /components/ui/:
@@ -142,11 +143,11 @@ function buildWorkspaceContext(
   if (files.length === 0) return "";
 
   const PRIORITY_FILES = [
-    "/App.jsx",
     "/App.tsx",
-    "/contexts/AuthContext.jsx",
-    "/layout/AppLayout.jsx",
-    "/layout/Sidebar.jsx",
+    "/App.jsx",
+    "/contexts/AuthContext.tsx",
+    "/layout/AppLayout.tsx",
+    "/layout/Sidebar.tsx",
   ];
 
   const isRelevant = (path: string) => {

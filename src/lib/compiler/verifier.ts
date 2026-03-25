@@ -293,11 +293,11 @@ function getProducedFileCandidates(expectedFile: string): string[] {
   }
 
   // Known plan-agent aliases (path convention drift)
-  if (/^\/contexts\/AuthContext\.(js|ts|tsx)$/i.test(normalized)) {
-    candidates.add("/contexts/AuthContext.jsx");
+  if (/^\/contexts\/AuthContext\.(js|ts|jsx)$/i.test(normalized)) {
+    candidates.add("/contexts/AuthContext.tsx");
   }
-  if (/^\/components\/ProtectedRoute\.(js|ts|tsx)$/i.test(normalized)) {
-    candidates.add("/components/ProtectedRoute.jsx");
+  if (/^\/components\/ProtectedRoute\.(js|ts|jsx)$/i.test(normalized)) {
+    candidates.add("/components/ProtectedRoute.tsx");
   }
 
   const topLevelAuthPage = normalized.match(/^\/pages\/(Login|Signup)(Page)?\.(jsx|tsx|js|ts)$/i);
@@ -434,7 +434,7 @@ function checkRoutes(workspace: Workspace): {
 
   // ─── Nav-Route Mismatch Check ───────────────────────────────────────
   // Find sidebar/navbar NavLink paths and verify they have matching Route entries
-  for (const sidebarPath of ["/layout/Sidebar.jsx", "/layout/Sidebar.tsx", "/components/Sidebar.jsx", "/layout/Navigation.jsx"]) {
+  for (const sidebarPath of ["/layout/Sidebar.tsx", "/layout/Sidebar.jsx", "/components/Sidebar.tsx", "/components/Sidebar.jsx", "/layout/Navigation.tsx", "/layout/Navigation.jsx"]) {
     const sidebarContent = workspace.getFile(sidebarPath);
     if (!sidebarContent) continue;
 
