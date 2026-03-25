@@ -1274,7 +1274,8 @@ export function useApi(collection, projectId, sampleData) {
 }
 
 export function getGlobalStyles(): string {
-  return DESIGN_SYSTEM_CSS + "\n" + UI_ANIMATIONS_CSS;
+  const { ANIMATION_CSS } = require("@/lib/compiler/animations");
+  return DESIGN_SYSTEM_CSS + "\n" + UI_ANIMATIONS_CSS + "\n" + ANIMATION_CSS;
 }
 
 function generateAppLayout(): string {
