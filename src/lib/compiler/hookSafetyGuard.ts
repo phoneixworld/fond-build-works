@@ -164,9 +164,10 @@ export default function ${hookName}() {
         const projectId = (window as any).__PROJECT_ID__;
         const apiBase = (window as any).__SUPABASE_URL__;
         const apiKey = (window as any).__SUPABASE_KEY__;
-        const res = await fetch(\`\${apiBase}/functions/v1/project-api\`, {
+        const url = apiBase + "/functions/v1/project-api";
+        const res = await fetch(url, {
           method: "POST",
-          headers: { "Content-Type": "application/json", "Authorization": \`Bearer \${apiKey}\` },
+          headers: { "Content-Type": "application/json", "Authorization": "Bearer " + apiKey },
           body: JSON.stringify({ project_id: projectId, collection: "${collectionName}", action: "list" }),
         });
         const json = await res.json();
