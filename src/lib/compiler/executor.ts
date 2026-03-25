@@ -461,6 +461,11 @@ export async function executeTask(
     }
   }
 
+  // ── Hook Safety Guard: detect & repair broken data hooks ───────────
+  if (extracted && Object.keys(extracted).length > 0) {
+    extracted = repairBrokenDataHooks(extracted);
+  }
+
   return extracted && Object.keys(extracted).length > 0 ? extracted : {};
 }
 
