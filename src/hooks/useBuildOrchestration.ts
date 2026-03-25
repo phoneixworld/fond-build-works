@@ -1896,13 +1896,25 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
   ]);
 
   const abortBuild = useCallback(() => {
+    buildRunTokenRef.current += 1;
     abortControllerRef.current?.abort();
     abortControllerRef.current = null;
+    if (buildSafetyTimeoutRef.current) {
+      clearTimeout(buildSafetyTimeoutRef.current);
+      buildSafetyTimeoutRef.current = null;
+    }
+    sandpackFilesRef.current = null;
+    setSandpackFiles(null);
+    setSandpackDeps({});
+    syncSandpackToVirtualFS({});
+    setCompilerTasks([]);
+    setPipelineStep(null);
+    setCurrentAgent(null);
     setIsLoading(false);
     setIsBuilding(false);
     setBuildStep("");
     isSendingRef.current = false;
-  }, [setIsBuilding, setBuildStep]);
+  }, [setSandpackFiles, setSandpackDeps, syncSandpackToVirtualFS, setIsBuilding, setBuildStep]);
 
   return {
     isLoading,
