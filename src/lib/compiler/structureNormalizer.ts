@@ -15,7 +15,6 @@ export function normalizeGeneratedStructure(workspace: Workspace): number {
   fixed += normalizeContextReferences(workspace);
   fixed += normalizeExportDuplication(workspace);
   fixed += normalizeComponentExportConventions(workspace);
-  fixed += normalizeBarrelExports(workspace);
   return fixed;
 }
 
