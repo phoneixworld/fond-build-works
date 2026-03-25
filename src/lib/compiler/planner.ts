@@ -321,15 +321,15 @@ Each component must export default and use lucide-react for icons.`,
         description: `Generate Features and How It Works sections for: "${ctx.rawRequirements.slice(0, 1200)}"
 
 Create THESE files:
-1. /components/FeaturesSection.jsx — 6 feature cards in a 3-column grid
-2. /components/HowItWorks.jsx — 3-step process section
-3. /components/QuickLinks.jsx — Grid of action/resource cards
+1. /components/FeaturesSection.tsx — 6 feature cards in a 3-column grid
+2. /components/HowItWorks.tsx — 3-step process section
+3. /components/QuickLinks.tsx — Grid of action/resource cards
 
 Each component must export default and use lucide-react for icons.`,
         produces: [
-          "/components/FeaturesSection.jsx",
-          "/components/HowItWorks.jsx",
-          "/components/QuickLinks.jsx",
+          "/components/FeaturesSection.tsx",
+          "/components/HowItWorks.tsx",
+          "/components/QuickLinks.tsx",
         ],
         dependsOn: [infraTask.id],
         priority: 3,
@@ -342,19 +342,19 @@ Each component must export default and use lucide-react for icons.`,
         description: `Generate Testimonials, Pricing, CTA, News, and Events sections for: "${ctx.rawRequirements.slice(0, 1200)}"
 
 Create THESE files:
-- /components/TestimonialsSection.jsx
-- /components/PricingSection.jsx
-- /components/CTASection.jsx
-- /components/NewsSection.jsx
-- /components/EventsSection.jsx
+- /components/TestimonialsSection.tsx
+- /components/PricingSection.tsx
+- /components/CTASection.tsx
+- /components/NewsSection.tsx
+- /components/EventsSection.tsx
 
 Each component must export default and use lucide-react for icons.`,
         produces: [
-          "/components/TestimonialsSection.jsx",
-          "/components/PricingSection.jsx",
-          "/components/CTASection.jsx",
-          "/components/NewsSection.jsx",
-          "/components/EventsSection.jsx",
+          "/components/TestimonialsSection.tsx",
+          "/components/PricingSection.tsx",
+          "/components/CTASection.tsx",
+          "/components/NewsSection.tsx",
+          "/components/EventsSection.tsx",
         ],
         dependsOn: [infraTask.id],
         priority: 3,
@@ -366,13 +366,13 @@ Each component must export default and use lucide-react for icons.`,
         type: "frontend",
         description: `Generate the main landing page that assembles all section components: "${ctx.rawRequirements.slice(0, 800)}"
 
-Create /pages/Index.jsx that imports and renders ALL sections in order:
+Create /pages/Index.tsx that imports and renders ALL sections in order:
 Navbar, HeroSection, StatsSection, FeaturesSection, HowItWorks, QuickLinks,
 EventsSection, NewsSection, TestimonialsSection, PricingSection, CTASection, Footer.
 
 Use a min-h-screen wrapper with smooth scroll enabled.
 Do NOT put any section content inline — import everything.`,
-        produces: ["/pages/Index.jsx"],
+        produces: ["/pages/Index.tsx"],
         dependsOn: [infraTask.id, layoutTask.id, heroTask.id, featuresTask.id, socialProofTask.id],
         priority: 4,
       });
@@ -387,8 +387,8 @@ Do NOT put any section content inline — import everything.`,
         description: `Generate the layout shell for this application: "${ctx.rawRequirements.slice(0, 1500)}"
 
 Create TWO files:
-1. /layout/AppLayout.jsx — Main layout wrapper with a sidebar on the left and {children} content area on the right. Must use <Outlet /> from react-router-dom for nested routing.
-2. /layout/Sidebar.jsx — Professional sidebar with:
+1. /layout/AppLayout.tsx — Main layout wrapper with a sidebar on the left and {children} content area on the right. Must use <Outlet /> from react-router-dom for nested routing.
+2. /layout/Sidebar.tsx — Professional sidebar with:
    - App logo/name at the top
    - Navigation links with icons (from lucide-react) for each module
    - Active state highlighting using useLocation() from react-router-dom
@@ -397,8 +397,8 @@ Create TWO files:
 
 Use NavLink from react-router-dom for active state detection.`,
         produces: [
-          "/layout/AppLayout.jsx",
-          "/layout/Sidebar.jsx",
+          "/layout/AppLayout.tsx",
+          "/layout/Sidebar.tsx",
         ],
         dependsOn: [infraTask.id, authTaskId],
         priority: 3,
@@ -411,25 +411,25 @@ Use NavLink from react-router-dom for active state detection.`,
         description: `Generate reusable domain components for: "${ctx.rawRequirements.slice(0, 1000)}"
 
 REQUIRED components to generate (each in its own file):
-1. /components/StatCard.jsx — Reusable stat card with icon, value, label, trend props
-2. /components/DataTable.jsx — Sortable table with columns, data, onRowClick, searchable, pagination props
-3. /components/StatusBadge.jsx — Badge with status prop mapping to colors
-4. /components/PageHeader.jsx — Page header with title, subtitle, action buttons slot
-5. /components/SearchFilterBar.jsx — Search + filter bar with search input, filter dropdown, add button
-6. /components/ActivityFeed.jsx — Recent activity list with avatar, action text, timestamp
-7. /components/QuickActions.jsx — Grid of shortcut action cards with icons and labels
-8. /components/NotificationBell.jsx — Notification icon with badge count and dropdown
+1. /components/StatCard.tsx — Reusable stat card with icon, value, label, trend props
+2. /components/DataTable.tsx — Sortable table with columns, data, onRowClick, searchable, pagination props
+3. /components/StatusBadge.tsx — Badge with status prop mapping to colors
+4. /components/PageHeader.tsx — Page header with title, subtitle, action buttons slot
+5. /components/SearchFilterBar.tsx — Search + filter bar with search input, filter dropdown, add button
+6. /components/ActivityFeed.tsx — Recent activity list with avatar, action text, timestamp
+7. /components/QuickActions.tsx — Grid of shortcut action cards with icons and labels
+8. /components/NotificationBell.tsx — Notification icon with badge count and dropdown
 
 Each component must accept props, include realistic defaults, use lucide-react icons, and export default.`,
         produces: [
-          "/components/StatCard.jsx",
-          "/components/DataTable.jsx",
-          "/components/StatusBadge.jsx",
-          "/components/PageHeader.jsx",
-          "/components/SearchFilterBar.jsx",
-          "/components/ActivityFeed.jsx",
-          "/components/QuickActions.jsx",
-          "/components/NotificationBell.jsx",
+          "/components/StatCard.tsx",
+          "/components/DataTable.tsx",
+          "/components/StatusBadge.tsx",
+          "/components/PageHeader.tsx",
+          "/components/SearchFilterBar.tsx",
+          "/components/ActivityFeed.tsx",
+          "/components/QuickActions.tsx",
+          "/components/NotificationBell.tsx",
         ],
         dependsOn: [infraTask.id],
         priority: 3,
