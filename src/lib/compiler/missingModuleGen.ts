@@ -86,8 +86,14 @@ export function repairMissingModules(workspace: Workspace): {
     const componentName = extractComponentName(issue.resolvedPath);
     const stub = generateStubComponent(componentName, issue);
 
-    workspace.addFile(issue.resolvedPath, stub);
-    created.push(issue.resolvedPath);
+    // If the stub contains JSX but the target is a .ts file, rename to .tsx
+    let targetPath = issue.resolvedPath;
+    if (stub.includes("<") && /\.ts$/.test(targetPath)) {
+      targetPath = targetPath.replace(/\.ts$/, ".tsx");
+    }
+
+    workspace.addFile(targetPath, stub);
+    created.push(targetPath);
 
     cloudLog.warn(
       `Generated stub for missing module: ${issue.resolvedPath} (imported by ${issue.file})`,
