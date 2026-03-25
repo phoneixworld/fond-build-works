@@ -355,6 +355,48 @@ export function applyDeterministicFix(action: RepairAction, workspace: Workspace
   }
 }
 
+// ─── Cross-File Context Helper ────────────────────────────────────────────
+
+/**
+ * Get contents of files related to the target file (imports/importers)
+ * for better repair context.
+ */
+function getRelatedFileContents(
+  targetFile: string,
+  workspace: Workspace,
+  budgetChars: number,
+): string {
+  const parts: string[] = [];
+  let remaining = budgetChars;
+  const idx = workspace.index;
+
+  // Files that the target imports from
+  const imports = idx.imports[targetFile] || [];
+  for (const imp of imports) {
+    if (remaining <= 0) break;
+    const resolved = workspace.resolveImport(targetFile, imp.from);
+    if (!resolved) continue;
+    const content = workspace.getFile(resolved);
+    if (content && content.length < remaining) {
+      parts.push(`--- ${resolved}\n${content}`);
+      remaining -= content.length + 50;
+    }
+  }
+
+  // Files that import the target (importers)
+  const importers = findImporters(targetFile, workspace);
+  for (const importer of importers.slice(0, 2)) {
+    if (remaining <= 0) break;
+    const content = workspace.getFile(importer.file);
+    if (content && content.length < remaining) {
+      parts.push(`--- ${importer.file} (imports ${importer.symbols.join(", ")})\n${content}`);
+      remaining -= content.length + 50;
+    }
+  }
+
+  return parts.join("\n\n");
+}
+
 // ─── Helpers ──────────────────────────────────────────────────────────────
 
 function findImporters(
