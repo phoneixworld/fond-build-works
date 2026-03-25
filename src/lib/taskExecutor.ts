@@ -6,6 +6,7 @@
 import { streamBuildAgent } from "@/lib/agentPipeline";
 import type { BuildPlan, PlanTask, TaskStatus } from "@/lib/planningAgent";
 import { updateTaskStatus } from "@/lib/planningAgent";
+import { validateAllFiles, buildFileRetryPrompt } from "@/lib/compiler/syntaxValidator";
 
 export interface TaskExecutionCallbacks {
   onTaskStart: (task: PlanTask, index: number, total: number) => void;

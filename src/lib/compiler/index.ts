@@ -50,4 +50,5 @@ export { classifyRepairActions, applyDeterministicFix, MAX_REPAIR_ROUNDS, MAX_RE
 export { createTrace, printTrace } from "./observability";
 export { lintDesignQuality, formatLintSummary, type DesignLintResult, type DesignLintIssue } from "./designLint";
 export { DESIGN_THEMES, getDesignThemePrompt, detectDesignTheme, type DesignTheme } from "./designThemes";
-export { validateFileSyntax, validateAllFiles, type ParseResult } from "./syntaxValidator";
+export { validateFileSyntax, validateAllFiles, buildFileRetryPrompt, type ParseResult } from "./syntaxValidator";
+export { checkBuildInvariants, type InvariantResult, type InvariantViolation } from "./buildInvariants";
