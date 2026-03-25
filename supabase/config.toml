@@ -77,3 +77,9 @@ verify_jwt = false
 
 [functions.project-db]
 verify_jwt = false
+
+[functions.container-build]
+verify_jwt = false
+
+[functions.container-status]
+verify_jwt = false
