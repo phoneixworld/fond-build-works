@@ -48,3 +48,5 @@ export { Workspace } from "./workspace";
 export { verifyWorkspace } from "./verifier";
 export { classifyRepairActions, applyDeterministicFix, MAX_REPAIR_ROUNDS, MAX_REPAIR_ACTIONS_TOTAL } from "./repair";
 export { createTrace, printTrace } from "./observability";
+export { lintDesignQuality, formatLintSummary, type DesignLintResult, type DesignLintIssue } from "./designLint";
+export { DESIGN_THEMES, getDesignThemePrompt, detectDesignTheme, type DesignTheme } from "./designThemes";

@@ -9,6 +9,7 @@ import { streamBuildAgent } from "@/lib/agentPipeline";
 import { detectTruncation } from "@/lib/truncationRecovery";
 import type { BuildContext, CompilerTask, TaskGraph } from "./types";
 import type { Workspace } from "./workspace";
+import { getDesignThemePrompt } from "./designThemes";
 
 // ─── Task Prompt Builder ──────────────────────────────────────────────────
 
@@ -46,11 +47,14 @@ export function buildTaskPrompt(
   const irRoutes =
     ctx.ir.routes.length > 0 ? `- Routes: ${ctx.ir.routes.map((r) => `${r.path} → ${r.page}`).join(", ")}` : "";
 
+  const designThemeSection = getDesignThemePrompt(ctx.designTheme);
+
   return `## BUILD TASK ${taskIndex + 1}/${totalTasks}: ${task.label}
 
 ### What to build:
 ${task.description}
 ${requirementsSection}
+${designThemeSection ? `### Design Theme:\n${designThemeSection}\n` : ""}
 ### Files to create/modify:
 ${task.produces.map((f) => `- CREATE or UPDATE: ${f}`).join("\n")}
 ${task.touches.length > 0 ? task.touches.map((f) => `- TOUCH: ${f}`).join("\n") : ""}
@@ -131,6 +135,18 @@ ${workspaceContext ? `### Current code (scoped):\n${workspaceContext}` : ""}
 12. Every file MUST import ALL identifiers it uses.
 13. Every function called in a component MUST be defined in that component, imported, or destructured from a hook/context.
 14. When using useEffect, ensure ALL dependencies referenced inside the effect are either defined above or listed in the dependency array.
+
+### DESIGN QUALITY RULES (CRITICAL — make it beautiful):
+15. **Typography Hierarchy**: Use a consistent scale — page titles: text-2xl font-bold, section titles: text-lg font-semibold, body: text-sm, meta/labels: text-xs font-medium uppercase tracking-wider text-[var(--color-text-muted)].
+16. **Spacing Rhythm**: Use consistent spacing: var(--space-2) for tight gaps, var(--space-4) for standard padding, var(--space-6) for card padding, var(--space-8) for section gaps, var(--space-12) for page sections. NEVER mix arbitrary spacing values.
+17. **Color Usage**: Primary for CTAs and active states. Success/Warning/Danger for status ONLY. Muted text for secondary information. NEVER use more than 3 colors prominently on one page.
+18. **Interactive States**: EVERY clickable element MUST have hover, focus, and disabled states. Buttons: hover:translateY(-1px) + shadow. Cards: hover:shadow-lg + translateY(-2px). Links: underline on hover.
+19. **Loading & Empty States**: Data-fetching components MUST show skeleton shimmer while loading. Empty data MUST show the "empty-state" pattern with icon + title + description + CTA button. NEVER show a blank area.
+20. **Visual Hierarchy**: Each page needs ONE clear focal point (hero stat, primary CTA, or key data). Use size, weight, and color contrast to create a clear reading flow: primary action → data → secondary actions.
+21. **Responsive Design**: All layouts MUST work at mobile (375px), tablet (768px), and desktop (1280px). Use grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 for card grids.
+22. **Micro-Interactions**: Add "animate-fade-in" to page containers, "stagger" class to list/grid parents, hover scale on cards. Use transition-all duration-200 on interactive elements.
+23. **Component Polish**: Tables MUST have header styling (uppercase, muted, smaller font) + row hover + status badges. Forms MUST have labels, placeholders, validation feedback, and proper spacing between fields.
+24. **Page Structure**: Every page MUST follow: PageHeader (title + description + primary action) → content area with proper sections. Dashboard pages MUST lead with stat cards in a responsive grid.
 `;
 }
 

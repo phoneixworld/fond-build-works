@@ -29,6 +29,8 @@ import { fixMissingImports, fixProviderOrdering } from "./missingImportFixer";
 import { fixExportMismatches } from "./exportMismatchFixer";
 import { deduplicateFiles } from "./deduplicator";
 import { normalizeGeneratedStructure } from "./structureNormalizer";
+import { lintDesignQuality, formatLintSummary } from "./designLint";
+import { detectDesignTheme } from "./designThemes";
 import {
   createTrace, startPass, endPass,
   traceTaskStart, traceTaskEnd, finalizeTrace, printTrace,
@@ -106,8 +108,17 @@ export async function compile(
     model: options.model,
   });
 
-  cloudLog.info(`Build started: intent=${ctx.buildIntent}, ${ctx.ir.entities.length} entities, ${ctx.ir.routes.length} routes`, "compiler");
-  console.log(`[Compiler] Context assembled: intent=${ctx.buildIntent}, entities=${ctx.ir.entities.length}, routes=${ctx.ir.routes.length}, modules=${ctx.ir.modules.length}`);
+  // ── Auto-detect design theme if not explicitly provided ─────────────
+  if (!ctx.designTheme) {
+    const detectedTheme = detectDesignTheme(options.rawRequirements);
+    if (detectedTheme) {
+      ctx.designTheme = detectedTheme;
+      console.log(`[Compiler] 🎨 Auto-detected design theme: ${detectedTheme}`);
+    }
+  }
+
+  cloudLog.info(`Build started: intent=${ctx.buildIntent}, ${ctx.ir.entities.length} entities, ${ctx.ir.routes.length} routes, theme=${ctx.designTheme || 'default'}`, "compiler");
+  console.log(`[Compiler] Context assembled: intent=${ctx.buildIntent}, entities=${ctx.ir.entities.length}, routes=${ctx.ir.routes.length}, modules=${ctx.ir.modules.length}, theme=${ctx.designTheme || 'default'}`);
 
   // ── Phase 1.5: Pre-Build Agents (invisible) ─────────────────────────
 
@@ -503,6 +514,29 @@ export async function compile(
   if (structureFixes > 0) {
     cloudLog.info(`Structure normalizer: applied ${structureFixes} structural fix(es)`, "compiler");
     console.log(`[Compiler] 🧱 Structure normalizer: applied ${structureFixes} structural fix(es)`);
+  }
+
+  // ── Phase 3.97: Design Quality Lint ─────────────────────────────────
+
+  callbacks.onPhase("design-lint", "Linting design quality and fixing raw colors...");
+
+  const designLintResult = lintDesignQuality(workspace.toRecord());
+  if (designLintResult.autoFixCount > 0) {
+    // Apply auto-fixed files back to workspace
+    for (const [path, content] of Object.entries(designLintResult.files)) {
+      if (workspace.hasFile(path) && workspace.getFile(path) !== content) {
+        workspace.updateFile(path, content);
+      }
+    }
+    const summary = formatLintSummary(designLintResult);
+    cloudLog.info(`Design lint: ${summary}`, "compiler");
+    console.log(`[Compiler] 🎨 Design lint: ${summary}`);
+  }
+  if (designLintResult.issues.length > 0) {
+    const warnings = designLintResult.issues.filter(i => !i.autoFixed);
+    if (warnings.length > 0) {
+      console.log(`[Compiler] 🎨 Design warnings: ${warnings.map(w => `${w.file}: ${w.message}`).join("; ")}`);
+    }
   }
 
   // ── Phase 3.10: Ensure App.jsx exists and has valid imports ──────────
