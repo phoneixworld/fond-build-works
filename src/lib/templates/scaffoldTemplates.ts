@@ -1107,13 +1107,13 @@ export default function NotificationBell({ count = 3 }) {
 
 export function getDomainComponents(): Record<string, string> {
   return {
-    "/components/StatCard.jsx": STAT_CARD_COMPONENT,
-    "/components/StatusBadge.jsx": STATUS_BADGE_COMPONENT,
-    "/components/PageHeader.jsx": PAGE_HEADER_COMPONENT,
-    "/components/SearchFilterBar.jsx": SEARCH_FILTER_BAR_COMPONENT,
-    "/components/ActivityFeed.jsx": ACTIVITY_FEED_COMPONENT,
-    "/components/QuickActions.jsx": QUICK_ACTIONS_COMPONENT,
-    "/components/NotificationBell.jsx": NOTIFICATION_BELL_COMPONENT,
+    "/components/StatCard.tsx": STAT_CARD_COMPONENT,
+    "/components/StatusBadge.tsx": STATUS_BADGE_COMPONENT,
+    "/components/PageHeader.tsx": PAGE_HEADER_COMPONENT,
+    "/components/SearchFilterBar.tsx": SEARCH_FILTER_BAR_COMPONENT,
+    "/components/ActivityFeed.tsx": ACTIVITY_FEED_COMPONENT,
+    "/components/QuickActions.tsx": QUICK_ACTIONS_COMPONENT,
+    "/components/NotificationBell.tsx": NOTIFICATION_BELL_COMPONENT,
   };
 }
 
@@ -1190,7 +1190,7 @@ export default function AppLayout() {
 function getGenericScaffold(): Record<string, string> {
   const files: Record<string, string> = {};
 
-  files["/App.jsx"] = `import React from "react";
+  files["/App.tsx"] = `import React from "react";
 import { HashRouter, Routes, Route, Navigate } from "react-router-dom";
 import AppLayout from "./layout/AppLayout";
 import Dashboard from "./pages/Dashboard/Dashboard";
@@ -1209,9 +1209,9 @@ export default function App() {
 }
 `;
 
-  files["/layout/AppLayout.jsx"] = generateAppLayout();
+  files["/layout/AppLayout.tsx"] = generateAppLayout();
 
-  files["/layout/Sidebar.jsx"] = `import React from "react";
+  files["/layout/Sidebar.tsx"] = `import React from "react";
 import { NavLink } from "react-router-dom";
 import { LayoutDashboard } from "lucide-react";
 
@@ -1247,7 +1247,7 @@ export default function Sidebar() {
 }
 `;
 
-  files["/pages/Dashboard/Dashboard.jsx"] = `import React from "react";
+  files["/pages/Dashboard/Dashboard.tsx"] = `import React from "react";
 
 export default function Dashboard() {
   return (
@@ -1260,7 +1260,7 @@ export default function Dashboard() {
 `;
 
   Object.assign(files, getSharedUIComponents());
-  files["/hooks/useApi.js"] = getUseApiHook();
+  files["/hooks/useApi.ts"] = getUseApiHook();
   files["/styles/globals.css"] = getGlobalStyles();
 
   return files;
