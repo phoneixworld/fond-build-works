@@ -64,24 +64,25 @@ function buildSystemPrompt(projectId: string, techStack: string, schemas?: any[]
 
 ${isReactStack ? `## OUTPUT FORMAT — MANDATORY
 \`\`\`react-preview
---- /App.jsx
+--- /App.tsx
 import React from "react";
 import { HashRouter, Routes, Route } from "react-router-dom";
 export default function App() { return <HashRouter><Routes>...</Routes></HashRouter>; }
---- /layout/AppLayout.jsx
---- /layout/Sidebar.jsx
---- /pages/Module/ModulePage.jsx
---- /components/ui/Card.jsx
---- /hooks/useFetch.js
+--- /layout/AppLayout.tsx
+--- /layout/Sidebar.tsx
+--- /pages/Module/ModulePage.tsx
+--- /components/ui/Card.tsx
+--- /hooks/useFetch.ts
 --- /styles/globals.css
 --- dependencies
 {"lucide-react":"^0.400.0"}
 \`\`\`
 
 ### File Rules
-- Paths start with / (no /src/). /App.jsx MUST export default.
-- Structure: /App.jsx → /layout/ → /pages/Module/ → /components/ui/ → /hooks/ → /styles/
-- Each page gets its OWN folder. Min 10-15 files for simple apps, 15-25 for complex.` : `## OUTPUT FORMAT
+- Paths start with / (no /src/). /App.tsx MUST export default.
+- Structure: /App.tsx → /layout/ → /pages/Module/ → /components/ui/ → /hooks/ → /styles/
+- Each page gets its OWN folder. Min 10-15 files for simple apps, 15-25 for complex.
+- **MANDATORY: ALL source files must use .tsx (for components/JSX) or .ts (for pure logic/hooks). NEVER use .jsx or .js extensions.**` : `## OUTPUT FORMAT
 Generate a SINGLE complete index.html inside a \`\`\`html-preview code fence.`}
 
 ## ITERATION RULES (CRITICAL FOR FOLLOW-UP REQUESTS)
