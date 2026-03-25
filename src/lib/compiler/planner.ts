@@ -446,7 +446,7 @@ Each component must accept props, include realistic defaults, use lucide-react i
         type: "frontend",
         description: `Generate a RICH Dashboard page for: "${ctx.rawRequirements.slice(0, 1000)}"
 
-Create /pages/Dashboard/${dashPageName}.jsx that MUST include:
+Create /pages/Dashboard/${dashPageName}.tsx that MUST include:
 1. Welcome header with user greeting and current date
 2. 4 StatCard components imported from ../../components/StatCard
 3. ActivityFeed imported from ../../components/ActivityFeed
@@ -454,7 +454,7 @@ Create /pages/Dashboard/${dashPageName}.jsx that MUST include:
 5. DataTable imported from ../../components/DataTable showing recent records (5+ rows)
 
 CRITICAL: Import reusable components — do NOT inline them. Use domain-specific data.`,
-        produces: [`/pages/Dashboard/${dashPageName}.jsx`],
+        produces: [`/pages/Dashboard/${dashPageName}.tsx`],
         dependsOn: [infraTask.id, authTaskId, layoutTask.id, componentsTask.id],
         priority: 4,
       });
@@ -464,7 +464,7 @@ CRITICAL: Import reusable components — do NOT inline them. Use domain-specific
       // Generate one task per domain page to avoid oversized model outputs and truncation.
       for (const route of otherRoutes) {
         const pageDir = route.page.replace(/Page$/, "");
-        const pagePath = `/pages/${pageDir}/${route.page}.jsx`;
+        const pagePath = `/pages/${pageDir}/${route.page}.tsx`;
 
         const domainPageTask = createTask({
           label: `page:${pageDir}`,
@@ -495,14 +495,14 @@ RULES:
         const settingsTask = createTask({
           label: "page:Settings",
           type: "frontend",
-          description: `Generate a Settings page at /pages/Settings/SettingsPage.jsx with:
+          description: `Generate a Settings page at /pages/Settings/SettingsPage.tsx with:
 1. Tabs: General, Profile, Notifications, Security
 2. General tab: App name, timezone, language dropdown
 3. Profile tab: Avatar upload area, name, email, phone inputs
 4. Notifications tab: Toggle switches for email, SMS, push notifications
 5. Security tab: Change password form, two-factor toggle
 Import PageHeader from ../../components/PageHeader.`,
-          produces: ["/pages/Settings/SettingsPage.jsx"],
+          produces: ["/pages/Settings/SettingsPage.tsx"],
           dependsOn: [infraTask.id, componentsTask.id],
           priority: 4,
         });
@@ -529,7 +529,7 @@ Import PageHeader from ../../components/PageHeader.`,
       }
 
       const pageDir = route.page.replace(/Page$/, "");
-      const pagePath = `/pages/${pageDir}/${route.page}.jsx`;
+      const pagePath = `/pages/${pageDir}/${route.page}.tsx`;
 
       const pageTask = createTask({
         label: `page:${route.page}`,
@@ -556,23 +556,23 @@ RULES:
   const sidebarVerifyTask = createTask({
     label: "sidebar:verify-and-stub",
     type: "frontend",
-    description: `Verify that /layout/Sidebar.jsx navigation links match the routes in /App.jsx and existing pages.
+    description: `Verify that /layout/Sidebar.tsx navigation links match the routes in /App.tsx and existing pages.
 
 Responsibilities:
-- Parse /layout/Sidebar.jsx and extract all NavLink/Link paths.
-- Parse /App.jsx and ensure there is a <Route> for each sidebar path.
+- Parse /layout/Sidebar.tsx and extract all NavLink/Link paths.
+- Parse /App.tsx and ensure there is a <Route> for each sidebar path.
 - For any sidebar path without a matching route:
-  - Add a <Route> entry in /App.jsx pointing to a stub page.
-  - Generate a simple, fully working stub page under /pages/Module/ModulePage.jsx that:
+  - Add a <Route> entry in /App.tsx pointing to a stub page.
+  - Generate a simple, fully working stub page under /pages/Module/ModulePage.tsx that:
     - Imports PageHeader and DataTable from /components/
     - Fetches data from project-api with loading skeleton and empty state UI
     - NEVER uses inline SAMPLE_DATA arrays — all data must come from API calls
     - Uses proper layout and styling consistent with the rest of the app.
 - Do NOT remove existing routes or pages.`,
-    produces: ["/App.jsx"],
+    produces: ["/App.tsx"],
     dependsOn: [...pageTaskIds],
     priority: 5,
-    touches: ["/App.jsx", "/layout/Sidebar.jsx"],
+    touches: ["/App.tsx", "/layout/Sidebar.tsx"],
   });
   tasks.push(sidebarVerifyTask);
 
