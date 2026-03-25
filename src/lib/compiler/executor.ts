@@ -10,6 +10,7 @@ import { detectTruncation } from "@/lib/truncationRecovery";
 import type { BuildContext, CompilerTask, TaskGraph } from "./types";
 import type { Workspace } from "./workspace";
 import { getDesignThemePrompt } from "./designThemes";
+import { validateAllFiles, buildFileRetryPrompt, type ParseResult } from "./syntaxValidator";
 
 // ─── Task Prompt Builder ──────────────────────────────────────────────────
 
