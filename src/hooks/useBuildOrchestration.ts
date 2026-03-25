@@ -834,6 +834,7 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
 
         const compileCallbacks: CompileCallbacks = {
           onPhase: (phase, detail) => {
+            if (isStaleBuild()) return;
             resetBuildSafetyTimeout();
             setBuildStep(detail);
             if (phase === "planning") setPipelineStep("planning");
@@ -843,6 +844,7 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
             else if (phase === "complete") setPipelineStep("complete");
           },
           onPlanReady: (tasks) => {
+            if (isStaleBuild()) return;
             planLabelsRef.current = tasks.map((t) => t.label);
             setCompilerTasks(
               tasks.map((t, i) => ({
@@ -853,6 +855,7 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
             );
           },
           onTaskStart: (task, index, total) => {
+            if (isStaleBuild()) return;
             resetBuildSafetyTimeout();
             setCurrentTaskIndex(index);
             setTotalPlanTasks(total);
@@ -881,10 +884,15 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
             });
           },
           onTaskDelta: (task, chunk) => {
+            if (isStaleBuild()) return;
             resetBuildSafetyTimeout();
             setBuildStreamContent((prev) => prev + chunk);
           },
           onTaskDone: (task, files) => {
+            if (isStaleBuild()) {
+              console.warn("[Compiler] ⛔ Ignored stale task output from cancelled/superseded build");
+              return;
+            }
             resetBuildSafetyTimeout();
             if (lastProjectIdRef.current !== null && lastProjectIdRef.current !== buildProjectId) {
               console.warn(`[Compiler] ⛔ Blocked cross-project file injection`);
@@ -930,6 +938,7 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
             }
           },
           onTaskError: (task, error) => {
+            if (isStaleBuild()) return;
             console.error(`[Compiler] Task '${task.label}' failed:`, error);
             setCompilerTasks((prev) =>
               prev.map((t) =>
@@ -938,6 +947,7 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
             );
           },
           onVerification: (result) => {
+            if (isStaleBuild()) return;
             resetBuildSafetyTimeout();
             if (result.ok) {
               setBuildStep("✅ All checks passed");
@@ -947,10 +957,15 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
             }
           },
           onRepairStart: (round, actionCount) => {
+            if (isStaleBuild()) return;
             resetBuildSafetyTimeout();
             setBuildStep(`🔧 Auto-repair round ${round}: fixing ${actionCount} issues...`);
           },
           onComplete: (result: BuildResult) => {
+            if (isStaleBuild()) {
+              console.warn("[Compiler] ⛔ Ignored stale completion from cancelled/superseded build");
+              return;
+            }
             lastVerificationOkRef.current = result.verification.ok;
 
             if (deferredPreviewTimerRef.current) {
