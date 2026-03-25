@@ -9,6 +9,7 @@ import { streamBuildAgent } from "@/lib/agentPipeline";
 import { detectTruncation } from "@/lib/truncationRecovery";
 import type { BuildContext, CompilerTask, TaskGraph } from "./types";
 import type { Workspace } from "./workspace";
+import { getDesignThemePrompt } from "./designThemes";
 
 // ─── Task Prompt Builder ──────────────────────────────────────────────────
 
@@ -46,11 +47,14 @@ export function buildTaskPrompt(
   const irRoutes =
     ctx.ir.routes.length > 0 ? `- Routes: ${ctx.ir.routes.map((r) => `${r.path} → ${r.page}`).join(", ")}` : "";
 
+  const designThemeSection = getDesignThemePrompt(ctx.designTheme);
+
   return `## BUILD TASK ${taskIndex + 1}/${totalTasks}: ${task.label}
 
 ### What to build:
 ${task.description}
 ${requirementsSection}
+${designThemeSection ? `### Design Theme:\n${designThemeSection}\n` : ""}
 ### Files to create/modify:
 ${task.produces.map((f) => `- CREATE or UPDATE: ${f}`).join("\n")}
 ${task.touches.length > 0 ? task.touches.map((f) => `- TOUCH: ${f}`).join("\n") : ""}
