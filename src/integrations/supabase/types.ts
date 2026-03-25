@@ -2558,6 +2558,75 @@ export type Database = {
         }
         Relationships: []
       }
+      pd_fb79adf5f404_contact: {
+        Row: {
+          company: string | null
+          created_at: string
+          description: string | null
+          email: string
+          id: string
+          name: string
+          phone: string | null
+          project_id: string
+          status: string | null
+          updated_at: string
+        }
+        Insert: {
+          company?: string | null
+          created_at?: string
+          description?: string | null
+          email: string
+          id?: string
+          name: string
+          phone?: string | null
+          project_id?: string
+          status?: string | null
+          updated_at?: string
+        }
+        Update: {
+          company?: string | null
+          created_at?: string
+          description?: string | null
+          email?: string
+          id?: string
+          name?: string
+          phone?: string | null
+          project_id?: string
+          status?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      pd_fb79adf5f404_crm: {
+        Row: {
+          created_at: string
+          description: string | null
+          id: string
+          name: string
+          project_id: string
+          status: string | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          name: string
+          project_id?: string
+          status?: string | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          name?: string
+          project_id?: string
+          status?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       pd_fbefa4f4ad88_state: {
         Row: {
           created_at: string
