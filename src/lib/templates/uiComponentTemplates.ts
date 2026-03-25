@@ -12,7 +12,11 @@
 
 // ─── 1. Utils (cn helper) ────────────────────────────────────────────────────
 
-export const UTILS_COMPONENT = `export function cn(...classes) {
+export const UTILS_COMPONENT = `/**
+ * Utility: class name merger (cn helper)
+ * Location: /utils/cn.ts — NOT inside /components/ui/
+ */
+export function cn(...classes) {
   return classes.filter(Boolean).join(" ");
 }
 `;
@@ -20,7 +24,7 @@ export const UTILS_COMPONENT = `export function cn(...classes) {
 // ─── 2. Button ───────────────────────────────────────────────────────────────
 
 export const BUTTON_COMPONENT = `import React from "react";
-import { cn } from "./utils";
+import { cn } from "../utils/cn";
 
 const buttonVariants = {
   variant: {
@@ -1186,8 +1190,8 @@ export const UI_ANIMATIONS_CSS = `
 
 export function getAllUIComponents(): Record<string, string> {
   return {
-    // Core utils
-    "/components/ui/utils.ts": UTILS_COMPONENT,
+    // Core utils — lives in /utils/, NOT inside /components/ui/
+    "/utils/cn.ts": UTILS_COMPONENT,
     // 22 shadcn-compatible components
     "/components/ui/Button.tsx": BUTTON_COMPONENT,
     "/components/ui/Card.tsx": CARD_COMPONENT,
@@ -1217,7 +1221,21 @@ export function getAllUIComponents(): Record<string, string> {
     "/components/ui/DataTable.tsx": DATATABLE_COMPONENT,
     "/components/ui/Toast.tsx": TOAST_COMPONENT,
     "/components/ui/Spinner.tsx": SPINNER_COMPONENT,
+    // Barrel exports for clean imports
+    "/components/ui/index.ts": generateUIBarrelExport(),
+    "/components/index.ts": `// Domain components barrel — re-export as modules are created\n`,
+    "/pages/index.ts": `// Pages barrel — re-export as pages are created\n`,
   };
+}
+
+function generateUIBarrelExport(): string {
+  const components = [
+    "Button", "Card", "Input", "Label", "Badge", "Separator", "Skeleton",
+    "Checkbox", "Dialog", "Table", "Textarea", "Select", "Tabs", "Alert",
+    "Avatar", "Progress", "Switch", "Tooltip", "ScrollArea", "Dropdown",
+    "Sheet", "Popover", "Accordion", "Modal", "DataTable", "Toast", "Spinner",
+  ];
+  return components.map(c => `export * from "./${c}";`).join("\n") + "\n";
 }
 
 export function getShadcnUIComponents(): Record<string, string> {
