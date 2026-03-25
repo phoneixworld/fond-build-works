@@ -1003,7 +1003,14 @@ function buildSandpackFiles(files: SandpackFileSet | null, projectId: string, su
     }
 
     const normalized = trimmedPath.startsWith("/") ? trimmedPath : `/${trimmedPath}`;
-    const sandpackPath = normalized;
+    let sandpackPath = normalized.startsWith("/") ? normalized : `/${normalized}`;
+
+    // Fix: .ts files containing JSX must be renamed to .tsx for Sandpack's Babel
+    if (sandpackPath.endsWith(".ts") && !sandpackPath.endsWith(".d.ts") && /<\w[\s\S]*?>/.test(code)) {
+      console.warn(`[SandpackPreview] Renaming ${sandpackPath} → .tsx (contains JSX)`);
+      sandpackPath = sandpackPath.replace(/\.ts$/, ".tsx");
+    }
+
     const isCodeFile = /\.(jsx?|tsx?)$/.test(sandpackPath);
     let processed = isCodeFile ? sanitizeImports(code, sandpackPath) : code;
 
