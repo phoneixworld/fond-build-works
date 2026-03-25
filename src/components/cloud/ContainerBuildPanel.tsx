@@ -65,7 +65,11 @@ const ContainerBuildPanel = () => {
   const handleStartBuild = async () => {
     if (!currentProject) return;
     try {
-      await build.startBuild(currentProject.id, files, {}, {});
+      const plainFiles: Record<string, string> = {};
+      for (const [path, vf] of Object.entries(files)) {
+        plainFiles[path] = vf.content;
+      }
+      await build.startBuild(currentProject.id, plainFiles, {}, {});
     } catch (err) {
       console.error("Failed to start container build:", err);
     }
