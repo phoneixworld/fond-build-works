@@ -291,6 +291,7 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
   const streamingControllerRef = useRef<StreamingPreviewController | null>(null);
   const lastProjectIdRef = useRef<string | null>(null);
   const deferredPreviewTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const buildRunTokenRef = useRef(0);
 
   useEffect(() => {
     buildRetryCountRef.current = buildRetryCount;
@@ -579,7 +580,10 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
       if (!text || !currentProject) return;
 
       const buildProjectId = currentProject.id;
+      const runToken = buildRunTokenRef.current + 1;
+      buildRunTokenRef.current = runToken;
       const isStaleBuild = () =>
+        runToken !== buildRunTokenRef.current ||
         !currentProject ||
         currentProject.id !== buildProjectId ||
         (lastProjectIdRef.current !== null && lastProjectIdRef.current !== buildProjectId);
@@ -611,6 +615,7 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
       const resetBuildSafetyTimeout = () => {
         if (buildSafetyTimeoutRef.current) clearTimeout(buildSafetyTimeoutRef.current);
         buildSafetyTimeoutRef.current = setTimeout(() => {
+          if (isStaleBuild()) return;
           console.warn("[BuildOrch] Build safety timeout — forcing isBuilding=false");
           setIsBuilding(false);
           setIsLoading(false);
