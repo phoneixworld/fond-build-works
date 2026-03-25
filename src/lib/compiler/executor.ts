@@ -240,7 +240,10 @@ export interface ExecutionCallbacks {
 
 /**
  * Execute a single task: build prompt, call model, parse output, return files.
- * Includes truncation detection with auto-retry (up to 1 continuation).
+ * Includes:
+ *  - Truncation detection with auto-retry (up to 3 continuations)
+ *  - Pre-commit syntax validation (Babel parse gate)
+ *  - Per-file retry for files that fail to parse
  */
 export async function executeTask(
   task: CompilerTask,
@@ -253,7 +256,8 @@ export async function executeTask(
   const prompt = buildTaskPrompt(task, ctx, workspace, taskIndex, totalTasks);
   task.buildPrompt = prompt;
 
-  const MAX_CONTINUATION_RETRIES = 2;
+  const MAX_CONTINUATION_RETRIES = 3;
+  const MAX_FILE_RETRIES = 2;
 
   const runStream = (
     messages: Array<{ role: "user" | "assistant" | "system"; content: string }>,
@@ -299,6 +303,7 @@ export async function executeTask(
   let { text: responseText, files: extracted } = await runStream(baseMessages);
 
   if (extracted && Object.keys(extracted).length > 0) {
+    // ── Truncation handling ───────────────────────────────────────────
     const initialTruncation = detectTruncation(responseText, extracted);
     if (initialTruncation.isTruncated) {
       console.warn(`[Executor] Truncation detected in task '${task.label}': ${initialTruncation.reason}`);
@@ -326,9 +331,8 @@ export async function executeTask(
           const fullCombined = responseText + "\n" + contResult.text;
           const recheck = detectTruncation(fullCombined, extracted);
           if (!recheck.isTruncated) {
-            console.log(`[Executor] Continuation successful for task '${task.label}'`);
+            console.log(`[Executor] Continuation successful for task '${task.label}' (attempt ${attempt + 1})`);
             responseText = fullCombined;
-            activeTruncation = recheck;
             break;
           }
 
@@ -336,7 +340,7 @@ export async function executeTask(
           responseText = fullCombined;
           activeTruncation = recheck;
         } catch (contErr) {
-          console.warn(`[Executor] Continuation attempt failed:`, contErr);
+          console.warn(`[Executor] Continuation attempt ${attempt + 1} failed:`, contErr);
           break;
         }
       }
@@ -347,9 +351,99 @@ export async function executeTask(
         delete extracted[finalTruncation.truncatedFile];
       }
     }
+
+    // ── Pre-commit syntax validation (Babel parse gate) ───────────────
+    const { valid, invalid } = validateAllFiles(extracted);
+
+    if (invalid.length > 0) {
+      console.warn(`[Executor] ${invalid.length} file(s) failed syntax validation in task '${task.label}'`);
+
+      // Per-file retry: re-request only the broken files
+      for (const parseErr of invalid) {
+        const originalCode = extracted[parseErr.path];
+        if (!originalCode) continue;
+
+        let fixed = false;
+        for (let retryAttempt = 0; retryAttempt < MAX_FILE_RETRIES; retryAttempt++) {
+          try {
+            // Build workspace context from files that import this one
+            const relatedContext = buildRelatedFilesContext(parseErr.path, valid, workspace);
+            const retryPrompt = buildFileRetryPrompt(parseErr, originalCode, relatedContext);
+
+            console.log(`[Executor] 🔄 Per-file retry ${retryAttempt + 1}/${MAX_FILE_RETRIES} for ${parseErr.path}`);
+
+            const retryResult = await runStream([
+              {
+                role: "system",
+                content: "You are a syntax repair agent. Fix the syntax error in the provided file. Output ONLY the corrected file with a file header (--- /path/to/file.tsx).",
+              },
+              { role: "user", content: retryPrompt },
+            ]);
+
+            if (retryResult.files) {
+              // Find the matching file in retry output
+              const retryCode = retryResult.files[parseErr.path]
+                || Object.values(retryResult.files)[0]; // Fallback to first file
+
+              if (retryCode) {
+                const revalidation = validateAllFiles({ [parseErr.path]: retryCode });
+                if (revalidation.invalid.length === 0) {
+                  valid[parseErr.path] = retryCode;
+                  fixed = true;
+                  console.log(`[Executor] ✅ Per-file retry fixed ${parseErr.path} (attempt ${retryAttempt + 1})`);
+                  break;
+                } else {
+                  console.warn(`[Executor] ⚠️ Per-file retry ${retryAttempt + 1} for ${parseErr.path} still has errors`);
+                }
+              }
+            }
+          } catch (retryErr: any) {
+            console.warn(`[Executor] Per-file retry failed for ${parseErr.path}:`, retryErr.message);
+            break;
+          }
+        }
+
+        if (!fixed) {
+          console.warn(`[Executor] ❌ Dropping unparseable file ${parseErr.path} after ${MAX_FILE_RETRIES} retries`);
+        }
+      }
+
+      extracted = valid;
+    }
   }
 
   return extracted && Object.keys(extracted).length > 0 ? extracted : {};
+}
+
+/**
+ * Build context of related files for per-file retry.
+ * Includes files that the broken file likely imports from.
+ */
+function buildRelatedFilesContext(
+  brokenPath: string,
+  validFiles: Record<string, string>,
+  workspace: Workspace,
+): string {
+  const parts: string[] = [];
+  let budget = 4000;
+
+  // Check workspace index for files that import or are imported by the broken file
+  const idx = workspace.index;
+  const imports = idx.imports[brokenPath] || [];
+
+  for (const imp of imports) {
+    const resolved = workspace.resolveImport(brokenPath, imp.from);
+    if (!resolved) continue;
+
+    // Check valid files first, then workspace
+    const content = validFiles[resolved] || workspace.getFile(resolved);
+    if (content && content.length < budget) {
+      parts.push(`--- ${resolved}\n${content}`);
+      budget -= content.length;
+    }
+  }
+
+  return parts.join("\n\n");
 }
 
 // ─── Path Sanitizer ───────────────────────────────────────────────────────
