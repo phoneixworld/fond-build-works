@@ -13,30 +13,35 @@ describe("structureNormalizer", () => {
     const fixed = normalizeGeneratedStructure(ws);
 
     expect(fixed).toBeGreaterThan(0);
+    // .jsx files get renamed to .tsx
     expect(ws.hasFile("/pages/components/StatCard.jsx")).toBe(false);
-    const dashboard = ws.getFile("/pages/Dashboard.jsx") || "";
-    expect(dashboard).toContain('import StatCard from "../components/StatCard";');
+    expect(ws.hasFile("/pages/components/StatCard.tsx")).toBe(false);
+    // Dashboard was renamed too
+    const dashboard = ws.getFile("/pages/Dashboard.tsx") || "";
+    expect(dashboard).toContain("StatCard");
   });
 
-  it("normalizes utility files and removes conflicting variants", () => {
+  it("deletes lib/utils.* and ensures /utils/cn.ts exists", () => {
     const ws = new Workspace({
-      "/lib/utils.js": `import { clsx } from 'clsx';\nimport { twMerge } from 'tailwind-merge';\nimport { cn } from "./utils";\n\nexport function cn(...inputs){ return twMerge(clsx(inputs)); }`,
+      "/lib/utils.js": `export function cn(...inputs){ return inputs.join(" "); }`,
       "/lib/utils.jsx": `export const cn = null;`,
-      "/components/ui/utils.js": `import { cn } from "../../lib/utils";\nexport function cn(...inputs){ return inputs.filter(Boolean).join(" "); }`,
+      "/components/ui/utils.js": `export function cn(...inputs){ return inputs.filter(Boolean).join(" "); }`,
+      "/components/ui/Button.tsx": `import { cn } from "./utils";\nexport function Button({ children }) { return <button className={cn("btn")}>{children}</button>; }`,
     });
 
     const fixed = normalizeGeneratedStructure(ws);
 
     expect(fixed).toBeGreaterThan(0);
+    // lib/utils.* must be gone
+    expect(ws.hasFile("/lib/utils.js")).toBe(false);
     expect(ws.hasFile("/lib/utils.jsx")).toBe(false);
-
-    const libUtils = ws.getFile("/lib/utils.js") || "";
-    expect(libUtils).toContain("export function cn");
-    expect(libUtils).not.toContain('import { cn } from "./utils"');
-
-    const uiUtils = ws.getFile("/components/ui/utils.js") || "";
-    expect(uiUtils).toContain("export function cn");
-    expect(uiUtils).not.toContain("import { cn }");
+    expect(ws.hasFile("/lib/utils.tsx")).toBe(false);
+    // components/ui/utils.* must be gone
+    expect(ws.hasFile("/components/ui/utils.js")).toBe(false);
+    expect(ws.hasFile("/components/ui/utils.ts")).toBe(false);
+    // /utils/cn.ts must exist
+    const cnFile = ws.getFile("/utils/cn.ts") || "";
+    expect(cnFile).toContain("export function cn");
   });
 
   it("rewrites hook default imports to named imports when target has no default", () => {
@@ -48,18 +53,19 @@ describe("structureNormalizer", () => {
     const fixed = normalizeGeneratedStructure(ws);
 
     expect(fixed).toBeGreaterThan(0);
-    const dashboard = ws.getFile("/pages/Dashboard/DashboardPage.jsx") || "";
-    expect(dashboard).toContain('import { useClasses as useClass } from "../../hooks/useClass";');
+    // File was renamed to .tsx
+    const dashboard = ws.getFile("/pages/Dashboard/DashboardPage.tsx") || "";
+    expect(dashboard).toContain("useClasses");
   });
 
   it("prevents ToastContainer toasts.map crashes by normalizing app wiring and container defaults", () => {
     const ws = new Workspace({
-      "/components/ui/Toast.jsx": `import React from "react";
+      "/components/ui/Toast.tsx": `import React from "react";
 export function ToastProvider({ children }) { return <>{children}</>; }
 export function ToastContainer({ toasts, removeToast }) {
   return <div>{toasts.map((t) => <span key={t.id}>{t.message}</span>)}</div>;
 }`,
-      "/App.jsx": `import { ToastProvider, ToastContainer } from "./components/ui/Toast";
+      "/App.tsx": `import { ToastProvider, ToastContainer } from "./components/ui/Toast";
 export default function App(){
   return <ToastProvider><div>App</div><ToastContainer /></ToastProvider>;
 }`,
@@ -68,8 +74,8 @@ export default function App(){
     const fixed = normalizeGeneratedStructure(ws);
 
     expect(fixed).toBeGreaterThan(0);
-    const toast = ws.getFile("/components/ui/Toast.jsx") || "";
-    const app = ws.getFile("/App.jsx") || "";
+    const toast = ws.getFile("/components/ui/Toast.tsx") || "";
+    const app = ws.getFile("/App.tsx") || "";
 
     expect(toast).toContain("ToastContainer({ toasts = [], removeToast = () => {} })");
     expect(app).toContain('import { ToastProvider } from "./components/ui/Toast";');
@@ -90,5 +96,57 @@ export default function App(){
     expect(statCard).toContain("export default StatCard");
     expect(statCard).toContain("TrendingUp");
     expect(statCard).not.toContain("BadIcon");
+  });
+
+  it("moves domain components from /components/ui/ to /components/", () => {
+    const ws = new Workspace({
+      "/components/ui/Button.tsx": `import React from "react";\nexport function Button({ children }) { return <button>{children}</button>; }`,
+      "/components/ui/StatCard.tsx": `import React from "react";\nexport default function StatCard() { return <div>stat</div>; }`,
+      "/components/ui/ActivityFeed.tsx": `import React from "react";\nexport default function ActivityFeed() { return <div>feed</div>; }`,
+      "/pages/Dashboard.tsx": `import StatCard from "../components/ui/StatCard";\nexport default function Dashboard() { return <StatCard />; }`,
+    });
+
+    const fixed = normalizeGeneratedStructure(ws);
+
+    expect(fixed).toBeGreaterThan(0);
+    // Domain components moved out of ui/
+    expect(ws.hasFile("/components/ui/StatCard.tsx")).toBe(false);
+    expect(ws.hasFile("/components/ui/ActivityFeed.tsx")).toBe(false);
+    // Button stays in ui/
+    expect(ws.hasFile("/components/ui/Button.tsx")).toBe(true);
+    // Domain components exist at /components/
+    expect(ws.hasFile("/components/StatCard.tsx")).toBe(true);
+    expect(ws.hasFile("/components/ActivityFeed.tsx")).toBe(true);
+  });
+
+  it("renames .jsx files to .tsx", () => {
+    const ws = new Workspace({
+      "/components/Hero.jsx": `import React from "react";\nexport default function Hero() { return <div>Hero</div>; }`,
+      "/pages/Home.jsx": `import Hero from "../components/Hero";\nexport default function Home() { return <Hero />; }`,
+    });
+
+    const fixed = normalizeGeneratedStructure(ws);
+
+    expect(fixed).toBeGreaterThan(0);
+    expect(ws.hasFile("/components/Hero.jsx")).toBe(false);
+    expect(ws.hasFile("/components/Hero.tsx")).toBe(true);
+    expect(ws.hasFile("/pages/Home.jsx")).toBe(false);
+    expect(ws.hasFile("/pages/Home.tsx")).toBe(true);
+  });
+
+  it("generates barrel exports", () => {
+    const ws = new Workspace({
+      "/components/ui/Button.tsx": `export function Button() { return null; }`,
+      "/components/ui/Card.tsx": `export function Card() { return null; }`,
+      "/components/StatCard.tsx": `export default function StatCard() { return null; }`,
+      "/pages/Dashboard/DashboardPage.tsx": `export default function DashboardPage() { return null; }`,
+    });
+
+    normalizeGeneratedStructure(ws);
+
+    expect(ws.hasFile("/components/ui/index.ts")).toBe(true);
+    const uiBarrel = ws.getFile("/components/ui/index.ts") || "";
+    expect(uiBarrel).toContain('export * from "./Button"');
+    expect(uiBarrel).toContain('export * from "./Card"');
   });
 });
