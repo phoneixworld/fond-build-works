@@ -135,6 +135,142 @@ export type Database = {
           },
         ]
       }
+      container_builds: {
+        Row: {
+          artifact_path: string | null
+          azure_execution_id: string | null
+          azure_job_name: string | null
+          build_config: Json
+          build_duration_ms: number | null
+          build_log: string[]
+          completed_at: string | null
+          container_image: string | null
+          created_at: string
+          dependencies: Json
+          error: string | null
+          file_count: number
+          id: string
+          output_files: Json
+          preview_url: string | null
+          project_id: string
+          source_files: Json
+          started_at: string | null
+          status: string
+          total_size_bytes: number
+          user_id: string
+        }
+        Insert: {
+          artifact_path?: string | null
+          azure_execution_id?: string | null
+          azure_job_name?: string | null
+          build_config?: Json
+          build_duration_ms?: number | null
+          build_log?: string[]
+          completed_at?: string | null
+          container_image?: string | null
+          created_at?: string
+          dependencies?: Json
+          error?: string | null
+          file_count?: number
+          id?: string
+          output_files?: Json
+          preview_url?: string | null
+          project_id: string
+          source_files?: Json
+          started_at?: string | null
+          status?: string
+          total_size_bytes?: number
+          user_id: string
+        }
+        Update: {
+          artifact_path?: string | null
+          azure_execution_id?: string | null
+          azure_job_name?: string | null
+          build_config?: Json
+          build_duration_ms?: number | null
+          build_log?: string[]
+          completed_at?: string | null
+          container_image?: string | null
+          created_at?: string
+          dependencies?: Json
+          error?: string | null
+          file_count?: number
+          id?: string
+          output_files?: Json
+          preview_url?: string | null
+          project_id?: string
+          source_files?: Json
+          started_at?: string | null
+          status?: string
+          total_size_bytes?: number
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "container_builds_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      container_tasks: {
+        Row: {
+          build_id: string
+          created_at: string
+          depends_on: string[] | null
+          duration_ms: number | null
+          error: string | null
+          exit_code: number | null
+          id: string
+          label: string
+          output: string | null
+          sort_order: number
+          status: string
+          task_type: string
+          updated_at: string
+        }
+        Insert: {
+          build_id: string
+          created_at?: string
+          depends_on?: string[] | null
+          duration_ms?: number | null
+          error?: string | null
+          exit_code?: number | null
+          id?: string
+          label: string
+          output?: string | null
+          sort_order?: number
+          status?: string
+          task_type: string
+          updated_at?: string
+        }
+        Update: {
+          build_id?: string
+          created_at?: string
+          depends_on?: string[] | null
+          duration_ms?: number | null
+          error?: string | null
+          exit_code?: number | null
+          id?: string
+          label?: string
+          output?: string | null
+          sort_order?: number
+          status?: string
+          task_type?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "container_tasks_build_id_fkey"
+            columns: ["build_id"]
+            isOneToOne: false
+            referencedRelation: "container_builds"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       credit_usage: {
         Row: {
           created_at: string
