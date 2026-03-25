@@ -143,11 +143,11 @@ function buildWorkspaceContext(
   if (files.length === 0) return "";
 
   const PRIORITY_FILES = [
-    "/App.jsx",
     "/App.tsx",
-    "/contexts/AuthContext.jsx",
-    "/layout/AppLayout.jsx",
-    "/layout/Sidebar.jsx",
+    "/App.jsx",
+    "/contexts/AuthContext.tsx",
+    "/layout/AppLayout.tsx",
+    "/layout/Sidebar.tsx",
   ];
 
   const isRelevant = (path: string) => {
