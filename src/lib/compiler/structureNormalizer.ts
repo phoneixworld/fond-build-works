@@ -240,61 +240,55 @@ function normalizeMirroredFiles(workspace: Workspace): number {
 function normalizeUtilityModules(workspace: Workspace): number {
   let fixed = 0;
 
+  // DELETE all lib/utils.* variants — these must never exist
   const libUtilVariants = workspace
     .listFiles()
     .filter((p) => /^\/lib\/utils\.(js|jsx|ts|tsx)$/.test(p));
 
-  let canonicalLibUtil = "/lib/utils.js";
-  if (!workspace.hasFile(canonicalLibUtil)) {
-    canonicalLibUtil = libUtilVariants[0] || canonicalLibUtil;
+  for (const variant of libUtilVariants) {
+    // Rewrite imports away from this file before deleting
+    fixed += rewriteImportsToCanonical(workspace, variant, "/utils/cn");
+    workspace.deleteFile(variant);
+    fixed++;
+    console.log(`[StructureNormalizer] Deleted banned file: ${variant}`);
   }
 
-  if (canonicalLibUtil && workspace.hasFile(canonicalLibUtil)) {
-    const normalized = buildCanonicalUtilsModule(workspace.getFile(canonicalLibUtil) || "");
-    if (normalized !== (workspace.getFile(canonicalLibUtil) || "")) {
-      workspace.updateFile(canonicalLibUtil, normalized);
-      fixed++;
-      console.log(`[StructureNormalizer] Normalized utility module: ${canonicalLibUtil}`);
-    }
-
-    for (const variant of libUtilVariants) {
-      if (variant === canonicalLibUtil) continue;
-      fixed += rewriteImportsToCanonical(workspace, variant, canonicalLibUtil);
-      workspace.deleteFile(variant);
-      fixed++;
-      console.log(`[StructureNormalizer] Removed duplicate util variant: ${variant}`);
-    }
-  }
-
-  // Migrate /components/ui/utils.ts → /utils/cn.ts if it still exists
-  const legacyUiUtilsPaths = ["/components/ui/utils.js", "/components/ui/utils.ts"];
+  // Migrate /components/ui/utils.* → /utils/cn.ts
+  const legacyUiUtilsPaths = ["/components/ui/utils.js", "/components/ui/utils.ts", "/components/ui/utils.jsx", "/components/ui/utils.tsx"];
   for (const legacyPath of legacyUiUtilsPaths) {
     if (workspace.hasFile(legacyPath)) {
-      const content = workspace.getFile(legacyPath) || "";
-      // Move to canonical /utils/cn.ts
-      if (!workspace.hasFile("/utils/cn.ts")) {
-        let normalized = content
-          .replace(/^import\s+\{\s*cn\s*\}\s+from\s+["'][^"']+["'];?\s*$/gm, "")
-          .trim();
-        if (!/export\s+function\s+cn\s*\(/.test(normalized)) {
-          normalized = `export function cn(...inputs) {\n  return inputs.filter(Boolean).join(" ");\n}`;
-        }
-        workspace.updateFile("/utils/cn.ts", `${normalized}\n`);
-        console.log(`[StructureNormalizer] Migrated ${legacyPath} → /utils/cn.ts`);
-      }
       workspace.deleteFile(legacyPath);
-      // Rewrite all imports from the old path to the new one
       fixed += rewriteImportsToCanonical(workspace, legacyPath, "/utils/cn");
       fixed++;
       console.log(`[StructureNormalizer] Removed legacy util: ${legacyPath}`);
     }
   }
 
-  // Ensure /utils/cn.ts exists
+  // Ensure /utils/cn.ts exists with correct content
   if (!workspace.hasFile("/utils/cn.ts")) {
     workspace.updateFile("/utils/cn.ts", `export function cn(...inputs) {\n  return inputs.filter(Boolean).join(" ");\n}\n`);
     fixed++;
     console.log(`[StructureNormalizer] Created missing /utils/cn.ts`);
+  }
+
+  // Fix all cn imports to point to /utils/cn
+  for (const filePath of workspace.listFiles()) {
+    if (!CODE_FILE_RE.test(filePath)) continue;
+    const content = workspace.getFile(filePath) || "";
+    // Match imports of cn from wrong paths (lib/utils, ./utils, ../utils, components/ui/utils, etc.)
+    const badCnImport = /^(import\s+\{\s*cn\s*\}\s+from\s+["'])([^"']+)(["'];?\s*)$/gm;
+    let updated = content;
+    updated = updated.replace(badCnImport, (full, pre, fromPath, post) => {
+      // If already pointing to utils/cn, skip
+      if (/\/utils\/cn$/.test(fromPath)) return full;
+      // Compute correct relative path to /utils/cn
+      const newSpec = toImportSpecifier(filePath, "/utils/cn.ts");
+      return `${pre}${newSpec}${post}`;
+    });
+    if (updated !== content) {
+      workspace.updateFile(filePath, updated);
+      fixed++;
+    }
   }
 
   return fixed;
