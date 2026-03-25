@@ -28,6 +28,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toExportPath } from "@/lib/pathNormalizer";
 import { StreamingPreviewController } from "@/lib/streamingPreview";
 import { type MsgContent, getTextContent } from "@/lib/codeParser";
+import { normalizeSandpackFileMap as normalizeSandpackFileMapShared } from "@/lib/preview/normalizeFileMap";
 
 /** Generate a self-contained preview HTML from workspace files */
 function generatePreviewHtmlForBuild(files: Record<string, string>): string {
@@ -378,6 +379,10 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
       const normalizedPath = normalizeVirtualPath(trimmedPath);
       sanitized[normalizedPath] = cleanedContent;
     }
+
+    // Apply structure normalization so domain components, cn dedup, and
+    // import rewrites are applied regardless of which code path sets files.
+    normalizeSandpackFileMapShared(sanitized);
 
     return sanitized;
   }, []);
