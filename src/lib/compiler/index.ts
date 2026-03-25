@@ -52,3 +52,6 @@ export { lintDesignQuality, formatLintSummary, type DesignLintResult, type Desig
 export { DESIGN_THEMES, getDesignThemePrompt, detectDesignTheme, type DesignTheme } from "./designThemes";
 export { validateFileSyntax, validateAllFiles, buildFileRetryPrompt, type ParseResult } from "./syntaxValidator";
 export { checkBuildInvariants, type InvariantResult, type InvariantViolation } from "./buildInvariants";
+export { selectLayoutSnippets, formatLayoutSnippetsForPrompt, LAYOUT_SNIPPETS, type LayoutSnippet } from "./layoutSnippets";
+export { ANIMATIONS, MOTION_PRESETS, ANIMATION_CSS, ANIMATION_PROMPT_SECTION } from "./animations";
+export { applyPolishPass, type PolishResult } from "./polishPass";
