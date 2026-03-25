@@ -379,6 +379,10 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
       sanitized[normalizedPath] = cleanedContent;
     }
 
+    // Apply structure normalization so domain components, cn dedup, and
+    // import rewrites are applied regardless of which code path sets files.
+    normalizeSandpackFileMapShared(sanitized);
+
     return sanitized;
   }, []);
 
