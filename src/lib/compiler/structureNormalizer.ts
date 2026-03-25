@@ -133,6 +133,7 @@ function normalizeBarrelExports(workspace: Workspace): number {
   return fixed;
 }
 
+/**
  * Removes duplicate exports: if a file has both `export { X }` and `export default X`,
  * strip the named re-export to prevent "already exported" runtime errors.
  */
