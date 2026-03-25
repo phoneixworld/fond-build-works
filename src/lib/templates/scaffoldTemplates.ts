@@ -20,6 +20,7 @@
 import { type DomainModel } from "@/lib/domainTemplates";
 import { DESIGN_SYSTEM_CSS } from "@/lib/designSystem";
 import { getAllUIComponents, UI_ANIMATIONS_CSS } from "@/lib/templates/uiComponentTemplates";
+import { ANIMATION_CSS } from "@/lib/compiler/animations";
 
 // ─── Public API ───────────────────────────────────────────────────────────
 
@@ -1274,7 +1275,6 @@ export function useApi(collection, projectId, sampleData) {
 }
 
 export function getGlobalStyles(): string {
-  const { ANIMATION_CSS } = require("@/lib/compiler/animations");
   return DESIGN_SYSTEM_CSS + "\n" + UI_ANIMATIONS_CSS + "\n" + ANIMATION_CSS;
 }
 
