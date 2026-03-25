@@ -20,7 +20,7 @@ export function scaffoldEntitiesFromIR(ir: IR): Record<string, string> {
 
   // Domain provider that wraps all entity providers
   if (Object.keys(ir.entities).length > 0) {
-    files["/contexts/DomainProvider.jsx"] = generateDomainProvider(Object.keys(ir.entities));
+    files["/contexts/DomainProvider.tsx"] = generateDomainProvider(Object.keys(ir.entities));
   }
 
   return files;
