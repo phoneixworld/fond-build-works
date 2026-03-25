@@ -208,9 +208,9 @@ export function autoCreateStubFiles(
     // collides with the `const AuthContext = createContext(...)` declaration,
     // causing "Identifier has already been declared" errors.
     const contextFiles = [
-      "/contexts/AuthContext.jsx", "/contexts/AuthContext.js",
-      "/contexts/CartContext.jsx", "/contexts/CartContext.js",
-      "/contexts/ThemeContext.jsx", "/contexts/ThemeContext.js",
+      "/contexts/AuthContext.tsx", "/contexts/AuthContext.jsx", "/contexts/AuthContext.js",
+      "/contexts/CartContext.tsx", "/contexts/CartContext.jsx", "/contexts/CartContext.js",
+      "/contexts/ThemeContext.tsx", "/contexts/ThemeContext.jsx", "/contexts/ThemeContext.js",
     ];
     if (contextFiles.some(f => filePath === f || filePath.endsWith(f))) {
       console.log("[BuildValidator] Skipped stub for context file (would cause naming collision): " + filePath);

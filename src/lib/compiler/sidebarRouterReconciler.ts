@@ -1,7 +1,7 @@
 /**
  * Sidebar–Router Reconciler — Phase 3.97
  * 
- * Ensures every nav link in Sidebar.jsx has a matching route in App.jsx
+ * Ensures every nav link in Sidebar has a matching route in App
  * and a corresponding page file. Generates stubs for missing pages.
  */
 
@@ -17,7 +17,7 @@ interface ReconciliationResult {
  * Parse Sidebar for nav paths (NavLink to="...", Link to="...", href="...")
  */
 function extractSidebarPaths(workspace: Workspace): string[] {
-  const sidebarCandidates = ["/layout/Sidebar.jsx", "/layout/Sidebar.tsx", "/components/Sidebar.jsx"];
+  const sidebarCandidates = ["/layout/Sidebar.tsx", "/layout/Sidebar.jsx", "/components/Sidebar.tsx", "/components/Sidebar.jsx"];
   const sidebarPath = sidebarCandidates.find(p => workspace.hasFile(p));
   if (!sidebarPath) return [];
 

@@ -18,10 +18,10 @@ export function generatePreloadFiles(ir: IR): Record<string, string> {
   files["/lib/preloadRegistry.jsx"] = generatePreloadRegistry(ir);
 
   // Background warmers
-  files["/hooks/useBackgroundWarmers.jsx"] = generateBackgroundWarmers(ir);
+  files["/hooks/useBackgroundWarmers.ts"] = generateBackgroundWarmers(ir);
 
   // Enhanced sidebar with preloading
-  files["/layout/PreloadingSidebar.jsx"] = generatePreloadingSidebar(ir);
+  files["/layout/PreloadingSidebar.tsx"] = generatePreloadingSidebar(ir);
 
   return files;
 }
