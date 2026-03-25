@@ -29,7 +29,8 @@ import { fixMissingImports, fixProviderOrdering } from "./missingImportFixer";
 import { fixExportMismatches } from "./exportMismatchFixer";
 import { deduplicateFiles } from "./deduplicator";
 import { normalizeGeneratedStructure } from "./structureNormalizer";
-import {
+import { lintDesignQuality, formatLintSummary } from "./designLint";
+import { detectDesignTheme } from "./designThemes";
   createTrace, startPass, endPass,
   traceTaskStart, traceTaskEnd, finalizeTrace, printTrace,
 } from "./observability";
