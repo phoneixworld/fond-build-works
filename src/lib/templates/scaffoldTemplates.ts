@@ -30,10 +30,12 @@ import { getAllUIComponents, UI_ANIMATIONS_CSS } from "@/lib/templates/uiCompone
  * structure from the start instead of a generic Dashboard shell.
  */
 export function getBaseTemplate(domainModel?: DomainModel | null): Record<string, string> {
-  if (!domainModel) {
-    return getGenericScaffold();
-  }
-  return buildDomainScaffold(domainModel);
+  const scaffold = domainModel ? buildDomainScaffold(domainModel) : getGenericScaffold();
+  
+  // Add project config files (package.json, vite.config.ts, tsconfig.json)
+  Object.assign(scaffold, getProjectConfigFiles(domainModel));
+  
+  return scaffold;
 }
 
 // ─── Domain Scaffold ──────────────────────────────────────────────────────
