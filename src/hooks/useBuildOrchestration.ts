@@ -28,7 +28,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toExportPath } from "@/lib/pathNormalizer";
 import { StreamingPreviewController } from "@/lib/streamingPreview";
 import { type MsgContent, getTextContent } from "@/lib/codeParser";
-import { normalizeSandpackFileMap as normalizeSandpackFileMapShared } from "@/lib/preview/normalizeFileMap";
+// normalization is inlined below to avoid import-resolution failures
 
 /** Generate a self-contained preview HTML from workspace files */
 function generatePreviewHtmlForBuild(files: Record<string, string>): string {
