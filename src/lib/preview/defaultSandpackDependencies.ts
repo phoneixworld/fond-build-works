@@ -48,4 +48,5 @@ export const DEFAULT_SANDPACK_DEPENDENCIES: Record<string, string> = {
   "@radix-ui/react-toggle": "^1.1.9",
   "@radix-ui/react-toggle-group": "^1.1.10",
   "@radix-ui/react-tooltip": "^1.2.7",
+  uuid: "^9.0.0",
 };
