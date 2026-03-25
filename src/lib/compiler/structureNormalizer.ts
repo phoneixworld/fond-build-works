@@ -102,10 +102,17 @@ function normalizeBarrelExports(workspace: Workspace): number {
     f => /^\/components\/[^/]+\.(tsx?|jsx?)$/.test(f) && !f.endsWith("/index.ts")
   );
   if (domainFiles.length > 0) {
-    const lines = domainFiles.map(f => {
+    const lines: string[] = [];
+    for (const f of domainFiles) {
       const name = f.split("/").pop()!.replace(/\.(tsx?|jsx?)$/, "");
-      return `export { default as ${name} } from "./${name}";`;
-    });
+      const content = workspace.getFile(f) || "";
+      // Only re-export default if the file actually has one
+      if (/export\s+default\s/.test(content)) {
+        lines.push(`export { default as ${name} } from "./${name}";`);
+      } else {
+        lines.push(`export * from "./${name}";`);
+      }
+    }
     workspace.updateFile("/components/index.ts", lines.join("\n") + "\n");
     fixed++;
   }
@@ -119,12 +126,17 @@ function normalizeBarrelExports(workspace: Workspace): number {
     const lines: string[] = [];
     for (const f of pageFiles) {
       const parts = f.split("/");
-      // e.g. /pages/Dashboard/DashboardPage.tsx or /pages/DashboardPage.tsx
       const name = parts[parts.length - 1].replace(/\.(tsx?|jsx?)$/, "");
       if (seen.has(name)) continue;
       seen.add(name);
       const rel = f.replace(/^\/pages\//, "./").replace(/\.(tsx?|jsx?)$/, "");
-      lines.push(`export { default as ${name} } from "${rel}";`);
+      const content = workspace.getFile(f) || "";
+      // Only re-export default if the file actually has one
+      if (/export\s+default\s/.test(content)) {
+        lines.push(`export { default as ${name} } from "${rel}";`);
+      } else {
+        lines.push(`export * from "${rel}";`);
+      }
     }
     workspace.updateFile("/pages/index.ts", lines.join("\n") + "\n");
     fixed++;
