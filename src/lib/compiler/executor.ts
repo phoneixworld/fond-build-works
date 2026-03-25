@@ -328,10 +328,19 @@ export async function executeTask(
 
           if (contResult.files) {
             for (const [path, code] of Object.entries(contResult.files)) {
+              let stitched: string;
               if (activeTruncation.truncatedFile && path === activeTruncation.truncatedFile && extracted[path]) {
-                extracted[path] = extracted[path] + "\n" + code;
+                stitched = extracted[path] + "\n" + code;
               } else {
-                extracted[path] = code;
+                stitched = code;
+              }
+              // Validate stitched file before accepting it
+              const stitchCheck = validateAllFiles({ [path]: stitched });
+              if (stitchCheck.invalid.length > 0) {
+                console.warn(`[Executor] ⛔ Stitched continuation for ${path} failed parse — keeping original`);
+                // Don't update extracted[path] — keep the pre-stitch version (or nothing)
+              } else {
+                extracted[path] = stitched;
               }
             }
           }

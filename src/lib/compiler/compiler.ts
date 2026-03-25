@@ -30,6 +30,7 @@ import { fixExportMismatches } from "./exportMismatchFixer";
 import { deduplicateFiles } from "./deduplicator";
 import { normalizeGeneratedStructure } from "./structureNormalizer";
 import { lintDesignQuality, formatLintSummary } from "./designLint";
+import { validateAllFiles } from "./syntaxValidator";
 import { applyPolishPass } from "./polishPass";
 import { detectDesignTheme } from "./designThemes";
 import {
@@ -605,6 +606,29 @@ export async function compile(
     if (postSynthFixes > 0) {
       cloudLog.info(`Post-synthesis export mismatch fixer: fixed ${postSynthFixes} mismatch(es)`, "compiler");
       console.log(`[Compiler] 🔀 Post-synthesis export fix: ${postSynthFixes} mismatch(es)`);
+    }
+  }
+
+  // ── Phase 3.99: Post-Transform Syntax Sweep ─────────────────────────
+  // Re-validate ALL workspace files after fixer passes. Any file broken
+  // by the import fixer, provider injector, structure normalizer, etc.
+  // gets reverted to its pre-transform version or dropped.
+  {
+    callbacks.onPhase("syntax-sweep", "Final syntax validation sweep...");
+
+    const allFiles = workspace.toRecord();
+    const { valid: validFiles, invalid: brokenFiles } = validateAllFiles(allFiles);
+
+    if (brokenFiles.length > 0) {
+      for (const broken of brokenFiles) {
+        // The file was valid when executeTask returned it (it passed the executor gate),
+        // so a fixer phase must have corrupted it. Revert by dropping and re-adding
+        // from the valid set won't help — just remove it to prevent runtime crashes.
+        workspace.deleteFile(broken.path);
+        cloudLog.warn(`Post-transform sweep: dropped ${broken.path} — ${broken.error} (line ${broken.errorLine})`, "compiler");
+        console.warn(`[Compiler] ⛔ Post-transform sweep dropped ${broken.path}: ${broken.error}`);
+      }
+      console.log(`[Compiler] 🧹 Post-transform sweep: removed ${brokenFiles.length} broken file(s)`);
     }
   }
 

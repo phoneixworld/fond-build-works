@@ -3,9 +3,11 @@
  * 
  * First-class codebase object. All file operations go through here.
  * Maintains a symbol index (exports/imports) for verification.
+ * Includes a parse gate: JS/TS files are Babel-validated before entering.
  */
 
 import type { FileEntry, SymbolIndex, ImportRef } from "./types";
+import { validateFileSyntax } from "./syntaxValidator";
 
 export class Workspace {
   private files: Map<string, string>;
@@ -51,8 +53,25 @@ export class Workspace {
     return this.files.size;
   }
 
-  /** Apply a batch of file changes from a task output */
+  /** Apply a batch of file changes from a task output.
+   *  Each JS/TS file is Babel-validated; unparseable files are rejected. */
   applyPatch(patch: Record<string, string>): string[] {
+    const applied: string[] = [];
+    for (const [path, content] of Object.entries(patch)) {
+      const normalized = this.normalizePath(path);
+      const parseResult = validateFileSyntax(normalized, content);
+      if (!parseResult.valid) {
+        console.warn(`[Workspace] ⛔ Rejecting malformed file ${normalized}: ${parseResult.error} (line ${parseResult.errorLine})`);
+        continue;
+      }
+      this.addFile(path, content);
+      applied.push(normalized);
+    }
+    return applied;
+  }
+
+  /** Apply a batch WITHOUT parse gate — for trusted internal transformations (import fixer, etc.) */
+  applyPatchTrusted(patch: Record<string, string>): string[] {
     const applied: string[] = [];
     for (const [path, content] of Object.entries(patch)) {
       this.addFile(path, content);
