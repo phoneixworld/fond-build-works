@@ -1119,6 +1119,114 @@ export function getDomainComponents(): Record<string, string> {
   };
 }
 
+// ─── Project Config Files ─────────────────────────────────────────────────
+
+function getProjectConfigFiles(domainModel?: DomainModel | null): Record<string, string> {
+  const projectName = domainModel?.templateName
+    ?.toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-|-$/g, "") || "phoenix-app";
+
+  return {
+    "/package.json": JSON.stringify({
+      name: projectName,
+      private: true,
+      version: "0.1.0",
+      type: "module",
+      scripts: {
+        dev: "vite",
+        build: "tsc && vite build",
+        preview: "vite preview",
+      },
+      dependencies: {
+        react: "^18.3.1",
+        "react-dom": "^18.3.1",
+        "react-router-dom": "^6.30.0",
+        "lucide-react": "^0.462.0",
+      },
+      devDependencies: {
+        "@types/react": "^18.3.0",
+        "@types/react-dom": "^18.3.0",
+        "@vitejs/plugin-react": "^4.3.0",
+        typescript: "^5.5.0",
+        vite: "^5.4.0",
+      },
+    }, null, 2),
+
+    "/vite.config.ts": `import { defineConfig } from "vite";
+import react from "@vitejs/plugin-react";
+import path from "path";
+
+export default defineConfig({
+  plugins: [react()],
+  resolve: {
+    alias: {
+      "@": path.resolve(__dirname, "./src"),
+    },
+  },
+  server: {
+    port: 3000,
+    open: true,
+  },
+  build: {
+    outDir: "dist",
+    sourcemap: true,
+  },
+});
+`,
+
+    "/tsconfig.json": JSON.stringify({
+      compilerOptions: {
+        target: "ES2020",
+        useDefineForClassFields: true,
+        lib: ["ES2020", "DOM", "DOM.Iterable"],
+        module: "ESNext",
+        skipLibCheck: true,
+        moduleResolution: "bundler",
+        allowImportingTsExtensions: true,
+        isolatedModules: true,
+        moduleDetection: "force",
+        noEmit: true,
+        jsx: "react-jsx",
+        strict: false,
+        noUnusedLocals: false,
+        noUnusedParameters: false,
+        noFallthroughCasesInSwitch: true,
+        baseUrl: ".",
+        paths: { "@/*": ["./src/*"] },
+      },
+      include: ["src"],
+    }, null, 2),
+
+    "/index.html": `<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>${domainModel?.templateName || "App"}</title>
+    <script src="https://cdn.tailwindcss.com"><\/script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"><\/script>
+  </body>
+</html>
+`,
+
+    "/main.tsx": `import React from "react";
+import ReactDOM from "react-dom/client";
+import App from "./App";
+import "./styles/globals.css";
+
+ReactDOM.createRoot(document.getElementById("root")!).render(
+  <React.StrictMode>
+    <App />
+  </React.StrictMode>
+);
+`,
+  };
+}
+
 // ─── Utility Generators ───────────────────────────────────────────────────
 
 export function getUseApiHook(): string {
