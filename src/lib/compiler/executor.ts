@@ -7,6 +7,7 @@
 
 import { streamBuildAgent } from "@/lib/agentPipeline";
 import { detectTruncation } from "@/lib/truncationRecovery";
+import { repairBrokenDataHooks } from "./hookSafetyGuard";
 import type { BuildContext, CompilerTask, TaskGraph } from "./types";
 import type { Workspace } from "./workspace";
 import { getDesignThemePrompt } from "./designThemes";
@@ -97,14 +98,45 @@ ${workspaceContext ? `### Current code (scoped):\n${workspaceContext}` : ""}
    - /utils/cn.ts — cn() class-merge utility. NEVER put utils inside /components/ui/.
    - /components/ui/ — pre-scaffolded shadcn-compatible UI components (do not modify). These use NAMED exports (e.g. import { Card, CardHeader } from "./ui/Card").
      **UI COMPONENTS MUST BE PURE React + Tailwind CSS. NO Radix UI imports, NO class-variance-authority, NO tailwind-variants, NO external dependencies beyond React and lucide-react.**
-   - /components/ — reusable DOMAIN components (StatCard, StatusBadge, PageHeader, SearchFilterBar, ActivityFeed, QuickActions, NotificationBell, ChartCard, FormModal). These use DEFAULT exports.
-   - /contexts/ — React contexts (AuthContext, etc.).
-   - /pages/ModuleName/ — page components in named directories (e.g. /pages/Dashboard/DashboardPage.tsx). These use DEFAULT exports.
-   - /hooks/ — custom hooks (.ts files). Subfolder /hooks/data/ for data-fetching hooks.
-   - /services/ — API services (.ts files).
-   - /styles/ — CSS files.
-   - /layout/ — layout wrappers (AppLayout.tsx, Sidebar.tsx). These use DEFAULT exports.
-   When importing, always use correct relative paths from the file's location.
+    - /components/ — reusable DOMAIN components (StatCard, StatusBadge, PageHeader, SearchFilterBar, ActivityFeed, QuickActions, NotificationBell, ChartCard, FormModal). These use DEFAULT exports.
+    - /contexts/ — React contexts (AuthContext, etc.).
+    - /pages/ModuleName/ — page components in named directories (e.g. /pages/Dashboard/DashboardPage.tsx). These use DEFAULT exports.
+    - /hooks/ — custom hooks (.ts files). Subfolder /hooks/data/ for data-fetching hooks.
+    - /services/ — API services (.ts files).
+    - /styles/ — CSS files.
+    - /layout/ — layout wrappers (AppLayout.tsx, Sidebar.tsx). These use DEFAULT exports.
+    When importing, always use correct relative paths from the file's location.
+25. **DATA HOOKS MUST BE SHORT (CRITICAL — prevents truncation)**:
+    Data hooks in /hooks/data/ MUST follow this EXACT compact template. Do NOT add verbose types, schemas, transforms, or mock data:
+    \`\`\`ts
+    import { useState, useEffect } from "react";
+    export default function useXxx() {
+      const [data, setData] = useState<any[]>([]);
+      const [loading, setLoading] = useState(true);
+      const [error, setError] = useState<Error | null>(null);
+      useEffect(() => {
+        async function load() {
+          try {
+            setLoading(true);
+            const projectId = (window as any).__PROJECT_ID__;
+            const apiBase = (window as any).__SUPABASE_URL__;
+            const apiKey = (window as any).__SUPABASE_KEY__;
+            const res = await fetch(\\\`\\\${apiBase}/functions/v1/project-api\\\`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json", "Authorization": \\\`Bearer \\\${apiKey}\\\` },
+              body: JSON.stringify({ project_id: projectId, collection: "xxx", action: "list" }),
+            });
+            const json = await res.json();
+            setData(json.data || []);
+          } catch (err) { setError(err as Error); }
+          finally { setLoading(false); }
+        }
+        load();
+      }, []);
+      return { data, loading, error };
+    }
+    \`\`\`
+    Keep each data hook UNDER 40 lines. NEVER generate verbose hooks that risk truncation.
    Import cn from "../utils/cn" (adjust relative path based on file depth). NEVER import from "./ui/utils" or "./utils".
 6. **COMPONENT DECOMPOSITION (CRITICAL)**: Pages must NOT be monolithic. Every page MUST import and use components from /components/ui/:
    - Use Table + TableHeader/TableBody/TableRow/TableHead/TableCell for data lists (NOT raw <table> tags).
@@ -427,6 +459,11 @@ export async function executeTask(
 
       extracted = valid;
     }
+  }
+
+  // ── Hook Safety Guard: detect & repair broken data hooks ───────────
+  if (extracted && Object.keys(extracted).length > 0) {
+    extracted = repairBrokenDataHooks(extracted);
   }
 
   return extracted && Object.keys(extracted).length > 0 ? extracted : {};
