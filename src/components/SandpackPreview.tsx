@@ -915,6 +915,125 @@ function repairRelativeImports(files: Record<string, string>): Record<string, st
   return result;
 }
 
+// ─── Mirror structureNormalizer: normalize file placement in Sandpack map ──
+
+const DOMAIN_COMPONENTS = new Set([
+  "ActivityFeed", "NotificationBell", "PageHeader",
+  "QuickActions", "SearchFilterBar", "StatCard", "StatusBadge",
+]);
+
+const ROUTING_COMPONENTS = new Set(["ProtectedRoute"]);
+
+function normalizeSandpackFileMap(base: Record<string, string>): void {
+  const moves: Array<[string, string]> = [];
+
+  // 1) Move domain components out of /components/ui/ → /components/
+  // 2) Move routing components out of /components/ui/ → /components/
+  for (const path of Object.keys(base)) {
+    if (!path.startsWith("/components/ui/")) continue;
+    const fileName = path.split("/").pop() || "";
+    const baseName = fileName.replace(/\.(tsx?|jsx?)$/, "");
+
+    if (DOMAIN_COMPONENTS.has(baseName)) {
+      moves.push([path, `/components/${fileName}`]);
+    } else if (ROUTING_COMPONENTS.has(baseName)) {
+      moves.push([path, `/components/${fileName}`]);
+    }
+  }
+
+  // Execute moves
+  for (const [from, to] of moves) {
+    if (!base[to]) {
+      base[to] = base[from];
+    }
+    delete base[from];
+    console.log(`[SandpackNormalizer] Moved ${from} → ${to}`);
+  }
+
+  // 3) Deduplicate cn: remove cn.tsx if cn.ts exists (or vice versa, prefer .ts)
+  if (base["/utils/cn.ts"] && base["/utils/cn.tsx"]) {
+    delete base["/utils/cn.tsx"];
+    console.log("[SandpackNormalizer] Removed duplicate /utils/cn.tsx");
+  }
+
+  // 4) Ensure /utils/cn.ts always exists
+  if (!base["/utils/cn.ts"] && !base["/utils/cn.tsx"]) {
+    base["/utils/cn.ts"] = `import { clsx } from "clsx";\nimport { twMerge } from "tailwind-merge";\n\nexport function cn(...inputs: (string | undefined | null | false)[]) {\n  return twMerge(clsx(inputs));\n}\n`;
+    console.log("[SandpackNormalizer] Injected missing /utils/cn.ts");
+  }
+
+  // 5) Rewrite imports in ALL files that reference moved paths
+  const allMoves = new Map(moves.map(([from, to]) => [from, to]));
+
+  for (const [filePath, content] of Object.entries(base)) {
+    if (!/\.(jsx?|tsx?)$/.test(filePath)) continue;
+    let updated = content;
+
+    // Fix cn imports from any wrong path
+    updated = updated.replace(
+      /import\s+\{\s*cn\s*\}\s+from\s+["']([^"']+)["']/g,
+      (_full, fromPath) => {
+        // Already correct
+        if (/\/utils\/cn['"]?$/.test(fromPath)) {
+          const correctRel = computeRelativePath(filePath, "/utils/cn.ts");
+          return `import { cn } from "${correctRel}"`;
+        }
+        // Pointing to wrong location
+        if (/utils|lib\/utils|components\/ui\/utils/.test(fromPath)) {
+          const correctRel = computeRelativePath(filePath, "/utils/cn.ts");
+          return `import { cn } from "${correctRel}"`;
+        }
+        return `import { cn } from "${fromPath}"`;
+      }
+    );
+
+    // Fix imports referencing moved files
+    for (const [oldPath, newPath] of allMoves) {
+      const oldBase = oldPath.replace(/\.\w+$/, "");
+      const newRel = computeRelativePath(filePath, newPath);
+      // Replace import specifiers that resolved to the old path
+      updated = updated.replace(
+        new RegExp(`(from\\s+["'])(\\.[^"']*${escapeRegex(oldBase.split("/").pop() || "")})(["'])`, "g"),
+        (_m, pre, spec, post) => {
+          // Only rewrite if the spec actually resolves to the old path
+          if (spec.includes("/ui/") || resolveSpecToPath(filePath, spec) === oldBase) {
+            return `${pre}${newRel}${post}`;
+          }
+          return `${pre}${spec}${post}`;
+        }
+      );
+    }
+
+    if (updated !== content) base[filePath] = updated;
+  }
+}
+
+function computeRelativePath(from: string, to: string): string {
+  const fromParts = from.split("/").filter(Boolean).slice(0, -1); // dir of source
+  const toParts = to.split("/").filter(Boolean);
+  const toNoExt = toParts.map((p, i) => i === toParts.length - 1 ? p.replace(/\.\w+$/, "") : p);
+  let common = 0;
+  while (common < fromParts.length && common < toNoExt.length && fromParts[common] === toNoExt[common]) common++;
+  const ups = fromParts.length - common;
+  return (ups === 0 ? "./" : "../".repeat(ups)) + toNoExt.slice(common).join("/");
+}
+
+function resolveSpecToPath(from: string, spec: string): string {
+  if (!spec.startsWith(".")) return spec;
+  const fromDir = from.split("/").filter(Boolean).slice(0, -1);
+  const parts = spec.split("/");
+  for (const p of parts) {
+    if (p === ".") continue;
+    if (p === "..") fromDir.pop();
+    else fromDir.push(p);
+  }
+  return "/" + fromDir.join("/");
+}
+
+function escapeRegex(s: string): string {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
 function buildSandpackFiles(files: SandpackFileSet | null, projectId: string, supabaseUrl: string, supabaseKey: string): Record<string, string> {
   // Determine the actual App entry path + extension from user files
   let appImportPath = "./App"; // default
