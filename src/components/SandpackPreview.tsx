@@ -1059,6 +1059,31 @@ function buildSandpackFiles(files: SandpackFileSet | null, projectId: string, su
     base["/App.js"] = DEFAULT_APP;
   }
 
+  // ── Ensure essential utility modules always exist ──
+  if (!base["/utils/cn.ts"] && !base["/utils/cn.tsx"]) {
+    base["/utils/cn.ts"] = `import { clsx } from "clsx";\nimport { twMerge } from "tailwind-merge";\n\nexport function cn(...inputs: (string | undefined | null | false)[]) {\n  return twMerge(clsx(inputs));\n}\n`;
+    console.log("[SandpackPreview] Injected missing /utils/cn.ts");
+  }
+
+  // Fix dangling cn imports pointing to non-existent paths
+  for (const [path, content] of Object.entries(base)) {
+    if (!/\.(jsx?|tsx?)$/.test(path)) continue;
+    // Match any import of cn from a path that doesn't resolve to /utils/cn
+    const fixed = content.replace(
+      /import\s+\{\s*cn\s*\}\s+from\s+["']([^"']+)["']/g,
+      (full, fromPath) => {
+        if (fromPath.endsWith("/utils/cn") || fromPath === "../../utils/cn" || fromPath === "../utils/cn") {
+          // Compute correct relative path
+          const depth = path.split("/").length - 1; // e.g. /components/ui/X.tsx → 3 segments after split → depth 3
+          const prefix = "../".repeat(depth - 1) || "./";
+          return `import { cn } from "${prefix}utils/cn"`;
+        }
+        return full;
+      }
+    );
+    if (fixed !== content) base[path] = fixed;
+  }
+
   // ── Last-resort import repair pass ──
   return repairRelativeImports(base);
 }
