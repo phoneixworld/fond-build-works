@@ -916,15 +916,34 @@ function repairRelativeImports(files: Record<string, string>): Record<string, st
 }
 
 function buildSandpackFiles(files: SandpackFileSet | null, projectId: string, supabaseUrl: string, supabaseKey: string): Record<string, string> {
-  // Determine the actual App entry extension from user files
+  // Determine the actual App entry path + extension from user files
+  let appImportPath = "./App"; // default
   let appExt = ".js";
+  let appFoundInFiles = false;
   if (files) {
+    // Priority order: exact root paths first, then src/ paths
+    const appPatterns: Array<{ re: RegExp; ext: string; prefix: string }> = [
+      { re: /^\/App\.tsx$/, ext: ".tsx", prefix: "./" },
+      { re: /^\/App\.jsx$/, ext: ".jsx", prefix: "./" },
+      { re: /^\/App\.ts$/, ext: ".ts", prefix: "./" },
+      { re: /^\/App\.js$/, ext: ".js", prefix: "./" },
+      { re: /^\/src\/App\.tsx$/, ext: ".tsx", prefix: "./src/" },
+      { re: /^\/src\/App\.jsx$/, ext: ".jsx", prefix: "./src/" },
+      { re: /^\/src\/App\.ts$/, ext: ".ts", prefix: "./src/" },
+      { re: /^\/src\/App\.js$/, ext: ".js", prefix: "./src/" },
+    ];
     for (const p of Object.keys(files)) {
-      if (!p) continue; // Guard against null/undefined keys
+      if (!p) continue;
       const norm = p.startsWith("/") ? p : `/${p}`;
-      if (/^\/(?:src\/)?App\.tsx$/.test(norm)) { appExt = ".tsx"; break; }
-      if (/^\/(?:src\/)?App\.jsx$/.test(norm)) { appExt = ".jsx"; break; }
-      if (/^\/(?:src\/)?App\.ts$/.test(norm)) { appExt = ".ts"; break; }
+      for (const pat of appPatterns) {
+        if (pat.re.test(norm)) {
+          appExt = pat.ext;
+          appImportPath = `${pat.prefix}App${pat.ext}`;
+          appFoundInFiles = true;
+          break;
+        }
+      }
+      if (appFoundInFiles) break;
     }
   }
 
@@ -940,10 +959,10 @@ function buildSandpackFiles(files: SandpackFileSet | null, projectId: string, su
     }
   }
 
-  // Build index.js with user CSS imports appended
+  // Build index.js with the correct App import path
   let indexJs = buildIndexJs(projectId, supabaseUrl, supabaseKey).replace(
     'import App from "./App"',
-    `import App from "./App${appExt === ".js" ? "" : appExt.replace(/\./, ".")}"`
+    `import App from "${appImportPath}"`
   );
 
   // Inject imports for user CSS files (e.g. /styles/globals.css)
@@ -1023,7 +1042,13 @@ function buildSandpackFiles(files: SandpackFileSet | null, projectId: string, su
     }
   }
 
-  if (!base["/App.tsx"] && !base["/App.jsx"] && !base["/App.js"]) {
+  // Only inject DEFAULT_APP if no App entry exists anywhere (root or src/)
+  const hasAnyAppEntry = [
+    "/App.tsx", "/App.jsx", "/App.js", "/App.ts",
+    "/src/App.tsx", "/src/App.jsx", "/src/App.js", "/src/App.ts",
+  ].some(p => p in base);
+  if (!hasAnyAppEntry) {
+    console.warn("[SandpackPreview] No App entry found in workspace, injecting DEFAULT_APP. Keys:", Object.keys(base).filter(k => /App/i.test(k)));
     base["/App.js"] = DEFAULT_APP;
   }
 
