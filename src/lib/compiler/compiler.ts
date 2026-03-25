@@ -31,6 +31,7 @@ import { deduplicateFiles } from "./deduplicator";
 import { normalizeGeneratedStructure } from "./structureNormalizer";
 import { lintDesignQuality, formatLintSummary } from "./designLint";
 import { detectDesignTheme } from "./designThemes";
+import {
   createTrace, startPass, endPass,
   traceTaskStart, traceTaskEnd, finalizeTrace, printTrace,
 } from "./observability";
