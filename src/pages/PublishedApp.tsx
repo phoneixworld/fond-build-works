@@ -59,12 +59,19 @@ function buildFiles(raw: Record<string, string>): Record<string, string> {
     base[sandpackPath] = code;
   }
 
-  if (!base["/App.js"] && !base["/App.jsx"]) {
-    base["/App.js"] = DEFAULT_APP;
-  }
+  // Check for App entry in root or src/
+  const hasAnyAppEntry = [
+    "/App.js", "/App.jsx", "/src/App.js", "/src/App.jsx",
+  ].some(p => p in base);
 
-  if (base["/App.jsx"] && !base["/App.js"]) {
-    base["/index.js"] = INDEX_JS.replace("./App", "./App.jsx");
+  if (!hasAnyAppEntry) {
+    // Check if it's under src/ and update index.js import
+    const srcApp = Object.keys(base).find(p => /^\/src\/App\.(js|jsx)$/.test(p));
+    if (srcApp) {
+      base["/index.js"] = INDEX_JS.replace('./App', `./src/App`);
+    } else {
+      base["/App.js"] = DEFAULT_APP;
+    }
   }
 
   return base;
