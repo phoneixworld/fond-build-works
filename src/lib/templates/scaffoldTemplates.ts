@@ -16,7 +16,6 @@
  * 
  * All generated code files use .tsx/.ts extensions for TypeScript support.
  */
- */
 
 import { type DomainModel } from "@/lib/domainTemplates";
 import { DESIGN_SYSTEM_CSS } from "@/lib/designSystem";
