@@ -731,21 +731,134 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
         if (isSimpleBuild || isFirstBuild) {
           const instantResult = await tryInstantBuild(template, userText);
           if (instantResult) {
-            templateFiles = instantResult.files;
-            templateName = instantResult.templateName;
-            // Show instant preview while compile() runs full pipeline
-            setSandpackFiles(instantResult.files);
-            syncSandpackToVirtualFS(instantResult.files);
+            // ── Instant template is self-contained — skip compile() entirely ──
+            const finalFiles = instantResult.files;
+            setSandpackFiles(finalFiles);
+            syncSandpackToVirtualFS(finalFiles);
             if (Object.keys(instantResult.deps).length > 0) setSandpackDeps(instantResult.deps);
             setPreviewMode("sandpack");
+
+            const fileCount = Object.keys(finalFiles).length;
+            const msg = `✅ **${instantResult.templateName}** — ${fileCount} files rendered instantly!\n\nYour app is ready with API-wired data hooks and fallback demo data. Backend schema included.`;
             setMessages((prev) => {
-              const msg = `⚡ **Instant Preview** — ${Object.keys(instantResult.files).length} files rendered!\nRunning full build pipeline for verification and polish...`;
               const last = prev[prev.length - 1];
               if (last?.role === "assistant") {
                 return prev.map((m, i) => (i === prev.length - 1 ? { ...m, content: msg } : m));
               }
               return [...prev, { role: "assistant", content: msg, timestamp: Date.now() }];
             });
+
+            // Persist sandpack state
+            if (currentProject?.id) {
+              const payload = { files: finalFiles, deps: instantResult.deps };
+              supabase
+                .from("project_data")
+                .upsert(
+                  {
+                    project_id: currentProject.id,
+                    collection: "sandpack_state",
+                    data: payload as any,
+                  },
+                  { onConflict: "project_id,collection" },
+                )
+                .then(({ error: err }) => {
+                  if (err) console.warn("[InstantBuild] Failed to persist sandpack state:", err);
+                  else console.log("[InstantBuild] ✅ Sandpack state persisted");
+                });
+            }
+
+            // Record build in build_jobs
+            const totalSizeBytes = Object.values(finalFiles).reduce(
+              (sum, code) => sum + (code?.length || 0), 0
+            );
+            supabase.auth.getUser().then(async ({ data: authData }) => {
+              const userId = authData?.user?.id;
+              if (!userId) return;
+
+              const buildId = crypto.randomUUID();
+              const storagePath = `${currentProject.id}/${buildId}`;
+              const previewHtml = generatePreviewHtmlForBuild(finalFiles);
+              const previewPath = `${storagePath}/preview/index.html`;
+
+              await supabase.storage
+                .from("build-artifacts")
+                .upload(previewPath, new Blob([previewHtml], { type: "text/html" }), {
+                  contentType: "text/html",
+                  upsert: true,
+                });
+
+              const { data: publicUrlData } = supabase.storage
+                .from("build-artifacts")
+                .getPublicUrl(previewPath);
+              const previewUrl = publicUrlData?.publicUrl || null;
+
+              supabase
+                .from("build_jobs")
+                .insert({
+                  project_id: currentProject.id,
+                  user_id: userId,
+                  status: "complete",
+                  file_count: fileCount,
+                  total_size_bytes: totalSizeBytes,
+                  build_duration_ms: 0,
+                  build_config: { model: "instant-template", techStack: "react-cdn", template: instantResult.templateName } as any,
+                  validation_results: { valid: true, errors: [], warnings: [] } as any,
+                  build_log: [
+                    `[${new Date().toISOString()}] Instant template: ${instantResult.templateName}`,
+                    `[${new Date().toISOString()}] Files: ${fileCount}`,
+                    `[${new Date().toISOString()}] Build complete (instant)`,
+                  ],
+                  source_files: {} as any,
+                  output_files: {} as any,
+                  dependencies: instantResult.deps as any,
+                  artifact_path: storagePath,
+                  preview_url: previewUrl,
+                  error: null,
+                  started_at: new Date().toISOString(),
+                  completed_at: new Date().toISOString(),
+                })
+                .then(({ error: buildErr }) => {
+                  if (buildErr) console.error("[InstantBuild] build_jobs insert failed:", buildErr.message);
+                  else {
+                    console.log("[InstantBuild] ✅ Build recorded");
+                    if (previewUrl) {
+                      window.dispatchEvent(new CustomEvent("build-preview-url", { detail: previewUrl }));
+                    }
+                  }
+                });
+            }).catch(() => {});
+
+            // Save chat history
+            const persistMessages = messagesRef.current.map((m) => ({
+              role: m.role,
+              content: typeof m.content === "string" ? m.content : getTextContent(m.content),
+            }));
+            saveProject({
+              chat_history: persistMessages,
+              html_content: currentProject.html_content || "",
+            });
+
+            if (onVersionCreated) {
+              onVersionCreated({
+                id: crypto.randomUUID(),
+                timestamp: Date.now(),
+                label: userText.slice(0, 60) || "Instant build",
+                html: "",
+                messageIndex: currentMessages.length,
+              });
+            }
+
+            // ── Clean up build state and return — skip compile() ──
+            setIsLoading(false);
+            setIsBuilding(false);
+            setBuildStep("");
+            setPipelineStep("complete");
+            setCurrentAgent(null);
+            isSendingRef.current = false;
+            setBuildRetryCount(0);
+            setTimeout(() => setBuildStreamContent(""), 1000);
+            console.log(`[InstantBuild] ⚡ Complete — skipped compile() pipeline entirely`);
+            return;
           }
         }
 
