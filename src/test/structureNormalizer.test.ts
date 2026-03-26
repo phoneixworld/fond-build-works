@@ -130,19 +130,20 @@ export default function App(){
     expect(ws.hasFile("/pages/Home.tsx")).toBe(true);
   });
 
-  it("generates barrel exports", () => {
+  it("does not generate /utils/cn.ts (uses /lib/utils.ts instead)", () => {
     const ws = new Workspace({
-      "/components/ui/Button.tsx": `export function Button() { return null; }`,
-      "/components/ui/Card.tsx": `export function Card() { return null; }`,
-      "/components/StatCard.tsx": `export default function StatCard() { return null; }`,
-      "/pages/Dashboard/DashboardPage.tsx": `export default function DashboardPage() { return null; }`,
+      "/utils/cn.ts": `export function cn(...classes) { return classes.filter(Boolean).join(" "); }`,
+      "/components/ui/Button.tsx": `import { cn } from "../utils/cn";\nexport function Button({ children }) { return <button className={cn("btn")}>{children}</button>; }`,
     });
 
     normalizeGeneratedStructure(ws);
 
-    expect(ws.hasFile("/components/ui/index.ts")).toBe(true);
-    const uiBarrel = ws.getFile("/components/ui/index.ts") || "";
-    expect(uiBarrel).toContain('export * from "./Button"');
-    expect(uiBarrel).toContain('export * from "./Card"');
+    // /utils/cn.ts must be deleted
+    expect(ws.hasFile("/utils/cn.ts")).toBe(false);
+    // /lib/utils.ts must exist
+    expect(ws.hasFile("/lib/utils.ts")).toBe(true);
+    // Button import should point to ../lib/utils
+    const button = ws.getFile("/components/ui/Button.tsx") || "";
+    expect(button).toContain("../lib/utils");
   });
 });
