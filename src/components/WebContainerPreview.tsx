@@ -62,7 +62,8 @@ export default function WebContainerPreview({
     if (mountedRef.current || !files || Object.keys(files).length === 0) return;
     mountedRef.current = true;
 
-    mountAndRun(files, {}, {
+    const stringFiles = toStringMap(files);
+    mountAndRun(stringFiles, {}, {
       onStatus: setStatus,
       onLog: addLog,
       onServerReady: (url) => {
@@ -77,7 +78,7 @@ export default function WebContainerPreview({
       setError(err.message);
     });
 
-    prevFilesRef.current = { ...files };
+    prevFilesRef.current = stringFiles;
 
     return () => {
       teardownWebContainer();
@@ -89,8 +90,9 @@ export default function WebContainerPreview({
   useEffect(() => {
     if (status !== "ready" || !files) return;
 
+    const stringFiles = toStringMap(files);
     const changed: Record<string, string> = {};
-    for (const [path, content] of Object.entries(files)) {
+    for (const [path, content] of Object.entries(stringFiles)) {
       if (prevFilesRef.current[path] !== content) {
         changed[path] = content;
       }
@@ -103,7 +105,7 @@ export default function WebContainerPreview({
       }).catch((err) => {
         addLog(`❌ Update failed: ${err.message}`);
       });
-      prevFilesRef.current = { ...files };
+      prevFilesRef.current = stringFiles;
     }
   }, [files, status, addLog]);
 
