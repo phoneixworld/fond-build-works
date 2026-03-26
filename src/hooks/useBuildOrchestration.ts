@@ -2137,6 +2137,10 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
     setCurrentTaskIndex(0);
     setTotalPlanTasks(0);
     setCompilerTasks([]);
+    // Pillar 2: Reset build engine state
+    resetASTWorkspace();
+    clearProvenance();
+    clearBuildHistory();
     isSendingRef.current = false;
     saveProject({ chat_history: [], html_content: "" });
   }, [
