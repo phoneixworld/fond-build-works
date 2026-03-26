@@ -13,7 +13,8 @@
  */
 
 import { createASTWorkspace, type ASTWorkspace } from "@/lib/ast";
-import type { PatchOperation, PatchResult } from "@/lib/ast/types";
+import type { PatchOperation } from "@/lib/ast/types";
+import type { PatchResult } from "@/lib/ast/patch";
 
 // ─── Edit Intent Classification ─────────────────────────────────────────
 
