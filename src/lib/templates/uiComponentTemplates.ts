@@ -11,15 +11,12 @@
  */
 
 // ─── 1. Utils (cn helper) ────────────────────────────────────────────────────
+// NOTE: cn() lives at /lib/utils.ts (the real project file using clsx + twMerge).
+// Do NOT scaffold a separate /utils/cn.ts — it causes circular imports and
+// overwrites the real implementation.
 
-export const UTILS_COMPONENT = `/**
- * Utility: class name merger (cn helper)
- * Location: /utils/cn.ts — NOT inside /components/ui/
- */
-export function cn(...classes) {
-  return classes.filter(Boolean).join(" ");
-}
-`;
+// All templates below import cn from "../lib/utils" (relative to /components/ui/).
+
 
 // ─── 2. Button ───────────────────────────────────────────────────────────────
 
@@ -1190,8 +1187,8 @@ export const UI_ANIMATIONS_CSS = `
 
 export function getAllUIComponents(): Record<string, string> {
   return {
-    // Core utils — lives in /utils/, NOT inside /components/ui/
-    "/utils/cn.ts": UTILS_COMPONENT,
+    // cn() lives at /lib/utils.ts — NOT scaffolded here.
+    // Toast lives at src/components/ui/toast.tsx (real project file) — NOT scaffolded here.
     // 22 shadcn-compatible components
     "/components/ui/Button.tsx": BUTTON_COMPONENT,
     "/components/ui/Card.tsx": CARD_COMPONENT,
@@ -1216,10 +1213,9 @@ export function getAllUIComponents(): Record<string, string> {
     "/components/ui/Sheet.tsx": SHEET_COMPONENT,
     "/components/ui/Popover.tsx": POPOVER_COMPONENT,
     "/components/ui/Accordion.tsx": ACCORDION_COMPONENT,
-    // Phoenix-specific higher-level components
+    // Phoenix-specific higher-level components (NO Toast — use real toast.tsx)
     "/components/ui/Modal.tsx": MODAL_COMPONENT,
     "/components/ui/DataTable.tsx": DATATABLE_COMPONENT,
-    "/components/ui/Toast.tsx": TOAST_COMPONENT,
     "/components/ui/Spinner.tsx": SPINNER_COMPONENT,
     // Barrel exports for clean imports
     "/components/ui/index.ts": generateUIBarrelExport(),
@@ -1233,7 +1229,7 @@ function generateUIBarrelExport(): string {
     "Button", "Card", "Input", "Label", "Badge", "Separator", "Skeleton",
     "Checkbox", "Dialog", "Table", "Textarea", "Select", "Tabs", "Alert",
     "Avatar", "Progress", "Switch", "Tooltip", "ScrollArea", "Dropdown",
-    "Sheet", "Popover", "Accordion", "Modal", "DataTable", "Toast", "Spinner",
+    "Sheet", "Popover", "Accordion", "Modal", "DataTable", "Spinner",
   ];
   return components.map(c => `export * from "./${c}";`).join("\n") + "\n";
 }
@@ -1241,6 +1237,6 @@ function generateUIBarrelExport(): string {
 export function getShadcnUIComponents(): Record<string, string> {
   const all = getAllUIComponents();
   // Exclude Phoenix-specific components
-  const { "/components/ui/Modal.tsx": _m, "/components/ui/DataTable.tsx": _d, "/components/ui/Toast.tsx": _t, "/components/ui/Spinner.tsx": _s, ...shadcn } = all;
+  const { "/components/ui/Modal.tsx": _m, "/components/ui/DataTable.tsx": _d, "/components/ui/Spinner.tsx": _s, ...shadcn } = all;
   return shadcn;
 }

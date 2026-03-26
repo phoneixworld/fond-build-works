@@ -190,8 +190,8 @@ export function planTaskGraph(ctx: BuildContext, structuredIR?: IR): TaskGraph {
     description: `Shared UI component library with design tokens and global styles.
 
 Pre-built components are already scaffolded in the workspace — do NOT regenerate them.
-The cn() helper lives at /utils/cn.ts — NEVER put it inside /components/ui/.
-Import it as: import { cn } from "../utils/cn" (adjust relative path as needed).
+The cn() helper lives at /lib/utils.ts — NEVER create /utils/cn.ts or put cn inside /components/ui/.
+Import it as: import { cn } from "../lib/utils" (adjust relative path as needed).
 
 **CRITICAL**: All UI components MUST be pure React + Tailwind CSS.
 - NO Radix UI (@radix-ui/*) imports
