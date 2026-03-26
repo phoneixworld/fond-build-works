@@ -15,6 +15,8 @@ describe("School ERP integration", () => {
     const ui = getAllUIComponents();
     return new Workspace({
       ...ui,
+      // cn lives at /lib/utils.ts (the real project file)
+      "/lib/utils.ts": `import { clsx } from "clsx";\nimport { twMerge } from "tailwind-merge";\n\nexport function cn(...inputs) {\n  return twMerge(clsx(inputs));\n}\n`,
       "/contexts/AuthContext.jsx": `import React, { createContext, useContext, useState } from "react";
 const AuthContext = createContext(null);
 export function AuthProvider({ children }) {
