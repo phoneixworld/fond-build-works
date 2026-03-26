@@ -37,7 +37,49 @@ import { normalizeGeneratedStructure } from "@/lib/compiler/structureNormalizer"
 import { classifyIntentGate, parseConfirmationReply, type GuardRouteHint } from "@/lib/intentGate";
 import { extractUrlFromMessage, analyzeUrl } from "@/lib/urlAnalyzer";
 
-/** Generate a self-contained preview HTML from workspace files */
+/** Phase 3: Normalize task labels for user display */
+function normalizeTaskLabel(raw: string): string {
+  if (!raw || raw.trim().length === 0) return "Application Setup";
+  
+  const LABEL_MAP: Record<string, string> = {
+    infra: "Infrastructure",
+    auth: "Authentication",
+    routing: "Routing & Navigation",
+    shell: "Application Shell",
+    layout: "Layout & Structure",
+    nav: "Navigation",
+    sidebar: "Sidebar Navigation",
+    dashboard: "Dashboard",
+    db: "Database Schema",
+    schema: "Database Schema",
+    api: "API Integration",
+    styles: "Styling & Theme",
+    theme: "Styling & Theme",
+    config: "Configuration",
+    setup: "Project Setup",
+  };
+
+  // Handle "page:PageName" format
+  const pageMatch = raw.match(/^page:(.+)$/i);
+  if (pageMatch) return `${pageMatch[1].trim()} Page`;
+  
+  // Handle "component:Name" format  
+  const compMatch = raw.match(/^component:(.+)$/i);
+  if (compMatch) return `${compMatch[1].trim()} Component`;
+
+  // Check direct map
+  const lower = raw.toLowerCase().trim();
+  if (LABEL_MAP[lower]) return LABEL_MAP[lower];
+
+  // If it's a single generic word, try to capitalize nicely
+  if (/^[a-z_-]+$/.test(lower) && lower.length < 20) {
+    return lower.replace(/[-_]/g, " ").replace(/\b\w/g, c => c.toUpperCase());
+  }
+
+  // Already reasonable — just ensure first letter is capitalized
+  return raw.charAt(0).toUpperCase() + raw.slice(1);
+}
+
 function generatePreviewHtmlForBuild(files: Record<string, string>): string {
   const cssFiles = Object.entries(files)
     .filter(([p]) => p.endsWith(".css"))
