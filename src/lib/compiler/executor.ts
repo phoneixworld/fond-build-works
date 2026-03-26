@@ -314,32 +314,21 @@ function buildWorkspaceContext(
 
 function verifyRuntimeContracts(files: Record<string, string>): { ok: boolean; errors: string[] } {
   const errors: string[] = [];
-  const forbiddenWindowPatterns = ["window.__PROJECT_ID__", "window.__SUPABASE_URL__", "window.__SUPABASE_KEY__"];
   const forbiddenImportAlias = "@/";
+  
+  // These files should NOT be generated — the Supabase client is pre-configured
+  const forbiddenFiles = ["/lib/config.ts", "/lib/supabase.ts"];
 
   for (const [path, code] of Object.entries(files)) {
-    // Skip config and supabase modules themselves; they are allowed to read env/globals.
-    const isConfig = path === "/lib/config.ts" || path.endsWith("/lib/config.ts");
-    const isSupabase = path === "/lib/supabase.ts" || path.endsWith("/lib/supabase.ts") ||
-      path.includes("/integrations/supabase/");
-
-    if (!isConfig && !isSupabase) {
-      for (const pattern of forbiddenWindowPatterns) {
-        if (code.includes(pattern)) {
-          errors.push(
-            `File ${path} illegally reads preview/global value via '${pattern}'. Use /lib/config.ts instead.`,
-          );
-          break;
-        }
-      }
+    // Reject generated config/supabase files — these are pre-configured
+    if (forbiddenFiles.some(f => path === f || path.endsWith(f))) {
+      errors.push(`File ${path} should NOT be generated. The Supabase client is pre-configured at /integrations/supabase/client.ts.`);
+      continue;
     }
 
     if (code.includes(forbiddenImportAlias)) {
       errors.push(`File ${path} uses '@/'. All imports must be relative paths only.`);
     }
-
-    // NOTE: supabase.from() is ALLOWED — the project has a real Supabase backend via Lovable Cloud.
-    // The old project-api proxy restriction has been removed.
   }
 
   return { ok: errors.length === 0, errors };
