@@ -21,7 +21,7 @@
 // ─── 2. Button ───────────────────────────────────────────────────────────────
 
 export const BUTTON_COMPONENT = `import React from "react";
-import { cn } from "../utils/cn";
+import { cn } from "../lib/utils";
 
 const buttonVariants = {
   variant: {
@@ -67,7 +67,7 @@ export { Button };
 // ─── 3. Card ─────────────────────────────────────────────────────────────────
 
 export const CARD_COMPONENT = `import React from "react";
-import { cn } from "../utils/cn";
+import { cn } from "../lib/utils";
 
 export function Card({ children, className = "", ...props }) {
   return <div className={cn("rounded-lg border border-[var(--color-border)] bg-white shadow-sm", className)} {...props}>{children}</div>;
@@ -99,7 +99,7 @@ export default Card;
 // ─── 4. Input ────────────────────────────────────────────────────────────────
 
 export const INPUT_COMPONENT = `import React from "react";
-import { cn } from "../utils/cn";
+import { cn } from "../lib/utils";
 
 const Input = React.forwardRef(({ className = "", type = "text", ...props }, ref) => {
   return (
@@ -123,7 +123,7 @@ export { Input };
 // ─── 5. Label ────────────────────────────────────────────────────────────────
 
 export const LABEL_COMPONENT = `import React from "react";
-import { cn } from "../utils/cn";
+import { cn } from "../lib/utils";
 
 export default function Label({ children, htmlFor, className = "", ...props }) {
   return (
@@ -143,7 +143,7 @@ export { Label };
 // ─── 6. Badge ────────────────────────────────────────────────────────────────
 
 export const BADGE_COMPONENT = `import React from "react";
-import { cn } from "../utils/cn";
+import { cn } from "../lib/utils";
 
 const badgeVariants = {
   default: "bg-[var(--color-primary)] text-white border-transparent",
@@ -174,7 +174,7 @@ export { Badge };
 // ─── 7. Separator ────────────────────────────────────────────────────────────
 
 export const SEPARATOR_COMPONENT = `import React from "react";
-import { cn } from "../utils/cn";
+import { cn } from "../lib/utils";
 
 export default function Separator({ orientation = "horizontal", className = "", ...props }) {
   return (
@@ -196,7 +196,7 @@ export { Separator };
 // ─── 8. Skeleton ─────────────────────────────────────────────────────────────
 
 export const SKELETON_COMPONENT = `import React from "react";
-import { cn } from "../utils/cn";
+import { cn } from "../lib/utils";
 
 export default function Skeleton({ className = "", ...props }) {
   return (
@@ -211,7 +211,7 @@ export { Skeleton };
 
 export const CHECKBOX_COMPONENT = `import React from "react";
 import { Check } from "lucide-react";
-import { cn } from "../utils/cn";
+import { cn } from "../lib/utils";
 
 export default function Checkbox({ checked, onCheckedChange, className = "", disabled = false, id, ...props }) {
   return (
@@ -241,7 +241,7 @@ export { Checkbox };
 
 export const DIALOG_COMPONENT = `import React, { useEffect, useRef } from "react";
 import { X } from "lucide-react";
-import { cn } from "../utils/cn";
+import { cn } from "../lib/utils";
 
 export function Dialog({ open, onOpenChange, children }) {
   useEffect(() => {
@@ -289,7 +289,7 @@ export default Dialog;
 // ─── 11. Table ───────────────────────────────────────────────────────────────
 
 export const TABLE_COMPONENT = `import React from "react";
-import { cn } from "../utils/cn";
+import { cn } from "../lib/utils";
 
 export function Table({ children, className = "", ...props }) {
   return (
@@ -339,7 +339,7 @@ export default Table;
 // ─── 12. Textarea ────────────────────────────────────────────────────────────
 
 export const TEXTAREA_COMPONENT = `import React from "react";
-import { cn } from "../utils/cn";
+import { cn } from "../lib/utils";
 
 const Textarea = React.forwardRef(({ className = "", ...props }, ref) => {
   return (
@@ -363,7 +363,7 @@ export { Textarea };
 
 export const SELECT_COMPONENT = `import React, { useState, useRef, useEffect, createContext, useContext } from "react";
 import { ChevronDown, Check } from "lucide-react";
-import { cn } from "../utils/cn";
+import { cn } from "../lib/utils";
 
 const SelectContext = createContext({});
 
@@ -460,7 +460,7 @@ export default Select;
 // ─── 14. Tabs ────────────────────────────────────────────────────────────────
 
 export const TABS_COMPONENT = `import React, { useState, createContext, useContext } from "react";
-import { cn } from "../utils/cn";
+import { cn } from "../lib/utils";
 
 const TabsContext = createContext({});
 
@@ -522,7 +522,7 @@ export default Tabs;
 // ─── 15. Alert ───────────────────────────────────────────────────────────────
 
 export const ALERT_COMPONENT = `import React from "react";
-import { cn } from "../utils/cn";
+import { cn } from "../lib/utils";
 
 const variants = {
   default: "bg-white border-[var(--color-border)] text-[var(--color-text)]",
@@ -553,7 +553,7 @@ export default Alert;
 // ─── 16. Avatar ──────────────────────────────────────────────────────────────
 
 export const AVATAR_COMPONENT = `import React, { useState } from "react";
-import { cn } from "../utils/cn";
+import { cn } from "../lib/utils";
 
 export function Avatar({ children, className = "" }) {
   return (
@@ -583,7 +583,7 @@ export default Avatar;
 // ─── 17. Progress ────────────────────────────────────────────────────────────
 
 export const PROGRESS_COMPONENT = `import React from "react";
-import { cn } from "../utils/cn";
+import { cn } from "../lib/utils";
 
 export default function Progress({ value = 0, max = 100, className = "" }) {
   const pct = Math.min(100, Math.max(0, (value / max) * 100));
@@ -603,7 +603,7 @@ export { Progress };
 // ─── 18. Switch ──────────────────────────────────────────────────────────────
 
 export const SWITCH_COMPONENT = `import React from "react";
-import { cn } from "../utils/cn";
+import { cn } from "../lib/utils";
 
 export default function Switch({ checked = false, onCheckedChange, disabled = false, className = "" }) {
   return (
@@ -633,7 +633,7 @@ export { Switch };
 // ─── 19. Tooltip ─────────────────────────────────────────────────────────────
 
 export const TOOLTIP_COMPONENT = `import React, { useState, useRef, createContext, useContext } from "react";
-import { cn } from "../utils/cn";
+import { cn } from "../lib/utils";
 
 const TooltipProviderCtx = createContext({});
 
@@ -691,7 +691,7 @@ export default Tooltip;
 // ─── 20. ScrollArea ──────────────────────────────────────────────────────────
 
 export const SCROLLAREA_COMPONENT = `import React from "react";
-import { cn } from "../utils/cn";
+import { cn } from "../lib/utils";
 
 export function ScrollArea({ children, className = "", style }) {
   return (
@@ -712,7 +712,7 @@ export default ScrollArea;
 // ─── 21. DropdownMenu ────────────────────────────────────────────────────────
 
 export const DROPDOWN_COMPONENT = `import React, { useState, useRef, useEffect, createContext, useContext } from "react";
-import { cn } from "../utils/cn";
+import { cn } from "../lib/utils";
 
 const DropdownCtx = createContext({});
 
@@ -784,7 +784,7 @@ export default DropdownMenu;
 
 export const SHEET_COMPONENT = `import React, { useEffect, createContext, useContext, useState } from "react";
 import { X } from "lucide-react";
-import { cn } from "../utils/cn";
+import { cn } from "../lib/utils";
 
 const SheetCtx = createContext({});
 
@@ -864,7 +864,7 @@ export default Sheet;
 // ─── 23. Popover ─────────────────────────────────────────────────────────────
 
 export const POPOVER_COMPONENT = `import React, { useState, useRef, useEffect, createContext, useContext } from "react";
-import { cn } from "../utils/cn";
+import { cn } from "../lib/utils";
 
 const PopoverCtx = createContext({});
 
@@ -920,7 +920,7 @@ export default Popover;
 
 export const ACCORDION_COMPONENT = `import React, { useState, createContext, useContext } from "react";
 import { ChevronDown } from "lucide-react";
-import { cn } from "../utils/cn";
+import { cn } from "../lib/utils";
 
 const AccordionCtx = createContext({});
 
