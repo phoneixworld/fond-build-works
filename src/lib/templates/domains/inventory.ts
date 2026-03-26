@@ -2,7 +2,7 @@
  * Inventory Management Template
  */
 
-import { registerTemplate, TEMPLATE_CSS, generateSidebar, generateHeader, generateStatsCards, generateDataTable } from "./templateRegistry";
+import { registerTemplate, TEMPLATE_CSS, generateSidebar, generateHeader, generateStatsCards, generateDataTable } from "../templateRegistry";
 
 const INVENTORY_APP = `import React, { useState } from "react";
 import Sidebar from "./components/Sidebar";

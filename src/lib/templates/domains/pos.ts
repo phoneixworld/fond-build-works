@@ -2,7 +2,7 @@
  * POS (Point of Sale) Template
  */
 
-import { registerTemplate, TEMPLATE_CSS } from "./templateRegistry";
+import { registerTemplate, TEMPLATE_CSS } from "../templateRegistry";
 
 const POS_APP = `import React, { useState } from "react";
 import ProductGrid from "./components/ProductGrid";

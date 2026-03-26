@@ -2,7 +2,7 @@
  * Kanban / Project Board Template
  */
 
-import { registerTemplate, TEMPLATE_CSS } from "./templateRegistry";
+import { registerTemplate, TEMPLATE_CSS } from "../templateRegistry";
 
 const KANBAN_APP = `import React, { useState } from "react";
 import Board from "./components/Board";

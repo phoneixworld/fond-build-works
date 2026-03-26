@@ -2,7 +2,7 @@
  * Analytics Dashboard Template
  */
 
-import { registerTemplate, TEMPLATE_CSS, generateSidebar, generateHeader, generateStatsCards } from "./templateRegistry";
+import { registerTemplate, TEMPLATE_CSS, generateSidebar, generateHeader, generateStatsCards } from "../templateRegistry";
 
 const ANALYTICS_APP = `import React, { useState } from "react";
 import Sidebar from "./components/Sidebar";

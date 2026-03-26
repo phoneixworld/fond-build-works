@@ -2,7 +2,7 @@
  * Invoice/Billing Management Template
  */
 
-import { registerTemplate, TEMPLATE_CSS, generateSidebar, generateHeader, generateStatsCards, generateDataTable } from "./templateRegistry";
+import { registerTemplate, TEMPLATE_CSS, generateSidebar, generateHeader, generateStatsCards, generateDataTable } from "../templateRegistry";
 
 const INVOICE_APP = `import React, { useState } from "react";
 import Sidebar from "./components/Sidebar";
