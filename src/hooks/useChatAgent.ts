@@ -280,7 +280,7 @@ export function useChatAgent(config: ChatAgentConfig) {
           setPendingBuildPrompt(JSON.stringify(buildEnvelope));
         }
 
-        const displayText = stripBuildMarker(responseText);
+        const displayText = sanitizeChatTruthfulness(stripBuildMarker(responseText));
         const cacheTag =
           isCached && cacheInfo
             ? `\n\n_⚡ ${cacheInfo.layer} cache ${cacheInfo.matchType} hit (${(
@@ -357,7 +357,7 @@ export function useChatAgent(config: ChatAgentConfig) {
                 if (!isMountedRef.current) return;
                 fullChatResponseRef.current += token;
                 tokenCount += Math.ceil(token.length / 4);
-                const displayText = stripBuildMarker(fullChatResponseRef.current);
+                const displayText = sanitizeChatTruthfulness(stripBuildMarker(fullChatResponseRef.current));
                 setMessages((prev) => {
                   const last = prev[prev.length - 1];
                   if (last?.role === "assistant") {
