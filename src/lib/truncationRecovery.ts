@@ -133,8 +133,9 @@ function detectCodeTruncation(code: string, filePath: string): string | null {
     return `${filePath}: ${parenDepth} unclosed parentheses — code was truncated`;
   }
 
-  // Check for missing export in JSX files
-  if (filePath.match(/\.(jsx?|tsx?)$/) && !code.includes("export")) {
+  // Check for missing export in JSX files (skip entry points which don't need exports)
+  const isEntryPoint = /\/(index|main)\.(jsx?|tsx?)$/.test(filePath);
+  if (!isEntryPoint && filePath.match(/\.(jsx?|tsx?)$/) && !code.includes("export")) {
     return `${filePath}: No export statement — file may be incomplete`;
   }
 
