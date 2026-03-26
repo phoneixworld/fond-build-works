@@ -72,3 +72,35 @@ export {
   type ASTVerificationIssue,
   type QualityScore,
 } from "./astVerifier";
+
+// Phase 5: Hybrid Generation Engine
+export {
+  classifyFiles,
+  saturateWithTemplates,
+  analyzeAIGaps,
+  gapsToMicroTasks,
+  type HybridPlan,
+  type FileClassification,
+  type GenerationLane,
+  type AIGap,
+} from "./hybridGenerator";
+
+// Phase 6: Agent Orchestration
+export {
+  registerAgent,
+  getAgentsForPhase,
+  executeAgentPhase,
+  buildAgentPipelineSummary,
+  type AgentDefinition,
+  type AgentPipelineResult,
+} from "./agentOrchestrationPhase";
+
+// Phase 7: WebContainer Runtime Validation
+export {
+  validateRuntime,
+  validateQuick,
+  type RuntimeValidationResult,
+  type TierResult,
+  type ValidationCheck,
+  type FileValidationResult,
+} from "./webContainerValidator";
