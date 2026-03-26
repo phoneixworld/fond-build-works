@@ -18,56 +18,46 @@ export function generateSupabaseEntityFiles(ir: IR): Record<string, string> {
 }
 
 function generateSupabaseEntity(entityName: string): string {
-  const table = entityName.toLowerCase();
+  const collection = entityName.toLowerCase() + "s";
 
   return `
-import { getSupabase } from "@/lib/supabaseAdapter";
+const API_BASE = window.__SUPABASE_URL__ || "";
+const API_KEY = window.__SUPABASE_KEY__ || "";
+const PROJECT_ID = window.__PROJECT_ID__ || "";
+
+async function apiCall(action, data) {
+  const res = await fetch(API_BASE + "/functions/v1/project-api", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "Authorization": "Bearer " + API_KEY },
+    body: JSON.stringify({ project_id: PROJECT_ID, collection: "${collection}", action, ...data }),
+  });
+  const json = await res.json();
+  if (!res.ok) throw new Error(json.error || "API error");
+  return json;
+}
 
 export async function list${entityName}s() {
-  const { data, error } = await getSupabase()
-    .from("${table}")
-    .select("*");
-  if (error) throw error;
-  return data;
+  const json = await apiCall("list");
+  return json.data || [];
 }
 
 export async function get${entityName}(id) {
-  const { data, error } = await getSupabase()
-    .from("${table}")
-    .select("*")
-    .eq("id", id)
-    .single();
-  if (error) throw error;
-  return data;
+  const json = await apiCall("get", { id });
+  return json.data;
 }
 
 export async function create${entityName}(input) {
-  const { data, error } = await getSupabase()
-    .from("${table}")
-    .insert(input)
-    .select()
-    .single();
-  if (error) throw error;
-  return data;
+  const json = await apiCall("create", { data: input });
+  return json.data;
 }
 
 export async function update${entityName}(id, input) {
-  const { data, error } = await getSupabase()
-    .from("${table}")
-    .update(input)
-    .eq("id", id)
-    .select()
-    .single();
-  if (error) throw error;
-  return data;
+  const json = await apiCall("update", { id, data: input });
+  return json.data;
 }
 
 export async function delete${entityName}(id) {
-  const { error } = await getSupabase()
-    .from("${table}")
-    .delete()
-    .eq("id", id);
-  if (error) throw error;
+  await apiCall("delete", { id });
   return true;
 }
 `.trim();

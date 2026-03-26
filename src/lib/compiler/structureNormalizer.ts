@@ -6,6 +6,7 @@ const CODE_FILE_RE = /\.(jsx?|tsx?)$/;
 export function normalizeGeneratedStructure(workspace: Workspace): number {
   let fixed = 0;
   fixed += normalizeFileExtensions(workspace);
+  fixed += normalizeAliasImports(workspace);
   fixed += normalizeMirroredFiles(workspace);
   fixed += normalizeUtilityModules(workspace);
   fixed += normalizeDomainComponentPlacement(workspace);
@@ -15,6 +16,52 @@ export function normalizeGeneratedStructure(workspace: Workspace): number {
   fixed += normalizeContextReferences(workspace);
   fixed += normalizeExportDuplication(workspace);
   fixed += normalizeComponentExportConventions(workspace);
+  return fixed;
+}
+
+// ─── Rewrite @/ alias imports to relative paths (Sandpack compatibility) ──
+
+function computeRelativeImport(fromFile: string, toFile: string): string {
+  const fromParts = fromFile.split("/").filter(Boolean);
+  fromParts.pop(); // remove filename
+  const toParts = toFile.split("/").filter(Boolean);
+
+  // Find common prefix length
+  let common = 0;
+  while (common < fromParts.length && common < toParts.length && fromParts[common] === toParts[common]) {
+    common++;
+  }
+
+  const ups = fromParts.length - common;
+  const downs = toParts.slice(common);
+
+  if (ups === 0) return "./" + downs.join("/");
+  return "../".repeat(ups) + downs.join("/");
+}
+
+function normalizeAliasImports(workspace: Workspace): number {
+  let fixed = 0;
+  const aliasRe = /(from\s+["'])@\/([^"']+)(["'])/g;
+
+  for (const filePath of workspace.listFiles()) {
+    if (!CODE_FILE_RE.test(filePath)) continue;
+    const content = workspace.getFile(filePath) || "";
+    if (!content.includes("@/")) continue;
+
+    const updated = content.replace(aliasRe, (_full, pre, aliasPath, post) => {
+      // @/lib/utils → /lib/utils, then compute relative from current file
+      const targetAbsolute = "/" + aliasPath;
+      const relative = computeRelativeImport(filePath, targetAbsolute);
+      fixed++;
+      return `${pre}${relative}${post}`;
+    });
+
+    if (updated !== content) {
+      workspace.updateFile(filePath, updated);
+      console.log(`[StructureNormalizer] Rewrote @/ aliases in ${filePath}`);
+    }
+  }
+
   return fixed;
 }
 
