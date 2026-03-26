@@ -124,7 +124,7 @@ ${workspaceContext ? `### Current code (scoped):\n${workspaceContext}` : ""}
 - **BAN-7**: NEVER add \`export { X }\` alongside \`export default X\` for the same symbol.
 - **BAN-8**: NEVER leave placeholders, TODOs, or stubs. Output COMPLETE working code.
 - **BAN-9**: NEVER call \`useNavigate()\` inside AuthContext. AuthContext must be router-agnostic.
-- **BAN-10**: NEVER read \`window.*\` globals in app code. ONLY \`/lib/config.ts\` may read globals or environment.
+- **BAN-10**: NEVER generate \`/lib/config.ts\` or \`/lib/supabase.ts\` — the Supabase client is pre-configured.
 
 ## ══════════════════════════════════════════════════════════════════
 ## CRITICAL RULES (output quality)
