@@ -919,34 +919,25 @@ function repairRelativeImports(files: Record<string, string>): Record<string, st
 // normalizeSandpackFileMap is now imported from @/lib/preview/normalizeFileMap
 
 function buildSandpackFiles(files: SandpackFileSet | null, projectId: string, supabaseUrl: string, supabaseKey: string): Record<string, string> {
-  // Determine the actual App entry path + extension from user files
-  let appImportPath = "./App"; // default
-  let appExt = ".js";
-  let appFoundInFiles = false;
+  // Determine the App entry import path from user files.
+  // IMPORTANT: keep this extensionless so later TS/JS auto-renames never break the import.
+  let appImportPath = "./App";
   if (files) {
-    // Priority order: exact root paths first, then src/ paths
-    const appPatterns: Array<{ re: RegExp; ext: string; prefix: string }> = [
-      { re: /^\/App\.tsx$/, ext: ".tsx", prefix: "./" },
-      { re: /^\/App\.jsx$/, ext: ".jsx", prefix: "./" },
-      { re: /^\/App\.ts$/, ext: ".ts", prefix: "./" },
-      { re: /^\/App\.js$/, ext: ".js", prefix: "./" },
-      { re: /^\/src\/App\.tsx$/, ext: ".tsx", prefix: "./src/" },
-      { re: /^\/src\/App\.jsx$/, ext: ".jsx", prefix: "./src/" },
-      { re: /^\/src\/App\.ts$/, ext: ".ts", prefix: "./src/" },
-      { re: /^\/src\/App\.js$/, ext: ".js", prefix: "./src/" },
+    const normalizedPaths = Object.keys(files)
+      .filter(Boolean)
+      .map((p) => (p.startsWith("/") ? p : `/${p}`));
+
+    // Deterministic priority: root App.* first, then src/App.*
+    const appPatterns: Array<{ re: RegExp; importPath: string }> = [
+      { re: /^\/App\.(tsx|jsx|ts|js)$/, importPath: "./App" },
+      { re: /^\/src\/App\.(tsx|jsx|ts|js)$/, importPath: "./src/App" },
     ];
-    for (const p of Object.keys(files)) {
-      if (!p) continue;
-      const norm = p.startsWith("/") ? p : `/${p}`;
-      for (const pat of appPatterns) {
-        if (pat.re.test(norm)) {
-          appExt = pat.ext;
-          appImportPath = `${pat.prefix}App${pat.ext}`;
-          appFoundInFiles = true;
-          break;
-        }
+
+    for (const pat of appPatterns) {
+      if (normalizedPaths.some((p) => pat.re.test(p))) {
+        appImportPath = pat.importPath;
+        break;
       }
-      if (appFoundInFiles) break;
     }
   }
 
