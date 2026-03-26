@@ -322,13 +322,37 @@ function verifyRuntimeContracts(files: Record<string, string>): { ok: boolean; e
   for (const [path, code] of Object.entries(files)) {
     // Reject generated config/supabase files — these are pre-configured
     if (forbiddenFiles.some(f => path === f || path.endsWith(f))) {
-      errors.push(`File ${path} should NOT be generated. The Supabase client is pre-configured at /integrations/supabase/client.ts.`);
+      console.warn(`[Executor] 🗑️ Auto-removing forbidden file ${path} — Supabase client is pre-configured`);
+      delete files[path];
       continue;
     }
 
     if (code.includes(forbiddenImportAlias)) {
       errors.push(`File ${path} uses '@/'. All imports must be relative paths only.`);
     }
+  }
+
+  // Rewrite imports referencing removed config/supabase files in remaining files
+  const configImportPattern = /import\s+\{[^}]*\}\s+from\s+['"][^'"]*(?:lib\/config|lib\/supabase)['"]\s*;?/g;
+  const configRequirePattern = /(?:const|let|var)\s+\{[^}]*\}\s*=\s*require\(['"][^'"]*(?:lib\/config|lib\/supabase)['"]\)\s*;?/g;
+  
+  for (const [path, code] of Object.entries(files)) {
+    if (configImportPattern.test(code) || configRequirePattern.test(code)) {
+      // Determine relative path from this file to /integrations/supabase/client
+      const depth = path.split("/").filter(Boolean).length - 1;
+      const prefix = depth <= 1 ? "./" : "../".repeat(depth - 1);
+      const clientPath = `${prefix}integrations/supabase/client`;
+      
+      let fixed = code
+        .replace(configImportPattern, `import { supabase } from '${clientPath}';`)
+        .replace(configRequirePattern, `import { supabase } from '${clientPath}';`);
+      
+      console.warn(`[Executor] 🔧 Rewrote config/supabase imports in ${path} → ${clientPath}`);
+      files[path] = fixed;
+    }
+    // Reset regex lastIndex
+    configImportPattern.lastIndex = 0;
+    configRequirePattern.lastIndex = 0;
   }
 
   return { ok: errors.length === 0, errors };
@@ -477,9 +501,14 @@ export async function executeTask(
         `[Executor] Runtime contract violations in task '${task.label}':\n` +
           runtimeCheck.errors.map((e) => ` - ${e}`).join("\n"),
       );
-      throw new Error(
-        `Runtime contract violation in task '${task.label}'. Generated files violate Sandpack-only, preview-agnostic runtime rules.`,
-      );
+      // Log violations but don't throw — the verifier auto-fixes what it can
+      // Only throw if there are unfixable violations (like @/ aliases)
+      const criticalErrors = runtimeCheck.errors.filter(e => e.includes("'@/'"));
+      if (criticalErrors.length > 0) {
+        throw new Error(
+          `Runtime contract violation in task '${task.label}': ${criticalErrors[0]}`,
+        );
+      }
     }
 
     // ── Pre-commit syntax validation (Babel parse gate) ───────────────
