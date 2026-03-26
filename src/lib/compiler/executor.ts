@@ -200,8 +200,7 @@ ${workspaceContext ? `### Current code (scoped):\n${workspaceContext}` : ""}
 
 10. **File layout**:
     - /lib/utils.ts — cn() class-merge utility. NEVER put utils in /components/ui/ or /utils/.
-    - /lib/config.ts — PROJECT_ID, SUPABASE_URL, SUPABASE_KEY. ONLY this file may read globals/env.
-    - /lib/supabase.ts — single Supabase client instance, imported by auth and related logic.
+    - /integrations/supabase/client.ts — pre-configured Supabase client. NEVER modify or recreate.
     - /components/ui/ — pre-scaffolded shadcn-compatible UI components (NAMED exports, do not modify).
     - /components/ — reusable DOMAIN components (StatCard, StatusBadge, PageHeader, etc.). DEFAULT exports.
     - /contexts/ — React contexts (AuthContext, etc.).
@@ -209,6 +208,7 @@ ${workspaceContext ? `### Current code (scoped):\n${workspaceContext}` : ""}
     - /hooks/ — custom hooks (.ts files). /hooks/data/ for data-fetching hooks.
     - /layout/ — layout wrappers (AppLayout.tsx, Sidebar.tsx). DEFAULT exports.
     Import cn from "../lib/utils" (adjust relative path based on file depth).
+    Import supabase from "../integrations/supabase/client" (adjust relative path).
 
 11. **COMPONENT DECOMPOSITION**: Pages must NOT be monolithic. Every page MUST import and use components from /components/ui/:
     - Table + TableHeader/TableBody/TableRow/TableHead/TableCell for data lists
