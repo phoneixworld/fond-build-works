@@ -1038,13 +1038,13 @@ function buildAIGap(
   ir: IR,
   requirements: string
 ): AIGap {
-  const entityNames = Object.keys(ir.entities);
+  const entityNames = Object.keys(ir.entities || {});
   const relatedEntity = entityNames.find(e =>
     filePath.toLowerCase().includes(e.toLowerCase())
   );
 
   const entityContext = relatedEntity
-    ? `\nEntity "${relatedEntity}" has fields: ${ir.entities[relatedEntity].fields.map(f => f.name).join(", ")}`
+    ? `\nEntity "${relatedEntity}" has fields: ${Object.keys(ir.entities[relatedEntity].fields).join(", ")}`
     : "";
 
   return {
