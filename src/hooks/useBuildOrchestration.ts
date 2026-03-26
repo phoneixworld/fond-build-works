@@ -1062,12 +1062,13 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
             resetBuildSafetyTimeout();
             setCurrentTaskIndex(index);
             setTotalPlanTasks(total);
-            setBuildStep(`🔨 Task ${index + 1}/${total}: ${task.label}`);
+            const normalizedLabel = normalizeTaskLabel(task.label);
+            setBuildStep(`🔨 Task ${index + 1}/${total}: ${normalizedLabel}`);
 
             setCompilerTasks((prev) =>
               prev.map((t, i) => ({
                 ...t,
-                label: i === index ? task.label : t.label,
+                label: i === index ? normalizedLabel : t.label,
                 status: i < index ? "done" : i === index ? "in_progress" : t.status,
               })),
             );
@@ -1075,7 +1076,7 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
             const labels = planLabelsRef.current;
             const progressMsg = `📋 **Building** (${total} tasks)\n\n${Array.from({ length: total }, (_, i) => {
               const status = i < index ? "✅" : i === index ? "🔨" : "⏳";
-              const label = labels[i] || task.label;
+              const label = labels[i] || normalizedLabel;
               return `${status} ${i + 1}. ${label}`;
             }).join("\n")}`;
             setMessages((prev) => {
