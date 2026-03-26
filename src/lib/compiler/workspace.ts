@@ -53,12 +53,28 @@ export class Workspace {
     return this.files.size;
   }
 
+  /** Paths that are pre-scaffolded and MUST NOT be overwritten by AI-generated code. */
+  private static readonly PROTECTED_PREFIXES = ["/components/ui/"];
+
+  private isProtectedPath(path: string): boolean {
+    const normalized = this.normalizePath(path);
+    return Workspace.PROTECTED_PREFIXES.some((prefix) => normalized.startsWith(prefix));
+  }
+
   /** Apply a batch of file changes from a task output.
-   *  Each JS/TS file is Babel-validated; unparseable files are rejected. */
+   *  Each JS/TS file is Babel-validated; unparseable files are rejected.
+   *  Files under /components/ui/ are HARD-BLOCKED — AI must never overwrite pre-scaffolded UI primitives. */
   applyPatch(patch: Record<string, string>): string[] {
     const applied: string[] = [];
     for (const [path, content] of Object.entries(patch)) {
       const normalized = this.normalizePath(path);
+
+      // ── HARD GUARD: never allow AI writes to protected paths ──
+      if (this.isProtectedPath(normalized)) {
+        console.warn(`[Workspace] 🛑 BLOCKED AI write to protected path: ${normalized}`);
+        continue;
+      }
+
       const parseResult = validateFileSyntax(normalized, content);
       if (!parseResult.valid) {
         console.warn(`[Workspace] ⛔ Rejecting malformed file ${normalized}: ${parseResult.error} (line ${parseResult.errorLine})`);
