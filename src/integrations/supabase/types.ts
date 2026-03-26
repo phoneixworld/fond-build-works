@@ -395,6 +395,66 @@ export type Database = {
           },
         ]
       }
+      pd_05bbce8ce6b6_landing: {
+        Row: {
+          created_at: string
+          description: string | null
+          id: string
+          name: string
+          project_id: string
+          status: string | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          name: string
+          project_id?: string
+          status?: string | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          name?: string
+          project_id?: string
+          status?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      pd_05bbce8ce6b6_pricing: {
+        Row: {
+          created_at: string
+          description: string | null
+          id: string
+          name: string
+          project_id: string
+          status: string | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          name: string
+          project_id?: string
+          status?: string | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          name?: string
+          project_id?: string
+          status?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       pd_1690a1e023a3_message: {
         Row: {
           created_at: string
@@ -1997,6 +2057,36 @@ export type Database = {
         }
         Relationships: []
       }
+      pd_a5239846e1c4_landing: {
+        Row: {
+          created_at: string
+          description: string | null
+          id: string
+          name: string
+          project_id: string
+          status: string | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          name: string
+          project_id?: string
+          status?: string | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          name?: string
+          project_id?: string
+          status?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       pd_b0de245a069e_authentication: {
         Row: {
           created_at: string
@@ -2757,6 +2847,66 @@ export type Database = {
         Relationships: []
       }
       pd_c577748f0230_crm: {
+        Row: {
+          created_at: string
+          description: string | null
+          id: string
+          name: string
+          project_id: string
+          status: string | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          name: string
+          project_id?: string
+          status?: string | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          name?: string
+          project_id?: string
+          status?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      pd_cbe817e080e7_landing: {
+        Row: {
+          created_at: string
+          description: string | null
+          id: string
+          name: string
+          project_id: string
+          status: string | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          name: string
+          project_id?: string
+          status?: string | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          name?: string
+          project_id?: string
+          status?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      pd_cdb87e1f5565_landing: {
         Row: {
           created_at: string
           description: string | null
