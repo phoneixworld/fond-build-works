@@ -345,12 +345,12 @@ function verifyRuntimeContracts(files: Record<string, string>): { ok: boolean; e
   const errors: string[] = [];
   const forbiddenWindowPatterns = ["window.__PROJECT_ID__", "window.__SUPABASE_URL__", "window.__SUPABASE_KEY__"];
   const forbiddenImportAlias = "@/";
-  const forbiddenSupabaseDirect = "supabase.from(";
 
   for (const [path, code] of Object.entries(files)) {
     // Skip config and supabase modules themselves; they are allowed to read env/globals.
     const isConfig = path === "/lib/config.ts" || path.endsWith("/lib/config.ts");
-    const isSupabase = path === "/lib/supabase.ts" || path.endsWith("/lib/supabase.ts");
+    const isSupabase = path === "/lib/supabase.ts" || path.endsWith("/lib/supabase.ts") ||
+      path.includes("/integrations/supabase/");
 
     if (!isConfig && !isSupabase) {
       for (const pattern of forbiddenWindowPatterns) {
@@ -367,11 +367,8 @@ function verifyRuntimeContracts(files: Record<string, string>): { ok: boolean; e
       errors.push(`File ${path} uses '@/'. All imports must be relative paths only.`);
     }
 
-    if (!isSupabase && code.includes(forbiddenSupabaseDirect)) {
-      errors.push(
-        `File ${path} calls supabase.from() directly. All data access must go through project-api via fetch().`,
-      );
-    }
+    // NOTE: supabase.from() is ALLOWED — the project has a real Supabase backend via Lovable Cloud.
+    // The old project-api proxy restriction has been removed.
   }
 
   return { ok: errors.length === 0, errors };
