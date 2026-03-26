@@ -19,6 +19,7 @@ export interface InstantBuildConfig {
 
 export function useInstantBuild(config: InstantBuildConfig) {
   const { currentProject } = config;
+  const ENABLE_LEGACY_INSTANT_TEMPLATES = false;
 
   const tryInstantBuild = useCallback(
     async (
@@ -33,6 +34,11 @@ export function useInstantBuild(config: InstantBuildConfig) {
 
       if (!template) {
         console.log("[InstantBuild] No template matched — skipping instant path");
+        return null;
+      }
+
+      if (!ENABLE_LEGACY_INSTANT_TEMPLATES) {
+        console.log(`[InstantBuild] Legacy instant templates disabled for "${template.id}" — using full compiler build`);
         return null;
       }
 
