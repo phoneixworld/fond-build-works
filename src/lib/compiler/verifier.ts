@@ -69,6 +69,10 @@ export function verifyWorkspace(
   const migrationResults = checkMigrationPresence(workspace, taskGraph);
   issues.push(...migrationResults.issues);
 
+  // 14. Sandpack compatibility: no @/ aliases remaining
+  const aliasResults = checkAliasImports(workspace);
+  issues.push(...aliasResults.issues);
+
   // Stats
   const files = workspace.listFiles();
   const jsFiles = files.filter(f => /\.(jsx?|tsx?)$/.test(f));
