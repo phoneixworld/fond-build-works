@@ -36,7 +36,7 @@ export default defineConfig(({ mode }) => ({
         ],
       },
       workbox: {
-        maximumFileSizeToCacheInBytes: 4194304, // 4MB to accommodate mermaid library
+        maximumFileSizeToCacheInBytes: 5242880, // 5MB to accommodate large bundles
         globPatterns: ["**/*.{js,css,html,ico,png,svg,woff2}"],
         navigateFallbackDenylist: [/^\/~oauth/],
         runtimeCaching: [
