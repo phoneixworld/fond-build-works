@@ -93,25 +93,20 @@ ${workspaceContext ? `### Current code (scoped):\n${workspaceContext}` : ""}
 
 ### RUNTIME CONTRACT (CANONICAL APP RUNTIME):
 
-- The app runtime is **Sandpack-only**, browser-only, client-side React.
-- Generated app code MUST be **preview-agnostic**:
-  - App code MUST NOT read \`window.__PROJECT_ID__\`, \`window.__SUPABASE_URL__\`, \`window.__SUPABASE_KEY__\`, or ANY \`window.*\` globals directly.
-  - ONLY \`/lib/config.ts\` is allowed to read globals or environment. All other files MUST import from it.
-- Configuration:
-  - \`/lib/config.ts\` exports compile-time constants:
-    - \`PROJECT_ID\`
-    - \`SUPABASE_URL\`
-    - \`SUPABASE_KEY\`
-  - All runtime configuration MUST be imported from \`/lib/config.ts\`.
+- This project has a **real Supabase backend** via Lovable Cloud.
+- Generated app code is client-side React running in the browser.
 - Supabase client:
-  - \`/lib/supabase.ts\` is the ONLY Supabase client module.
-  - It imports from \`@supabase/supabase-js\` and \`/lib/config.ts\`, and exports a single \`supabase\` client instance.
-  - ALL auth-related code MUST import \`supabase\` from \`/lib/supabase.ts\`.
+  - Import the pre-configured Supabase client: \`import { supabase } from "../integrations/supabase/client";\`
+  - Adjust the relative path based on file location.
+  - Use \`supabase.from("table").select("*")\` for data queries.
+  - Use \`supabase.auth\` for authentication.
+  - Do NOT create your own Supabase client or config files — the client is pre-configured.
+  - Do NOT generate \`/lib/config.ts\` or \`/lib/supabase.ts\` — these are unnecessary.
 - Imports:
   - ALL imports MUST be **relative paths only** (e.g. \`../../lib/utils\`).
   - \`@/\` aliases are FORBIDDEN and will cause build rejection.
-- Data API:
-  - You may use \`supabase.from()\` directly for database queries — this project has a real Supabase backend.
+- Data access:
+  - Use \`supabase.from()\` directly for database queries.
   - Import the supabase client from the integrations module.
 - Verifier:
   - Any occurrence of \`window.__PROJECT_ID__\`, \`window.__SUPABASE_URL__\`, \`window.__SUPABASE_KEY__\`, or \`@/\` imports in generated app files will cause the build to be rejected.
