@@ -35,6 +35,16 @@ import { fixExportMismatches } from "@/lib/compiler/exportMismatchFixer";
 import { deduplicateFiles } from "@/lib/compiler/deduplicator";
 import { normalizeGeneratedStructure } from "@/lib/compiler/structureNormalizer";
 import { classifyIntentGate, parseConfirmationReply, type GuardRouteHint } from "@/lib/intentGate";
+import {
+  indexFilesIntoAST,
+  buildProvenanceMap,
+  startBuildManifest,
+  recordFileInManifest,
+  completeBuildManifest,
+  resetASTWorkspace,
+  clearProvenance,
+  clearBuildHistory,
+} from "@/lib/buildEngine";
 import { extractUrlFromMessage, analyzeUrl } from "@/lib/urlAnalyzer";
 
 /** Phase 3: Normalize task labels for user display */
