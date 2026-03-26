@@ -815,7 +815,7 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
             setSandpackFiles(finalFiles);
             syncSandpackToVirtualFS(finalFiles);
             if (Object.keys(instantResult.deps).length > 0) setSandpackDeps(instantResult.deps);
-            setPreviewMode("webcontainer");
+            setPreviewMode("sandpack");
 
             // Pillar 2: Index into AST + provenance
             try {
@@ -1203,7 +1203,7 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
             const finalWorkspace = sanitizeWorkspaceForPreview(result.workspace);
             setSandpackFiles(finalWorkspace);
             syncSandpackToVirtualFS(finalWorkspace);
-            setPreviewMode("webcontainer");
+            setPreviewMode("sandpack");
 
             // Pillar 2: Index into AST + provenance + manifest
             try {
@@ -1631,7 +1631,7 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
             ...aggregatedDependencies,
           }));
         }
-        setPreviewMode("webcontainer");
+        setPreviewMode("sandpack");
 
         // Pillar 2: Index edited files into AST
         try {
