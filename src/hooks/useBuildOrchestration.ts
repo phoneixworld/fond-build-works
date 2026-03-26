@@ -15,10 +15,7 @@
  */
 
 import { useState, useRef, useEffect, useCallback } from "react";
-import {
-  type AgentIntent,
-  type PipelineStep,
-} from "@/lib/agentPipeline";
+import { type AgentIntent, type PipelineStep } from "@/lib/agentPipeline";
 import { compile, type CompileOptions, type CompileCallbacks, type BuildResult } from "@/lib/compiler";
 import { matchTemplate, type PageTemplate } from "@/lib/pageTemplates";
 import { getSnippetsPromptContext } from "@/lib/componentSnippets";
@@ -28,7 +25,17 @@ import { supabase } from "@/integrations/supabase/client";
 import { toExportPath } from "@/lib/pathNormalizer";
 import { StreamingPreviewController } from "@/lib/streamingPreview";
 import { type MsgContent, getTextContent } from "@/lib/codeParser";
-// normalization is inlined below to avoid import-resolution failures
+import { useChatAgent, type ChatAgentConfig } from "@/hooks/useChatAgent";
+import { useInstantBuild, type InstantBuildConfig } from "@/hooks/useInstantBuild";
+import { executeEdit, type EditResult } from "@/lib/editEngine";
+import { Workspace } from "@/lib/compiler/workspace";
+import { repairMissingModules } from "@/lib/compiler/missingModuleGen";
+import { fixMissingImports } from "@/lib/compiler/missingImportFixer";
+import { fixExportMismatches } from "@/lib/compiler/exportMismatchFixer";
+import { deduplicateFiles } from "@/lib/compiler/deduplicator";
+import { normalizeGeneratedStructure } from "@/lib/compiler/structureNormalizer";
+import { classifyIntentGate, parseConfirmationReply, type GuardRouteHint } from "@/lib/intentGate";
+import { extractUrlFromMessage, analyzeUrl } from "@/lib/urlAnalyzer";
 
 /** Generate a self-contained preview HTML from workspace files */
 function generatePreviewHtmlForBuild(files: Record<string, string>): string {
@@ -76,18 +83,6 @@ function generatePreviewHtmlForBuild(files: Record<string, string>): string {
 </body>
 </html>`;
 }
-import { useChatAgent, type ChatAgentConfig } from "@/hooks/useChatAgent";
-import { useInstantBuild, type InstantBuildConfig } from "@/hooks/useInstantBuild";
-
-import { executeEdit, type EditResult } from "@/lib/editEngine";
-import { Workspace } from "@/lib/compiler/workspace";
-import { repairMissingModules } from "@/lib/compiler/missingModuleGen";
-import { fixMissingImports } from "@/lib/compiler/missingImportFixer";
-import { fixExportMismatches } from "@/lib/compiler/exportMismatchFixer";
-import { deduplicateFiles } from "@/lib/compiler/deduplicator";
-import { normalizeGeneratedStructure } from "@/lib/compiler/structureNormalizer";
-import { classifyIntentGate, parseConfirmationReply, type GuardRouteHint } from "@/lib/intentGate";
-import { extractUrlFromMessage, analyzeUrl } from "@/lib/urlAnalyzer";
 
 type MsgMeta = { tokens?: number; durationMs?: number; model?: string };
 type Msg = { role: "user" | "assistant"; content: MsgContent; timestamp?: number; meta?: MsgMeta };
@@ -298,7 +293,6 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
     buildRetryCountRef.current = buildRetryCount;
   }, [buildRetryCount]);
 
-  // Auto-clear safety timeout when isBuilding goes false
   useEffect(() => {
     if (!isLoading && buildSafetyTimeoutRef.current) {
       clearTimeout(buildSafetyTimeoutRef.current);
@@ -306,7 +300,6 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
     }
   }, [isLoading]);
 
-  // Cleanup deferred preview timer
   useEffect(() => {
     return () => {
       if (deferredPreviewTimerRef.current) {
@@ -316,7 +309,6 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
     };
   }, []);
 
-  // Cleanup safety timeout and abort controller on unmount
   useEffect(() => {
     return () => {
       if (buildSafetyTimeoutRef.current) {
@@ -330,9 +322,7 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
     };
   }, []);
 
-  // Pre-scaffolded UI component paths — previously hidden from explorer.
-  // Now shown to match professional IDE standards (Lovable shows all shadcn components).
-  // All UI components are always visible in the file tree.
+  // Pre-scaffolded UI component paths — now visible in the tree.
   const SCAFFOLDED_UI_PATHS = new Set<string>();
 
   const normalizeVirtualPath = (value: string) => {
@@ -379,11 +369,19 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
       const normalizedPath = normalizeVirtualPath(trimmedPath);
       sanitized[normalizedPath] = cleanedContent;
     }
-    // Apply structure normalization inline to avoid module-resolution failures.
-    // Moves domain components out of /components/ui/, ensures /lib/utils.ts exists.
+
     try {
-      const DOMAIN_NAMES = new Set(["ActivityFeed","NotificationBell","PageHeader","QuickActions","SearchFilterBar","StatCard","StatusBadge","ProtectedRoute"]);
-      const moves: Array<[string,string]> = [];
+      const DOMAIN_NAMES = new Set([
+        "ActivityFeed",
+        "NotificationBell",
+        "PageHeader",
+        "QuickActions",
+        "SearchFilterBar",
+        "StatCard",
+        "StatusBadge",
+        "ProtectedRoute",
+      ]);
+      const moves: Array<[string, string]> = [];
       for (const p of Object.keys(sanitized)) {
         if (!p.startsWith("/components/ui/")) continue;
         const fn = p.split("/").pop() || "";
@@ -394,11 +392,12 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
         if (!sanitized[to]) sanitized[to] = sanitized[from];
         delete sanitized[from];
       }
-      // Remove any virtual /utils/cn.* — cn lives at /lib/utils.ts
       delete sanitized["/utils/cn.ts"];
       delete sanitized["/utils/cn.tsx"];
       if (!sanitized["/lib/utils.ts"]) {
-        sanitized["/lib/utils.ts"] = `import { clsx } from "clsx";\nimport { twMerge } from "tailwind-merge";\nexport function cn(...inputs: (string | undefined | null | false)[]) { return twMerge(clsx(inputs)); }\n`;
+        sanitized["/lib/utils.ts"] =
+          `import { clsx } from "clsx";\nimport { twMerge } from "tailwind-merge";\n` +
+          `export function cn(...inputs: (string | undefined | null | false)[]) { return twMerge(clsx(inputs)); }\n`;
       }
     } catch (e) {
       console.warn("[BuildOrch] Normalization pass failed, continuing:", e);
@@ -685,14 +684,12 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
         }
 
         const liveSandpackFilesForContext = sandpackFilesRef.current;
-        const shouldIncludeCurrentCode = !!(
-          liveSandpackFilesForContext && Object.keys(liveSandpackFilesForContext).length > 0
-        );
+        const hasAnyFiles = !!liveSandpackFilesForContext && Object.keys(liveSandpackFilesForContext).length > 0;
 
         const safeSandpackFiles = sandpackFilesRef.current;
         const currentCodeSummary = buildCodeSummary(
-          shouldIncludeCurrentCode ? safeSandpackFiles : null,
-          shouldIncludeCurrentCode ? "" : currentPreviewHtml,
+          hasAnyFiles ? safeSandpackFiles : null,
+          hasAnyFiles ? "" : currentPreviewHtml,
         );
 
         const currentMessages = messagesRef.current;
@@ -700,7 +697,10 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
         const themeInfo = DESIGN_THEMES.find((t) => t.id === selectedTheme);
         const userText = typeof text === "string" ? text : "";
         const snippetsContext = getSnippetsPromptContext(userText);
-        const template = selectedTemplate || (currentMessages.length === 0 ? matchTemplate(userText) : null);
+
+        // Bug B fix: always allow template matching
+        const template = selectedTemplate || matchTemplate(userText);
+
         let templateCtx = "";
         if (template) {
           templateCtx = `## MATCHED TEMPLATE: ${template.name}\n\nUse this as your structural blueprint:\n${template.blueprint}\n\nCustomize the content, colors, and details based on the user's specific request. Do NOT copy the blueprint literally — adapt it creatively.`;
@@ -711,12 +711,15 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
         setCurrentAgent("build");
         setPipelineStep("planning");
 
-        const liveSandpackFiles = sandpackFilesRef.current;
-        const isFirstBuild = !liveSandpackFiles || Object.keys(liveSandpackFiles).length === 0;
+        const liveSandpackFiles = sandpackFilesRef.current || {};
+
+        // Bug A fix: first-build based on user files, not scaffolded UI
+        const userFileCount = Object.keys(liveSandpackFiles).filter((p) => !p.startsWith("/components/ui/")).length;
+        const isFirstBuild = userFileCount === 0;
 
         if (!isFirstBuild && !text.startsWith("🔧 AUTO-FIX") && !text.includes("# APPLICATION REQUIREMENTS")) {
           console.log(
-            `[BuildOrch] Workspace has ${Object.keys(liveSandpackFiles!).length} files — routing to edit pipeline instead of rebuild`,
+            `[BuildOrch] Workspace has ${Object.keys(liveSandpackFiles).length} files (${userFileCount} user files) — routing to edit pipeline instead of rebuild`,
           );
           setCurrentAgent("edit");
           setPipelineStep("resolving");
@@ -731,7 +734,6 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
         if (isSimpleBuild || isFirstBuild) {
           const instantResult = await tryInstantBuild(template, userText);
           if (instantResult) {
-            // ── Instant template is self-contained — skip compile() entirely ──
             const finalFiles = instantResult.files;
             setSandpackFiles(finalFiles);
             syncSandpackToVirtualFS(finalFiles);
@@ -748,7 +750,6 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
               return [...prev, { role: "assistant", content: msg, timestamp: Date.now() }];
             });
 
-            // Persist sandpack state
             if (currentProject?.id) {
               const payload = { files: finalFiles, deps: instantResult.deps };
               supabase
@@ -767,68 +768,69 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
                 });
             }
 
-            // Record build in build_jobs
-            const totalSizeBytes = Object.values(finalFiles).reduce(
-              (sum, code) => sum + (code?.length || 0), 0
-            );
-            supabase.auth.getUser().then(async ({ data: authData }) => {
-              const userId = authData?.user?.id;
-              if (!userId) return;
+            const totalSizeBytes = Object.values(finalFiles).reduce((sum, code) => sum + (code?.length || 0), 0);
+            supabase.auth
+              .getUser()
+              .then(async ({ data: authData }) => {
+                const userId = authData?.user?.id;
+                if (!userId) return;
 
-              const buildId = crypto.randomUUID();
-              const storagePath = `${currentProject.id}/${buildId}`;
-              const previewHtml = generatePreviewHtmlForBuild(finalFiles);
-              const previewPath = `${storagePath}/preview/index.html`;
+                const buildId = crypto.randomUUID();
+                const storagePath = `${currentProject.id}/${buildId}`;
+                const previewHtml = generatePreviewHtmlForBuild(finalFiles);
+                const previewPath = `${storagePath}/preview/index.html`;
 
-              await supabase.storage
-                .from("build-artifacts")
-                .upload(previewPath, new Blob([previewHtml], { type: "text/html" }), {
-                  contentType: "text/html",
-                  upsert: true,
-                });
+                await supabase.storage
+                  .from("build-artifacts")
+                  .upload(previewPath, new Blob([previewHtml], { type: "text/html" }), {
+                    contentType: "text/html",
+                    upsert: true,
+                  });
 
-              const { data: publicUrlData } = supabase.storage
-                .from("build-artifacts")
-                .getPublicUrl(previewPath);
-              const previewUrl = publicUrlData?.publicUrl || null;
+                const { data: publicUrlData } = supabase.storage.from("build-artifacts").getPublicUrl(previewPath);
+                const previewUrl = publicUrlData?.publicUrl || null;
 
-              supabase
-                .from("build_jobs")
-                .insert({
-                  project_id: currentProject.id,
-                  user_id: userId,
-                  status: "complete",
-                  file_count: fileCount,
-                  total_size_bytes: totalSizeBytes,
-                  build_duration_ms: 0,
-                  build_config: { model: "instant-template", techStack: "react-cdn", template: instantResult.templateName } as any,
-                  validation_results: { valid: true, errors: [], warnings: [] } as any,
-                  build_log: [
-                    `[${new Date().toISOString()}] Instant template: ${instantResult.templateName}`,
-                    `[${new Date().toISOString()}] Files: ${fileCount}`,
-                    `[${new Date().toISOString()}] Build complete (instant)`,
-                  ],
-                  source_files: {} as any,
-                  output_files: {} as any,
-                  dependencies: instantResult.deps as any,
-                  artifact_path: storagePath,
-                  preview_url: previewUrl,
-                  error: null,
-                  started_at: new Date().toISOString(),
-                  completed_at: new Date().toISOString(),
-                })
-                .then(({ error: buildErr }) => {
-                  if (buildErr) console.error("[InstantBuild] build_jobs insert failed:", buildErr.message);
-                  else {
-                    console.log("[InstantBuild] ✅ Build recorded");
-                    if (previewUrl) {
-                      window.dispatchEvent(new CustomEvent("build-preview-url", { detail: previewUrl }));
+                supabase
+                  .from("build_jobs")
+                  .insert({
+                    project_id: currentProject.id,
+                    user_id: userId,
+                    status: "complete",
+                    file_count: fileCount,
+                    total_size_bytes: totalSizeBytes,
+                    build_duration_ms: 0,
+                    build_config: {
+                      model: "instant-template",
+                      techStack: "react-cdn",
+                      template: instantResult.templateName,
+                    } as any,
+                    validation_results: { valid: true, errors: [], warnings: [] } as any,
+                    build_log: [
+                      `[${new Date().toISOString()}] Instant template: ${instantResult.templateName}`,
+                      `[${new Date().toISOString()}] Files: ${fileCount}`,
+                      `[${new Date().toISOString()}] Build complete (instant)`,
+                    ],
+                    source_files: {} as any,
+                    output_files: {} as any,
+                    dependencies: instantResult.deps as any,
+                    artifact_path: storagePath,
+                    preview_url: previewUrl,
+                    error: null,
+                    started_at: new Date().toISOString(),
+                    completed_at: new Date().toISOString(),
+                  })
+                  .then(({ error: buildErr }) => {
+                    if (buildErr) console.error("[InstantBuild] build_jobs insert failed:", buildErr.message);
+                    else {
+                      console.log("[InstantBuild] ✅ Build recorded");
+                      if (previewUrl) {
+                        window.dispatchEvent(new CustomEvent("build-preview-url", { detail: previewUrl }));
+                      }
                     }
-                  }
-                });
-            }).catch(() => {});
+                  });
+              })
+              .catch(() => {});
 
-            // Save chat history
             const persistMessages = messagesRef.current.map((m) => ({
               role: m.role,
               content: typeof m.content === "string" ? m.content : getTextContent(m.content),
@@ -848,7 +850,6 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
               });
             }
 
-            // ── Clean up build state and return — skip compile() ──
             setIsLoading(false);
             setIsBuilding(false);
             setBuildStep("");
@@ -932,9 +933,7 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
         }
 
         const safeExistingFiles =
-          shouldIncludeCurrentCode && liveSandpackFiles && Object.keys(liveSandpackFiles).length > 0
-            ? liveSandpackFiles
-            : undefined;
+          hasAnyFiles && liveSandpackFiles && Object.keys(liveSandpackFiles).length > 0 ? liveSandpackFiles : undefined;
 
         const fileCount = safeExistingFiles ? Object.keys(safeExistingFiles).length : 0;
         const fullPromptForScoring = currentCodeSummary ? `${userText}\n\n${currentCodeSummary}` : userText;
@@ -954,7 +953,6 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
 
         saveSnapshot(`Pre-build: ${userText.slice(0, 50)}`);
 
-        // Single build path: compile() handles IR extraction, planning, and execution
         const compileOptions: CompileOptions = {
           rawRequirements: templateFiles
             ? `${userText}\n\n## TEMPLATE CONTEXT\n${templateCtx}\nCustomize the existing ${templateName} template files based on the user request above.`
@@ -1188,12 +1186,8 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
                   else console.log("[Compiler] ✅ Sandpack state persisted");
                 });
 
-              // ── Record build in build_jobs table ──────────────────────────
               const buildDurationMs = result.trace?.totalDurationMs ?? null;
-              const totalSizeBytes = Object.values(finalWorkspace).reduce(
-                (sum, code) => sum + (code?.length || 0),
-                0
-              );
+              const totalSizeBytes = Object.values(finalWorkspace).reduce((sum, code) => sum + (code?.length || 0), 0);
 
               const validationResults = {
                 valid: result.verification.ok,
@@ -1219,12 +1213,16 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
                     return;
                   }
 
-                  console.log("[Compiler] Inserting build_jobs record for user:", userId, "project:", currentProject.id);
+                  console.log(
+                    "[Compiler] Inserting build_jobs record for user:",
+                    userId,
+                    "project:",
+                    currentProject.id,
+                  );
 
                   const buildId = crypto.randomUUID();
                   const storagePath = `${currentProject.id}/${buildId}`;
 
-                  // Upload source files to build-artifacts bucket
                   await Promise.all(
                     Object.entries(finalWorkspace).map(async ([path, code]) => {
                       const cleanPath = path.startsWith("/") ? path.slice(1) : path;
@@ -1233,10 +1231,9 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
                         .upload(`${storagePath}/src/${cleanPath}`, new Blob([code], { type: "text/plain" }), {
                           upsert: true,
                         });
-                    })
+                    }),
                   );
 
-                  // Generate and upload preview HTML
                   const previewHtml = generatePreviewHtmlForBuild(finalWorkspace);
                   const previewPath = `${storagePath}/preview/index.html`;
                   await supabase.storage
@@ -1246,16 +1243,14 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
                       upsert: true,
                     });
 
-                  const { data: publicUrlData } = supabase.storage
-                    .from("build-artifacts")
-                    .getPublicUrl(previewPath);
+                  const { data: publicUrlData } = supabase.storage.from("build-artifacts").getPublicUrl(previewPath);
                   const previewUrl = publicUrlData?.publicUrl || null;
 
                   const sourceFiles = Object.fromEntries(
                     Object.keys(finalWorkspace).map((path) => {
                       const cleanPath = path.startsWith("/") ? path.slice(1) : path;
                       return [path, `${storagePath}/src/${cleanPath}`];
-                    })
+                    }),
                   );
 
                   supabase
@@ -1264,11 +1259,7 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
                       project_id: currentProject.id,
                       user_id: userId,
                       status:
-                        result.status === "success"
-                          ? "complete"
-                          : result.status === "partial"
-                          ? "complete"
-                          : "failed",
+                        result.status === "success" ? "complete" : result.status === "partial" ? "complete" : "failed",
                       file_count: Object.keys(finalWorkspace).length,
                       total_size_bytes: totalSizeBytes,
                       build_duration_ms: buildDurationMs,
@@ -1297,8 +1288,12 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
                       if (buildErr)
                         console.error("[Compiler] Failed to insert build_jobs record:", buildErr.message, buildErr);
                       else {
-                        console.log("[Compiler] ✅ Build recorded in build_jobs:", buildRow?.[0]?.id, "preview:", previewUrl);
-                        // Emit event so ChatPanel can update the build result with preview URL
+                        console.log(
+                          "[Compiler] ✅ Build recorded in build_jobs:",
+                          buildRow?.[0]?.id,
+                          "preview:",
+                          previewUrl,
+                        );
                         if (previewUrl) {
                           window.dispatchEvent(new CustomEvent("build-preview-url", { detail: previewUrl }));
                         }
@@ -1443,149 +1438,161 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
       isSendingRef.current = true;
       setBuildStreamContent("");
 
+      const WORKSPACE_ENTRIES = Object.entries(workspace);
+      const BATCH_SIZE = 40;
+
       let resolvedTargetFiles: string[] = [];
       const beforeSnapshots: Record<string, string> = {};
+      const aggregatedModifiedFiles: Record<string, string> = {};
+      const aggregatedDependencies: Record<string, string> = {};
+      let aggregatedExplanation = "";
 
       try {
-        await executeEdit(
-          {
-            instruction: enrichedInstruction,
-            workspace,
-            projectId: currentProject.id,
-            model: selectedModel,
-            designTheme: selectedTheme,
-            knowledge: [],
-            images,
-          },
-          {
-            onResolving: (targetFiles) => {
-              resolvedTargetFiles = targetFiles;
-              for (const f of targetFiles) {
-                if (workspace[f]) beforeSnapshots[f] = workspace[f];
-              }
-              setPipelineStep("resolving");
-              setBuildStep(`Editing ${targetFiles.length} file${targetFiles.length > 1 ? "s" : ""}`);
-              console.log("[EditMode] Target files:", targetFiles);
+        for (let i = 0; i < WORKSPACE_ENTRIES.length; i += BATCH_SIZE) {
+          const batchEntries = WORKSPACE_ENTRIES.slice(i, i + BATCH_SIZE);
+          const batchWorkspace: Record<string, string> = {};
+          for (const [path, code] of batchEntries) {
+            batchWorkspace[path] = code;
+          }
 
-              conversationStartEditing?.(enrichedInstruction, targetFiles, beforeSnapshots);
+          await executeEdit(
+            {
+              instruction: enrichedInstruction,
+              workspace: batchWorkspace,
+              projectId: currentProject.id,
+              model: selectedModel,
+              designTheme: selectedTheme,
+              knowledge: [],
+              images,
             },
-            onStreaming: (chunk) => {
-              setBuildStreamContent((prev) => prev + chunk);
-              setPipelineStep("editing");
-            },
-            onComplete: async (result: EditResult) => {
-              console.log("[EditMode] Complete:", Object.keys(result.modifiedFiles));
-              if (Object.keys(result.dependencies).length > 0) {
-                console.log("[EditMode] Dependencies:", result.dependencies);
-              }
+            {
+              onResolving: (targetFiles) => {
+                if (resolvedTargetFiles.length === 0) {
+                  resolvedTargetFiles = targetFiles;
+                  for (const f of targetFiles) {
+                    if (workspace[f]) beforeSnapshots[f] = workspace[f];
+                  }
+                  setPipelineStep("resolving");
+                  setBuildStep(`Editing ${targetFiles.length} file${targetFiles.length > 1 ? "s" : ""}`);
+                  console.log("[EditMode] Target files:", targetFiles);
 
-              const updatedFiles = { ...workspace };
-              for (const [path, code] of Object.entries(result.modifiedFiles)) {
-                updatedFiles[path] = code;
-              }
-
-              try {
-                const repairWorkspace = new Workspace(updatedFiles);
-                repairMissingModules(repairWorkspace);
-                fixMissingImports(repairWorkspace);
-                fixExportMismatches(repairWorkspace);
-                normalizeGeneratedStructure(repairWorkspace);
-                deduplicateFiles(repairWorkspace);
-                const repairedFiles: Record<string, string> = {};
-                for (const f of repairWorkspace.listFiles()) {
-                  repairedFiles[f] = repairWorkspace.getFile(f)!;
+                  conversationStartEditing?.(enrichedInstruction, targetFiles, beforeSnapshots);
                 }
-                Object.assign(updatedFiles, repairedFiles);
-              } catch (repairErr) {
-                console.warn("[EditMode] Post-edit repair failed (non-blocking):", repairErr);
-              }
-
-              const afterSnapshots: Record<string, string> = {};
-              for (const f of resolvedTargetFiles) {
-                if (updatedFiles[f]) afterSnapshots[f] = updatedFiles[f];
-              }
-
-              setSandpackFiles(updatedFiles);
-              syncSandpackToVirtualFS(updatedFiles);
-              if (Object.keys(result.dependencies).length > 0) {
-                setSandpackDeps((prev: Record<string, string>) => ({
-                  ...prev,
-                  ...result.dependencies,
-                }));
-              }
-              setPreviewMode("sandpack");
-
-              const postEditReadiness = await conversationCompleteEdit?.(
-                enrichedInstruction,
-                resolvedTargetFiles,
-                beforeSnapshots,
-                afterSnapshots,
-                result.explanation,
-              );
-
-              const fileList = result.targetFiles.map((f) => f.split("/").pop()).join(", ");
-              let editMsg = `✅ **Edited ${result.targetFiles.length} file${
-                result.targetFiles.length > 1 ? "s" : ""
-              }** (${fileList})\n\n${result.explanation}`;
-              if (postEditReadiness && !postEditReadiness.isReady) {
-                editMsg += `\n\n⚠️ **Post-edit readiness:** ${postEditReadiness.score}% — ${postEditReadiness.recommendation}`;
-              }
-
-              const assistantMsg: Msg = {
-                role: "assistant",
-                content: editMsg,
-                timestamp: Date.now(),
-              };
-              setMessages((prev) => [...prev, assistantMsg]);
-
-              const updatedMessages = [...messagesRef.current, userMsg, assistantMsg];
-              saveProject({
-                chat_history: updatedMessages.map((m) => ({
-                  role: m.role,
-                  content: m.content,
-                })),
-              });
-
-              supabase
-                .from("project_data")
-                .upsert(
-                  {
-                    project_id: currentProject.id,
-                    collection: "sandpack_state",
-                    data: { files: updatedFiles, deps: {} } as any,
-                  },
-                  { onConflict: "project_id,collection" },
-                )
-                .then(({ error }) => {
-                  if (error) console.warn("[EditMode] Failed to persist sandpack state:", error);
-                });
-
-              saveSnapshot(`Edit: ${text.slice(0, 40)}`);
-
-              setPipelineStep("complete");
-              setIsLoading(false);
-              setIsBuilding(false);
-              setBuildStep("");
-              isSendingRef.current = false;
+              },
+              onStreaming: (chunk) => {
+                setBuildStreamContent((prev) => prev + chunk);
+                setPipelineStep("editing");
+              },
+              onComplete: async (result: EditResult) => {
+                console.log("[EditMode] Batch complete:", Object.keys(result.modifiedFiles));
+                Object.assign(aggregatedModifiedFiles, result.modifiedFiles);
+                Object.assign(aggregatedDependencies, result.dependencies);
+                aggregatedExplanation += (aggregatedExplanation ? "\n\n" : "") + result.explanation;
+              },
+              onError: (error) => {
+                throw new Error(error);
+              },
             },
-            onError: (error) => {
-              console.error("[EditMode] Error:", error);
-              const assistantMsg: Msg = {
-                role: "assistant",
-                content: `⚠️ Edit failed: ${error}\n\nTry being more specific about which page or component to modify.`,
-                timestamp: Date.now(),
-              };
-              setMessages((prev) => [...prev, assistantMsg]);
-              setPipelineStep("error");
-              setIsLoading(false);
-              setIsBuilding(false);
-              setBuildStep("");
-              isSendingRef.current = false;
-            },
-          },
+          );
+        }
+
+        const updatedFiles = { ...workspace };
+        for (const [path, code] of Object.entries(aggregatedModifiedFiles)) {
+          updatedFiles[path] = code;
+        }
+
+        try {
+          const repairWorkspace = new Workspace(updatedFiles);
+          repairMissingModules(repairWorkspace);
+          fixMissingImports(repairWorkspace);
+          fixExportMismatches(repairWorkspace);
+          normalizeGeneratedStructure(repairWorkspace);
+          deduplicateFiles(repairWorkspace);
+          const repairedFiles: Record<string, string> = {};
+          for (const f of repairWorkspace.listFiles()) {
+            repairedFiles[f] = repairWorkspace.getFile(f)!;
+          }
+          Object.assign(updatedFiles, repairedFiles);
+        } catch (repairErr) {
+          console.warn("[EditMode] Post-edit repair failed (non-blocking):", repairErr);
+        }
+
+        const afterSnapshots: Record<string, string> = {};
+        for (const f of resolvedTargetFiles) {
+          if (updatedFiles[f]) afterSnapshots[f] = updatedFiles[f];
+        }
+
+        setSandpackFiles(updatedFiles);
+        syncSandpackToVirtualFS(updatedFiles);
+        if (Object.keys(aggregatedDependencies).length > 0) {
+          setSandpackDeps((prev: Record<string, string>) => ({
+            ...prev,
+            ...aggregatedDependencies,
+          }));
+        }
+        setPreviewMode("sandpack");
+
+        const postEditReadiness = await conversationCompleteEdit?.(
+          enrichedInstruction,
+          resolvedTargetFiles,
+          beforeSnapshots,
+          afterSnapshots,
+          aggregatedExplanation,
         );
+
+        const fileList = resolvedTargetFiles.map((f) => f.split("/").pop()).join(", ");
+        let editMsg = `✅ **Edited ${resolvedTargetFiles.length} file${
+          resolvedTargetFiles.length > 1 ? "s" : ""
+        }** (${fileList})\n\n${aggregatedExplanation}`;
+        if (postEditReadiness && !postEditReadiness.isReady) {
+          editMsg += `\n\n⚠️ **Post-edit readiness:** ${postEditReadiness.score}% — ${postEditReadiness.recommendation}`;
+        }
+
+        const assistantMsg: Msg = {
+          role: "assistant",
+          content: editMsg,
+          timestamp: Date.now(),
+        };
+        setMessages((prev) => [...prev, assistantMsg]);
+
+        const updatedMessages = [...messagesRef.current, userMsg, assistantMsg];
+        saveProject({
+          chat_history: updatedMessages.map((m) => ({
+            role: m.role,
+            content: m.content,
+          })),
+        });
+
+        supabase
+          .from("project_data")
+          .upsert(
+            {
+              project_id: currentProject.id,
+              collection: "sandpack_state",
+              data: { files: updatedFiles, deps: {} } as any,
+            },
+            { onConflict: "project_id,collection" },
+          )
+          .then(({ error }) => {
+            if (error) console.warn("[EditMode] Failed to persist sandpack state:", error);
+          });
+
+        saveSnapshot(`Edit: ${text.slice(0, 40)}`);
+
+        setPipelineStep("complete");
+        setIsLoading(false);
+        setIsBuilding(false);
+        setBuildStep("");
+        isSendingRef.current = false;
       } catch (err: any) {
         console.error("[EditMode] Unexpected error:", err);
+        const assistantMsg: Msg = {
+          role: "assistant",
+          content: `⚠️ Edit failed: ${err?.message || String(err)}\n\nTry being more specific about which page or component to modify.`,
+          timestamp: Date.now(),
+        };
+        setMessages((prev) => [...prev, assistantMsg]);
+        setPipelineStep("error");
         setIsLoading(false);
         setIsBuilding(false);
         setBuildStep("");
