@@ -6,13 +6,22 @@
  */
 
 import { useEffect, useState, useRef, useCallback } from "react";
-import { useVirtualFS } from "@/contexts/VirtualFSContext";
+import { useVirtualFS, type VirtualFile } from "@/contexts/VirtualFSContext";
 import {
   mountAndRun,
   updateFiles,
   teardownWebContainer,
   type WebContainerStatus,
 } from "@/lib/webcontainer/engine";
+
+/** Extract plain string content map from VirtualFile records */
+function toStringMap(files: Record<string, VirtualFile>): Record<string, string> {
+  const result: Record<string, string> = {};
+  for (const [path, vf] of Object.entries(files)) {
+    result[path] = vf.content;
+  }
+  return result;
+}
 import { Loader2, Terminal, AlertCircle, CheckCircle2 } from "lucide-react";
 
 interface WebContainerPreviewProps {
