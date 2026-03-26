@@ -182,7 +182,10 @@ function collapseDuplicateReactImports(code: string, filePath: string): string {
 }
 
 function hasLikelyJsx(code: string): boolean {
-  return /<([A-Z][\w.-]*|[a-z][\w:-]*)(\s[^>]*)?>|<\/>|<\s*>|<\//.test(code);
+  const hasFragmentSyntax = /<>|<\/>|<\s*>/.test(code);
+  const hasSelfClosingTag = /<([A-Za-z][\w:-]*)(\s[^<>]*)?\/>/.test(code);
+  const hasPairedTag = /<([A-Za-z][\w:-]*)(\s[^<>]*)?>[\s\S]*?<\/\1>/.test(code);
+  return hasFragmentSyntax || hasSelfClosingTag || hasPairedTag;
 }
 
 function ensureReactInScope(code: string, filePath: string): string {
@@ -1000,7 +1003,7 @@ function buildSandpackFiles(files: SandpackFileSet | null, projectId: string, su
     let sandpackPath = normalized.startsWith("/") ? normalized : `/${normalized}`;
 
     // Fix: .ts files containing JSX must be renamed to .tsx for Sandpack's Babel
-    if (sandpackPath.endsWith(".ts") && !sandpackPath.endsWith(".d.ts") && /<\w[\s\S]*?>/.test(code)) {
+    if (sandpackPath.endsWith(".ts") && !sandpackPath.endsWith(".d.ts") && hasLikelyJsx(code)) {
       console.warn(`[SandpackPreview] Renaming ${sandpackPath} → .tsx (contains JSX)`);
       sandpackPath = sandpackPath.replace(/\.ts$/, ".tsx");
     }
@@ -1008,7 +1011,7 @@ function buildSandpackFiles(files: SandpackFileSet | null, projectId: string, su
     // Fix: .js/.jsx files containing TypeScript syntax (generics, type annotations) must be .tsx
     if (/\.(js|jsx)$/.test(sandpackPath)) {
       const hasTypeScriptSyntax = /useState<[^>]+>|useRef<[^>]+>|useCallback<[^>]+>|useMemo<[^>]+>|:\s*(React\.FC|React\.ReactNode|string|number|boolean|void|any|null|undefined)\b|<[A-Z]\w+(?:<[^>]*>)?\s*\[\]>|interface\s+\w+|type\s+\w+\s*=|as\s+(string|number|boolean|any|const)\b/.test(code);
-      const hasJsx = /<\w[\s\S]*?>/.test(code);
+      const hasJsx = hasLikelyJsx(code);
       if (hasTypeScriptSyntax) {
         const newExt = hasJsx ? ".tsx" : ".ts";
         const oldPath = sandpackPath;
