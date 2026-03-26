@@ -21,10 +21,8 @@ describe("structureNormalizer", () => {
     expect(dashboard).toContain("StatCard");
   });
 
-  it("deletes lib/utils.* and ensures /utils/cn.ts exists", () => {
+  it("deletes legacy utils and ensures /lib/utils.ts exists", () => {
     const ws = new Workspace({
-      "/lib/utils.js": `export function cn(...inputs){ return inputs.join(" "); }`,
-      "/lib/utils.jsx": `export const cn = null;`,
       "/components/ui/utils.js": `export function cn(...inputs){ return inputs.filter(Boolean).join(" "); }`,
       "/components/ui/Button.tsx": `import { cn } from "./utils";\nexport function Button({ children }) { return <button className={cn("btn")}>{children}</button>; }`,
     });
@@ -32,15 +30,13 @@ describe("structureNormalizer", () => {
     const fixed = normalizeGeneratedStructure(ws);
 
     expect(fixed).toBeGreaterThan(0);
-    // lib/utils.* must be gone
-    expect(ws.hasFile("/lib/utils.js")).toBe(false);
-    expect(ws.hasFile("/lib/utils.jsx")).toBe(false);
-    expect(ws.hasFile("/lib/utils.tsx")).toBe(false);
     // components/ui/utils.* must be gone
     expect(ws.hasFile("/components/ui/utils.js")).toBe(false);
     expect(ws.hasFile("/components/ui/utils.ts")).toBe(false);
-    // /utils/cn.ts must exist
-    const cnFile = ws.getFile("/utils/cn.ts") || "";
+    // /utils/cn.ts must NOT exist (removed)
+    expect(ws.hasFile("/utils/cn.ts")).toBe(false);
+    // /lib/utils.ts must exist
+    const cnFile = ws.getFile("/lib/utils.ts") || "";
     expect(cnFile).toContain("export function cn");
   });
 
