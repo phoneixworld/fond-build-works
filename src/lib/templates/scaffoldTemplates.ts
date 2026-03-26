@@ -209,49 +209,36 @@ function generateDashboardPage(name: string, templateName: string, entities: Dom
   }).join("\n");
 
   const tableEntity = entities[0];
-  const sampleRows = tableEntity ? `
-      <div className="bg-white rounded-xl border border-[var(--color-border)] overflow-hidden">
-        <div className="px-5 py-4 border-b border-[var(--color-border)] flex items-center justify-between">
-          <h2 className="text-sm font-semibold text-[var(--color-text)]">Recent ${tableEntity.pluralName}</h2>
-          <button className="text-xs text-[var(--color-primary)] hover:underline">View All</button>
-        </div>
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="border-b border-[var(--color-border)] bg-[var(--color-bg-secondary)]">
-              <th className="text-left px-5 py-2.5 text-xs font-medium text-[var(--color-text-secondary)] uppercase">Name</th>
-              <th className="text-left px-5 py-2.5 text-xs font-medium text-[var(--color-text-secondary)] uppercase">Status</th>
-              <th className="text-left px-5 py-2.5 text-xs font-medium text-[var(--color-text-secondary)] uppercase">Date</th>
-              <th className="text-right px-5 py-2.5 text-xs font-medium text-[var(--color-text-secondary)] uppercase">Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {[
-              { name: "Sarah Johnson", status: "Active", date: "2024-03-15" },
-              { name: "Michael Chen", status: "Pending", date: "2024-03-14" },
-              { name: "Emily Brown", status: "Active", date: "2024-03-13" },
-              { name: "James Wilson", status: "Inactive", date: "2024-03-12" },
-              { name: "Sophia Martinez", status: "Active", date: "2024-03-11" },
-            ].map((row, i) => (
-              <tr key={i} className="border-b border-[var(--color-border)] last:border-0 hover:bg-[var(--color-bg-secondary)] transition-colors">
-                <td className="px-5 py-3 font-medium text-[var(--color-text)]">{row.name}</td>
-                <td className="px-5 py-3">
-                  <span className={\`px-2 py-0.5 rounded-full text-xs font-medium \${row.status === "Active" ? "bg-green-100 text-green-700" : row.status === "Pending" ? "bg-yellow-100 text-yellow-700" : "bg-gray-100 text-gray-600"}\`}>{row.status}</span>
-                </td>
-                <td className="px-5 py-3 text-[var(--color-text-secondary)]">{row.date}</td>
-                <td className="px-5 py-3 text-right">
-                  <button className="text-[var(--color-primary)] hover:underline text-xs mr-3">Edit</button>
-                  <button className="text-[var(--color-danger)] hover:underline text-xs">Delete</button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>` : "";
+  const collectionName = tableEntity ? tableEntity.pluralName.toLowerCase().replace(/\s+/g, "_") : "items";
 
-  return `import React from "react";
+  return `import React, { useState, useEffect } from "react";
 import { Users, CheckCircle, DollarSign, Clock } from "lucide-react";
 
+const API_BASE = window.__SUPABASE_URL__ || "";
+const API_KEY = window.__SUPABASE_KEY__ || "";
+const PROJECT_ID = window.__PROJECT_ID__ || "";
+
 export default function ${name}() {
+  const [recentData, setRecentData] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    async function fetchRecent() {
+      if (!API_BASE || !PROJECT_ID) { setLoading(false); return; }
+      try {
+        const res = await fetch(API_BASE + "/functions/v1/project-api", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "Authorization": "Bearer " + API_KEY },
+          body: JSON.stringify({ project_id: PROJECT_ID, collection: "${collectionName}", action: "list" }),
+        });
+        const json = await res.json();
+        setRecentData((json.data || []).slice(0, 5));
+      } catch (e) { console.error("Dashboard fetch error:", e); }
+      finally { setLoading(false); }
+    }
+    fetchRecent();
+  }, []);
+
   return (
     <div className="p-6 space-y-6">
       <div className="flex items-center justify-between">
@@ -263,7 +250,44 @@ export default function ${name}() {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
 ${statCards}
       </div>
-${sampleRows}
+${tableEntity ? `      <div className="bg-white rounded-xl border border-[var(--color-border)] overflow-hidden">
+        <div className="px-5 py-4 border-b border-[var(--color-border)] flex items-center justify-between">
+          <h2 className="text-sm font-semibold text-[var(--color-text)]">Recent ${tableEntity.pluralName}</h2>
+          <button className="text-xs text-[var(--color-primary)] hover:underline">View All</button>
+        </div>
+        {loading ? (
+          <div className="p-5 space-y-3 animate-pulse">
+            {[1,2,3,4,5].map(i => <div key={i} className="h-10 bg-[var(--color-bg-secondary)] rounded" />)}
+          </div>
+        ) : recentData.length === 0 ? (
+          <div className="py-12 text-center">
+            <Users className="w-10 h-10 mx-auto text-[var(--color-text-muted)] mb-3" />
+            <p className="text-sm font-medium text-[var(--color-text)]">No ${tableEntity.pluralName.toLowerCase()} yet</p>
+            <p className="text-xs text-[var(--color-text-muted)] mt-1">Create your first record to get started</p>
+          </div>
+        ) : (
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-[var(--color-border)] bg-[var(--color-bg-secondary)]">
+                <th className="text-left px-5 py-2.5 text-xs font-medium text-[var(--color-text-secondary)] uppercase">Name</th>
+                <th className="text-left px-5 py-2.5 text-xs font-medium text-[var(--color-text-secondary)] uppercase">Status</th>
+                <th className="text-left px-5 py-2.5 text-xs font-medium text-[var(--color-text-secondary)] uppercase">Created</th>
+              </tr>
+            </thead>
+            <tbody>
+              {recentData.map((row, i) => (
+                <tr key={row.id || i} className="border-b border-[var(--color-border)] last:border-0 hover:bg-[var(--color-bg-secondary)] transition-colors">
+                  <td className="px-5 py-3 font-medium text-[var(--color-text)]">{row.name || "—"}</td>
+                  <td className="px-5 py-3">
+                    <span className={\\\`px-2 py-0.5 rounded-full text-xs font-medium \\\${(row.status || "Active") === "Active" ? "bg-green-100 text-green-700" : "bg-yellow-100 text-yellow-700"}\\\`}>{row.status || "Active"}</span>
+                  </td>
+                  <td className="px-5 py-3 text-[var(--color-text-secondary)]">{row.created_at ? new Date(row.created_at).toLocaleDateString() : "—"}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </div>` : ""}
     </div>
   );
 }
@@ -1123,6 +1147,11 @@ export function getDomainComponents(): Record<string, string> {
 // ─── Project Config Files ─────────────────────────────────────────────────
 
 function getProjectConfigFiles(domainModel?: DomainModel | null): Record<string, string> {
+  // NOTE: Runtime target is Sandpack (in-browser bundler).
+  // Sandpack provides its own entry point, bundler, and module resolution.
+  // We only generate package.json for dependency metadata — NO vite.config.ts,
+  // tsconfig.json, index.html, or main.tsx (Sandpack ignores them and they
+  // mislead the AI into generating @/ alias imports that Sandpack can't resolve).
   const projectName = domainModel?.templateName
     ?.toLowerCase()
     .replace(/[^a-z0-9]+/g, "-")
@@ -1134,97 +1163,13 @@ function getProjectConfigFiles(domainModel?: DomainModel | null): Record<string,
       private: true,
       version: "0.1.0",
       type: "module",
-      scripts: {
-        dev: "vite",
-        build: "tsc && vite build",
-        preview: "vite preview",
-      },
       dependencies: {
         react: "^18.3.1",
         "react-dom": "^18.3.1",
         "react-router-dom": "^6.30.0",
         "lucide-react": "^0.462.0",
       },
-      devDependencies: {
-        "@types/react": "^18.3.0",
-        "@types/react-dom": "^18.3.0",
-        "@vitejs/plugin-react": "^4.3.0",
-        typescript: "^5.5.0",
-        vite: "^5.4.0",
-      },
     }, null, 2),
-
-    "/vite.config.ts": `import { defineConfig } from "vite";
-import react from "@vitejs/plugin-react";
-import path from "path";
-
-export default defineConfig({
-  plugins: [react()],
-  resolve: {
-    alias: {
-      "@": path.resolve(__dirname, "./src"),
-    },
-  },
-  server: {
-    port: 3000,
-    open: true,
-  },
-  build: {
-    outDir: "dist",
-    sourcemap: true,
-  },
-});
-`,
-
-    "/tsconfig.json": JSON.stringify({
-      compilerOptions: {
-        target: "ES2020",
-        useDefineForClassFields: true,
-        lib: ["ES2020", "DOM", "DOM.Iterable"],
-        module: "ESNext",
-        skipLibCheck: true,
-        moduleResolution: "bundler",
-        allowImportingTsExtensions: true,
-        isolatedModules: true,
-        moduleDetection: "force",
-        noEmit: true,
-        jsx: "react-jsx",
-        strict: false,
-        noUnusedLocals: false,
-        noUnusedParameters: false,
-        noFallthroughCasesInSwitch: true,
-        baseUrl: ".",
-        paths: { "@/*": ["./src/*"] },
-      },
-      include: ["src"],
-    }, null, 2),
-
-    "/index.html": `<!DOCTYPE html>
-<html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>${domainModel?.templateName || "App"}</title>
-    <script src="https://cdn.tailwindcss.com"><\/script>
-  </head>
-  <body>
-    <div id="root"></div>
-    <script type="module" src="/src/main.tsx"><\/script>
-  </body>
-</html>
-`,
-
-    "/main.tsx": `import React from "react";
-import ReactDOM from "react-dom/client";
-import App from "./App";
-import "./styles/globals.css";
-
-ReactDOM.createRoot(document.getElementById("root")!).render(
-  <React.StrictMode>
-    <App />
-  </React.StrictMode>
-);
-`,
   };
 }
 

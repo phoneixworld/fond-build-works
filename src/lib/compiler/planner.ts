@@ -409,7 +409,7 @@ Use NavLink from react-router-dom for active state detection.`,
           "/layout/AppLayout.tsx",
           "/layout/Sidebar.tsx",
         ],
-        dependsOn: [infraTask.id, authTaskId],
+        dependsOn: [infraTask.id, ...(authTaskId ? [authTaskId] : [])],
         priority: 3,
       });
       tasks.push(layoutTask);
@@ -421,7 +421,7 @@ Use NavLink from react-router-dom for active state detection.`,
 
 REQUIRED components to generate (each in its own file):
 1. /components/StatCard.tsx — Reusable stat card with icon, value, label, trend props
-2. /components/DataTable.tsx — Sortable table with columns, data, onRowClick, searchable, pagination props
+2. /components/DataTable.tsx — RE-EXPORT: This file must import DataTable from "../components/ui/DataTable" and re-export it as default. Do NOT create a new implementation.
 3. /components/StatusBadge.tsx — Badge with status prop mapping to colors
 4. /components/PageHeader.tsx — Page header with title, subtitle, action buttons slot
 5. /components/SearchFilterBar.tsx — Search + filter bar with search input, filter dropdown, add button
@@ -464,7 +464,7 @@ Create /pages/Dashboard/${dashPageName}.tsx that MUST include:
 
 CRITICAL: Import reusable components — do NOT inline them. Use domain-specific data.`,
         produces: [`/pages/Dashboard/${dashPageName}.tsx`],
-        dependsOn: [infraTask.id, authTaskId, layoutTask.id, componentsTask.id],
+        dependsOn: [infraTask.id, ...(authTaskId ? [authTaskId] : []), layoutTask.id, componentsTask.id],
         priority: 4,
       });
       tasks.push(dashboardTask);
@@ -491,7 +491,7 @@ RULES:
 - Keep the page fully functional with sensible defaults; do NOT leave placeholders.
 - Export default.` ,
           produces: [pagePath],
-          dependsOn: [infraTask.id, authTaskId, layoutTask.id, componentsTask.id],
+          dependsOn: [infraTask.id, ...(authTaskId ? [authTaskId] : []), layoutTask.id, componentsTask.id],
           priority: 4,
         });
 
