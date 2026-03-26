@@ -147,36 +147,25 @@ ${workspaceContext ? `### Current code (scoped):\n${workspaceContext}` : ""}
 
 6. **NAV-ROUTE CONSISTENCY**: Every navigation link in Sidebar MUST have a matching <Route> in App. Every <Route> in App MUST have a matching nav link. Mismatches = blank pages.
 
-7. **DATA ACCESS (CRITICAL — Sandpack runtime, preview-agnostic app code)**:
-   - Runtime target: Sandpack in-browser bundler. App code MUST NOT read globals directly.
-   - Use the project Data API for ALL CRUD operations via \`project-api\`:
+7. **DATA ACCESS (CRITICAL — Real Supabase Backend)**:
+   - This project has a REAL Supabase backend via Lovable Cloud.
+   - Use the Supabase client directly for ALL CRUD operations:
      \`\`\`ts
-     import { PROJECT_ID, SUPABASE_URL, SUPABASE_KEY } from "../lib/config"; // adjust relative path
+     import { supabase } from "../integrations/supabase/client"; // adjust relative path
+     
      export async function listEmployees() {
-       const url = SUPABASE_URL + "/functions/v1/project-api";
-       const res = await fetch(url, {
-         method: "POST",
-         headers: {
-           "Content-Type": "application/json",
-           "Authorization": "Bearer " + SUPABASE_KEY,
-         },
-         body: JSON.stringify({
-           project_id: PROJECT_ID,
-           collection: "employees",
-           action: "list",
-         }),
-       });
-       const json = await res.json();
-       return json.data || [];
+       const { data, error } = await supabase.from("employees").select("*");
+       if (error) throw error;
+       return data || [];
      }
      \`\`\`
    - Show loading skeleton while fetching, empty state with CTA when data is empty.
 
 8. **DATA HOOKS MUST BE SHORT (CRITICAL — prevents truncation)**:
-    Data hooks in /hooks/data/ MUST follow this EXACT compact template (UNDER 40 lines) and MUST import config from \`/lib/config.ts\`:
+    Data hooks MUST follow this EXACT compact template (UNDER 40 lines):
     \`\`\ts
     import { useState, useEffect } from "react";
-    import { PROJECT_ID, SUPABASE_URL, SUPABASE_KEY } from "../../lib/config"; // adjust if path differs
+    import { supabase } from "../../integrations/supabase/client"; // adjust relative path
 
     export default function useXxx() {
       const [data, setData] = useState<any[]>([]);
@@ -187,21 +176,9 @@ ${workspaceContext ? `### Current code (scoped):\n${workspaceContext}` : ""}
         async function load() {
           try {
             setLoading(true);
-            const url = SUPABASE_URL + "/functions/v1/project-api";
-            const res = await fetch(url, {
-              method: "POST",
-              headers: {
-                "Content-Type": "application/json",
-                "Authorization": "Bearer " + SUPABASE_KEY,
-              },
-              body: JSON.stringify({
-                project_id: PROJECT_ID,
-                collection: "xxx",
-                action: "list",
-              }),
-            });
-            const json = await res.json();
-            setData(json.data || []);
+            const { data: rows, error: err } = await supabase.from("xxx").select("*");
+            if (err) throw err;
+            setData(rows || []);
           } catch (err) {
             setError(err as Error);
           } finally {
