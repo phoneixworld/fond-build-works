@@ -10,7 +10,7 @@ export function generateSupabaseEntityFiles(ir: IR): Record<string, string> {
   const files: Record<string, string> = {};
 
   for (const entityName of Object.keys(ir.entities)) {
-    const filePath = `/lib/supabase/${entityName.toLowerCase()}.js`;
+    const filePath = `/lib/supabase/${entityName.toLowerCase()}.ts`;
     files[filePath] = generateSupabaseEntity(entityName);
   }
 
