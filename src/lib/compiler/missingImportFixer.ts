@@ -86,7 +86,7 @@ const KNOWN_IMPORTS: KnownImport[] = [
     usagePattern: /\bcn\s*\(/,
     importPattern: /import\s+(?:{[^}]*\bcn\b[^}]*}|cn)\s+from/,
     importStatement: (filePath: string) => {
-      const relPath = computeRelativePath(filePath, "/lib/utils");
+      const relPath = computeRelativePath(filePath, "/utils/cn");
       return `import { cn } from "${relPath}";`;
     },
   },

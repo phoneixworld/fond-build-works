@@ -110,7 +110,7 @@ function isAllowedPkg(pkg: string): boolean {
  */
 function makeSafeStub(filePath: string): string {
   // Preserve utility files — don't turn them into React components
-  if (/\/utils\.(js|ts|jsx|tsx)$/.test(filePath)) {
+  if (/\/utils\.(js|ts|jsx|tsx)$/.test(filePath) || /\/utils\/cn\.(js|ts|jsx|tsx)$/.test(filePath)) {
     return `export function cn(...classes) { return classes.filter(Boolean).join(" "); }\n`;
   }
 
