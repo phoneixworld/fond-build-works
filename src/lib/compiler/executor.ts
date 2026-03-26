@@ -93,25 +93,20 @@ ${workspaceContext ? `### Current code (scoped):\n${workspaceContext}` : ""}
 
 ### RUNTIME CONTRACT (CANONICAL APP RUNTIME):
 
-- The app runtime is **Sandpack-only**, browser-only, client-side React.
-- Generated app code MUST be **preview-agnostic**:
-  - App code MUST NOT read \`window.__PROJECT_ID__\`, \`window.__SUPABASE_URL__\`, \`window.__SUPABASE_KEY__\`, or ANY \`window.*\` globals directly.
-  - ONLY \`/lib/config.ts\` is allowed to read globals or environment. All other files MUST import from it.
-- Configuration:
-  - \`/lib/config.ts\` exports compile-time constants:
-    - \`PROJECT_ID\`
-    - \`SUPABASE_URL\`
-    - \`SUPABASE_KEY\`
-  - All runtime configuration MUST be imported from \`/lib/config.ts\`.
+- This project has a **real Supabase backend** via Lovable Cloud.
+- Generated app code is client-side React running in the browser.
 - Supabase client:
-  - \`/lib/supabase.ts\` is the ONLY Supabase client module.
-  - It imports from \`@supabase/supabase-js\` and \`/lib/config.ts\`, and exports a single \`supabase\` client instance.
-  - ALL auth-related code MUST import \`supabase\` from \`/lib/supabase.ts\`.
+  - Import the pre-configured Supabase client: \`import { supabase } from "../integrations/supabase/client";\`
+  - Adjust the relative path based on file location.
+  - Use \`supabase.from("table").select("*")\` for data queries.
+  - Use \`supabase.auth\` for authentication.
+  - Do NOT create your own Supabase client or config files — the client is pre-configured.
+  - Do NOT generate \`/lib/config.ts\` or \`/lib/supabase.ts\` — these are unnecessary.
 - Imports:
   - ALL imports MUST be **relative paths only** (e.g. \`../../lib/utils\`).
   - \`@/\` aliases are FORBIDDEN and will cause build rejection.
-- Data API:
-  - You may use \`supabase.from()\` directly for database queries — this project has a real Supabase backend.
+- Data access:
+  - Use \`supabase.from()\` directly for database queries.
   - Import the supabase client from the integrations module.
 - Verifier:
   - Any occurrence of \`window.__PROJECT_ID__\`, \`window.__SUPABASE_URL__\`, \`window.__SUPABASE_KEY__\`, or \`@/\` imports in generated app files will cause the build to be rejected.
@@ -129,7 +124,7 @@ ${workspaceContext ? `### Current code (scoped):\n${workspaceContext}` : ""}
 - **BAN-7**: NEVER add \`export { X }\` alongside \`export default X\` for the same symbol.
 - **BAN-8**: NEVER leave placeholders, TODOs, or stubs. Output COMPLETE working code.
 - **BAN-9**: NEVER call \`useNavigate()\` inside AuthContext. AuthContext must be router-agnostic.
-- **BAN-10**: NEVER read \`window.*\` globals in app code. ONLY \`/lib/config.ts\` may read globals or environment.
+- **BAN-10**: NEVER generate \`/lib/config.ts\` or \`/lib/supabase.ts\` — the Supabase client is pre-configured.
 
 ## ══════════════════════════════════════════════════════════════════
 ## CRITICAL RULES (output quality)
@@ -205,8 +200,7 @@ ${workspaceContext ? `### Current code (scoped):\n${workspaceContext}` : ""}
 
 10. **File layout**:
     - /lib/utils.ts — cn() class-merge utility. NEVER put utils in /components/ui/ or /utils/.
-    - /lib/config.ts — PROJECT_ID, SUPABASE_URL, SUPABASE_KEY. ONLY this file may read globals/env.
-    - /lib/supabase.ts — single Supabase client instance, imported by auth and related logic.
+    - /integrations/supabase/client.ts — pre-configured Supabase client. NEVER modify or recreate.
     - /components/ui/ — pre-scaffolded shadcn-compatible UI components (NAMED exports, do not modify).
     - /components/ — reusable DOMAIN components (StatCard, StatusBadge, PageHeader, etc.). DEFAULT exports.
     - /contexts/ — React contexts (AuthContext, etc.).
@@ -214,6 +208,7 @@ ${workspaceContext ? `### Current code (scoped):\n${workspaceContext}` : ""}
     - /hooks/ — custom hooks (.ts files). /hooks/data/ for data-fetching hooks.
     - /layout/ — layout wrappers (AppLayout.tsx, Sidebar.tsx). DEFAULT exports.
     Import cn from "../lib/utils" (adjust relative path based on file depth).
+    Import supabase from "../integrations/supabase/client" (adjust relative path).
 
 11. **COMPONENT DECOMPOSITION**: Pages must NOT be monolithic. Every page MUST import and use components from /components/ui/:
     - Table + TableHeader/TableBody/TableRow/TableHead/TableCell for data lists
@@ -319,32 +314,21 @@ function buildWorkspaceContext(
 
 function verifyRuntimeContracts(files: Record<string, string>): { ok: boolean; errors: string[] } {
   const errors: string[] = [];
-  const forbiddenWindowPatterns = ["window.__PROJECT_ID__", "window.__SUPABASE_URL__", "window.__SUPABASE_KEY__"];
   const forbiddenImportAlias = "@/";
+  
+  // These files should NOT be generated — the Supabase client is pre-configured
+  const forbiddenFiles = ["/lib/config.ts", "/lib/supabase.ts"];
 
   for (const [path, code] of Object.entries(files)) {
-    // Skip config and supabase modules themselves; they are allowed to read env/globals.
-    const isConfig = path === "/lib/config.ts" || path.endsWith("/lib/config.ts");
-    const isSupabase = path === "/lib/supabase.ts" || path.endsWith("/lib/supabase.ts") ||
-      path.includes("/integrations/supabase/");
-
-    if (!isConfig && !isSupabase) {
-      for (const pattern of forbiddenWindowPatterns) {
-        if (code.includes(pattern)) {
-          errors.push(
-            `File ${path} illegally reads preview/global value via '${pattern}'. Use /lib/config.ts instead.`,
-          );
-          break;
-        }
-      }
+    // Reject generated config/supabase files — these are pre-configured
+    if (forbiddenFiles.some(f => path === f || path.endsWith(f))) {
+      errors.push(`File ${path} should NOT be generated. The Supabase client is pre-configured at /integrations/supabase/client.ts.`);
+      continue;
     }
 
     if (code.includes(forbiddenImportAlias)) {
       errors.push(`File ${path} uses '@/'. All imports must be relative paths only.`);
     }
-
-    // NOTE: supabase.from() is ALLOWED — the project has a real Supabase backend via Lovable Cloud.
-    // The old project-api proxy restriction has been removed.
   }
 
   return { ok: errors.length === 0, errors };
