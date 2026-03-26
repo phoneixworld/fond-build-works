@@ -11,7 +11,12 @@ export function synthesizeAppJsx(
   ws: Workspace,
   routes?: Array<{ path: string; component: string; file: string }>,
 ): string {
-  const pageFiles = ws.listFiles().filter((f) => f.startsWith("/pages/") && /\.(jsx|tsx)$/.test(f));
+  // Support both /pages/ and /src/pages/ prefixes (AI may generate either)
+  const pageFiles = ws.listFiles().filter((f) =>
+    (f.startsWith("/pages/") || f.startsWith("/src/pages/")) &&
+    /\.(jsx|tsx)$/.test(f) &&
+    !/index\.(jsx|tsx)$/.test(f) // skip barrel files
+  );
 
   const pageImports: string[] = [];
   const routeLines: string[] = [];
@@ -47,7 +52,10 @@ export function synthesizeAppJsx(
   }
 
   // Context providers
-  const contextFiles = ws.listFiles().filter((f) => f.startsWith("/contexts/") && /\.(jsx|tsx)$/.test(f));
+  const contextFiles = ws.listFiles().filter((f) =>
+    (f.startsWith("/contexts/") || f.startsWith("/src/contexts/")) &&
+    /\.(jsx|tsx)$/.test(f)
+  );
 
   const contextImports: string[] = [];
   for (const file of contextFiles) {

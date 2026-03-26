@@ -603,13 +603,20 @@ export async function compile(
         console.warn(`[Compiler] ⚠️ App.jsx import unresolved: ${m[1]}`);
       }
     }
-    // If more than half of local imports are broken, re-synthesize
-    if (totalLocalImports > 0 && brokenImports > 0 && brokenImports / totalLocalImports > 0.3) {
+    // Count available page files to detect stub App entries
+    const availablePages = workspace.listFiles().filter(f =>
+      (f.startsWith("/pages/") || f.startsWith("/src/pages/")) &&
+      /\.(jsx|tsx)$/.test(f) && !/index\.(jsx|tsx)$/.test(f)
+    );
+    const isStubApp = totalLocalImports === 0 && availablePages.length > 0;
+    
+    // Re-synthesize if: stub with no imports but pages exist, OR too many broken imports
+    if (isStubApp || (totalLocalImports > 0 && brokenImports > 0 && brokenImports / totalLocalImports > 0.3)) {
       callbacks.onPhase("synthesizing-app", "Re-synthesizing App.jsx (too many broken imports)...");
       const synthesizedApp = synthesizeAppJsx(workspace);
       workspace.updateFile(appPath, synthesizedApp);
-      cloudLog.warn(`App.jsx had ${brokenImports}/${totalLocalImports} broken imports — re-synthesized`, "compiler");
-      console.log(`[Compiler] 🏗️ Re-synthesized App.jsx: ${brokenImports}/${totalLocalImports} imports were broken`);
+      cloudLog.warn(`App.jsx re-synthesized (stub=${isStubApp}, broken=${brokenImports}/${totalLocalImports}, pages=${availablePages.length})`, "compiler");
+      console.log(`[Compiler] 🏗️ Re-synthesized App.jsx: stub=${isStubApp}, broken=${brokenImports}/${totalLocalImports}, available pages=${availablePages.length}`);
     }
   }
 
