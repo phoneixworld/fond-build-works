@@ -417,7 +417,7 @@ export function buildESMPreview(
   <script type="importmap">
   ${JSON.stringify({ imports: importMap }, null, 2)}
   </script>
-  <script src="https://cdn.tailwindcss.com"></script>
+  
   <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
     *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
