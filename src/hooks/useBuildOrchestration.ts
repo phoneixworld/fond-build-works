@@ -1102,8 +1102,9 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
               console.warn(`[Compiler] ⛔ Blocked cross-project file injection`);
               return;
             }
+            const doneLabel = normalizeTaskLabel(task.label);
             setCompilerTasks((prev) =>
-              prev.map((t) => (t.label === task.label ? { ...t, status: "done" as const } : t)),
+              prev.map((t) => (t.label === doneLabel ? { ...t, status: "done" as const } : t)),
             );
 
             if (Object.keys(files).length > 0) {
@@ -1143,10 +1144,11 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
           },
           onTaskError: (task, error) => {
             if (isStaleBuild()) return;
-            console.error(`[Compiler] Task '${task.label}' failed:`, error);
+            const errLabel = normalizeTaskLabel(task.label);
+            console.error(`[Compiler] Task '${errLabel}' failed:`, error);
             setCompilerTasks((prev) =>
               prev.map((t) =>
-                t.label === task.label ? { ...t, status: "done" as const, label: `❌ ${task.label}` } : t,
+                t.label === errLabel ? { ...t, status: "done" as const, label: `❌ ${errLabel}` } : t,
               ),
             );
           },
