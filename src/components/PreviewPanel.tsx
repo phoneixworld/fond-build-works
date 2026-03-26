@@ -6,6 +6,7 @@ import { DIRECT_TOUCH_SCRIPT } from "@/components/DirectTouch";
 import SandpackPreview from "@/components/SandpackPreview";
 import ESMPreview from "@/components/ESMPreview";
 import VitePreview from "@/components/VitePreview";
+import WebContainerPreview from "@/components/WebContainerPreview";
 
 const VIEWPORTS_MAP = {
   desktop: { width: "100%", maxWidth: "none" },
@@ -213,7 +214,19 @@ const PreviewPanel = () => {
           )}
         </AnimatePresence>
 
-        {previewMode === "vite" ? (
+        {previewMode === "webcontainer" ? (
+          <div className="absolute inset-0" key="wc-container" style={{ display: 'flex', flexDirection: 'column' }}>
+            {suspendLivePreviewDuringBuild ? (
+              <EmptyState />
+            ) : (
+              <WebContainerPreview
+                key={refreshKey}
+                viewport={{ width: currentViewport.width, maxWidth: currentViewport.maxWidth }}
+                initialPath={currentPath}
+              />
+            )}
+          </div>
+        ) : previewMode === "vite" ? (
           <div className="absolute inset-0" key="vite-container" style={{ display: 'flex', flexDirection: 'column' }}>
             {suspendLivePreviewDuringBuild ? (
               <EmptyState />
