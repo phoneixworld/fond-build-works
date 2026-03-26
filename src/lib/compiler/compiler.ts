@@ -47,6 +47,7 @@ import {
 import { reconcileSidebarAndRouter } from "./sidebarRouterReconciler";
 import { checkBuildInvariants } from "./buildInvariants";
 import { fetchServerPlan, serverPlanToTaskGraph } from "@/lib/serverPlanAgent";
+import { matchTemplate as matchDomainTemplate, hydrateTemplateFiles, type TemplateMatch } from "@/lib/templates/domainTemplates";
 
 // ─── Public API ───────────────────────────────────────────────────────────
 
@@ -280,6 +281,30 @@ export async function compile(
   if (scaffoldedCount > 0) {
     cloudLog.info(`Pre-scaffolded ${scaffoldedCount} UI + domain components + design tokens`, "compiler");
     console.log(`[Compiler] 🎨 Pre-scaffolded ${scaffoldedCount} UI + domain components into workspace`);
+  }
+
+  // ── Phase 2.4: Domain Template Matching ──────────────────────────────
+  // Check if the user's requirements match a high-quality domain template.
+  // If so, seed the workspace with the template's pre-built files BEFORE
+  // the AI tasks run. The AI refines/extends these instead of generating from scratch.
+  const domainTemplateMatch: TemplateMatch | null = matchDomainTemplate(ctx.rawRequirements);
+  if (domainTemplateMatch && domainTemplateMatch.score >= 3) {
+    const tmpl = domainTemplateMatch.template;
+    const projectName = ctx.rawRequirements.match(/(?:build|create|make)\s+(?:a\s+)?(.{3,40}?)(?:\s+(?:app|system|platform|site|website|dashboard|tool))/i)?.[1] || tmpl.name;
+    const hydratedFiles = hydrateTemplateFiles(tmpl, { APP_NAME: projectName });
+    let domainFileCount = 0;
+    for (const [path, content] of Object.entries(hydratedFiles)) {
+      if (!workspace.hasFile(path)) {
+        workspace.addFile(path, content);
+        domainFileCount++;
+      }
+    }
+    if (domainFileCount > 0) {
+      cloudLog.info(`Domain template "${tmpl.name}" matched (score=${domainTemplateMatch.score}, keywords=${domainTemplateMatch.matchedKeywords.join(",")}): seeded ${domainFileCount} files`, "compiler");
+      console.log(`[Compiler] 🏗️ Domain template "${tmpl.name}" matched (score=${domainTemplateMatch.score}): seeded ${domainFileCount} files`);
+    }
+  } else if (domainTemplateMatch) {
+    console.log(`[Compiler] ℹ️ Domain template "${domainTemplateMatch.template.name}" matched but score too low (${domainTemplateMatch.score} < 3) — skipping`);
   }
 
   // ── Phase 2.5: Deterministic IR page scaffolding ─────────────────────
