@@ -51,6 +51,13 @@ export {
   type BuildErrorCategory,
 } from "./errorBridge";
 
+// Pillar 4: Unified Repair Pipeline (re-export from compiler)
+export {
+  RepairPipeline,
+  type RepairPipelineConfig,
+  type RepairPipelineResult,
+} from "../compiler/repairPipeline";
+
 // Component 5: Build Manifest
 export {
   startBuildManifest,

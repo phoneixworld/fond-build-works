@@ -48,6 +48,22 @@ export { Workspace } from "./workspace";
 export { verifyWorkspace } from "./verifier";
 export { classifyRepairActions, applyDeterministicFix, MAX_REPAIR_ROUNDS, MAX_REPAIR_ACTIONS_TOTAL } from "./repair";
 export { createTrace, printTrace } from "./observability";
+
+// Pillar 4: Unified Repair Pipeline
+export {
+  RepairPipeline,
+  type RepairPipelineConfig,
+  type RepairPipelineResult,
+  type RepairPipelineRound,
+  type RepairProgressEvent,
+  type RebuildResult,
+} from "./repairPipeline";
+
+// Pillar 4: Repair Metrics
+export {
+  RepairMetrics,
+  type RepairMetricsSnapshot,
+} from "./repairMetrics";
 export { lintDesignQuality, formatLintSummary, type DesignLintResult, type DesignLintIssue } from "./designLint";
 export { DESIGN_THEMES, getDesignThemePrompt, detectDesignTheme, type DesignTheme } from "./designThemes";
 export { validateFileSyntax, validateAllFiles, buildFileRetryPrompt, type ParseResult } from "./syntaxValidator";
