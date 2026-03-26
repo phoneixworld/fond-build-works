@@ -1150,9 +1150,6 @@ const SandpackPreview = ({ viewport, showConsole = false, initialPath }: Sandpac
             dependencies,
           }}
           options={{
-            externalResources: [
-              "https://cdn.tailwindcss.com",
-            ],
             recompileMode: "delayed",
             recompileDelay: 1200,
             bundlerTimeOut: 240000,

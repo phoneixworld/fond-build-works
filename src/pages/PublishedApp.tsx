@@ -157,7 +157,6 @@ const PublishedApp = () => {
             },
           }}
           options={{
-            externalResources: ["https://cdn.tailwindcss.com"],
             bundlerTimeOut: 120000,
           }}
         >
