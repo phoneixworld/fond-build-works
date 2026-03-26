@@ -111,21 +111,20 @@ ${workspaceContext ? `### Current code (scoped):\n${workspaceContext}` : ""}
   - ALL imports MUST be **relative paths only** (e.g. \`../../lib/utils\`).
   - \`@/\` aliases are FORBIDDEN and will cause build rejection.
 - Data API:
-  - ALL CRUD operations MUST go through the \`project-api\` HTTP endpoint via \`fetch()\`.
-  - Direct \`supabase.from()\` calls in app code are FORBIDDEN.
+  - You may use \`supabase.from()\` directly for database queries — this project has a real Supabase backend.
+  - Import the supabase client from the integrations module.
 - Verifier:
-  - Any occurrence of \`window.__PROJECT_ID__\`, \`window.__SUPABASE_URL__\`, \`window.__SUPABASE_KEY__\`, \`@/\` imports, or direct \`supabase.from()\` in generated app files will cause the build to be rejected.
+  - Any occurrence of \`window.__PROJECT_ID__\`, \`window.__SUPABASE_URL__\`, \`window.__SUPABASE_KEY__\`, or \`@/\` imports in generated app files will cause the build to be rejected.
 
 ### RULES:
 
 ## ══════════════════════════════════════════════════════════════════
 ## ABSOLUTE BANS (violating ANY of these = build rejection)
 ## ══════════════════════════════════════════════════════════════════
-- **BAN-1**: NEVER generate inline sample/mock data arrays (e.g. \`const SAMPLE_DATA = [...]\`). ALL data comes from API fetch.
+- **BAN-1**: NEVER generate inline sample/mock data arrays (e.g. \`const SAMPLE_DATA = [...]\`). ALL data comes from database queries.
 - **BAN-2**: NEVER use \`@/\` import aliases. Use RELATIVE paths only (e.g. \`../../lib/utils\`).
-- **BAN-3**: NEVER use \`supabase.from()\` directly in app code. ALL data goes through \`project-api\` via fetch().
-- **BAN-4**: NEVER import from \`@radix-ui/*\`, \`class-variance-authority\`, or \`tailwind-variants\`.
-- **BAN-5**: NEVER generate \`.jsx\` or \`.js\` files. ALL source files must be \`.tsx\` or \`.ts\`.
+- **BAN-3**: NEVER import from \`@radix-ui/*\`, \`class-variance-authority\`, or \`tailwind-variants\`.
+- **BAN-4**: NEVER generate \`.jsx\` or \`.js\` files. ALL source files must be \`.tsx\` or \`.ts\`.
 - **BAN-6**: NEVER write to \`/components/ui/**\` — those are pre-scaffolded UI primitives.
 - **BAN-7**: NEVER add \`export { X }\` alongside \`export default X\` for the same symbol.
 - **BAN-8**: NEVER leave placeholders, TODOs, or stubs. Output COMPLETE working code.
