@@ -1048,11 +1048,11 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
           },
           onPlanReady: (tasks) => {
             if (isStaleBuild()) return;
-            planLabelsRef.current = tasks.map((t) => t.label);
+            planLabelsRef.current = tasks.map((t) => normalizeTaskLabel(t.label));
             setCompilerTasks(
               tasks.map((t, i) => ({
                 id: `task-${i}`,
-                label: t.label,
+                label: normalizeTaskLabel(t.label),
                 status: "pending" as const,
               })),
             );
