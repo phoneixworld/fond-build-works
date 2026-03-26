@@ -275,7 +275,7 @@ describe("Phase 6: Agent Orchestration Pipeline", () => {
     });
 
     const workspace = new Workspace({
-      "/App.jsx": `import React from "react";\nconst api_key = "sk_live_abcdefghijklmnopqrstuvwxyz12345";\nexport default function App() { return <div>App</div>; }`,
+      "/App.jsx": `import React from "react";\nconst api_key = "sk_live_abcdefghijklmnopqrstuvwxyz1234567890abc";\nexport default function App() { return <div>App</div>; }`,
     });
 
     const callbacks = makeTestCallbacks();
