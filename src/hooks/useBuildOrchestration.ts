@@ -35,6 +35,16 @@ import { fixExportMismatches } from "@/lib/compiler/exportMismatchFixer";
 import { deduplicateFiles } from "@/lib/compiler/deduplicator";
 import { normalizeGeneratedStructure } from "@/lib/compiler/structureNormalizer";
 import { classifyIntentGate, parseConfirmationReply, type GuardRouteHint } from "@/lib/intentGate";
+import {
+  indexFilesIntoAST,
+  buildProvenanceMap,
+  startBuildManifest,
+  recordFileInManifest,
+  completeBuildManifest,
+  resetASTWorkspace,
+  clearProvenance,
+  clearBuildHistory,
+} from "@/lib/buildEngine";
 import { extractUrlFromMessage, analyzeUrl } from "@/lib/urlAnalyzer";
 
 /** Phase 3: Normalize task labels for user display */
@@ -807,6 +817,17 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
             if (Object.keys(instantResult.deps).length > 0) setSandpackDeps(instantResult.deps);
             setPreviewMode("sandpack");
 
+            // Pillar 2: Index into AST + provenance
+            try {
+              const manifest = startBuildManifest(userText, "template");
+              indexFilesIntoAST(finalFiles);
+              buildProvenanceMap();
+              for (const [fp, content] of Object.entries(finalFiles)) {
+                recordFileInManifest(fp, content, { origin: "template", taskLabel: instantResult.templateName });
+              }
+              completeBuildManifest(true);
+            } catch (e) { console.warn("[Pillar2] AST indexing failed (non-blocking):", e); }
+
             const fileCount = Object.keys(finalFiles).length;
             const msg = `✅ **${instantResult.templateName}** — ${fileCount} files rendered instantly!\n\nYour app is ready with API-wired data hooks and fallback demo data. Backend schema included.`;
             setMessages((prev) => {
@@ -1183,6 +1204,16 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
             setSandpackFiles(finalWorkspace);
             syncSandpackToVirtualFS(finalWorkspace);
             setPreviewMode("sandpack");
+
+            // Pillar 2: Index into AST + provenance + manifest
+            try {
+              indexFilesIntoAST(finalWorkspace);
+              buildProvenanceMap();
+              for (const [fp, content] of Object.entries(finalWorkspace)) {
+                recordFileInManifest(fp, content, { origin: "ai_generated", model: selectedModel });
+              }
+              completeBuildManifest(result.status === "success");
+            } catch (e) { console.warn("[Pillar2] AST indexing failed (non-blocking):", e); }
 
             const statusEmoji = result.status === "success" ? "✅" : result.status === "partial" ? "⚠️" : "❌";
             const staticLine = result.verification.ok
@@ -1601,6 +1632,18 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
           }));
         }
         setPreviewMode("sandpack");
+
+        // Pillar 2: Index edited files into AST
+        try {
+          indexFilesIntoAST(updatedFiles);
+          buildProvenanceMap();
+          for (const f of resolvedTargetFiles) {
+            if (updatedFiles[f]) {
+              recordFileInManifest(f, updatedFiles[f], { origin: "ai_edited", model: selectedModel });
+            }
+          }
+          completeBuildManifest(true);
+        } catch (e) { console.warn("[Pillar2] AST indexing failed (non-blocking):", e); }
 
         const postEditReadiness = await conversationCompleteEdit?.(
           enrichedInstruction,
@@ -2094,6 +2137,10 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
     setCurrentTaskIndex(0);
     setTotalPlanTasks(0);
     setCompilerTasks([]);
+    // Pillar 2: Reset build engine state
+    resetASTWorkspace();
+    clearProvenance();
+    clearBuildHistory();
     isSendingRef.current = false;
     saveProject({ chat_history: [], html_content: "" });
   }, [
