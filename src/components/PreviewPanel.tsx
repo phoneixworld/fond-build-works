@@ -262,6 +262,7 @@ const PreviewPanel = () => {
                 key={refreshKey}
                 viewport={{ width: currentViewport.width, maxWidth: currentViewport.maxWidth }}
                 initialPath={currentPath}
+                showConsole={true}
               />
             )}
           </div>
