@@ -53,6 +53,29 @@ const META_CONVERSATION_QA =
 const FRUSTRATION_OR_ESCALATION =
   /\b(you are continuing to build|i said do not build|dont build anything|don't build anything|stop building|why are you continuing|why are you still)\b/i;
 
+/**
+ * Phase 5: Client-side truthfulness guard
+ * Strips false build/edit completion claims from chat agent responses.
+ * The chat agent should NEVER claim it edited/built/created files.
+ */
+const FALSE_COMPLETION_PATTERNS = [
+  /✅\s*(?:edited|built|created|generated|updated|modified|fixed)\s+\d+\s+files?/gi,
+  /(?:i've|i have|i just)\s+(?:edited|built|created|generated|updated|modified|fixed)\s+(?:the\s+)?(?:files?|code|components?|pages?)/gi,
+  /changes?\s+(?:complete|applied|done|saved|committed)/gi,
+  /here(?:'s| is) what (?:i|was) (?:built|created|changed|edited|generated)/gi,
+];
+
+function sanitizeChatTruthfulness(text: string): string {
+  let result = text;
+  for (const pattern of FALSE_COMPLETION_PATTERNS) {
+    result = result.replace(pattern, (match) => {
+      console.warn(`[ChatTruth] Stripped false completion claim: "${match}"`);
+      return "";
+    });
+  }
+  return result.replace(/\n{3,}/g, "\n\n").trim();
+}
+
 function extractTextFromContent(content: any): string {
   if (typeof content === "string") return content;
   if (Array.isArray(content)) {
@@ -257,7 +280,7 @@ export function useChatAgent(config: ChatAgentConfig) {
           setPendingBuildPrompt(JSON.stringify(buildEnvelope));
         }
 
-        const displayText = stripBuildMarker(responseText);
+        const displayText = sanitizeChatTruthfulness(stripBuildMarker(responseText));
         const cacheTag =
           isCached && cacheInfo
             ? `\n\n_⚡ ${cacheInfo.layer} cache ${cacheInfo.matchType} hit (${(
@@ -334,7 +357,7 @@ export function useChatAgent(config: ChatAgentConfig) {
                 if (!isMountedRef.current) return;
                 fullChatResponseRef.current += token;
                 tokenCount += Math.ceil(token.length / 4);
-                const displayText = stripBuildMarker(fullChatResponseRef.current);
+                const displayText = sanitizeChatTruthfulness(stripBuildMarker(fullChatResponseRef.current));
                 setMessages((prev) => {
                   const last = prev[prev.length - 1];
                   if (last?.role === "assistant") {

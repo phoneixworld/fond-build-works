@@ -37,7 +37,49 @@ import { normalizeGeneratedStructure } from "@/lib/compiler/structureNormalizer"
 import { classifyIntentGate, parseConfirmationReply, type GuardRouteHint } from "@/lib/intentGate";
 import { extractUrlFromMessage, analyzeUrl } from "@/lib/urlAnalyzer";
 
-/** Generate a self-contained preview HTML from workspace files */
+/** Phase 3: Normalize task labels for user display */
+function normalizeTaskLabel(raw: string): string {
+  if (!raw || raw.trim().length === 0) return "Application Setup";
+  
+  const LABEL_MAP: Record<string, string> = {
+    infra: "Infrastructure",
+    auth: "Authentication",
+    routing: "Routing & Navigation",
+    shell: "Application Shell",
+    layout: "Layout & Structure",
+    nav: "Navigation",
+    sidebar: "Sidebar Navigation",
+    dashboard: "Dashboard",
+    db: "Database Schema",
+    schema: "Database Schema",
+    api: "API Integration",
+    styles: "Styling & Theme",
+    theme: "Styling & Theme",
+    config: "Configuration",
+    setup: "Project Setup",
+  };
+
+  // Handle "page:PageName" format
+  const pageMatch = raw.match(/^page:(.+)$/i);
+  if (pageMatch) return `${pageMatch[1].trim()} Page`;
+  
+  // Handle "component:Name" format  
+  const compMatch = raw.match(/^component:(.+)$/i);
+  if (compMatch) return `${compMatch[1].trim()} Component`;
+
+  // Check direct map
+  const lower = raw.toLowerCase().trim();
+  if (LABEL_MAP[lower]) return LABEL_MAP[lower];
+
+  // If it's a single generic word, try to capitalize nicely
+  if (/^[a-z_-]+$/.test(lower) && lower.length < 20) {
+    return lower.replace(/[-_]/g, " ").replace(/\b\w/g, c => c.toUpperCase());
+  }
+
+  // Already reasonable — just ensure first letter is capitalized
+  return raw.charAt(0).toUpperCase() + raw.slice(1);
+}
+
 function generatePreviewHtmlForBuild(files: Record<string, string>): string {
   const cssFiles = Object.entries(files)
     .filter(([p]) => p.endsWith(".css"))
@@ -599,8 +641,29 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
     currentProject,
   } as InstantBuildConfig);
 
+  /** Extract the original user intent from an internal requirement envelope */
+  const extractUserIntentFromPrompt = (prompt: string): string => {
+    // Try to extract the BUILD TRIGGER section (contains original user text)
+    const triggerMatch = prompt.match(/## BUILD TRIGGER\n(.+?)$/ms);
+    if (triggerMatch) return triggerMatch[1].trim();
+    
+    // Try to extract content after APPLICATION REQUIREMENTS header
+    const reqMatch = prompt.match(/# APPLICATION REQUIREMENTS\n\n(.+?)(?:\n\nBuild (?:EXACTLY|a complete))/s);
+    if (reqMatch) return reqMatch[1].trim();
+    
+    // Fallback: strip the envelope markers and return first meaningful line
+    const lines = prompt.split("\n").filter(l => 
+      l.trim() && 
+      !l.startsWith("#") && 
+      !l.startsWith("Build EXACTLY") && 
+      !l.startsWith("Build a complete") &&
+      !l.startsWith("Do NOT add")
+    );
+    return lines[0]?.trim() || "Building application...";
+  };
+
   const sendMessage = useCallback(
-    async (text: string, images: string[] = []) => {
+    async (text: string, images: string[] = [], displayText?: string) => {
       if (!text || !currentProject) return;
 
       const buildProjectId = currentProject.id;
@@ -622,7 +685,11 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
         setHealAttempts(0);
       }
 
-      const content = buildMessageContent(text, images);
+      // Phase 1: Separate display text from execution prompt
+      // Never persist internal requirement envelopes as user chat messages
+      const isInternalPrompt = text.includes("# APPLICATION REQUIREMENTS") || text.includes("## BUILD TRIGGER");
+      const safeDisplayText = displayText || (isInternalPrompt ? extractUserIntentFromPrompt(text) : text);
+      const content = buildMessageContent(safeDisplayText, images);
       const userMsg: Msg = { role: "user", content, timestamp: Date.now() };
       setInput("");
       setAttachedImages([]);
@@ -981,11 +1048,11 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
           },
           onPlanReady: (tasks) => {
             if (isStaleBuild()) return;
-            planLabelsRef.current = tasks.map((t) => t.label);
+            planLabelsRef.current = tasks.map((t) => normalizeTaskLabel(t.label));
             setCompilerTasks(
               tasks.map((t, i) => ({
                 id: `task-${i}`,
-                label: t.label,
+                label: normalizeTaskLabel(t.label),
                 status: "pending" as const,
               })),
             );
@@ -995,12 +1062,13 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
             resetBuildSafetyTimeout();
             setCurrentTaskIndex(index);
             setTotalPlanTasks(total);
-            setBuildStep(`🔨 Task ${index + 1}/${total}: ${task.label}`);
+            const normalizedLabel = normalizeTaskLabel(task.label);
+            setBuildStep(`🔨 Task ${index + 1}/${total}: ${normalizedLabel}`);
 
             setCompilerTasks((prev) =>
               prev.map((t, i) => ({
                 ...t,
-                label: i === index ? task.label : t.label,
+                label: i === index ? normalizedLabel : t.label,
                 status: i < index ? "done" : i === index ? "in_progress" : t.status,
               })),
             );
@@ -1008,7 +1076,7 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
             const labels = planLabelsRef.current;
             const progressMsg = `📋 **Building** (${total} tasks)\n\n${Array.from({ length: total }, (_, i) => {
               const status = i < index ? "✅" : i === index ? "🔨" : "⏳";
-              const label = labels[i] || task.label;
+              const label = labels[i] || normalizedLabel;
               return `${status} ${i + 1}. ${label}`;
             }).join("\n")}`;
             setMessages((prev) => {
@@ -1034,8 +1102,9 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
               console.warn(`[Compiler] ⛔ Blocked cross-project file injection`);
               return;
             }
+            const doneLabel = normalizeTaskLabel(task.label);
             setCompilerTasks((prev) =>
-              prev.map((t) => (t.label === task.label ? { ...t, status: "done" as const } : t)),
+              prev.map((t) => (t.label === doneLabel ? { ...t, status: "done" as const } : t)),
             );
 
             if (Object.keys(files).length > 0) {
@@ -1075,10 +1144,11 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
           },
           onTaskError: (task, error) => {
             if (isStaleBuild()) return;
-            console.error(`[Compiler] Task '${task.label}' failed:`, error);
+            const errLabel = normalizeTaskLabel(task.label);
+            console.error(`[Compiler] Task '${errLabel}' failed:`, error);
             setCompilerTasks((prev) =>
               prev.map((t) =>
-                t.label === task.label ? { ...t, status: "done" as const, label: `❌ ${task.label}` } : t,
+                t.label === errLabel ? { ...t, status: "done" as const, label: `❌ ${errLabel}` } : t,
               ),
             );
           },
