@@ -95,7 +95,7 @@ ${workspaceContext ? `### Current code (scoped):\n${workspaceContext}` : ""}
 4. NEVER write to /components/ui/** — those are pre-scaffolded UI primitives.
 5. **CRITICAL FILE STRUCTURE**:
    - **MANDATORY: ALL source files must use .tsx (for components/JSX) or .ts (for pure logic/hooks). NEVER generate .jsx or .js files.**
-   - /utils/cn.ts — cn() class-merge utility. NEVER put utils inside /components/ui/.
+   - /lib/utils.ts — cn() class-merge utility (uses clsx + twMerge). NEVER put utils inside /components/ui/ or /utils/.
    - /components/ui/ — pre-scaffolded shadcn-compatible UI components (do not modify). These use NAMED exports (e.g. import { Card, CardHeader } from "./ui/Card").
      **UI COMPONENTS MUST BE PURE React + Tailwind CSS. NO Radix UI imports, NO class-variance-authority, NO tailwind-variants, NO external dependencies beyond React and lucide-react.**
     - /components/ — reusable DOMAIN components (StatCard, StatusBadge, PageHeader, SearchFilterBar, ActivityFeed, QuickActions, NotificationBell, ChartCard, FormModal). These use DEFAULT exports.
@@ -138,7 +138,7 @@ ${workspaceContext ? `### Current code (scoped):\n${workspaceContext}` : ""}
     }
     \`\`\`
     Keep each data hook UNDER 40 lines. NEVER generate verbose hooks that risk truncation.
-   Import cn from "../utils/cn" (adjust relative path based on file depth). NEVER import from "./ui/utils" or "./utils".
+   Import cn from "../lib/utils" (adjust relative path based on file depth). NEVER import from "./ui/utils", "./utils", or "../utils/cn".
 6. **COMPONENT DECOMPOSITION (CRITICAL)**: Pages must NOT be monolithic. Every page MUST import and use components from /components/ui/:
    - Use Table + TableHeader/TableBody/TableRow/TableHead/TableCell for data lists (NOT raw <table> tags).
    - Use Tabs + TabsList/TabsTrigger/TabsContent for multi-section views.

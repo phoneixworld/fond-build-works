@@ -380,7 +380,7 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
       sanitized[normalizedPath] = cleanedContent;
     }
     // Apply structure normalization inline to avoid module-resolution failures.
-    // Moves domain components out of /components/ui/, deduplicates cn, ensures /utils/cn.ts.
+    // Moves domain components out of /components/ui/, ensures /lib/utils.ts exists.
     try {
       const DOMAIN_NAMES = new Set(["ActivityFeed","NotificationBell","PageHeader","QuickActions","SearchFilterBar","StatCard","StatusBadge","ProtectedRoute"]);
       const moves: Array<[string,string]> = [];
@@ -394,9 +394,11 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
         if (!sanitized[to]) sanitized[to] = sanitized[from];
         delete sanitized[from];
       }
-      if (sanitized["/utils/cn.ts"] && sanitized["/utils/cn.tsx"]) delete sanitized["/utils/cn.tsx"];
-      if (!sanitized["/utils/cn.ts"] && !sanitized["/utils/cn.tsx"]) {
-        sanitized["/utils/cn.ts"] = `import { clsx } from "clsx";\nimport { twMerge } from "tailwind-merge";\nexport function cn(...inputs: (string | undefined | null | false)[]) { return twMerge(clsx(inputs)); }\n`;
+      // Remove any virtual /utils/cn.* — cn lives at /lib/utils.ts
+      delete sanitized["/utils/cn.ts"];
+      delete sanitized["/utils/cn.tsx"];
+      if (!sanitized["/lib/utils.ts"]) {
+        sanitized["/lib/utils.ts"] = `import { clsx } from "clsx";\nimport { twMerge } from "tailwind-merge";\nexport function cn(...inputs: (string | undefined | null | false)[]) { return twMerge(clsx(inputs)); }\n`;
       }
     } catch (e) {
       console.warn("[BuildOrch] Normalization pass failed, continuing:", e);
