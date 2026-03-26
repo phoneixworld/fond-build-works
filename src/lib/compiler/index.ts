@@ -65,3 +65,10 @@ export {
   type ClassifiedIntent,
   type SurgicalEditResult,
 } from "./surgicalEditor";
+export {
+  verifyWithAST,
+  formatVerificationSummary,
+  type ASTVerificationResult,
+  type ASTVerificationIssue,
+  type QualityScore,
+} from "./astVerifier";
