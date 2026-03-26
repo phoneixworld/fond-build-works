@@ -1014,6 +1014,18 @@ function buildSandpackFiles(files: SandpackFileSet | null, projectId: string, su
       sandpackPath = sandpackPath.replace(/\.ts$/, ".tsx");
     }
 
+    // Fix: .js/.jsx files containing TypeScript syntax (generics, type annotations) must be .tsx
+    if (/\.(js|jsx)$/.test(sandpackPath)) {
+      const hasTypeScriptSyntax = /useState<[^>]+>|useRef<[^>]+>|useCallback<[^>]+>|useMemo<[^>]+>|:\s*(React\.FC|React\.ReactNode|string|number|boolean|void|any|null|undefined)\b|<[A-Z]\w+(?:<[^>]*>)?\s*\[\]>|interface\s+\w+|type\s+\w+\s*=|as\s+(string|number|boolean|any|const)\b/.test(code);
+      const hasJsx = /<\w[\s\S]*?>/.test(code);
+      if (hasTypeScriptSyntax) {
+        const newExt = hasJsx ? ".tsx" : ".ts";
+        const oldPath = sandpackPath;
+        sandpackPath = sandpackPath.replace(/\.(js|jsx)$/, newExt);
+        console.warn(`[SandpackPreview] Renaming ${oldPath} → ${sandpackPath} (contains TypeScript syntax)`);
+      }
+    }
+
     const isCodeFile = /\.(jsx?|tsx?)$/.test(sandpackPath);
     let processed = isCodeFile ? sanitizeImports(code, sandpackPath) : code;
 
