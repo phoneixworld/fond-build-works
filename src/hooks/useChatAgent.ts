@@ -53,12 +53,6 @@ const META_CONVERSATION_QA =
 const FRUSTRATION_OR_ESCALATION =
   /\b(you are continuing to build|i said do not build|dont build anything|don't build anything|stop building|why are you continuing|why are you still)\b/i;
 
-function extractTextFromContent(content: any): string {
-  if (typeof content === "string") return content;
-  if (Array.isArray(content)) {
-    return content
-      .filter((part: any) => part?.type === "text" && typeof part?.text === "string")
-
 /**
  * Phase 5: Client-side truthfulness guard
  * Strips false build/edit completion claims from chat agent responses.
@@ -79,9 +73,14 @@ function sanitizeChatTruthfulness(text: string): string {
       return "";
     });
   }
-  // Clean up resulting double newlines
   return result.replace(/\n{3,}/g, "\n\n").trim();
 }
+
+function extractTextFromContent(content: any): string {
+  if (typeof content === "string") return content;
+  if (Array.isArray(content)) {
+    return content
+      .filter((part: any) => part?.type === "text" && typeof part?.text === "string")
       .map((part: any) => part.text)
       .join(" ");
   }
