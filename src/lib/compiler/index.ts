@@ -55,3 +55,13 @@ export { checkBuildInvariants, type InvariantResult, type InvariantViolation } f
 export { selectLayoutSnippets, formatLayoutSnippetsForPrompt, LAYOUT_SNIPPETS, type LayoutSnippet } from "./layoutSnippets";
 export { ANIMATIONS, MOTION_PRESETS, ANIMATION_CSS, ANIMATION_PROMPT_SECTION } from "./animations";
 export { applyPolishPass, type PolishResult } from "./polishPass";
+export {
+  classifyEditIntent,
+  executeSurgicalEdit,
+  analyzeRenameImpact,
+  findUnusedImports,
+  removeAllUnusedImports,
+  type EditIntentType,
+  type ClassifiedIntent,
+  type SurgicalEditResult,
+} from "./surgicalEditor";
