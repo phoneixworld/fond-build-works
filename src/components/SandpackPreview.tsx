@@ -922,6 +922,75 @@ function repairRelativeImports(files: Record<string, string>): Record<string, st
 
 // normalizeSandpackFileMap is now imported from @/lib/preview/normalizeFileMap
 
+function synthesizeAppFromPages(files: Record<string, string>): string | null {
+  const pageFiles = Object.keys(files)
+    .filter((p) => /^(?:\/src)?\/pages\/[^/]+\.(jsx|tsx|js|ts)$/.test(p))
+    .filter((p) => !/\/index\.(jsx|tsx|js|ts)$/i.test(p))
+    .sort();
+
+  if (pageFiles.length === 0) return null;
+
+  const pageImports: string[] = [];
+  const routeLines: string[] = [];
+  const usedNames = new Set<string>();
+
+  for (const file of pageFiles) {
+    const content = files[file] || "";
+    const raw = file.match(/\/([^/]+)\.(jsx|tsx|js|ts)$/)?.[1] || "Page";
+    const baseName = raw.replace(/[^a-zA-Z0-9]/g, "") || "Page";
+
+    let componentName = /^[A-Z]/.test(baseName)
+      ? baseName
+      : `${baseName.charAt(0).toUpperCase()}${baseName.slice(1)}`;
+
+    if (usedNames.has(componentName)) {
+      let i = 2;
+      while (usedNames.has(`${componentName}${i}`)) i++;
+      componentName = `${componentName}${i}`;
+    }
+    usedNames.add(componentName);
+
+    const importPath = file.replace(/\.(jsx|tsx|js|ts)$/, "");
+    const hasDefault = /export\s+default/.test(content);
+
+    if (hasDefault) {
+      pageImports.push(`import ${componentName} from "${importPath}";`);
+    } else {
+      pageImports.push(`import { ${componentName} } from "${importPath}";`);
+    }
+
+    const normalized = componentName.toLowerCase();
+    const isIndexLike = normalized.includes("home") || normalized.includes("dashboard") || normalized === "index";
+    const routePath = isIndexLike
+      ? "/"
+      : `/${componentName
+          .replace(/Page$/i, "")
+          .replace(/([a-z])([A-Z])/g, "$1-$2")
+          .toLowerCase()}`;
+
+    const isIndex = routePath === "/";
+    routeLines.push(
+      `        <Route${isIndex ? " index" : ` path=\"${routePath.replace(/^\//, "")}\"`} element={<${componentName} />} />`
+    );
+  }
+
+  return `import React from "react";
+import { HashRouter, Routes, Route, Navigate } from "react-router-dom";
+${pageImports.join("\n")}
+
+export default function App() {
+  return (
+    <HashRouter>
+      <Routes>
+${routeLines.join("\n")}
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
+    </HashRouter>
+  );
+}
+`;
+}
+
 function buildSandpackFiles(files: SandpackFileSet | null, projectId: string, supabaseUrl: string, supabaseKey: string): Record<string, string> {
   // Determine the App entry import path from user files.
   // IMPORTANT: keep this extensionless so later TS/JS auto-renames never break the import.
@@ -1065,8 +1134,14 @@ function buildSandpackFiles(files: SandpackFileSet | null, projectId: string, su
     "/src/App.tsx", "/src/App.jsx", "/src/App.js", "/src/App.ts",
   ].some(p => p in base);
   if (!hasAnyAppEntry) {
-    console.warn("[SandpackPreview] No App entry found in workspace, injecting DEFAULT_APP. Keys:", Object.keys(base).filter(k => /App/i.test(k)));
-    base["/App.js"] = DEFAULT_APP;
+    const synthesizedApp = synthesizeAppFromPages(base);
+    if (synthesizedApp) {
+      base["/App.jsx"] = synthesizedApp;
+      console.warn("[SandpackPreview] No App entry found — synthesized App.jsx from pages/");
+    } else {
+      console.warn("[SandpackPreview] No App entry found in workspace, injecting DEFAULT_APP. Keys:", Object.keys(base).filter(k => /App/i.test(k)));
+      base["/App.js"] = DEFAULT_APP;
+    }
   }
 
   // ── Mirror structureNormalizer: normalize file placement ──
