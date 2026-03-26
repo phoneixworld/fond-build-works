@@ -425,10 +425,10 @@ export default function ${name}() {
       <div className="bg-white rounded-xl border border-[var(--color-border)] p-6">
         <div className="flex items-start justify-between mb-6">
           <div className="flex items-center gap-4">
-            <div className="w-14 h-14 rounded-full bg-[var(--color-primary)]/10 flex items-center justify-center text-lg font-bold text-[var(--color-primary)]">SJ</div>
+            <div className="w-14 h-14 rounded-full bg-[var(--color-primary)]/10 flex items-center justify-center text-lg font-bold text-[var(--color-primary)]">{(id || "?").slice(0, 2).toUpperCase()}</div>
             <div>
-              <h2 className="text-lg font-semibold text-[var(--color-text)]">Sarah Johnson</h2>
-              <p className="text-sm text-[var(--color-text-muted)]">ID: #{id || "1001"}</p>
+              <h2 className="text-lg font-semibold text-[var(--color-text)]">${entity} #{id || "—"}</h2>
+              <p className="text-sm text-[var(--color-text-muted)]">ID: #{id || "—"}</p>
             </div>
           </div>
           <div className="flex gap-2">
