@@ -953,6 +953,36 @@ export type Database = {
         }
         Relationships: []
       }
+      pd_314c420ea0f9_landing: {
+        Row: {
+          created_at: string
+          description: string | null
+          id: string
+          name: string
+          project_id: string
+          status: string | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          name: string
+          project_id?: string
+          status?: string | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          name?: string
+          project_id?: string
+          status?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       pd_41de2831d51c_category: {
         Row: {
           created_at: string
