@@ -856,3 +856,29 @@ function checkMigrationPresence(
   return { issues };
 }
 
+// ─── Alias Import Check (Sandpack Compat) ─────────────────────────────────
+
+function checkAliasImports(workspace: Workspace): { issues: VerificationIssue[] } {
+  const issues: VerificationIssue[] = [];
+  const aliasRe = /from\s+["']@\/[^"']+["']/g;
+
+  for (const filePath of workspace.listFiles()) {
+    if (!/\.(jsx?|tsx?)$/.test(filePath)) continue;
+    const content = workspace.getFile(filePath) || "";
+    const matches = content.match(aliasRe);
+    if (matches) {
+      for (const m of matches) {
+        issues.push({
+          category: "broken_import" as IssueCategory,
+          severity: "warning",
+          file: filePath,
+          message: `@/ alias import not supported in Sandpack runtime: ${m.slice(0, 60)}`,
+          suggestedFix: "Rewrite to relative path",
+        });
+      }
+    }
+  }
+
+  return { issues };
+}
+
