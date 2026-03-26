@@ -3,6 +3,9 @@
  *
  * Runs tasks through the AI model with scoped workspace context.
  * Each task sees only the relevant workspace slice and is told to import, not recreate.
+ *
+ * Canonical app runtime: Sandpack-only, browser-only, client-side React.
+ * Generated app code MUST be preview-agnostic and MUST NOT read preview-engine globals directly.
  */
 
 import { streamBuildAgent } from "@/lib/agentPipeline";
@@ -88,6 +91,31 @@ ${existingFiles.length > 0 ? existingFiles.map((f) => `- ${f}`).join("\n") : "(e
 
 ${workspaceContext ? `### Current code (scoped):\n${workspaceContext}` : ""}
 
+### RUNTIME CONTRACT (CANONICAL APP RUNTIME):
+
+- The app runtime is **Sandpack-only**, browser-only, client-side React.
+- Generated app code MUST be **preview-agnostic**:
+  - App code MUST NOT read \`window.__PROJECT_ID__\`, \`window.__SUPABASE_URL__\`, \`window.__SUPABASE_KEY__\`, or ANY \`window.*\` globals directly.
+  - ONLY \`/lib/config.ts\` is allowed to read globals or environment. All other files MUST import from it.
+- Configuration:
+  - \`/lib/config.ts\` exports compile-time constants:
+    - \`PROJECT_ID\`
+    - \`SUPABASE_URL\`
+    - \`SUPABASE_KEY\`
+  - All runtime configuration MUST be imported from \`/lib/config.ts\`.
+- Supabase client:
+  - \`/lib/supabase.ts\` is the ONLY Supabase client module.
+  - It imports from \`@supabase/supabase-js\` and \`/lib/config.ts\`, and exports a single \`supabase\` client instance.
+  - ALL auth-related code MUST import \`supabase\` from \`/lib/supabase.ts\`.
+- Imports:
+  - ALL imports MUST be **relative paths only** (e.g. \`../../lib/utils\`).
+  - \`@/\` aliases are FORBIDDEN and will cause build rejection.
+- Data API:
+  - ALL CRUD operations MUST go through the \`project-api\` HTTP endpoint via \`fetch()\`.
+  - Direct \`supabase.from()\` calls in app code are FORBIDDEN.
+- Verifier:
+  - Any occurrence of \`window.__PROJECT_ID__\`, \`window.__SUPABASE_URL__\`, \`window.__SUPABASE_KEY__\`, \`@/\` imports, or direct \`supabase.from()\` in generated app files will cause the build to be rejected.
+
 ### RULES:
 
 ## ══════════════════════════════════════════════════════════════════
@@ -95,13 +123,14 @@ ${workspaceContext ? `### Current code (scoped):\n${workspaceContext}` : ""}
 ## ══════════════════════════════════════════════════════════════════
 - **BAN-1**: NEVER generate inline sample/mock data arrays (e.g. \`const SAMPLE_DATA = [...]\`). ALL data comes from API fetch.
 - **BAN-2**: NEVER use \`@/\` import aliases. Use RELATIVE paths only (e.g. \`../../lib/utils\`).
-- **BAN-3**: NEVER use \`supabase.from()\` directly. ALL data goes through \`project-api\` via fetch().
+- **BAN-3**: NEVER use \`supabase.from()\` directly in app code. ALL data goes through \`project-api\` via fetch().
 - **BAN-4**: NEVER import from \`@radix-ui/*\`, \`class-variance-authority\`, or \`tailwind-variants\`.
 - **BAN-5**: NEVER generate \`.jsx\` or \`.js\` files. ALL source files must be \`.tsx\` or \`.ts\`.
 - **BAN-6**: NEVER write to \`/components/ui/**\` — those are pre-scaffolded UI primitives.
 - **BAN-7**: NEVER add \`export { X }\` alongside \`export default X\` for the same symbol.
 - **BAN-8**: NEVER leave placeholders, TODOs, or stubs. Output COMPLETE working code.
 - **BAN-9**: NEVER call \`useNavigate()\` inside AuthContext. AuthContext must be router-agnostic.
+- **BAN-10**: NEVER read \`window.*\` globals in app code. ONLY \`/lib/config.ts\` may read globals or environment.
 
 ## ══════════════════════════════════════════════════════════════════
 ## CRITICAL RULES (output quality)
@@ -119,49 +148,70 @@ ${workspaceContext ? `### Current code (scoped):\n${workspaceContext}` : ""}
 
 6. **NAV-ROUTE CONSISTENCY**: Every navigation link in Sidebar MUST have a matching <Route> in App. Every <Route> in App MUST have a matching nav link. Mismatches = blank pages.
 
-7. **DATA ACCESS (CRITICAL — Sandpack runtime uses window globals)**:
-   - Runtime target: Sandpack in-browser bundler. Globals are injected via _bootstrap.js.
-   - Use the project Data API for ALL CRUD operations:
-     \`\`\`
-     const projectId = window.__PROJECT_ID__;
-     const apiBase = window.__SUPABASE_URL__;
-     const apiKey = window.__SUPABASE_KEY__;
-     fetch(apiBase + "/functions/v1/project-api", {
-       method: "POST",
-       headers: { "Content-Type": "application/json", "Authorization": "Bearer " + apiKey },
-       body: JSON.stringify({ project_id: projectId, collection: "employees", action: "list" })
-     }).then(r => r.json()).then(d => setData(d.data || []));
+7. **DATA ACCESS (CRITICAL — Sandpack runtime, preview-agnostic app code)**:
+   - Runtime target: Sandpack in-browser bundler. App code MUST NOT read globals directly.
+   - Use the project Data API for ALL CRUD operations via \`project-api\`:
+     \`\`\`ts
+     import { PROJECT_ID, SUPABASE_URL, SUPABASE_KEY } from "../lib/config"; // adjust relative path
+     export async function listEmployees() {
+       const url = SUPABASE_URL + "/functions/v1/project-api";
+       const res = await fetch(url, {
+         method: "POST",
+         headers: {
+           "Content-Type": "application/json",
+           "Authorization": "Bearer " + SUPABASE_KEY,
+         },
+         body: JSON.stringify({
+           project_id: PROJECT_ID,
+           collection: "employees",
+           action: "list",
+         }),
+       });
+       const json = await res.json();
+       return json.data || [];
+     }
      \`\`\`
    - Show loading skeleton while fetching, empty state with CTA when data is empty.
 
 8. **DATA HOOKS MUST BE SHORT (CRITICAL — prevents truncation)**:
-    Data hooks in /hooks/data/ MUST follow this EXACT compact template (UNDER 40 lines):
-    \`\`\`ts
+    Data hooks in /hooks/data/ MUST follow this EXACT compact template (UNDER 40 lines) and MUST import config from \`/lib/config.ts\`:
+    \`\`\ts
     import { useState, useEffect } from "react";
+    import { PROJECT_ID, SUPABASE_URL, SUPABASE_KEY } from "../../lib/config"; // adjust if path differs
+
     export default function useXxx() {
       const [data, setData] = useState<any[]>([]);
       const [loading, setLoading] = useState(true);
       const [error, setError] = useState<Error | null>(null);
+
       useEffect(() => {
         async function load() {
           try {
             setLoading(true);
-            const projectId = (window as any).__PROJECT_ID__;
-            const apiBase = (window as any).__SUPABASE_URL__;
-            const apiKey = (window as any).__SUPABASE_KEY__;
-            const url = apiBase + "/functions/v1/project-api";
+            const url = SUPABASE_URL + "/functions/v1/project-api";
             const res = await fetch(url, {
               method: "POST",
-              headers: { "Content-Type": "application/json", "Authorization": "Bearer " + apiKey },
-              body: JSON.stringify({ project_id: projectId, collection: "xxx", action: "list" }),
+              headers: {
+                "Content-Type": "application/json",
+                "Authorization": "Bearer " + SUPABASE_KEY,
+              },
+              body: JSON.stringify({
+                project_id: PROJECT_ID,
+                collection: "xxx",
+                action: "list",
+              }),
             });
             const json = await res.json();
             setData(json.data || []);
-          } catch (err) { setError(err as Error); }
-          finally { setLoading(false); }
+          } catch (err) {
+            setError(err as Error);
+          } finally {
+            setLoading(false);
+          }
         }
         load();
       }, []);
+
       return { data, loading, error };
     }
     \`\`\`
@@ -179,6 +229,8 @@ ${workspaceContext ? `### Current code (scoped):\n${workspaceContext}` : ""}
 
 10. **File layout**:
     - /lib/utils.ts — cn() class-merge utility. NEVER put utils in /components/ui/ or /utils/.
+    - /lib/config.ts — PROJECT_ID, SUPABASE_URL, SUPABASE_KEY. ONLY this file may read globals/env.
+    - /lib/supabase.ts — single Supabase client instance, imported by auth and related logic.
     - /components/ui/ — pre-scaffolded shadcn-compatible UI components (NAMED exports, do not modify).
     - /components/ — reusable DOMAIN components (StatCard, StatusBadge, PageHeader, etc.). DEFAULT exports.
     - /contexts/ — React contexts (AuthContext, etc.).
@@ -287,6 +339,44 @@ function buildWorkspaceContext(
   return result;
 }
 
+// ─── Runtime Contract Verifier ────────────────────────────────────────────
+
+function verifyRuntimeContracts(files: Record<string, string>): { ok: boolean; errors: string[] } {
+  const errors: string[] = [];
+  const forbiddenWindowPatterns = ["window.__PROJECT_ID__", "window.__SUPABASE_URL__", "window.__SUPABASE_KEY__"];
+  const forbiddenImportAlias = "@/";
+  const forbiddenSupabaseDirect = "supabase.from(";
+
+  for (const [path, code] of Object.entries(files)) {
+    // Skip config and supabase modules themselves; they are allowed to read env/globals.
+    const isConfig = path === "/lib/config.ts" || path.endsWith("/lib/config.ts");
+    const isSupabase = path === "/lib/supabase.ts" || path.endsWith("/lib/supabase.ts");
+
+    if (!isConfig && !isSupabase) {
+      for (const pattern of forbiddenWindowPatterns) {
+        if (code.includes(pattern)) {
+          errors.push(
+            `File ${path} illegally reads preview/global value via '${pattern}'. Use /lib/config.ts instead.`,
+          );
+          break;
+        }
+      }
+    }
+
+    if (code.includes(forbiddenImportAlias)) {
+      errors.push(`File ${path} uses '@/'. All imports must be relative paths only.`);
+    }
+
+    if (!isSupabase && code.includes(forbiddenSupabaseDirect)) {
+      errors.push(
+        `File ${path} calls supabase.from() directly. All data access must go through project-api via fetch().`,
+      );
+    }
+  }
+
+  return { ok: errors.length === 0, errors };
+}
+
 // ─── Task Execution ───────────────────────────────────────────────────────
 
 export interface ExecutionCallbacks {
@@ -301,6 +391,7 @@ export interface ExecutionCallbacks {
  * Execute a single task: build prompt, call model, parse output, return files.
  * Includes:
  *  - Truncation detection with auto-retry (up to 3 continuations)
+ *  - Runtime contract verification (Sandpack-only, preview-agnostic app code)
  *  - Pre-commit syntax validation (Babel parse gate)
  *  - Per-file retry for files that fail to parse
  */
@@ -415,9 +506,23 @@ export async function executeTask(
 
       const finalTruncation = detectTruncation(responseText, extracted);
       if (finalTruncation.isTruncated && finalTruncation.truncatedFile && extracted[finalTruncation.truncatedFile]) {
-        console.warn(`[Executor] Dropping unsafe truncated file '${finalTruncation.truncatedFile}' to avoid syntax crash`);
+        console.warn(
+          `[Executor] Dropping unsafe truncated file '${finalTruncation.truncatedFile}' to avoid syntax crash`,
+        );
         delete extracted[finalTruncation.truncatedFile];
       }
+    }
+
+    // ── Runtime contract verification (Sandpack-only, preview-agnostic app code) ─
+    const runtimeCheck = verifyRuntimeContracts(extracted);
+    if (!runtimeCheck.ok) {
+      console.warn(
+        `[Executor] Runtime contract violations in task '${task.label}':\n` +
+          runtimeCheck.errors.map((e) => ` - ${e}`).join("\n"),
+      );
+      throw new Error(
+        `Runtime contract violation in task '${task.label}'. Generated files violate Sandpack-only, preview-agnostic runtime rules.`,
+      );
     }
 
     // ── Pre-commit syntax validation (Babel parse gate) ───────────────
@@ -443,15 +548,15 @@ export async function executeTask(
             const retryResult = await runStream([
               {
                 role: "system",
-                content: "You are a syntax repair agent. Fix the syntax error in the provided file. Output ONLY the corrected file with a file header (--- /path/to/file.tsx).",
+                content:
+                  "You are a syntax repair agent. Fix the syntax error in the provided file. Output ONLY the corrected file with a file header (--- /path/to/file.tsx).",
               },
               { role: "user", content: retryPrompt },
             ]);
 
             if (retryResult.files) {
               // Find the matching file in retry output
-              const retryCode = retryResult.files[parseErr.path]
-                || Object.values(retryResult.files)[0]; // Fallback to first file
+              const retryCode = retryResult.files[parseErr.path] || Object.values(retryResult.files)[0]; // Fallback to first file
 
               if (retryCode) {
                 const revalidation = validateAllFiles({ [parseErr.path]: retryCode });
@@ -461,7 +566,9 @@ export async function executeTask(
                   console.log(`[Executor] ✅ Per-file retry fixed ${parseErr.path} (attempt ${retryAttempt + 1})`);
                   break;
                 } else {
-                  console.warn(`[Executor] ⚠️ Per-file retry ${retryAttempt + 1} for ${parseErr.path} still has errors`);
+                  console.warn(
+                    `[Executor] ⚠️ Per-file retry ${retryAttempt + 1} for ${parseErr.path} still has errors`,
+                  );
                 }
               }
             }
@@ -541,7 +648,7 @@ function sanitizeFilePath(rawPath: string): string {
         .replace(/[^a-zA-Z0-9]+/g, " ")
         .split(" ")
         .filter(Boolean)
-        .map(w => w.charAt(0).toUpperCase() + w.slice(1))
+        .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
         .join("");
       return pascal + ext;
     }
@@ -557,7 +664,10 @@ function extractFilesFromOutput(text: string): Record<string, string> | null {
   const headerRegex = /^-{3}\s+(.+?)\s*$/;
 
   const parseHeader = (header: string): { type: "deps" | "file"; path?: string } | null => {
-    const cleaned = header.replace(/\s*-{0,3}\s*$/, "").replace(/\s*\(truncated\)\s*$/i, "").trim();
+    const cleaned = header
+      .replace(/\s*-{0,3}\s*$/, "")
+      .replace(/\s*\(truncated\)\s*$/i, "")
+      .trim();
 
     if (/^\/?dependencies\b/i.test(cleaned)) {
       return { type: "deps" };
