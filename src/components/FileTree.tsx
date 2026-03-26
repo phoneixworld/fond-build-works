@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { forwardRef, useState } from "react";
 import {
   ChevronRight,
   ChevronDown,
@@ -13,33 +13,40 @@ import {
 import { useVirtualFS, FileNode } from "@/contexts/VirtualFSContext";
 
 const getFileIcon = (name: string) => {
-  if (name.endsWith(".tsx") || name.endsWith(".ts")) return <FileCode className="w-3.5 h-3.5 text-[hsl(var(--ide-chat-user))]" />;
-  if (name.endsWith(".jsx") || name.endsWith(".js")) return <FileCode className="w-3.5 h-3.5 text-[hsl(var(--ide-warning))]" />;
+  if (name.endsWith(".tsx") || name.endsWith(".ts"))
+    return <FileCode className="w-3.5 h-3.5 text-[hsl(var(--ide-chat-user))]" />;
+  if (name.endsWith(".jsx") || name.endsWith(".js"))
+    return <FileCode className="w-3.5 h-3.5 text-[hsl(var(--ide-warning))]" />;
   if (name.endsWith(".json")) return <FileJson className="w-3.5 h-3.5 text-[hsl(var(--ide-warning))]" />;
   if (name.endsWith(".css")) return <FileCode className="w-3.5 h-3.5 text-accent" />;
   if (name.endsWith(".html")) return <FileType className="w-3.5 h-3.5 text-[hsl(var(--ide-chat-user))]" />;
   if (name.endsWith(".md")) return <FileText className="w-3.5 h-3.5 text-muted-foreground" />;
-  if (name.endsWith(".svg") || name.endsWith(".png") || name.endsWith(".jpg")) return <Image className="w-3.5 h-3.5 text-[hsl(var(--ide-success))]" />;
+  if (name.endsWith(".svg") || name.endsWith(".png") || name.endsWith(".jpg"))
+    return <Image className="w-3.5 h-3.5 text-[hsl(var(--ide-success))]" />;
   return <FileText className="w-3.5 h-3.5 text-muted-foreground" />;
 };
 
-const TreeItem = ({
-  node,
-  depth,
-  activePath,
-  onSelect,
-}: {
-  node: FileNode;
-  depth: number;
-  activePath: string;
-  onSelect: (path: string) => void;
-}) => {
+/**
+ * TreeItem now supports forwarded refs so parent components
+ * (e.g., virtualized lists, focus managers, Radix wrappers)
+ * can safely attach refs without React warnings.
+ */
+const TreeItem = forwardRef<
+  HTMLButtonElement,
+  {
+    node: FileNode;
+    depth: number;
+    activePath: string;
+    onSelect: (path: string) => void;
+  }
+>(({ node, depth, activePath, onSelect }, ref) => {
   const [open, setOpen] = useState(depth < 2);
 
   if (node.type === "folder") {
     return (
       <div>
         <button
+          ref={ref}
           onClick={() => setOpen(!open)}
           className="flex items-center gap-1 w-full py-[3px] text-[12px] text-muted-foreground hover:text-foreground hover:bg-secondary/60 rounded-sm transition-colors"
           style={{ paddingLeft: `${depth * 12 + 8}px` }}
@@ -52,19 +59,25 @@ const TreeItem = ({
           )}
           <span className="ml-0.5 truncate">{node.name}</span>
         </button>
-        {open && node.children?.map((child) => (
-          <TreeItem key={child.path} node={child} depth={depth + 1} activePath={activePath} onSelect={onSelect} />
-        ))}
+
+        {open &&
+          node.children?.map((child) => (
+            <TreeItem key={child.path} node={child} depth={depth + 1} activePath={activePath} onSelect={onSelect} />
+          ))}
       </div>
     );
   }
 
   const isSelected = activePath === node.path;
+
   return (
     <button
+      ref={ref}
       onClick={() => onSelect(node.path)}
       className={`flex items-center gap-1 w-full py-[3px] text-[12px] rounded-sm transition-colors ${
-        isSelected ? "bg-primary/15 text-foreground font-medium" : "text-muted-foreground hover:text-foreground hover:bg-secondary/60"
+        isSelected
+          ? "bg-primary/15 text-foreground font-medium"
+          : "text-muted-foreground hover:text-foreground hover:bg-secondary/60"
       }`}
       style={{ paddingLeft: `${depth * 12 + 8}px` }}
     >
@@ -72,17 +85,20 @@ const TreeItem = ({
       <span className="ml-0.5 truncate">{node.name}</span>
     </button>
   );
-};
+});
+TreeItem.displayName = "TreeItem";
 
+/**
+ * FileTree itself does not need ref forwarding,
+ * but TreeItem does — and now supports it.
+ */
 const FileTree = () => {
   const { fileTree, activeFile, setActiveFile } = useVirtualFS();
 
   if (fileTree.length === 0) {
     return (
       <div className="h-full bg-[hsl(var(--ide-panel))] flex items-center justify-center p-4">
-        <p className="text-xs text-muted-foreground text-center">
-          Build something to see the file tree
-        </p>
+        <p className="text-xs text-muted-foreground text-center">Build something to see the file tree</p>
       </div>
     );
   }
@@ -92,6 +108,7 @@ const FileTree = () => {
       <div className="px-3 py-1 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-0.5">
         Explorer
       </div>
+
       {fileTree.map((node) => (
         <TreeItem key={node.path} node={node} depth={0} activePath={activeFile} onSelect={setActiveFile} />
       ))}
