@@ -423,7 +423,7 @@ function generateAppEntry(ir: IR): string {
     const componentName = page.name.replace(/\s+/g, "");
     const pagePath = `/pages/${componentName}`;
     imports.push(`import ${componentName} from ".${pagePath}";`);
-    routes.push(`      <Route path="${page.route || `/${componentName.toLowerCase()}`}" element={<${componentName} />} />`);
+    routes.push(`      <Route path="${page.path || `/${componentName.toLowerCase()}`}" element={<${componentName} />} />`);
   }
 
   return `import React from "react";
@@ -446,11 +446,10 @@ ${routes.join("\n")}
 function generateCRUDPage(filePath: string, ir: IR): string {
   const pageName = filePath.match(/\/pages\/(\w+)Page/)?.[1] || "Item";
   const entity = ir.entities[pageName.toLowerCase()] || Object.values(ir.entities)[0];
-  const fields = entity?.fields || [
-    { name: "name", type: "string", required: true },
-    { name: "description", type: "string" },
-    { name: "status", type: "string" },
-  ];
+  const rawFields = entity?.fields;
+  const fields = rawFields
+    ? Object.entries(rawFields).map(([name, def]) => ({ name, ...def }))
+    : [{ name: "name", type: "string" as const, required: true }, { name: "description", type: "string" as const }, { name: "status", type: "string" as const }];
 
   const fieldList = fields.map(f => `"${f.name}"`).join(", ");
 
@@ -526,7 +525,7 @@ export default function ${pageName}Page() {
 }
 
 function generateDashboardPage(ir: IR): string {
-  const entityNames = Object.keys(ir.entities).slice(0, 4);
+  const entityNames = Object.keys(ir.entities || {}).slice(0, 4);
   const statCards = entityNames.map(
     (name, i) =>
       `        <div key="${name}" className="p-6 bg-card border rounded-xl">
@@ -575,7 +574,7 @@ ${statCards.join("\n") || '        <div className="p-6 bg-card border rounded-xl
 function generateEntityContext(filePath: string, ir: IR): string {
   const entityName = filePath.match(/\/contexts\/(\w+)Context/)?.[1] || "Entity";
   const entity = ir.entities[entityName.toLowerCase()];
-  const fields = entity?.fields || [{ name: "name", type: "string" }];
+  const fieldNames = entity?.fields ? Object.keys(entity.fields) : ["name"];
 
   return `import React, { createContext, useContext, useState, useCallback } from "react";
 
@@ -679,7 +678,7 @@ function generateLayoutComponent(filePath: string, ir: IR): string {
   if (name === "Sidebar" || name === "Navigation") {
     const navItems = ir.pages
       .slice(0, 8)
-      .map(p => `    { label: "${p.name}", path: "${p.route || `/${p.name.toLowerCase().replace(/\s+/g, "-")}`}" },`)
+      .map(p => `    { label: "${p.name}", path: "${p.path || `/${p.name.toLowerCase().replace(/\s+/g, "-")}`}" },`)
       .join("\n");
 
     return `import React from "react";
@@ -727,13 +726,12 @@ export default function ${name}({ children }) {
 function generateEntityForm(filePath: string, ir: IR): string {
   const entityName = filePath.match(/\/forms\/(\w+)Form/)?.[1] || "Entity";
   const entity = ir.entities[entityName.toLowerCase()];
-  const fields = entity?.fields || [
-    { name: "name", type: "string", required: true },
-    { name: "description", type: "string" },
-  ];
+  const fields = entity?.fields
+    ? Object.entries(entity.fields).map(([name, def]) => ({ name, type: def.type, required: def.required }))
+    : [{ name: "name", type: "string" as const, required: true }, { name: "description", type: "string" as const }];
 
   const fieldInputs = fields.map(f => {
-    const inputType = f.type === "number" ? "number" : f.type === "email" ? "email" : "text";
+    const inputType = f.type === "number" ? "number" : "text";
     return `      <div>
         <label className="block text-sm font-medium text-muted-foreground mb-1">${f.name}</label>
         <input
@@ -789,13 +787,12 @@ ${fieldInputs.join("\n")}
 function generateEntityTable(filePath: string, ir: IR): string {
   const entityName = filePath.match(/\/tables\/(\w+)Table/)?.[1] || "Entity";
   const entity = ir.entities[entityName.toLowerCase()];
-  const fields = entity?.fields || [
-    { name: "name", type: "string" },
-    { name: "status", type: "string" },
-  ];
+  const fieldNames = entity?.fields
+    ? Object.keys(entity.fields)
+    : ["name", "status"];
 
-  const headers = fields.map(f => `          <th className="px-4 py-3 text-left text-sm font-medium text-muted-foreground capitalize">${f.name}</th>`).join("\n");
-  const cells = fields.map(f => `            <td className="px-4 py-3 text-sm">{row.${f.name}}</td>`).join("\n");
+  const headers = fieldNames.map(f => `          <th className="px-4 py-3 text-left text-sm font-medium text-muted-foreground capitalize">${f}</th>`).join("\n");
+  const cells = fieldNames.map(f => `            <td className="px-4 py-3 text-sm">{row.${f}}</td>`).join("\n");
 
   return `import React from "react";
 
@@ -1006,7 +1003,7 @@ function deriveFileManifest(ir: IR): string[] {
   }
 
   // Entity contexts and hooks
-  for (const entityName of Object.keys(ir.entities)) {
+  for (const entityName of Object.keys(ir.entities || {})) {
     const capitalized = entityName.charAt(0).toUpperCase() + entityName.slice(1);
     files.push(`/contexts/${capitalized}Context.jsx`);
     files.push(`/hooks/use${capitalized}.js`);
@@ -1019,8 +1016,8 @@ function deriveFileManifest(ir: IR): string[] {
     files.push("/components/Sidebar.jsx");
   }
 
-  // Auth (if any route requires it)
-  if (ir.pages.some(p => p.auth)) {
+  // Auth (if any page has allowedRoles)
+  if (ir.pages.some(p => p.allowedRoles && p.allowedRoles.length > 0)) {
     files.push("/contexts/AuthContext.jsx");
     files.push("/components/ProtectedRoute.jsx");
     files.push("/pages/LoginPage.jsx");
