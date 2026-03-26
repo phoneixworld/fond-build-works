@@ -33,7 +33,7 @@ import { ANIMATION_CSS } from "@/lib/compiler/animations";
 export function getBaseTemplate(domainModel?: DomainModel | null): Record<string, string> {
   const scaffold = domainModel ? buildDomainScaffold(domainModel) : getGenericScaffold();
   
-  // Add project config files (package.json, vite.config.ts, tsconfig.json)
+  // Add project config files (package.json only — Sandpack runtime, no Vite config)
   Object.assign(scaffold, getProjectConfigFiles(domainModel));
   
   return scaffold;
