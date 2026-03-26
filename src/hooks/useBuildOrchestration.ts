@@ -599,6 +599,27 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
     currentProject,
   } as InstantBuildConfig);
 
+  /** Extract the original user intent from an internal requirement envelope */
+  const extractUserIntentFromPrompt = (prompt: string): string => {
+    // Try to extract the BUILD TRIGGER section (contains original user text)
+    const triggerMatch = prompt.match(/## BUILD TRIGGER\n(.+?)$/ms);
+    if (triggerMatch) return triggerMatch[1].trim();
+    
+    // Try to extract content after APPLICATION REQUIREMENTS header
+    const reqMatch = prompt.match(/# APPLICATION REQUIREMENTS\n\n(.+?)(?:\n\nBuild (?:EXACTLY|a complete))/s);
+    if (reqMatch) return reqMatch[1].trim();
+    
+    // Fallback: strip the envelope markers and return first meaningful line
+    const lines = prompt.split("\n").filter(l => 
+      l.trim() && 
+      !l.startsWith("#") && 
+      !l.startsWith("Build EXACTLY") && 
+      !l.startsWith("Build a complete") &&
+      !l.startsWith("Do NOT add")
+    );
+    return lines[0]?.trim() || "Building application...";
+  };
+
   const sendMessage = useCallback(
     async (text: string, images: string[] = [], displayText?: string) => {
       if (!text || !currentProject) return;
