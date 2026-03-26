@@ -870,7 +870,7 @@ function checkAliasImports(workspace: Workspace): { issues: VerificationIssue[] 
       for (const m of matches) {
         issues.push({
           category: "broken_import" as IssueCategory,
-          severity: "warning",
+          severity: "error",
           file: filePath,
           message: `@/ alias import not supported in Sandpack runtime: ${m.slice(0, 60)}`,
           suggestedFix: "Rewrite to relative path",
