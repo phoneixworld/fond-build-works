@@ -52,13 +52,13 @@ function scaffoldListPage(page: IRPage, ir: IR): string {
 
   return `
 import React from "react";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Card } from "@/components/ui/card";
-import { DataTable } from "@/components/domain/DataTable";
-import { PageHeader } from "@/components/domain/PageHeader";
-import { SearchFilterBar } from "@/components/domain/SearchFilterBar";
-import { ${hookName} } from "@/contexts/${entity}Context";
+import { Button } from "../components/ui/Button";
+import { Input } from "../components/ui/Input";
+import { Card } from "../components/ui/Card";
+import DataTable from "../components/ui/DataTable";
+import PageHeader from "../components/PageHeader";
+import SearchFilterBar from "../components/SearchFilterBar";
+import { ${hookName} } from "../contexts/${entity}Context";
 
 export default function ${page.name}({ data, isHydrated }) {
   const { items: contextItems, loading, createItem } = ${hookName}();

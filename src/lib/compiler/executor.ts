@@ -89,25 +89,53 @@ ${existingFiles.length > 0 ? existingFiles.map((f) => `- ${f}`).join("\n") : "(e
 ${workspaceContext ? `### Current code (scoped):\n${workspaceContext}` : ""}
 
 ### RULES:
-1. Generate ONLY the files listed above (in produces/touches).
+
+## ══════════════════════════════════════════════════════════════════
+## ABSOLUTE BANS (violating ANY of these = build rejection)
+## ══════════════════════════════════════════════════════════════════
+- **BAN-1**: NEVER generate inline sample/mock data arrays (e.g. \`const SAMPLE_DATA = [...]\`). ALL data comes from API fetch.
+- **BAN-2**: NEVER use \`@/\` import aliases. Use RELATIVE paths only (e.g. \`../../lib/utils\`).
+- **BAN-3**: NEVER use \`supabase.from()\` directly. ALL data goes through \`project-api\` via fetch().
+- **BAN-4**: NEVER import from \`@radix-ui/*\`, \`class-variance-authority\`, or \`tailwind-variants\`.
+- **BAN-5**: NEVER generate \`.jsx\` or \`.js\` files. ALL source files must be \`.tsx\` or \`.ts\`.
+- **BAN-6**: NEVER write to \`/components/ui/**\` — those are pre-scaffolded UI primitives.
+- **BAN-7**: NEVER add \`export { X }\` alongside \`export default X\` for the same symbol.
+- **BAN-8**: NEVER leave placeholders, TODOs, or stubs. Output COMPLETE working code.
+- **BAN-9**: NEVER call \`useNavigate()\` inside AuthContext. AuthContext must be router-agnostic.
+
+## ══════════════════════════════════════════════════════════════════
+## CRITICAL RULES (output quality)
+## ══════════════════════════════════════════════════════════════════
+
+1. Generate ONLY the files listed in produces/touches.
 2. If a file already exists, MODIFY it in-place — preserve existing imports, exports, and structure.
 3. Import from existing workspace files — do NOT recreate them.
-4. NEVER write to /components/ui/** — those are pre-scaffolded UI primitives.
-5. **CRITICAL FILE STRUCTURE**:
-   - **MANDATORY: ALL source files must use .tsx (for components/JSX) or .ts (for pure logic/hooks). NEVER generate .jsx or .js files.**
-   - /lib/utils.ts — cn() class-merge utility (uses clsx + twMerge). NEVER put utils inside /components/ui/ or /utils/.
-   - /components/ui/ — pre-scaffolded shadcn-compatible UI components (do not modify). These use NAMED exports (e.g. import { Card, CardHeader } from "./ui/Card").
-     **UI COMPONENTS MUST BE PURE React + Tailwind CSS. NO Radix UI imports, NO class-variance-authority, NO tailwind-variants, NO external dependencies beyond React and lucide-react.**
-    - /components/ — reusable DOMAIN components (StatCard, StatusBadge, PageHeader, SearchFilterBar, ActivityFeed, QuickActions, NotificationBell, ChartCard, FormModal). These use DEFAULT exports.
-    - /contexts/ — React contexts (AuthContext, etc.).
-    - /pages/ModuleName/ — page components in named directories (e.g. /pages/Dashboard/DashboardPage.tsx). These use DEFAULT exports.
-    - /hooks/ — custom hooks (.ts files). Subfolder /hooks/data/ for data-fetching hooks.
-    - /services/ — API services (.ts files).
-    - /styles/ — CSS files.
-    - /layout/ — layout wrappers (AppLayout.tsx, Sidebar.tsx). These use DEFAULT exports.
-    When importing, always use correct relative paths from the file's location.
-25. **DATA HOOKS MUST BE SHORT (CRITICAL — prevents truncation)**:
-    Data hooks in /hooks/data/ MUST follow this EXACT compact template. Do NOT add verbose types, schemas, transforms, or mock data:
+
+4. **EXPORT RULES**:
+   - /components/ui/ files: NAMED exports (export function Button, export function Card, etc.)
+   - ALL other files (pages, domain components, layout, hooks): DEFAULT export only.
+
+5. **COMPLETE FILES ONLY**: Every file MUST import ALL identifiers it uses. Every function called MUST be defined, imported, or destructured from a hook/context. useEffect dependencies MUST be complete.
+
+6. **NAV-ROUTE CONSISTENCY**: Every navigation link in Sidebar MUST have a matching <Route> in App. Every <Route> in App MUST have a matching nav link. Mismatches = blank pages.
+
+7. **DATA ACCESS (CRITICAL — Sandpack runtime uses window globals)**:
+   - Runtime target: Sandpack in-browser bundler. Globals are injected via _bootstrap.js.
+   - Use the project Data API for ALL CRUD operations:
+     \`\`\`
+     const projectId = window.__PROJECT_ID__;
+     const apiBase = window.__SUPABASE_URL__;
+     const apiKey = window.__SUPABASE_KEY__;
+     fetch(apiBase + "/functions/v1/project-api", {
+       method: "POST",
+       headers: { "Content-Type": "application/json", "Authorization": "Bearer " + apiKey },
+       body: JSON.stringify({ project_id: projectId, collection: "employees", action: "list" })
+     }).then(r => r.json()).then(d => setData(d.data || []));
+     \`\`\`
+   - Show loading skeleton while fetching, empty state with CTA when data is empty.
+
+8. **DATA HOOKS MUST BE SHORT (CRITICAL — prevents truncation)**:
+    Data hooks in /hooks/data/ MUST follow this EXACT compact template (UNDER 40 lines):
     \`\`\`ts
     import { useState, useEffect } from "react";
     export default function useXxx() {
@@ -137,58 +165,48 @@ ${workspaceContext ? `### Current code (scoped):\n${workspaceContext}` : ""}
       return { data, loading, error };
     }
     \`\`\`
-    Keep each data hook UNDER 40 lines. NEVER generate verbose hooks that risk truncation.
-   Import cn from "../lib/utils" (adjust relative path based on file depth). NEVER import from "./ui/utils", "./utils", or "../utils/cn".
-6. **COMPONENT DECOMPOSITION (CRITICAL)**: Pages must NOT be monolithic. Every page MUST import and use components from /components/ui/:
-   - Use Table + TableHeader/TableBody/TableRow/TableHead/TableCell for data lists (NOT raw <table> tags).
-   - Use Tabs + TabsList/TabsTrigger/TabsContent for multi-section views.
-   - Use Dialog for modals, Sheet for slide-out panels, Select for dropdowns.
-   - Use Card + CardHeader/CardContent for sections, Badge for statuses, Avatar for users.
-   - Use Button for all actions, Input/Label/Textarea for forms, Checkbox/Switch for toggles.
-   - Use Progress for progress bars, Skeleton for loading states, Separator for dividers.
-   - If a domain component doesn't exist yet, create it in /components/ using /components/ui/ primitives.
-7. **DATA ACCESS (CRITICAL — MUST MATCH BUILD-AGENT PATTERN)**:
-   - Use the project Data API for ALL CRUD operations via fetch():
-     \`\`\`
-     const projectId = window.__PROJECT_ID__;
-     const apiBase = window.__SUPABASE_URL__;
-     const apiKey = window.__SUPABASE_KEY__;
-     fetch(\`\${apiBase}/functions/v1/project-api\`, {
-       method: "POST",
-       headers: { "Content-Type": "application/json", "Authorization": \`Bearer \${apiKey}\` },
-       body: JSON.stringify({ project_id: projectId, collection: "employees", action: "list" })
-     }).then(r => r.json()).then(d => setData(d.data || []));
-     \`\`\`
-   - NEVER use supabase.from() directly — always go through project-api.
-   - NEVER use inline sample/mock data arrays as the primary data source.
-   - Show loading skeleton while fetching, empty state with CTA when data is empty.
-8. **BACKEND ARTIFACTS (CRITICAL — REQUIRED FOR DATA FEATURES)**:
+
+9. **BACKEND ARTIFACTS (REQUIRED FOR DATA FEATURES)**:
    - When the task involves schema/database/backend, you MUST generate:
      - /migrations/001_schema.sql — CREATE TABLE statements
      - /migrations/002_rls.sql — RLS policies for each table
      - /schema.json — JSON schema describing entities
    - Without these files, the build will be REJECTED.
-9. For auth, use the AuthContext pattern with project-auth API. AuthContext must NOT import or call useNavigate().
-10. **EXPORT RULES**:
-    - /components/ui/ files: use NAMED exports (export function Button, export function Card, etc.)
-    - ALL other files (pages, domain components, layout, hooks): use DEFAULT export only.
-    - NEVER add \`export { X }\` alongside \`export default X\` for the same symbol.
-11. Output complete, working code — no placeholders, no TODOs, no stubs.
-12. Every file MUST import ALL identifiers it uses.
-13. Every function called in a component MUST be defined in that component, imported, or destructured from a hook/context.
-14. When using useEffect, ensure ALL dependencies referenced inside the effect are either defined above or listed in the dependency array.
 
-### DESIGN QUALITY RULES (CRITICAL — make it beautiful):
-15. **Typography Hierarchy**: Use a consistent scale — page titles: text-2xl font-bold, section titles: text-lg font-semibold, body: text-sm, meta/labels: text-xs font-medium uppercase tracking-wider text-[var(--color-text-muted)].
-16. **Spacing Rhythm**: Use consistent spacing: var(--space-2) for tight gaps, var(--space-4) for standard padding, var(--space-6) for card padding, var(--space-8) for section gaps, var(--space-12) for page sections. NEVER mix arbitrary spacing values.
-17. **Color Usage**: Primary for CTAs and active states. Success/Warning/Danger for status ONLY. Muted text for secondary information. NEVER use more than 3 colors prominently on one page.
-18. **Interactive States**: EVERY clickable element MUST have hover, focus, and disabled states. Buttons: hover:translateY(-1px) + shadow. Cards: hover:shadow-lg + translateY(-2px). Links: underline on hover.
-19. **Loading & Empty States**: Data-fetching components MUST show skeleton shimmer while loading. Empty data MUST show the "empty-state" pattern with icon + title + description + CTA button. NEVER show a blank area.
-20. **Visual Hierarchy**: Each page needs ONE clear focal point (hero stat, primary CTA, or key data). Use size, weight, and color contrast to create a clear reading flow: primary action → data → secondary actions.
-21. **Responsive Design**: All layouts MUST work at mobile (375px), tablet (768px), and desktop (1280px). Use grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 for card grids.
-22. **Micro-Interactions**: Add "animate-fade-in" to page containers, "stagger" class to list/grid parents, hover scale on cards. Use transition-all duration-200 on interactive elements.
-23. **Component Polish**: Tables MUST have header styling (uppercase, muted, smaller font) + row hover + status badges. Forms MUST have labels, placeholders, validation feedback, and proper spacing between fields.
-24. **Page Structure**: Every page MUST follow: PageHeader (title + description + primary action) → content area with proper sections. Dashboard pages MUST lead with stat cards in a responsive grid.
+## ══════════════════════════════════════════════════════════════════
+## FILE STRUCTURE
+## ══════════════════════════════════════════════════════════════════
+
+10. **File layout**:
+    - /lib/utils.ts — cn() class-merge utility. NEVER put utils in /components/ui/ or /utils/.
+    - /components/ui/ — pre-scaffolded shadcn-compatible UI components (NAMED exports, do not modify).
+    - /components/ — reusable DOMAIN components (StatCard, StatusBadge, PageHeader, etc.). DEFAULT exports.
+    - /contexts/ — React contexts (AuthContext, etc.).
+    - /pages/ModuleName/ — page components in named directories. DEFAULT exports.
+    - /hooks/ — custom hooks (.ts files). /hooks/data/ for data-fetching hooks.
+    - /layout/ — layout wrappers (AppLayout.tsx, Sidebar.tsx). DEFAULT exports.
+    Import cn from "../lib/utils" (adjust relative path based on file depth).
+
+11. **COMPONENT DECOMPOSITION**: Pages must NOT be monolithic. Every page MUST import and use components from /components/ui/:
+    - Table + TableHeader/TableBody/TableRow/TableHead/TableCell for data lists
+    - Tabs + TabsList/TabsTrigger/TabsContent for multi-section views
+    - Dialog for modals, Sheet for slide-out panels, Select for dropdowns
+    - Card + CardHeader/CardContent for sections, Badge for statuses, Avatar for users
+    - Button for all actions, Input/Label/Textarea for forms
+    - Skeleton for loading states, Separator for dividers
+
+## ══════════════════════════════════════════════════════════════════
+## DESIGN QUALITY (appendix — follow these for visual polish)
+## ══════════════════════════════════════════════════════════════════
+
+12. **Typography**: Page titles: text-2xl font-bold. Sections: text-lg font-semibold. Body: text-sm. Labels: text-xs font-medium uppercase tracking-wider text-[var(--color-text-muted)].
+13. **Spacing**: var(--space-2) tight, var(--space-4) standard, var(--space-6) card padding, var(--space-8) section gaps.
+14. **Color**: Primary for CTAs. Success/Warning/Danger for status ONLY. Max 3 prominent colors per page.
+15. **Interactive States**: EVERY clickable element needs hover, focus, disabled states.
+16. **Loading & Empty**: Skeleton shimmer while loading. Empty state with icon + title + CTA.
+17. **Responsive**: grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 for card grids.
+18. **Micro-Interactions**: animate-fade-in on page containers, hover scale on cards, transition-all duration-200.
+19. **Page Structure**: PageHeader → content. Dashboards lead with stat cards grid.
 `;
 }
 
