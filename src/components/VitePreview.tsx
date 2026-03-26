@@ -100,7 +100,7 @@ const VitePreview = ({ viewport, initialPath, onFallback }: VitePreviewProps) =>
     if (engineState.status === "fallback") {
       // Give UI a moment to show the fallback message, then switch
       const timer = setTimeout(() => {
-        setPreviewMode("sandpack");
+        setPreviewMode("webcontainer");
       }, 1500);
       return () => clearTimeout(timer);
     }
