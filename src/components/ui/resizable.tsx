@@ -28,15 +28,15 @@ const ResizablePanel = ResizablePrimitive.Panel;
 /**
  * Resize handle wrapper with proper ref forwarding.
  */
-const ResizableHandle = forwardRef<
-  React.ElementRef<typeof ResizablePrimitive.PanelResizeHandle>,
-  React.ComponentPropsWithoutRef<typeof ResizablePrimitive.PanelResizeHandle> & {
-    withHandle?: boolean;
-  }
->(({ withHandle, className, ...props }, ref) => {
+const ResizableHandle = ({
+  withHandle,
+  className,
+  ...props
+}: React.ComponentPropsWithoutRef<typeof ResizablePrimitive.PanelResizeHandle> & {
+  withHandle?: boolean;
+}) => {
   return (
     <ResizablePrimitive.PanelResizeHandle
-      ref={ref}
       className={cn(
         "relative flex w-1 items-center justify-center bg-transparent " +
           "after:absolute after:inset-y-0 after:left-1/2 after:w-1 after:-translate-x-1/2 " +
@@ -58,7 +58,6 @@ const ResizableHandle = forwardRef<
       )}
     </ResizablePrimitive.PanelResizeHandle>
   );
-});
-ResizableHandle.displayName = "ResizableHandle";
+};
 
 export { ResizablePanelGroup, ResizablePanel, ResizableHandle };
