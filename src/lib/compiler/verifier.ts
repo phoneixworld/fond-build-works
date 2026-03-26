@@ -320,6 +320,14 @@ function getProducedFileCandidates(expectedFile: string): string[] {
   return [...candidates];
 }
 
+/** Entry-point files managed by the preview layer — never flag as missing */
+const ENTRY_POINT_FILES = new Set([
+  "/index.js", "/index.ts", "/index.jsx", "/index.tsx",
+  "/main.js", "/main.ts", "/main.jsx", "/main.tsx",
+  "/src/index.js", "/src/index.ts", "/src/index.jsx", "/src/index.tsx",
+  "/src/main.js", "/src/main.ts", "/src/main.jsx", "/src/main.tsx",
+]);
+
 function checkProducedFiles(
   workspace: Workspace,
   taskGraph: TaskGraph
@@ -330,6 +338,9 @@ function checkProducedFiles(
     if (task.status === "skipped") continue;
 
     for (const expectedFile of task.produces) {
+      // Skip entry-point files — they're handled by the preview/Sandpack layer
+      if (ENTRY_POINT_FILES.has(expectedFile)) continue;
+
       const candidates = getProducedFileCandidates(expectedFile);
       const exists = candidates.some((candidate) => workspace.hasFile(candidate));
 
