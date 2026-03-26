@@ -600,7 +600,7 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
   } as InstantBuildConfig);
 
   const sendMessage = useCallback(
-    async (text: string, images: string[] = []) => {
+    async (text: string, images: string[] = [], displayText?: string) => {
       if (!text || !currentProject) return;
 
       const buildProjectId = currentProject.id;
@@ -622,7 +622,11 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
         setHealAttempts(0);
       }
 
-      const content = buildMessageContent(text, images);
+      // Phase 1: Separate display text from execution prompt
+      // Never persist internal requirement envelopes as user chat messages
+      const isInternalPrompt = text.includes("# APPLICATION REQUIREMENTS") || text.includes("## BUILD TRIGGER");
+      const safeDisplayText = displayText || (isInternalPrompt ? extractUserIntentFromPrompt(text) : text);
+      const content = buildMessageContent(safeDisplayText, images);
       const userMsg: Msg = { role: "user", content, timestamp: Date.now() };
       setInput("");
       setAttachedImages([]);
