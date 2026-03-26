@@ -953,6 +953,105 @@ export type Database = {
         }
         Relationships: []
       }
+      pd_284ad6f856a3_contact: {
+        Row: {
+          company: string | null
+          created_at: string
+          description: string | null
+          email: string
+          id: string
+          name: string
+          phone: string | null
+          project_id: string
+          status: string | null
+          updated_at: string
+        }
+        Insert: {
+          company?: string | null
+          created_at?: string
+          description?: string | null
+          email: string
+          id?: string
+          name: string
+          phone?: string | null
+          project_id?: string
+          status?: string | null
+          updated_at?: string
+        }
+        Update: {
+          company?: string | null
+          created_at?: string
+          description?: string | null
+          email?: string
+          id?: string
+          name?: string
+          phone?: string | null
+          project_id?: string
+          status?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      pd_284ad6f856a3_crm: {
+        Row: {
+          created_at: string
+          description: string | null
+          id: string
+          name: string
+          project_id: string
+          status: string | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          name: string
+          project_id?: string
+          status?: string | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          name?: string
+          project_id?: string
+          status?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      pd_284ad6f856a3_detail: {
+        Row: {
+          created_at: string
+          description: string | null
+          id: string
+          name: string
+          project_id: string
+          status: string | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          name: string
+          project_id?: string
+          status?: string | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          name?: string
+          project_id?: string
+          status?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       pd_314c420ea0f9_landing: {
         Row: {
           created_at: string
