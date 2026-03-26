@@ -126,7 +126,7 @@ export class RepairMetrics {
     }
 
     // Hot files (most errors)
-    const hotFiles = [...this.fileErrorCounts.entries()]
+    const hotFiles = Array.from(this.fileErrorCounts.entries())
       .sort((a, b) => b[1] - a[1])
       .slice(0, 10)
       .map(([file, errorCount]) => ({ file, errorCount }));
