@@ -58,6 +58,30 @@ function extractTextFromContent(content: any): string {
   if (Array.isArray(content)) {
     return content
       .filter((part: any) => part?.type === "text" && typeof part?.text === "string")
+
+/**
+ * Phase 5: Client-side truthfulness guard
+ * Strips false build/edit completion claims from chat agent responses.
+ * The chat agent should NEVER claim it edited/built/created files.
+ */
+const FALSE_COMPLETION_PATTERNS = [
+  /✅\s*(?:edited|built|created|generated|updated|modified|fixed)\s+\d+\s+files?/gi,
+  /(?:i've|i have|i just)\s+(?:edited|built|created|generated|updated|modified|fixed)\s+(?:the\s+)?(?:files?|code|components?|pages?)/gi,
+  /changes?\s+(?:complete|applied|done|saved|committed)/gi,
+  /here(?:'s| is) what (?:i|was) (?:built|created|changed|edited|generated)/gi,
+];
+
+function sanitizeChatTruthfulness(text: string): string {
+  let result = text;
+  for (const pattern of FALSE_COMPLETION_PATTERNS) {
+    result = result.replace(pattern, (match) => {
+      console.warn(`[ChatTruth] Stripped false completion claim: "${match}"`);
+      return "";
+    });
+  }
+  // Clean up resulting double newlines
+  return result.replace(/\n{3,}/g, "\n\n").trim();
+}
       .map((part: any) => part.text)
       .join(" ");
   }
