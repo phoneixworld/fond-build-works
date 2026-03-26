@@ -15,6 +15,8 @@ describe("School ERP integration", () => {
     const ui = getAllUIComponents();
     return new Workspace({
       ...ui,
+      // cn lives at /lib/utils.ts (the real project file)
+      "/lib/utils.ts": `import { clsx } from "clsx";\nimport { twMerge } from "tailwind-merge";\n\nexport function cn(...inputs) {\n  return twMerge(clsx(inputs));\n}\n`,
       "/contexts/AuthContext.jsx": `import React, { createContext, useContext, useState } from "react";
 const AuthContext = createContext(null);
 export function AuthProvider({ children }) {
@@ -117,7 +119,8 @@ export default function AttendancePage() { return <div>Attendance</div>; }`,
 
   it("utils.ts should always export cn as a function", () => {
     const ws = buildSchoolErpWorkspace();
-    const utils = ws.getFile("/components/ui/utils.ts") || ws.getFile("/components/ui/utils.js");
+    // cn now lives at /lib/utils.ts (not /components/ui/utils.ts)
+    const utils = ws.getFile("/lib/utils.ts") || ws.getFile("/utils/cn.ts") || ws.getFile("/components/ui/utils.ts") || ws.getFile("/components/ui/utils.js");
     expect(utils).toBeDefined();
     expect(utils).toContain("export function cn");
   });
@@ -150,10 +153,8 @@ export default function AttendancePage() { return <div>Attendance</div>; }`,
     expect(ui["/components/ui/Card.tsx"]).toContain("export function Card");
     expect(ui["/components/ui/Button.tsx"]).toContain("export default");
     expect(ui["/components/ui/Table.tsx"]).toContain("export function Table");
-    expect(ui["/components/ui/utils.ts"]).toContain("export function cn");
 
-    // Verify cn is actually a function definition, not a React component
-    expect(ui["/components/ui/utils.ts"]).not.toContain("React");
-    expect(ui["/components/ui/utils.ts"]).toMatch(/function cn\(/);
+    // cn is no longer in getAllUIComponents() — it lives at /lib/utils.ts (real project file)
+    expect(ui["/components/ui/utils.ts"]).toBeUndefined();
   });
 });

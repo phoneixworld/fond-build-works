@@ -43,14 +43,13 @@ export function normalizeSandpackFileMap(base: Record<string, string>): void {
     delete base[from];
   }
 
-  // 2) Deduplicate cn
-  if (base["/utils/cn.ts"] && base["/utils/cn.tsx"]) {
-    delete base["/utils/cn.tsx"];
-  }
+  // 2) Remove any virtual /utils/cn.* — the real cn lives at /lib/utils.ts
+  delete base["/utils/cn.ts"];
+  delete base["/utils/cn.tsx"];
 
-  // 3) Ensure /utils/cn.ts always exists
-  if (!base["/utils/cn.ts"] && !base["/utils/cn.tsx"]) {
-    base["/utils/cn.ts"] = `import { clsx } from "clsx";\nimport { twMerge } from "tailwind-merge";\n\nexport function cn(...inputs: (string | undefined | null | false)[]) {\n  return twMerge(clsx(inputs));\n}\n`;
+  // 3) Ensure /lib/utils.ts always exists with the real cn implementation
+  if (!base["/lib/utils.ts"]) {
+    base["/lib/utils.ts"] = `import { clsx } from "clsx";\nimport { twMerge } from "tailwind-merge";\n\nexport function cn(...inputs: (string | undefined | null | false)[]) {\n  return twMerge(clsx(inputs));\n}\n`;
   }
 
   // 4) Rewrite imports for moved files and cn references
@@ -60,12 +59,12 @@ export function normalizeSandpackFileMap(base: Record<string, string>): void {
     if (!/\.(jsx?|tsx?)$/.test(filePath)) continue;
     let updated = content;
 
-    // Fix cn imports
+    // Fix cn imports → always point to /lib/utils
     updated = updated.replace(
       /import\s+\{\s*cn\s*\}\s+from\s+["']([^"']+)["']/g,
       (_full, fromPath) => {
         if (/utils\/cn|lib\/utils|components\/ui\/utils/.test(fromPath)) {
-          const correctRel = computeRelativePath(filePath, "/utils/cn.ts");
+          const correctRel = computeRelativePath(filePath, "/lib/utils.ts");
           return `import { cn } from "${correctRel}"`;
         }
         return `import { cn } from "${fromPath}"`;

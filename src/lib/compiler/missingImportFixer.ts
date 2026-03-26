@@ -81,12 +81,14 @@ const KNOWN_IMPORTS: KnownImport[] = [
     importPattern: /import\s+(?:React\s*,\s*\{[^}]*\buseMemo\b[^}]*\}|\{[^}]*\buseMemo\b[^}]*\})\s+from\s+['"]react['"]/,
     importStatement: `import { useMemo } from "react";`,
   },
-  // ── Utility: cn ──
+  // ── Utility: cn (lives at /lib/utils.ts) ──
   {
     usagePattern: /\bcn\s*\(/,
     importPattern: /import\s+(?:{[^}]*\bcn\b[^}]*}|cn)\s+from/,
     importStatement: (filePath: string) => {
-      const relPath = computeRelativePath(filePath, "/utils/cn");
+      // Skip the file that defines cn
+      if (filePath === "/lib/utils.ts") return "";
+      const relPath = computeRelativePath(filePath, "/lib/utils");
       return `import { cn } from "${relPath}";`;
     },
   },
@@ -107,6 +109,7 @@ export function fixMissingImports(workspace: Workspace): number {
 
     // Skip utility definition files — they define the symbols, not consume them
     if (/\/utils\.(js|ts|jsx|tsx)$/.test(filePath)) continue;
+    if (filePath === "/lib/utils.ts") continue;
 
     let content = workspace.getFile(filePath)!;
     let modified = false;

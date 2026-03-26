@@ -300,49 +300,48 @@ function normalizeMirroredFiles(workspace: Workspace): number {
 function normalizeUtilityModules(workspace: Workspace): number {
   let fixed = 0;
 
-  // DELETE all lib/utils.* variants — these must never exist
-  const libUtilVariants = workspace
-    .listFiles()
-    .filter((p) => /^\/lib\/utils\.(js|jsx|ts|tsx)$/.test(p));
-
-  for (const variant of libUtilVariants) {
-    // Rewrite imports away from this file before deleting
-    fixed += rewriteImportsToCanonical(workspace, variant, "/utils/cn");
-    workspace.deleteFile(variant);
-    fixed++;
-    console.log(`[StructureNormalizer] Deleted banned file: ${variant}`);
+  // The real cn helper lives at /lib/utils.ts (clsx + twMerge).
+  // Delete any virtual /utils/cn.ts that may have been generated and
+  // rewrite all cn imports to point to /lib/utils.
+  const virtualCnPaths = ["/utils/cn.ts", "/utils/cn.tsx", "/utils/cn.js", "/utils/cn.jsx"];
+  for (const cnPath of virtualCnPaths) {
+    if (workspace.hasFile(cnPath)) {
+      workspace.deleteFile(cnPath);
+      fixed++;
+      console.log(`[StructureNormalizer] Deleted virtual cn file: ${cnPath}`);
+    }
   }
 
-  // Migrate /components/ui/utils.* → /utils/cn.ts
+  // Migrate /components/ui/utils.* → /lib/utils
   const legacyUiUtilsPaths = ["/components/ui/utils.js", "/components/ui/utils.ts", "/components/ui/utils.jsx", "/components/ui/utils.tsx"];
   for (const legacyPath of legacyUiUtilsPaths) {
     if (workspace.hasFile(legacyPath)) {
       workspace.deleteFile(legacyPath);
-      fixed += rewriteImportsToCanonical(workspace, legacyPath, "/utils/cn");
+      fixed += rewriteImportsToCanonical(workspace, legacyPath, "/lib/utils");
       fixed++;
       console.log(`[StructureNormalizer] Removed legacy util: ${legacyPath}`);
     }
   }
 
-  // Ensure /utils/cn.ts exists with correct content
-  if (!workspace.hasFile("/utils/cn.ts")) {
-    workspace.updateFile("/utils/cn.ts", `export function cn(...inputs) {\n  return inputs.filter(Boolean).join(" ");\n}\n`);
+  // Ensure /lib/utils.ts exists with the real implementation
+  if (!workspace.hasFile("/lib/utils.ts")) {
+    workspace.updateFile("/lib/utils.ts", `import { clsx } from "clsx";\nimport { twMerge } from "tailwind-merge";\n\nexport function cn(...inputs) {\n  return twMerge(clsx(inputs));\n}\n`);
     fixed++;
-    console.log(`[StructureNormalizer] Created missing /utils/cn.ts`);
+    console.log(`[StructureNormalizer] Created /lib/utils.ts with real cn implementation`);
   }
 
-  // Fix all cn imports to point to /utils/cn
+  // Fix all cn imports to point to /lib/utils
   for (const filePath of workspace.listFiles()) {
     if (!CODE_FILE_RE.test(filePath)) continue;
+    // Skip the utils file itself
+    if (filePath === "/lib/utils.ts") continue;
     const content = workspace.getFile(filePath) || "";
-    // Match imports of cn from wrong paths (lib/utils, ./utils, ../utils, components/ui/utils, etc.)
     const badCnImport = /^(import\s+\{\s*cn\s*\}\s+from\s+["'])([^"']+)(["'];?\s*)$/gm;
     let updated = content;
     updated = updated.replace(badCnImport, (full, pre, fromPath, post) => {
-      // If already pointing to utils/cn, skip
-      if (/\/utils\/cn$/.test(fromPath)) return full;
-      // Compute correct relative path to /utils/cn
-      const newSpec = toImportSpecifier(filePath, "/utils/cn.ts");
+      // If already pointing to /lib/utils, skip
+      if (/\/lib\/utils$/.test(fromPath)) return full;
+      const newSpec = toImportSpecifier(filePath, "/lib/utils.ts");
       return `${pre}${newSpec}${post}`;
     });
     if (updated !== content) {
