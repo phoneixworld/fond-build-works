@@ -47,7 +47,7 @@ function makeTestIR(): IR {
     ],
     contexts: [],
     components: [],
-    mockEndpoints: [],
+    mockApi: {},
     roles: [],
     workflows: [],
     modules: [],
