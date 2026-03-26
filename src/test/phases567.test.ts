@@ -267,7 +267,7 @@ describe("Phase 6: Agent Orchestration Pipeline", () => {
     expect(postBuild.some(a => a.name === "orchestrator")).toBe(true);
   });
 
-  it("governance agent catches hardcoded secrets", async () => {
+  it("governance agent catches eval usage", async () => {
     const ctx = makeTestPipelineCtx();
     ctx.results.set("requirements", {
       agent: "requirements", status: "done", summary: "ok", durationMs: 1,
@@ -275,14 +275,14 @@ describe("Phase 6: Agent Orchestration Pipeline", () => {
     });
 
     const workspace = new Workspace({
-      "/App.jsx": 'import React from "react";\nconst api_key = "sk_live_aaaaaabbbbbbccccccddddddeeeeee";\nexport default function App() { return <div>App</div>; }',
+      "/App.jsx": 'import React from "react";\nfunction run(code) { return eval(code); }\nexport default function App() { return <div>App</div>; }',
     });
 
     const callbacks = makeTestCallbacks();
-    const result = await executeAgentPhase("post_build", ctx, workspace, callbacks);
+    await executeAgentPhase("post_build", ctx, workspace, callbacks);
 
     const govResult = ctx.results.get("governance");
-    expect(govResult?.violations?.some(v => v.rule === "no_hardcoded_secrets")).toBe(true);
+    expect(govResult?.violations?.some(v => v.rule === "no_eval")).toBe(true);
   });
 });
 
