@@ -111,21 +111,20 @@ ${workspaceContext ? `### Current code (scoped):\n${workspaceContext}` : ""}
   - ALL imports MUST be **relative paths only** (e.g. \`../../lib/utils\`).
   - \`@/\` aliases are FORBIDDEN and will cause build rejection.
 - Data API:
-  - ALL CRUD operations MUST go through the \`project-api\` HTTP endpoint via \`fetch()\`.
-  - Direct \`supabase.from()\` calls in app code are FORBIDDEN.
+  - You may use \`supabase.from()\` directly for database queries — this project has a real Supabase backend.
+  - Import the supabase client from the integrations module.
 - Verifier:
-  - Any occurrence of \`window.__PROJECT_ID__\`, \`window.__SUPABASE_URL__\`, \`window.__SUPABASE_KEY__\`, \`@/\` imports, or direct \`supabase.from()\` in generated app files will cause the build to be rejected.
+  - Any occurrence of \`window.__PROJECT_ID__\`, \`window.__SUPABASE_URL__\`, \`window.__SUPABASE_KEY__\`, or \`@/\` imports in generated app files will cause the build to be rejected.
 
 ### RULES:
 
 ## ══════════════════════════════════════════════════════════════════
 ## ABSOLUTE BANS (violating ANY of these = build rejection)
 ## ══════════════════════════════════════════════════════════════════
-- **BAN-1**: NEVER generate inline sample/mock data arrays (e.g. \`const SAMPLE_DATA = [...]\`). ALL data comes from API fetch.
+- **BAN-1**: NEVER generate inline sample/mock data arrays (e.g. \`const SAMPLE_DATA = [...]\`). ALL data comes from database queries.
 - **BAN-2**: NEVER use \`@/\` import aliases. Use RELATIVE paths only (e.g. \`../../lib/utils\`).
-- **BAN-3**: NEVER use \`supabase.from()\` directly in app code. ALL data goes through \`project-api\` via fetch().
-- **BAN-4**: NEVER import from \`@radix-ui/*\`, \`class-variance-authority\`, or \`tailwind-variants\`.
-- **BAN-5**: NEVER generate \`.jsx\` or \`.js\` files. ALL source files must be \`.tsx\` or \`.ts\`.
+- **BAN-3**: NEVER import from \`@radix-ui/*\`, \`class-variance-authority\`, or \`tailwind-variants\`.
+- **BAN-4**: NEVER generate \`.jsx\` or \`.js\` files. ALL source files must be \`.tsx\` or \`.ts\`.
 - **BAN-6**: NEVER write to \`/components/ui/**\` — those are pre-scaffolded UI primitives.
 - **BAN-7**: NEVER add \`export { X }\` alongside \`export default X\` for the same symbol.
 - **BAN-8**: NEVER leave placeholders, TODOs, or stubs. Output COMPLETE working code.
@@ -148,36 +147,25 @@ ${workspaceContext ? `### Current code (scoped):\n${workspaceContext}` : ""}
 
 6. **NAV-ROUTE CONSISTENCY**: Every navigation link in Sidebar MUST have a matching <Route> in App. Every <Route> in App MUST have a matching nav link. Mismatches = blank pages.
 
-7. **DATA ACCESS (CRITICAL — Sandpack runtime, preview-agnostic app code)**:
-   - Runtime target: Sandpack in-browser bundler. App code MUST NOT read globals directly.
-   - Use the project Data API for ALL CRUD operations via \`project-api\`:
+7. **DATA ACCESS (CRITICAL — Real Supabase Backend)**:
+   - This project has a REAL Supabase backend via Lovable Cloud.
+   - Use the Supabase client directly for ALL CRUD operations:
      \`\`\`ts
-     import { PROJECT_ID, SUPABASE_URL, SUPABASE_KEY } from "../lib/config"; // adjust relative path
+     import { supabase } from "../integrations/supabase/client"; // adjust relative path
+     
      export async function listEmployees() {
-       const url = SUPABASE_URL + "/functions/v1/project-api";
-       const res = await fetch(url, {
-         method: "POST",
-         headers: {
-           "Content-Type": "application/json",
-           "Authorization": "Bearer " + SUPABASE_KEY,
-         },
-         body: JSON.stringify({
-           project_id: PROJECT_ID,
-           collection: "employees",
-           action: "list",
-         }),
-       });
-       const json = await res.json();
-       return json.data || [];
+       const { data, error } = await supabase.from("employees").select("*");
+       if (error) throw error;
+       return data || [];
      }
      \`\`\`
    - Show loading skeleton while fetching, empty state with CTA when data is empty.
 
 8. **DATA HOOKS MUST BE SHORT (CRITICAL — prevents truncation)**:
-    Data hooks in /hooks/data/ MUST follow this EXACT compact template (UNDER 40 lines) and MUST import config from \`/lib/config.ts\`:
+    Data hooks MUST follow this EXACT compact template (UNDER 40 lines):
     \`\`\ts
     import { useState, useEffect } from "react";
-    import { PROJECT_ID, SUPABASE_URL, SUPABASE_KEY } from "../../lib/config"; // adjust if path differs
+    import { supabase } from "../../integrations/supabase/client"; // adjust relative path
 
     export default function useXxx() {
       const [data, setData] = useState<any[]>([]);
@@ -188,21 +176,9 @@ ${workspaceContext ? `### Current code (scoped):\n${workspaceContext}` : ""}
         async function load() {
           try {
             setLoading(true);
-            const url = SUPABASE_URL + "/functions/v1/project-api";
-            const res = await fetch(url, {
-              method: "POST",
-              headers: {
-                "Content-Type": "application/json",
-                "Authorization": "Bearer " + SUPABASE_KEY,
-              },
-              body: JSON.stringify({
-                project_id: PROJECT_ID,
-                collection: "xxx",
-                action: "list",
-              }),
-            });
-            const json = await res.json();
-            setData(json.data || []);
+            const { data: rows, error: err } = await supabase.from("xxx").select("*");
+            if (err) throw err;
+            setData(rows || []);
           } catch (err) {
             setError(err as Error);
           } finally {
@@ -345,12 +321,12 @@ function verifyRuntimeContracts(files: Record<string, string>): { ok: boolean; e
   const errors: string[] = [];
   const forbiddenWindowPatterns = ["window.__PROJECT_ID__", "window.__SUPABASE_URL__", "window.__SUPABASE_KEY__"];
   const forbiddenImportAlias = "@/";
-  const forbiddenSupabaseDirect = "supabase.from(";
 
   for (const [path, code] of Object.entries(files)) {
     // Skip config and supabase modules themselves; they are allowed to read env/globals.
     const isConfig = path === "/lib/config.ts" || path.endsWith("/lib/config.ts");
-    const isSupabase = path === "/lib/supabase.ts" || path.endsWith("/lib/supabase.ts");
+    const isSupabase = path === "/lib/supabase.ts" || path.endsWith("/lib/supabase.ts") ||
+      path.includes("/integrations/supabase/");
 
     if (!isConfig && !isSupabase) {
       for (const pattern of forbiddenWindowPatterns) {
@@ -367,11 +343,8 @@ function verifyRuntimeContracts(files: Record<string, string>): { ok: boolean; e
       errors.push(`File ${path} uses '@/'. All imports must be relative paths only.`);
     }
 
-    if (!isSupabase && code.includes(forbiddenSupabaseDirect)) {
-      errors.push(
-        `File ${path} calls supabase.from() directly. All data access must go through project-api via fetch().`,
-      );
-    }
+    // NOTE: supabase.from() is ALLOWED — the project has a real Supabase backend via Lovable Cloud.
+    // The old project-api proxy restriction has been removed.
   }
 
   return { ok: errors.length === 0, errors };
