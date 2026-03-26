@@ -60,6 +60,58 @@ export default function Home() {
   );
 }`,
 
+    "/hooks/useProducts.js": `import { useState, useEffect, useCallback } from "react";
+
+const FALLBACK_PRODUCTS = [
+  { id: 1, name: "Organic Cotton Tee", price: 48, rating: 4.8, reviews: 124, gradient: "from-sky-100 to-blue-200", tag: "Best Seller", category: "Tops" },
+  { id: 2, name: "Linen Relaxed Pants", price: 89, rating: 4.6, reviews: 87, gradient: "from-stone-100 to-stone-200", tag: null, category: "Bottoms" },
+  { id: 3, name: "Merino Wool Cardigan", price: 128, rating: 4.9, reviews: 203, gradient: "from-amber-100 to-yellow-200", tag: "New", category: "Outerwear" },
+  { id: 4, name: "Canvas Weekend Bag", price: 156, rating: 4.7, reviews: 56, gradient: "from-emerald-100 to-teal-200", tag: null, category: "Accessories" },
+  { id: 5, name: "Silk Scarf", price: 68, oldPrice: 95, rating: 4.5, reviews: 142, gradient: "from-rose-100 to-pink-200", tag: "Sale", category: "Accessories" },
+  { id: 6, name: "Leather Belt", price: 72, rating: 4.8, reviews: 98, gradient: "from-orange-100 to-amber-200", tag: null, category: "Accessories" },
+  { id: 7, name: "Cashmere Beanie", price: 64, rating: 4.4, reviews: 76, gradient: "from-violet-100 to-purple-200", tag: "New", category: "Accessories" },
+  { id: 8, name: "Denim Jacket", price: 175, rating: 4.9, reviews: 312, gradient: "from-indigo-100 to-blue-200", tag: "Best Seller", category: "Outerwear" },
+];
+
+const API_BASE = window.__SUPABASE_URL__ || "";
+const API_KEY = window.__SUPABASE_KEY__ || "";
+const PROJECT_ID = window.__PROJECT_ID__ || "";
+
+export default function useProducts() {
+  const [products, setProducts] = useState(FALLBACK_PRODUCTS);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  const fetchProducts = useCallback(async () => {
+    if (!API_BASE || !PROJECT_ID) {
+      setProducts(FALLBACK_PRODUCTS);
+      setLoading(false);
+      return;
+    }
+    try {
+      setLoading(true);
+      const res = await fetch(API_BASE + "/functions/v1/project-api", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "Authorization": "Bearer " + API_KEY },
+        body: JSON.stringify({ project_id: PROJECT_ID, collection: "products", action: "list" }),
+      });
+      const json = await res.json();
+      const result = json.data || [];
+      setProducts(result.length > 0 ? result : FALLBACK_PRODUCTS);
+    } catch (e) {
+      console.warn("API unavailable, using fallback products:", e.message);
+      setProducts(FALLBACK_PRODUCTS);
+      setError(null);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => { fetchProducts(); }, [fetchProducts]);
+
+  return { products, loading, error, refetch: fetchProducts };
+}`,
+
     "/components/Navbar.jsx": `import React, { useContext, useState } from "react";
 import { ShoppingBag, Search, Menu, X, Heart } from "lucide-react";
 import { CartContext } from "../App";
@@ -94,17 +146,17 @@ export default function Navbar() {
 }`,
 
     "/components/CartDrawer.jsx": `import React, { useContext } from "react";
-import { X, Plus, Minus, ShoppingBag } from "lucide-react";
+import { X, ShoppingBag } from "lucide-react";
 import { CartContext } from "../App";
 
 export default function CartDrawer({ open, onClose }) {
-  const { cart, removeFromCart, addToCart } = useContext(CartContext);
+  const { cart, removeFromCart } = useContext(CartContext);
   const total = cart.reduce((sum, i) => sum + i.price * i.qty, 0);
   if (!open) return null;
   return (
     <div className="fixed inset-0 z-50 flex justify-end">
       <div className="absolute inset-0 bg-black/40" onClick={onClose} />
-      <div className="relative w-full max-w-md bg-white h-full shadow-2xl flex flex-col animate-in slide-in-from-right">
+      <div className="relative w-full max-w-md bg-white h-full shadow-2xl flex flex-col" style={{ animation: "slideInRight 0.3s ease-out" }}>
         <div className="flex items-center justify-between p-6 border-b">
           <h2 className="text-lg font-semibold">Your Cart ({cart.length})</h2>
           <button onClick={onClose}><X className="w-5 h-5" /></button>
@@ -118,7 +170,7 @@ export default function CartDrawer({ open, onClose }) {
           )}
           {cart.map(item => (
             <div key={item.id} className="flex gap-4 p-3 bg-gray-50 rounded-xl">
-              <div className={"w-20 h-20 rounded-lg bg-gradient-to-br " + item.gradient} />
+              <div className={"w-20 h-20 rounded-lg bg-gradient-to-br " + (item.gradient || "from-gray-100 to-gray-200")} />
               <div className="flex-1">
                 <p className="font-medium text-sm">{item.name}</p>
                 <p className="text-sm text-gray-500">\${item.price}</p>
@@ -151,7 +203,7 @@ export default function Hero() {
   return (
     <section className="relative overflow-hidden bg-gradient-to-br from-amber-50 via-orange-50 to-rose-50">
       <div className="max-w-7xl mx-auto px-6 py-20 md:py-28">
-        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="max-w-2xl">
+        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6 }} className="max-w-2xl">
           <span className="inline-block px-4 py-1.5 bg-black text-white text-xs font-bold rounded-full mb-6 uppercase tracking-wider">New Season</span>
           <h1 className="text-5xl md:text-7xl font-bold text-gray-900 leading-[1.1] tracking-tight mb-6">{{APP_DESC}}</h1>
           <p className="text-lg text-gray-600 mb-8 max-w-lg">Discover curated collections designed for the modern lifestyle. Free shipping on orders over $100.</p>
@@ -200,20 +252,24 @@ export default function Categories() {
 import { Heart, ShoppingBag, Star } from "lucide-react";
 import { CartContext } from "../App";
 import { showToast } from "./ui/Toast";
+import useProducts from "../hooks/useProducts";
 
-const products = [
-  { id: 1, name: "Organic Cotton Tee", price: 48, rating: 4.8, reviews: 124, gradient: "from-sky-100 to-blue-200", tag: "Best Seller" },
-  { id: 2, name: "Linen Relaxed Pants", price: 89, rating: 4.6, reviews: 87, gradient: "from-stone-100 to-stone-200", tag: null },
-  { id: 3, name: "Merino Wool Cardigan", price: 128, rating: 4.9, reviews: 203, gradient: "from-amber-100 to-yellow-200", tag: "New" },
-  { id: 4, name: "Canvas Weekend Bag", price: 156, rating: 4.7, reviews: 56, gradient: "from-emerald-100 to-teal-200", tag: null },
-  { id: 5, name: "Silk Scarf", price: 68, oldPrice: 95, rating: 4.5, reviews: 142, gradient: "from-rose-100 to-pink-200", tag: "Sale" },
-  { id: 6, name: "Leather Belt", price: 72, rating: 4.8, reviews: 98, gradient: "from-orange-100 to-amber-200", tag: null },
-  { id: 7, name: "Cashmere Beanie", price: 64, rating: 4.4, reviews: 76, gradient: "from-violet-100 to-purple-200", tag: "New" },
-  { id: 8, name: "Denim Jacket", price: 175, rating: 4.9, reviews: 312, gradient: "from-indigo-100 to-blue-200", tag: "Best Seller" },
-];
+function ProductSkeleton() {
+  return (
+    <div className="bg-white rounded-2xl overflow-hidden border border-gray-100 animate-pulse">
+      <div className="aspect-[3/4] bg-gray-200" />
+      <div className="p-4 space-y-2">
+        <div className="h-4 bg-gray-200 rounded w-3/4" />
+        <div className="h-3 bg-gray-200 rounded w-1/2" />
+        <div className="h-4 bg-gray-200 rounded w-1/4" />
+      </div>
+    </div>
+  );
+}
 
 export default function ProductGrid() {
   const { addToCart } = useContext(CartContext);
+  const { products, loading } = useProducts();
   const [liked, setLiked] = useState(new Set());
   const toggleLike = (id) => setLiked(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; });
 
@@ -228,35 +284,39 @@ export default function ProductGrid() {
           <button className="text-sm font-medium text-gray-900 hover:underline">View All →</button>
         </div>
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-5">
-          {products.map(p => (
-            <div key={p.id} className="group bg-white rounded-2xl overflow-hidden border border-gray-100 hover:shadow-xl transition-all duration-300">
-              <div className="relative">
-                <div className={"aspect-[3/4] bg-gradient-to-br " + p.gradient} />
-                {p.tag && (
-                  <span className={"absolute top-3 left-3 px-2.5 py-1 text-[10px] font-bold uppercase rounded-full " + (p.tag === "Sale" ? "bg-red-500 text-white" : p.tag === "New" ? "bg-black text-white" : "bg-amber-100 text-amber-800")}>
-                    {p.tag}
-                  </span>
-                )}
-                <button onClick={() => toggleLike(p.id)} className="absolute top-3 right-3 p-2 bg-white/80 backdrop-blur rounded-full opacity-0 group-hover:opacity-100 transition-all hover:bg-white shadow-sm">
-                  <Heart className={"w-4 h-4 " + (liked.has(p.id) ? "fill-red-500 text-red-500" : "text-gray-600")} />
-                </button>
-                <button onClick={() => { addToCart(p); showToast("Added to cart!"); }} className="absolute bottom-3 right-3 p-2.5 bg-black text-white rounded-full opacity-0 group-hover:opacity-100 transition-all hover:bg-gray-800 shadow-lg">
-                  <ShoppingBag className="w-4 h-4" />
-                </button>
-              </div>
-              <div className="p-4">
-                <p className="text-sm font-medium text-gray-900 mb-1">{p.name}</p>
-                <div className="flex items-center gap-1 mb-2">
-                  <Star className="w-3 h-3 text-amber-400 fill-amber-400" />
-                  <span className="text-xs text-gray-500">{p.rating} ({p.reviews})</span>
+          {loading ? (
+            Array.from({ length: 8 }).map((_, i) => <ProductSkeleton key={i} />)
+          ) : (
+            products.map(p => (
+              <div key={p.id} className="group bg-white rounded-2xl overflow-hidden border border-gray-100 hover:shadow-xl transition-all duration-300">
+                <div className="relative">
+                  <div className={"aspect-[3/4] bg-gradient-to-br " + (p.gradient || "from-gray-100 to-gray-200")} />
+                  {p.tag && (
+                    <span className={"absolute top-3 left-3 px-2.5 py-1 text-[10px] font-bold uppercase rounded-full " + (p.tag === "Sale" ? "bg-red-500 text-white" : p.tag === "New" ? "bg-black text-white" : "bg-amber-100 text-amber-800")}>
+                      {p.tag}
+                    </span>
+                  )}
+                  <button onClick={() => toggleLike(p.id)} className="absolute top-3 right-3 p-2 bg-white/80 backdrop-blur rounded-full opacity-0 group-hover:opacity-100 transition-all hover:bg-white shadow-sm">
+                    <Heart className={"w-4 h-4 " + (liked.has(p.id) ? "fill-red-500 text-red-500" : "text-gray-600")} />
+                  </button>
+                  <button onClick={() => { addToCart(p); showToast("Added to cart!"); }} className="absolute bottom-3 right-3 p-2.5 bg-black text-white rounded-full opacity-0 group-hover:opacity-100 transition-all hover:bg-gray-800 shadow-lg">
+                    <ShoppingBag className="w-4 h-4" />
+                  </button>
                 </div>
-                <div className="flex items-center gap-2">
-                  <span className="font-semibold text-gray-900">\${p.price}</span>
-                  {p.oldPrice && <span className="text-sm text-gray-400 line-through">\${p.oldPrice}</span>}
+                <div className="p-4">
+                  <p className="text-sm font-medium text-gray-900 mb-1">{p.name}</p>
+                  <div className="flex items-center gap-1 mb-2">
+                    <Star className="w-3 h-3 text-amber-400 fill-amber-400" />
+                    <span className="text-xs text-gray-500">{p.rating} ({p.reviews})</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="font-semibold text-gray-900">\${p.price}</span>
+                    {p.oldPrice && <span className="text-sm text-gray-400 line-through">\${p.oldPrice}</span>}
+                  </div>
                 </div>
               </div>
-            </div>
-          ))}
+            ))
+          )}
         </div>
       </div>
     </section>
@@ -353,6 +413,77 @@ export function ToastProvider({ children }) {
 }
 export default function ToastContainer() { return <ToastProvider>{null}</ToastProvider>; }`,
 
+    "/migrations/001_schema.sql": `-- Products table for ecommerce store
+CREATE TABLE IF NOT EXISTS products (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  name TEXT NOT NULL,
+  price NUMERIC(10,2) NOT NULL DEFAULT 0,
+  description TEXT,
+  category TEXT,
+  tag TEXT,
+  rating NUMERIC(2,1) DEFAULT 0,
+  reviews INTEGER DEFAULT 0,
+  gradient TEXT DEFAULT 'from-gray-100 to-gray-200',
+  old_price NUMERIC(10,2),
+  image_url TEXT,
+  status TEXT DEFAULT 'active',
+  created_at TIMESTAMPTZ DEFAULT now(),
+  updated_at TIMESTAMPTZ DEFAULT now()
+);
+
+-- Orders table
+CREATE TABLE IF NOT EXISTS orders (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  customer_email TEXT,
+  items JSONB DEFAULT '[]',
+  total NUMERIC(10,2) NOT NULL DEFAULT 0,
+  status TEXT DEFAULT 'pending',
+  created_at TIMESTAMPTZ DEFAULT now(),
+  updated_at TIMESTAMPTZ DEFAULT now()
+);`,
+
+    "/migrations/002_rls.sql": `-- Enable RLS
+ALTER TABLE products ENABLE ROW LEVEL SECURITY;
+ALTER TABLE orders ENABLE ROW LEVEL SECURITY;
+
+-- Public read access for products
+CREATE POLICY "Products are viewable by everyone" ON products FOR SELECT USING (true);
+
+-- Orders visible to authenticated users only
+CREATE POLICY "Orders are viewable by authenticated users" ON orders FOR SELECT TO authenticated USING (true);
+CREATE POLICY "Orders are insertable by authenticated users" ON orders FOR INSERT TO authenticated WITH CHECK (true);`,
+
+    "/schema.json": `{
+  "entities": [
+    {
+      "name": "Product",
+      "table": "products",
+      "fields": [
+        { "name": "name", "type": "text", "required": true },
+        { "name": "price", "type": "number", "required": true },
+        { "name": "description", "type": "text", "required": false },
+        { "name": "category", "type": "text", "required": false },
+        { "name": "tag", "type": "text", "required": false },
+        { "name": "rating", "type": "number", "required": false },
+        { "name": "reviews", "type": "number", "required": false },
+        { "name": "gradient", "type": "text", "required": false },
+        { "name": "image_url", "type": "text", "required": false },
+        { "name": "status", "type": "text", "required": false }
+      ]
+    },
+    {
+      "name": "Order",
+      "table": "orders",
+      "fields": [
+        { "name": "customer_email", "type": "text", "required": false },
+        { "name": "items", "type": "json", "required": false },
+        { "name": "total", "type": "number", "required": true },
+        { "name": "status", "type": "text", "required": false }
+      ]
+    }
+  ]
+}`,
+
     "/styles/globals.css": `@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
 @tailwind base;
 @tailwind components;
@@ -360,6 +491,10 @@ export default function ToastContainer() { return <ToastProvider>{null}</ToastPr
 @layer base {
   body { font-family: 'Inter', system-ui, sans-serif; @apply bg-white text-gray-900 antialiased; }
   html { scroll-behavior: smooth; }
+}
+@keyframes slideInRight {
+  from { transform: translateX(100%); }
+  to { transform: translateX(0); }
 }`,
   },
 };
