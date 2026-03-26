@@ -676,6 +676,11 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
     async (text: string, images: string[] = [], displayText?: string) => {
       if (!text || !currentProject) return;
 
+      if (isSendingRef.current || isLoadingRef.current) {
+        console.warn("[BuildOrch] Blocked duplicate send while already sending");
+        return;
+      }
+
       const buildProjectId = currentProject.id;
       const runToken = buildRunTokenRef.current + 1;
       buildRunTokenRef.current = runToken;
@@ -685,10 +690,6 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
         currentProject.id !== buildProjectId ||
         (lastProjectIdRef.current !== null && lastProjectIdRef.current !== buildProjectId);
 
-      if (isSendingRef.current || isLoadingRef.current) {
-        console.warn("[BuildOrch] Blocked duplicate send while already sending");
-        return;
-      }
       isSendingRef.current = true;
 
       if (!text.startsWith("🔧 AUTO-FIX")) {
