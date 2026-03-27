@@ -138,6 +138,9 @@ export interface ChatAgentConfig {
     templateName: string | null;
     lastBuildSummary: string | null;
     fileMapKeys: string[];
+    entities?: { name: string; fields: { name: string; type: string }[]; relationships: { type: string; from: string; to: string }[] }[];
+    routes?: { path: string; label: string }[];
+    components?: { name: string; filePath: string; entity?: string; type: string }[];
   } | null>;
 }
 
@@ -239,9 +242,19 @@ export function useChatAgent(config: ChatAgentConfig) {
 
       // Invariant #5: Project identity context per turn
       const identityCtx = config.projectIdentityRef?.current;
-      const projectIdentityContext = identityCtx
-        ? `\n## PROJECT IDENTITY\nTemplate: ${identityCtx.templateName || "none"}\nLast build: ${identityCtx.lastBuildSummary || "none"}\nFiles: ${identityCtx.fileMapKeys.length} files`
-        : "";
+      let projectIdentityContext = "";
+      if (identityCtx) {
+        const entitySummary = (identityCtx.entities || [])
+          .map(e => `  - ${e.name} (${e.fields.map(f => f.name).join(", ")})${e.relationships.length ? ` [rels: ${e.relationships.map(r => `${r.type} → ${r.to}`).join(", ")}]` : ""}`)
+          .join("\n");
+        const routeSummary = (identityCtx.routes || [])
+          .map(r => `  - ${r.path} → ${r.label}`)
+          .join("\n");
+        const componentSummary = (identityCtx.components || [])
+          .map(c => `  - ${c.name} (${c.type}${c.entity ? `, entity: ${c.entity}` : ""})`)
+          .join("\n");
+        projectIdentityContext = `\n## PROJECT IDENTITY\nTemplate: ${identityCtx.templateName || "none"}\nLast build: ${identityCtx.lastBuildSummary || "none"}\nFiles: ${identityCtx.fileMapKeys.length} files\n\n### Schema Entities\n${entitySummary || "  (none)"}\n\n### Routes\n${routeSummary || "  (none)"}\n\n### Components\n${componentSummary || "  (none)"}`;
+      }
 
       // Interface contracts snapshot
       const contractSnapshot = getInterfaceContractsSnapshot();
