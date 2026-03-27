@@ -1123,10 +1123,23 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
 
         saveSnapshot(`Pre-build: ${userText.slice(0, 50)}`);
 
+        // Phase 2: Inject project identity context into build requirements
+        const identityCtx = projectIdentityRef.current;
+        let identityBlock = "";
+        if (identityCtx?.templateName) {
+          const entityList = (identityCtx.entities || [])
+            .map(e => `  - ${e.name} (${e.fields.map(f => f.name).join(", ")})`)
+            .join("\n");
+          const routeList = (identityCtx.routes || [])
+            .map(r => `  - ${r.path} → ${r.label}`)
+            .join("\n");
+          identityBlock = `\n\n## PROJECT IDENTITY\nTemplate: ${identityCtx.templateName}\n\n### Existing Entities\n${entityList || "  (none)"}\n\n### Existing Routes\n${routeList || "  (none)"}\n\nDo NOT regenerate existing entities or routes — extend them.`;
+        }
+
         const compileOptions: CompileOptions = {
           rawRequirements: templateFiles
-            ? `${userText}\n\n## TEMPLATE CONTEXT\n${templateCtx}\nCustomize the existing ${templateName} template files based on the user request above.`
-            : userText,
+            ? `${userText}\n\n## TEMPLATE CONTEXT\n${templateCtx}\nCustomize the existing ${templateName} template files based on the user request above.${identityBlock}`
+            : `${userText}${identityBlock}`,
           existingWorkspace: templateFiles || safeExistingFiles || {},
           projectId: buildProjectId,
           techStack: currentProject.tech_stack || "react-cdn",
