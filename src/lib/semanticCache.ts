@@ -72,7 +72,8 @@ const BARE_CONFIRMATIONS = new Set([
  * Build-triggering phrases that must NEVER be served from cache.
  * A cached "Build a CRM" response would trigger a fresh build on replay.
  */
-const BUILD_TRIGGER_PHRASES = /\b(build|create|generate|scaffold|implement|develop|make|produce)\s+(a|an|the|my|our|new)\b/i;
+const BUILD_TRIGGER_PHRASES =
+  /\b(build|create|generate|scaffold|implement|develop|make|produce|rebuild|start over|reset project)\b/i;
 
 /**
  * Returns true if the prompt is a bare confirmation that should NEVER

@@ -700,6 +700,7 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
     setPipelineStep,
     setCurrentAgent,
     setPendingBuildPrompt,
+    hasPendingExecution: !!pendingExecution,
     setIsLoading,
     messagesRef,
     isSendingRef,
@@ -1598,92 +1599,6 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
     ],
   );
 
-  useEffect(() => {
-    if (pendingBuildPrompt && !isSendingRef.current && !isLoadingRef.current) {
-      console.log("[BuildOrch] BUILD_CONFIRMED marker detected — triggering build pipeline");
-      const rawPendingPrompt = pendingBuildPrompt;
-      setPendingBuildPrompt(null);
-
-      type PendingBuildEnvelope = {
-        kind?: string;
-        source?: string;
-        prompt?: string;
-        requirementsSnippet?: string;
-      };
-
-      let envelope: PendingBuildEnvelope | null = null;
-      try {
-        if (rawPendingPrompt.trim().startsWith("{")) {
-          envelope = JSON.parse(rawPendingPrompt) as PendingBuildEnvelope;
-        }
-      } catch (err) {
-        console.warn("[BuildOrch] Failed to parse pending build envelope JSON:", err);
-      }
-
-      const envelopePrompt = typeof envelope?.prompt === "string" ? envelope.prompt : "";
-      const envelopeRequirements =
-        typeof envelope?.requirementsSnippet === "string" ? envelope.requirementsSnippet.trim() : "";
-
-      let latestDuplicateBuildRequest: string | null = null;
-
-      const relevantMessages = messagesRef.current.filter((m) => {
-        const msgText = getTextContent(m.content).trim();
-        if (m.role !== "user") return false;
-        if (msgText.length <= 10) return false;
-        if (NOISE.test(msgText.toLowerCase())) return false;
-        if (COMPLAINT_NOISE.test(msgText.toLowerCase())) return false;
-        if (META_NOISE.test(msgText.toLowerCase())) return false;
-
-        if (DUPLICATE_TRIGGER.test(msgText)) {
-          // Keep only the latest explicit build trigger (the user's newest intent).
-          latestDuplicateBuildRequest = msgText;
-          return false;
-        }
-
-        if (msgText.includes("# APPLICATION REQUIREMENTS") || msgText.includes("## BUILD TRIGGER")) return false;
-
-        return true;
-      });
-
-      const requirementParts = relevantMessages.map((m) => getTextContent(m.content));
-      if (latestDuplicateBuildRequest) requirementParts.push(latestDuplicateBuildRequest);
-      const userRequirements = requirementParts.join("\n\n").trim();
-
-      const fallbackIntent = extractUserIntentFromPrompt(stripBuildMarker(envelopePrompt || rawPendingPrompt)).trim();
-      const canonicalRequirements = (envelopeRequirements || userRequirements || fallbackIntent).trim();
-
-      if (!canonicalRequirements || NOISE.test(canonicalRequirements.toLowerCase())) {
-        setCurrentAgent("chat");
-        setPipelineStep("chatting");
-        setMessages((prev) => [
-          ...prev,
-          {
-            role: "assistant",
-            content: "I still need one concrete requirement (e.g. 'Build a CRM with contacts and pipeline') before I can run the build.",
-            timestamp: Date.now(),
-          },
-        ]);
-        return;
-      }
-
-      const finalPrompt =
-        rawPendingPrompt.includes("# APPLICATION REQUIREMENTS") && !envelope
-          ? rawPendingPrompt
-          : [
-              "# APPLICATION REQUIREMENTS",
-              "",
-              canonicalRequirements,
-              "",
-              "Build EXACTLY what the user requested above.",
-              "Do NOT add unrelated features.",
-            ].join("\n");
-
-      setCurrentAgent("build");
-      setPipelineStep("planning");
-      setTimeout(() => sendMessage(finalPrompt, []), 0);
-    }
-  }, [pendingBuildPrompt, sendMessage, setCurrentAgent, setPipelineStep, setMessages]);
-
   const sendEditMessage = useCallback(
     async (text: string, images: string[] = []) => {
       if (!currentProject) return;
@@ -1921,6 +1836,144 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
     ],
   );
 
+  useEffect(() => {
+    if (!pendingBuildPrompt || isSendingRef.current || isLoadingRef.current) return;
+
+    console.log("[BuildOrch] BUILD_CONFIRMED marker detected — validating handoff");
+    const rawPendingPrompt = pendingBuildPrompt;
+    setPendingBuildPrompt(null);
+
+    type PendingBuildEnvelope = {
+      kind?: string;
+      source?: string;
+      prompt?: string;
+      requirementsSnippet?: string;
+    };
+
+    const processPendingBuild = async () => {
+      let envelope: PendingBuildEnvelope | null = null;
+      try {
+        if (rawPendingPrompt.trim().startsWith("{")) {
+          envelope = JSON.parse(rawPendingPrompt) as PendingBuildEnvelope;
+        }
+      } catch (err) {
+        console.warn("[BuildOrch] Failed to parse pending build envelope JSON:", err);
+      }
+
+      const envelopePrompt = typeof envelope?.prompt === "string" ? envelope.prompt : "";
+      const envelopeRequirements =
+        typeof envelope?.requirementsSnippet === "string" ? envelope.requirementsSnippet.trim() : "";
+
+      let latestDuplicateBuildRequest: string | null = null;
+
+      const relevantMessages = messagesRef.current.filter((m) => {
+        const msgText = getTextContent(m.content).trim();
+        if (m.role !== "user") return false;
+        if (msgText.length <= 10) return false;
+        if (NOISE.test(msgText.toLowerCase())) return false;
+        if (COMPLAINT_NOISE.test(msgText.toLowerCase())) return false;
+        if (META_NOISE.test(msgText.toLowerCase())) return false;
+
+        if (DUPLICATE_TRIGGER.test(msgText)) {
+          latestDuplicateBuildRequest = msgText;
+          return false;
+        }
+
+        if (msgText.includes("# APPLICATION REQUIREMENTS") || msgText.includes("## BUILD TRIGGER")) return false;
+
+        return true;
+      });
+
+      const requirementParts = relevantMessages.map((m) => getTextContent(m.content));
+      if (latestDuplicateBuildRequest) requirementParts.push(latestDuplicateBuildRequest);
+      const userRequirements = requirementParts.join("\n\n").trim();
+
+      const fallbackIntent = extractUserIntentFromPrompt(stripBuildMarker(envelopePrompt || rawPendingPrompt)).trim();
+      const canonicalRequirements = (envelopeRequirements || userRequirements || fallbackIntent).trim();
+
+      if (!canonicalRequirements || NOISE.test(canonicalRequirements.toLowerCase())) {
+        console.warn("[BuildOrch] Ignored stale BUILD_CONFIRMED envelope with no concrete requirements");
+        setCurrentAgent("chat");
+        setPipelineStep("chatting");
+        setMessages((prev) => [
+          ...prev,
+          {
+            role: "assistant",
+            content: "I ignored that stale build trigger — please send one concrete build instruction.",
+            timestamp: Date.now(),
+          },
+        ]);
+        return;
+      }
+
+      const isFromChatAgent = envelope?.source === "chat-agent";
+      const hasUserWorkspaceFiles =
+        Object.keys(sandpackFilesRef.current || {}).filter((p) => !p.startsWith("/components/ui/")).length > 0;
+
+      if (isFromChatAgent) {
+        const identity = await loadProjectIdentity(currentProject.id);
+        const pendingDecision = routeIntent(
+          canonicalRequirements,
+          [],
+          identity,
+          hasUserWorkspaceFiles,
+          false,
+          false,
+        );
+
+        if (pendingDecision.route === "chat" || pendingDecision.route === "resolve_pending") {
+          console.warn(
+            `[BuildOrch] Blocked chat-origin BUILD_CONFIRMED — non-build intent (${pendingDecision.reason})`,
+          );
+          return;
+        }
+
+        if (pendingDecision.route === "edit") {
+          setCurrentAgent("edit");
+          setPipelineStep("resolving");
+          sendEditMessage(canonicalRequirements, []);
+          return;
+        }
+      }
+
+      const bsm = getBuildStateMachine();
+      if (!bsm.canStartFreshBuild(canonicalRequirements, { currentAgent, pipelineStep })) {
+        setCurrentAgent("edit");
+        setPipelineStep("resolving");
+        sendEditMessage(canonicalRequirements, []);
+        return;
+      }
+
+      const finalPrompt =
+        rawPendingPrompt.includes("# APPLICATION REQUIREMENTS") && !envelope
+          ? rawPendingPrompt
+          : [
+              "# APPLICATION REQUIREMENTS",
+              "",
+              canonicalRequirements,
+              "",
+              "Build EXACTLY what the user requested above.",
+              "Do NOT add unrelated features.",
+            ].join("\n");
+
+      setCurrentAgent("build");
+      setPipelineStep("planning");
+      setTimeout(() => sendMessage(finalPrompt, [], canonicalRequirements), 0);
+    };
+
+    void processPendingBuild();
+  }, [
+    pendingBuildPrompt,
+    sendMessage,
+    sendEditMessage,
+    setCurrentAgent,
+    setPipelineStep,
+    setMessages,
+    currentProject,
+    currentAgent,
+    pipelineStep,
+  ]);
+
   const CONFIRM_ONLY_RE =
     /^(yes|yep|yeah|go ahead|proceed|do it|ok|okay|sure|continue|start|build it|just do it)\s*[.!]?$/i;
 
@@ -2112,7 +2165,7 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
       if (decision.route === "build") {
         // GUARDRAIL 5: State machine must allow fresh builds
         const bsm = getBuildStateMachine();
-        if (!bsm.canStartFreshBuild()) {
+        if (!bsm.canStartFreshBuild(finalText, { currentAgent, pipelineStep })) {
           // Redirect to edit/enhancement instead of blocking entirely
           setCurrentAgent("edit");
           setPipelineStep("resolving");

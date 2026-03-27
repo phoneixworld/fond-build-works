@@ -38,6 +38,14 @@ export interface BuildStateSnapshot {
   elapsed: number;
 }
 
+export interface FreshBuildGuardContext {
+  currentAgent?: AgentType | "clarify" | null;
+  pipelineStep?: PipelineStep | null;
+}
+
+const EXPLICIT_RESET_PROJECT =
+  /\b(reset project|start over|from scratch|regenerate app|new project|rebuild)\b/i;
+
 export type StateChangeListener = (snapshot: BuildStateSnapshot) => void;
 
 // ─── Legal Transitions ──────────────────────────────────────────────────
@@ -88,8 +96,24 @@ export class BuildStateMachine {
    * GUARDRAIL: Reject fresh template builds when already in an active state.
    * Only "idle" or "error" states allow fresh builds.
    */
-  canStartFreshBuild(): boolean {
+  canStartFreshBuild(requestText = "", context?: FreshBuildGuardContext): boolean {
+    const resetRequested = EXPLICIT_RESET_PROJECT.test(requestText || "");
+    const enhancementInProgress =
+      this._state === "editing" ||
+      context?.currentAgent === "edit" ||
+      context?.pipelineStep === "editing" ||
+      context?.pipelineStep === "resolving";
+
+    if (enhancementInProgress && !resetRequested) {
+      console.warn(
+        `[StateMachine] Fresh build rejected — enhancement/edit mode active (state=${this._state}, agent=${context?.currentAgent}, step=${context?.pipelineStep})`,
+      );
+      return false;
+    }
+
     if (this._state === "idle" || this._state === "error") return true;
+    if (resetRequested) return true;
+
     console.warn(`[StateMachine] Fresh build rejected — currently in "${this._state}" state`);
     return false;
   }
