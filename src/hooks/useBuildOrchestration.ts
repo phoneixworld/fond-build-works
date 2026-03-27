@@ -862,10 +862,11 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
             } catch (e) { console.warn("[Pillar2] AST indexing failed (non-blocking):", e); }
 
             // Invariant #2: Persist full template + schema identity
+            const extractedEntities = extractEntitiesFromTemplate(template!, finalFiles);
+            const extractedRoutes = extractRoutesFromTemplate(finalFiles);
+            const extractedComponents = extractComponentsFromTemplate(finalFiles);
+
             if (currentProject?.id && template) {
-              const extractedEntities = extractEntitiesFromTemplate(template, finalFiles);
-              const extractedRoutes = extractRoutesFromTemplate(finalFiles);
-              const extractedComponents = extractComponentsFromTemplate(finalFiles);
               setTemplateIdentity(
                 currentProject.id,
                 template.id,
@@ -885,8 +886,32 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
               }, Object.keys(finalFiles)).catch(() => {});
             }
 
+            // Phase 2: Gap analysis — detect what the template doesn't cover
+            const { analyzeGaps } = await import("@/lib/hybridGapFill");
+            const gapAnalysis = analyzeGaps(userText, extractedEntities, finalFiles);
+
             const fileCount = Object.keys(finalFiles).length;
-            const msg = `✅ **${instantResult.templateName}** — ${fileCount} files rendered instantly!\n\nYour app is ready with API-wired data hooks and fallback demo data. Backend schema included.`;
+            let msg = `✅ **${instantResult.templateName}** — ${fileCount} files rendered instantly!\n\nYour app is ready with API-wired data hooks and fallback demo data. Backend schema included.`;
+
+            if (!gapAnalysis.fullyCovered) {
+              const gapCount = gapAnalysis.gaps.length;
+              msg += `\n\n🔧 **${gapCount} customization${gapCount > 1 ? "s" : ""} detected** — the template covers the core structure. The following gaps will be filled:\n${gapAnalysis.gaps.map(g => `- ${g.description}`).join("\n")}`;
+              console.log(`[Phase2:GapFill] ${gapCount} gaps detected:`, gapAnalysis.gaps);
+              // Store gap prompt for potential follow-up AI pass
+              if (currentProject?.id) {
+                supabase
+                  .from("project_data")
+                  .upsert({
+                    project_id: currentProject.id,
+                    collection: "pending_gap_fill",
+                    data: { gapPrompt: gapAnalysis.gapPrompt, gaps: gapAnalysis.gaps, protectedFiles: gapAnalysis.protectedFiles } as any,
+                  }, { onConflict: "project_id,collection" })
+                  .then(() => console.log("[Phase2:GapFill] Gap context persisted"));
+              }
+            } else {
+              console.log("[Phase2:GapFill] Template fully covers the request — no AI gap-fill needed");
+            }
+
             setMessages((prev) => {
               const last = prev[prev.length - 1];
               if (last?.role === "assistant") {
