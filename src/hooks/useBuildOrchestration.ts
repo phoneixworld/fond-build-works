@@ -1803,6 +1803,34 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
     ],
   );
 
+  const CONFIRM_ONLY_RE =
+    /^(yes|yep|yeah|go ahead|proceed|do it|ok|okay|sure|continue|start|build it|just do it)\s*[.!]?$/i;
+
+  const buildRequirementsPayload = useCallback(
+    async (triggerText: string) => {
+      const compiled = await Promise.resolve(conversationGetRequirements?.() || "");
+      const normalizedTrigger = triggerText.trim();
+
+      if (compiled && compiled.length > 50) {
+        return `${compiled}\n\n## BUILD TRIGGER\n${normalizedTrigger}`;
+      }
+
+      if (!normalizedTrigger || CONFIRM_ONLY_RE.test(normalizedTrigger)) {
+        return "";
+      }
+
+      return [
+        "# APPLICATION REQUIREMENTS",
+        "",
+        normalizedTrigger,
+        "",
+        "Build EXACTLY what the user requested above.",
+        "Do NOT add unrelated features.",
+      ].join("\n");
+    },
+    [conversationGetRequirements],
+  );
+
   const handleSmartSend = useCallback(
     async (text: string, images: string[] = []) => {
       if (!text && images.length === 0) return;
