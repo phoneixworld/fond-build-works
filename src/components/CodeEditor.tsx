@@ -41,7 +41,7 @@ function getMonacoLanguage(lang: string, filePath: string): string {
 
 const CodeEditor = () => {
   const { files, activeFile, setActiveFile, getFile, updateFile } = useVirtualFS();
-  const { previewHtml, setPreviewHtml } = usePreview();
+  const { previewHtml, setPreviewHtml, sandpackFiles, setSandpackFiles, triggerRefresh } = usePreview();
   const { currentProject, saveProject } = useProjects();
   const { toast } = useToast();
   const [copied, setCopied] = useState(false);
@@ -131,9 +131,15 @@ const CodeEditor = () => {
       }
     }
 
+    // Sync edit to Sandpack preview (live hot-reload)
+    if (sandpackFiles) {
+      const sandpackPath = activeFile.startsWith("/") ? activeFile : `/${activeFile}`;
+      setSandpackFiles({ ...sandpackFiles, [sandpackPath]: editContent });
+    }
+
     setDirty(false);
     toast({ title: "Saved", description: `${activeFile} updated` });
-  }, [dirty, editContent, activeFile, currentFile, updateFile, setPreviewHtml, currentProject, saveProject, toast]);
+  }, [dirty, editContent, activeFile, currentFile, updateFile, setPreviewHtml, currentProject, saveProject, toast, sandpackFiles, setSandpackFiles]);
 
   const stopEditing = useCallback(() => {
     if (dirty) saveEdit();
@@ -158,12 +164,24 @@ const CodeEditor = () => {
   }, [editing, dirty, saveEdit, stopEditing]);
 
   const runPreview = useCallback(() => {
-    const htmlFile = files["index.html"];
-    if (htmlFile) {
-      setPreviewHtml(htmlFile.content);
-      toast({ title: "Preview updated", description: "Running latest code" });
+    // Sync all VirtualFS files to Sandpack preview
+    if (sandpackFiles) {
+      const updatedFiles = { ...sandpackFiles };
+      for (const [path, file] of Object.entries(files)) {
+        const sandpackPath = path.startsWith("/") ? path : `/${path}`;
+        updatedFiles[sandpackPath] = file.content;
+      }
+      setSandpackFiles(updatedFiles);
+      triggerRefresh();
+      toast({ title: "Preview updated", description: "All files synced to preview" });
+    } else {
+      const htmlFile = files["index.html"];
+      if (htmlFile) {
+        setPreviewHtml(htmlFile.content);
+        toast({ title: "Preview updated", description: "Running latest code" });
+      }
     }
-  }, [files, setPreviewHtml, toast]);
+  }, [files, sandpackFiles, setSandpackFiles, triggerRefresh, setPreviewHtml, toast]);
 
   const getTabColor = (path: string) => {
     const ext = path.split(".").pop() || "";

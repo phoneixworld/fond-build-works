@@ -26,6 +26,8 @@ import ChatModeIndicator from "@/components/chat/ChatModeIndicator";
 import StreamingIndicator from "@/components/chat/StreamingIndicator";
 import ErrorRecoveryBanner from "@/components/chat/ErrorRecoveryBanner";
 import ChatSmartSuggestions from "@/components/chat/ChatSmartSuggestions";
+import MigrationApprovalCard from "@/components/chat/MigrationApprovalCard";
+import { useBackendCompletion } from "@/hooks/useBackendCompletion";
 import {
   type MsgContent,
   getTextContent,
@@ -216,6 +218,9 @@ const ChatPanel = forwardRef<ChatPanelHandle, { initialPrompt?: string; onVersio
     setBuildStreamContent, setBuildRetryCount, setPendingBuildPrompt, setIsLoading,
   } = buildOrch;
 
+  // Backend completion — auto-execute migrations after build
+  const backendCompletion = useBackendCompletion(currentProject?.id);
+
   // Sync refs after both hooks are initialized
   useEffect(() => { sendMessageRef.current = sendMessage; }, [sendMessage]);
   useEffect(() => { setPipelineStepRef.current = setPipelineStep; }, [setPipelineStep]);
@@ -290,6 +295,11 @@ const ChatPanel = forwardRef<ChatPanelHandle, { initialPrompt?: string; onVersio
         verificationOk: lastVerificationOkRef.current ?? undefined,
         previewUrl: null, // Will be updated async via event
       });
+
+      // Auto-process backend migrations from workspace
+      if (sandpackFilesRef.current) {
+        backendCompletion.processMigrations(sandpackFilesRef.current);
+      }
     }
     prevPipelineStep.current = pipelineStep;
   }, [pipelineStep, createCheckpoint]);
@@ -831,6 +841,19 @@ const ChatPanel = forwardRef<ChatPanelHandle, { initialPrompt?: string; onVersio
                 const event = new CustomEvent("switch-panel", { detail: "preview" });
                 window.dispatchEvent(event);
               }}
+            />
+          )}
+
+          {/* Backend Migration Approval Card */}
+          {backendCompletion.totalCount > 0 && (
+            <MigrationApprovalCard
+              migrations={backendCompletion.migrations}
+              pendingApproval={backendCompletion.pendingApproval}
+              completedCount={backendCompletion.completedCount}
+              totalCount={backendCompletion.totalCount}
+              isExecuting={backendCompletion.isExecuting}
+              onApprove={backendCompletion.approveMigration}
+              onSkip={backendCompletion.skipMigration}
             />
           )}
 
