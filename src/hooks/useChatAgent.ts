@@ -133,6 +133,12 @@ export interface ChatAgentConfig {
   // Workspace context for chat-agent
   sandpackFilesRef: React.RefObject<Record<string, string> | null>;
   previewErrors: string[];
+  // Invariant #5: Project identity context per turn
+  projectIdentityRef?: React.RefObject<{
+    templateName: string | null;
+    lastBuildSummary: string | null;
+    fileMapKeys: string[];
+  } | null>;
 }
 
 export function useChatAgent(config: ChatAgentConfig) {
@@ -230,6 +236,12 @@ export function useChatAgent(config: ChatAgentConfig) {
 
       // Recent preview errors for chat-agent context
       const recentErrors = previewErrorsRef.current.slice(-10);
+
+      // Invariant #5: Project identity context per turn
+      const identityCtx = config.projectIdentityRef?.current;
+      const projectIdentityContext = identityCtx
+        ? `\n## PROJECT IDENTITY\nTemplate: ${identityCtx.templateName || "none"}\nLast build: ${identityCtx.lastBuildSummary || "none"}\nFiles: ${identityCtx.fileMapKeys.length} files`
+        : "";
 
       // Interface contracts snapshot
       const contractSnapshot = getInterfaceContractsSnapshot();

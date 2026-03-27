@@ -46,6 +46,14 @@ import {
   clearBuildHistory,
 } from "@/lib/buildEngine";
 import { extractUrlFromMessage, analyzeUrl } from "@/lib/urlAnalyzer";
+import { routeIntent, type RouteDecision } from "@/lib/intentRouter";
+import {
+  loadProjectIdentity,
+  setTemplateIdentity,
+  setLastBuildResult,
+  clearIdentityCache,
+  type ProjectIdentity,
+} from "@/lib/projectIdentity";
 
 /** Phase 3: Normalize task labels for user display */
 function normalizeTaskLabel(raw: string): string {
@@ -340,6 +348,12 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
   const lastProjectIdRef = useRef<string | null>(null);
   const deferredPreviewTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const buildRunTokenRef = useRef(0);
+  // Invariant #5: Project identity ref for chat agent context
+  const projectIdentityRef = useRef<{
+    templateName: string | null;
+    lastBuildSummary: string | null;
+    fileMapKeys: string[];
+  } | null>(null);
 
   useEffect(() => {
     buildRetryCountRef.current = buildRetryCount;
@@ -628,6 +642,18 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
     [setMessages, setIsBuilding, setBuildStep, conversationCompleteBuild],
   );
 
+  // Invariant #5: Keep project identity ref synced
+  useEffect(() => {
+    if (!currentProject?.id) return;
+    loadProjectIdentity(currentProject.id).then((identity) => {
+      projectIdentityRef.current = {
+        templateName: identity.template?.templateName || null,
+        lastBuildSummary: identity.lastBuild?.summary || null,
+        fileMapKeys: identity.fileMapKeys,
+      };
+    });
+  }, [currentProject?.id]);
+
   const { sendChatMessage } = useChatAgent({
     currentProject,
     saveProject,
@@ -645,6 +671,7 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
     buildMessageContent,
     sandpackFilesRef,
     previewErrors,
+    projectIdentityRef,
   } as ChatAgentConfig);
 
   const { tryInstantBuild } = useInstantBuild({
@@ -838,6 +865,19 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
               }
               completeBuildManifest(true);
             } catch (e) { console.warn("[Pillar2] AST indexing failed (non-blocking):", e); }
+
+            // Invariant #2: Persist template identity
+            if (currentProject?.id && template) {
+              setTemplateIdentity(currentProject.id, template.id, instantResult.templateName).catch(() => {});
+              setLastBuildResult(currentProject.id, {
+                status: "success",
+                fileCount: Object.keys(finalFiles).length,
+                filesChanged: Object.keys(finalFiles),
+                verificationOk: true,
+                timestamp: Date.now(),
+                summary: `Template "${instantResult.templateName}" rendered`,
+              }, Object.keys(finalFiles)).catch(() => {});
+            }
 
             const fileCount = Object.keys(finalFiles).length;
             const msg = `✅ **${instantResult.templateName}** — ${fileCount} files rendered instantly!\n\nYour app is ready with API-wired data hooks and fallback demo data. Backend schema included.`;
@@ -1228,6 +1268,18 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
               }
               completeBuildManifest(result.status === "success");
             } catch (e) { console.warn("[Pillar2] AST indexing failed (non-blocking):", e); }
+
+            // Invariant #2: Persist last build result
+            if (currentProject?.id) {
+              setLastBuildResult(currentProject.id, {
+                status: result.status as "success" | "partial" | "failed",
+                fileCount: Object.keys(finalWorkspace).length,
+                filesChanged: Object.keys(finalWorkspace),
+                verificationOk: result.verification.ok,
+                timestamp: Date.now(),
+                summary: result.summary,
+              }, Object.keys(finalWorkspace)).catch(() => {});
+            }
 
             const statusEmoji = result.status === "success" ? "✅" : result.status === "partial" ? "⚠️" : "❌";
             const staticLine = result.verification.ok
@@ -1795,60 +1847,138 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
     ],
   );
 
+  const CONFIRM_ONLY_RE =
+    /^(yes|yep|yeah|go ahead|proceed|do it|ok|okay|sure|continue|start|build it|just do it)\s*[.!]?$/i;
+
+  const buildRequirementsPayload = useCallback(
+    async (triggerText: string) => {
+      const compiled = await Promise.resolve(conversationGetRequirements?.() || "");
+      const normalizedTrigger = triggerText.trim();
+
+      if (compiled && compiled.length > 50) {
+        return `${compiled}\n\n## BUILD TRIGGER\n${normalizedTrigger}`;
+      }
+
+      if (!normalizedTrigger || CONFIRM_ONLY_RE.test(normalizedTrigger)) {
+        return "";
+      }
+
+      return [
+        "# APPLICATION REQUIREMENTS",
+        "",
+        normalizedTrigger,
+        "",
+        "Build EXACTLY what the user requested above.",
+        "Do NOT add unrelated features.",
+      ].join("\n");
+    },
+    [conversationGetRequirements],
+  );
+
   const handleSmartSend = useCallback(
     async (text: string, images: string[] = []) => {
       if (!text && images.length === 0) return;
 
+      // Reset stale refs
       if (isSendingRef.current && !isLoading) {
-        console.warn("[SmartSend] Resetting stale isSendingRef (was true but isLoading=false)");
+        console.warn("[SmartSend] Resetting stale isSendingRef");
         isSendingRef.current = false;
       }
       if (isLoadingRef.current && !isLoading) {
-        console.warn("[SmartSend] Resetting stale isLoadingRef (was true but isLoading=false)");
+        console.warn("[SmartSend] Resetting stale isLoadingRef");
         isLoadingRef.current = false;
       }
-
       if (isSendingRef.current || isLoadingRef.current) return;
 
       const smartSendProjectId = currentProject?.id;
+      if (!smartSendProjectId) return;
       const isSmartSendStale = () =>
         !smartSendProjectId || (lastProjectIdRef.current !== null && lastProjectIdRef.current !== smartSendProjectId);
 
-      const hasImages = images.length > 0;
       const finalText = (text || "").trim();
-      if (!finalText && !hasImages) return;
+      if (!finalText && images.length === 0) return;
 
+      // ── Load project identity (Invariant #2) ──
+      const identity = await loadProjectIdentity(smartSendProjectId);
+      if (isSmartSendStale()) return;
+
+      // ── Workspace truth (Invariant #4) ──
       const getUserWorkspaceFileCount = (files: Record<string, string> | null | undefined) =>
         Object.keys(files || {}).filter((p) => !p.startsWith("/components/ui/")).length;
       const hasExistingCode = getUserWorkspaceFileCount(sandpackFilesRef.current) > 0;
-      const CONFIRM_ONLY =
-        /^(yes|yep|yeah|go ahead|proceed|do it|ok|okay|sure|continue|start|build it|just do it)\s*[.!]?$/i;
-      const NON_ACTIONABLE =
-        /^[\s!?.,:;\-—…'"()*#@&^%$~`]+$|^(fuck|shit|damn|hell|wtf|omg|ugh|lol|hmm|huh|meh|bruh|stop|quit|bye|go away|leave|shut up|whatever|forget it|never ?mind|screw|crap|bloody|idiot|stupid|dumb|rubbish|useless|hate|sucks?|annoying|terrible|horrible|awful|worst|lame|pathetic)\b/i;
 
-      const buildRequirementsPayload = async (triggerText: string) => {
-        const compiled = await Promise.resolve(conversationGetRequirements?.() || "");
-        const normalizedTrigger = triggerText.trim();
+      // ── URL detection (before routing) ──
+      const urlInfo = extractUrlFromMessage(finalText);
+      if (urlInfo) {
+        isSendingRef.current = true;
+        setIsLoading(true);
+        setBuildStep("🔍 Analyzing URL...");
+        setCurrentAgent("chat");
+        setPipelineStep("chatting");
 
-        if (compiled && compiled.length > 50) {
-          return `${compiled}\n\n## BUILD TRIGGER\n${normalizedTrigger}`;
+        const content = buildMessageContent(finalText, images);
+        setInput("");
+        setAttachedImages([]);
+        setMessages((prev) => [...prev, { role: "user", content, timestamp: Date.now() }]);
+
+        try {
+          const result = await analyzeUrl(urlInfo);
+          if (isSmartSendStale()) return;
+
+          if (result.success) {
+            setMessages((prev) => [
+              ...prev,
+              { role: "assistant", content: result.confirmationMessage || "URL analyzed successfully.", timestamp: Date.now() },
+            ]);
+          } else {
+            setMessages((prev) => [
+              ...prev,
+              {
+                role: "assistant",
+                content: result.error || "I couldn't analyze that URL.",
+                timestamp: Date.now(),
+              },
+            ]);
+          }
+        } catch (err: any) {
+          setMessages((prev) => [
+            ...prev,
+            { role: "assistant", content: `⚠️ Failed to analyze URL: ${err.message || "Unknown error"}`, timestamp: Date.now() },
+          ]);
         }
 
-        if (!normalizedTrigger || CONFIRM_ONLY.test(normalizedTrigger)) {
-          return "";
-        }
+        setIsLoading(false);
+        setBuildStep("");
+        setPipelineStep(null);
+        setCurrentAgent(null);
+        isSendingRef.current = false;
+        return;
+      }
 
-        return [
-          "# APPLICATION REQUIREMENTS",
-          "",
-          normalizedTrigger,
-          "",
-          "Build EXACTLY what the user requested above.",
-          "Do NOT add unrelated features.",
-        ].join("\n");
-      };
+      // ══════════════════════════════════════════════════════════
+      // SINGLE INTENT ROUTER — one call, one decision, no re-classification
+      // ══════════════════════════════════════════════════════════
+      const decision = routeIntent(finalText, images, identity, hasExistingCode, !!pendingExecution);
+      console.log(`[SmartSend] Route: ${decision.route} | Reason: ${decision.reason} | Enhancement: ${decision.isEnhancement}`);
 
-      if (pendingExecution) {
+      // ── Route: Chat ──
+      if (decision.route === "chat") {
+        setCurrentAgent("chat");
+        setPipelineStep("chatting");
+        sendChatMessage(finalText, images);
+        return;
+      }
+
+      // ── Route: Auto-fix ──
+      if (decision.route === "auto_fix") {
+        setCurrentAgent("build");
+        setPipelineStep("planning");
+        sendMessage(finalText, images);
+        return;
+      }
+
+      // ── Route: Resolve pending confirmation ──
+      if (decision.route === "resolve_pending" && pendingExecution) {
         const reply = parseConfirmationReply(finalText);
 
         if (reply === "cancel") {
@@ -1861,12 +1991,11 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
 
         if (reply === "unclear") {
           setPendingExecution(null);
+          // Fall through to re-route without pending
         } else {
+          // Confirmed
           if (pendingExecution.needsHighImpactConfirm && !pendingExecution.awaitingHighImpactConfirm) {
-            setPendingExecution({
-              ...pendingExecution,
-              awaitingHighImpactConfirm: true,
-            });
+            setPendingExecution({ ...pendingExecution, awaitingHighImpactConfirm: true });
             appendConversationTurn(finalText, images, "This will modify core application files.\nProceed?");
             return;
           }
@@ -1875,13 +2004,9 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
           setPendingExecution(null);
           appendConversationTurn(finalText, images, "Proceeding with the approved change.");
 
-          // Safety net: if there's existing user code and no explicit rebuild request,
-          // route to edit — but ignore scaffolding-only file sets.
-          const isExplicitRebuild = /\b(rebuild|from scratch|start over|regenerate app|new app|new project)\b/i.test(
-            approved.prompt.toLowerCase(),
-          );
-          const userWorkspaceFileCount = getUserWorkspaceFileCount(sandpackFilesRef.current);
-          const shouldEdit = approved.routeHint === "edit" || (userWorkspaceFileCount > 0 && !isExplicitRebuild);
+          // Invariant #3: existing code → edit, never rebuild
+          const isExplicitRebuild = /\b(rebuild|from scratch|start over|regenerate app|new app|new project)\b/i.test(approved.prompt);
+          const shouldEdit = approved.routeHint === "edit" || (hasExistingCode && !isExplicitRebuild);
 
           if (shouldEdit) {
             setCurrentAgent("edit");
@@ -1890,274 +2015,41 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
             return;
           }
 
-          const approvedBuildPrompt = await buildRequirementsPayload(approved.prompt);
-          if (isSmartSendStale()) return;
-
-          if (!approvedBuildPrompt) {
-            setCurrentAgent("chat");
-            setPipelineStep("chatting");
-            setMessages((prev) => [
-              ...prev,
-              {
-                role: "assistant",
-                content: "Please share one concrete build request (not just confirmation), then I’ll run it.",
-                timestamp: Date.now(),
-              },
-            ]);
-            return;
-          }
+          conversationStartBuilding?.();
+          const buildPrompt = await buildRequirementsPayload(approved.prompt);
+          if (isSmartSendStale() || !buildPrompt) return;
 
           setCurrentAgent("build");
           setPipelineStep("planning");
-          sendMessage(approvedBuildPrompt, approved.images);
+          sendMessage(buildPrompt, approved.images);
           return;
         }
       }
 
-      const isAutoFix = finalText.startsWith("🔧");
-      if (isAutoFix) {
-        setCurrentAgent("build");
-        setPipelineStep("planning");
-        sendMessage(finalText, images);
-        return;
-      }
-
-      // Hard override: explicit full-build commands like "Build a CRM" must execute build immediately
-      // and never fall back to planning/chat loops.
-      const EXPLICIT_BUILD_TRIGGER =
-        /^(build|create|generate|make)\s+(a\s+|an\s+|me\s+a\s+|me\s+an\s+)?[\w\s-]{0,30}(crm|dashboard|app|application|portal|system|platform|tracker|manager|tool)\b[.!?]*$/i;
-      const hasDirectTemplateMatch = !!matchTemplate(finalText);
-      const shouldForceDirectBuild = EXPLICIT_BUILD_TRIGGER.test(finalText) && hasDirectTemplateMatch;
-
-      if (shouldForceDirectBuild) {
-        conversationStartBuilding?.();
-        const buildPrompt = await buildRequirementsPayload(finalText);
-        if (isSmartSendStale()) return;
-
-        if (!buildPrompt) {
-          setCurrentAgent("chat");
-          setPipelineStep("chatting");
-          setMessages((prev) => [
-            ...prev,
-            {
-              role: "assistant",
-              content: "I need a concrete requirement to build from (not only confirmation).",
-              timestamp: Date.now(),
-            },
-          ]);
-          return;
-        }
-
-        setCurrentAgent("build");
-        setPipelineStep("planning");
-        sendMessage(buildPrompt, images);
-        return;
-      }
-
-      const detectedUrl = extractUrlFromMessage(finalText);
-      if (detectedUrl) {
-        const content = buildMessageContent(finalText, images);
-        const userMsg: Msg = { role: "user", content, timestamp: Date.now() };
-        setInput("");
-        setAttachedImages([]);
-        setMessages((prev) => [...prev, userMsg]);
-        setIsLoading(true);
-        setBuildStep("Analyzing URL...");
-        setCurrentAgent("chat");
-        setPipelineStep("chatting");
-
-        try {
-          const result = await analyzeUrl(detectedUrl);
-          setIsLoading(false);
-          setBuildStep("");
-
-          if (result.success && result.confirmationMessage && result.buildPrompt) {
-            setPendingExecution({
-              prompt: result.buildPrompt,
-              images: [],
-              routeHint: "build" as GuardRouteHint,
-              needsHighImpactConfirm: false,
-              awaitingHighImpactConfirm: false,
-            });
-
-            setMessages((prev) => [
-              ...prev,
-              {
-                role: "assistant",
-                content: result.confirmationMessage,
-                timestamp: Date.now(),
-              },
-            ]);
-
-            const persistMessages = messagesRef.current.map((m) => ({
-              role: m.role,
-              content: typeof m.content === "string" ? m.content : getTextContent(m.content),
-            }));
-            saveProject({ chat_history: persistMessages });
-          } else {
-            setMessages((prev) => [
-              ...prev,
-              {
-                role: "assistant",
-                content:
-                  result.error ||
-                  "I couldn't analyze that URL. Please try a different one or describe what you want to build.",
-                timestamp: Date.now(),
-              },
-            ]);
-          }
-        } catch (err: any) {
-          setIsLoading(false);
-          setBuildStep("");
-          setMessages((prev) => [
-            ...prev,
-            {
-              role: "assistant",
-              content: `⚠️ Failed to analyze URL: ${err.message || "Unknown error"}`,
-              timestamp: Date.now(),
-            },
-          ]);
-        }
-
-        setPipelineStep(null);
-        setCurrentAgent(null);
-        isSendingRef.current = false;
-        return;
-      }
-
-      const guardedIntent = classifyIntentGate(finalText, hasExistingCode);
-      if (guardedIntent.isAmbiguous || guardedIntent.routeHint === "chat") {
-        setCurrentAgent("chat");
-        setPipelineStep("chatting");
-        sendChatMessage(finalText, images);
-        return;
-      }
-
-      const shouldAutoBuildWithoutConfirmation =
-        guardedIntent.requiresConfirmation &&
-        guardedIntent.category === "generation_request" &&
-        guardedIntent.routeHint === "build" &&
-        !guardedIntent.requiresSecondConfirmation &&
-        !hasExistingCode;
-
-      if (shouldAutoBuildWithoutConfirmation) {
-        conversationStartBuilding?.();
-        const buildPrompt = await buildRequirementsPayload(finalText);
-        if (isSmartSendStale()) return;
-
-        if (!buildPrompt) {
-          setCurrentAgent("chat");
-          setPipelineStep("chatting");
-          setMessages((prev) => [
-            ...prev,
-            {
-              role: "assistant",
-              content: "I need a concrete requirement to build from (not only confirmation).",
-              timestamp: Date.now(),
-            },
-          ]);
-          return;
-        }
-
-        setCurrentAgent("build");
-        setPipelineStep("planning");
-        sendMessage(buildPrompt, images);
-        return;
-      }
-
-      if (guardedIntent.requiresConfirmation) {
-        setCurrentAgent("chat");
-        setPipelineStep("chatting");
-        setPendingExecution({
-          prompt: finalText,
-          images,
-          routeHint: guardedIntent.routeHint,
-          needsHighImpactConfirm: guardedIntent.requiresSecondConfirmation,
-          awaitingHighImpactConfirm: false,
-        });
-        appendConversationTurn(finalText, images, "I can generate this.\nDo you want me to proceed?");
-        return;
-      }
-
-      const normalizedText = finalText.toLowerCase();
-      const explicitRebuildRequest = /\b(rebuild|from scratch|start over|regenerate app|new app|new project)\b/i.test(
-        normalizedText,
-      );
-      const explicitEditVerb = /\b(fix|change|update|modify|refactor|patch|repair|replace|add|remove|delete)\b/i.test(
-        normalizedText,
-      );
-      const explicitBuildVerb = /\b(build|create|generate|scaffold|implement|develop|make)\b/i.test(normalizedText);
-      const hasRuntimeSignal =
-        /\b(bug|error|not working|doesn't work|doesnt work|broken|crash|failed|fails|preview|runtime|problem|issue)\b/i.test(
-          normalizedText,
-        );
-      const isQuestionOnly = finalText.endsWith("?") || /^(why|what|where|who|how)\b/i.test(finalText);
-      const stopOrExplainOnly =
-        /\b(do not build|don't build|dont build|do not edit|don't edit|dont edit|just explain|only explain|root cause only|without fixing)\b/i.test(
-          normalizedText,
-        );
-
-      if (
-        stopOrExplainOnly ||
-        NON_ACTIONABLE.test(finalText) ||
-        (isQuestionOnly && !explicitEditVerb && !explicitBuildVerb)
-      ) {
-        setCurrentAgent("chat");
-        setPipelineStep("chatting");
-        sendChatMessage(finalText, images);
-        return;
-      }
-
-      if (hasExistingCode && explicitEditVerb && hasRuntimeSignal && !explicitRebuildRequest) {
+      // ── Route: Edit (Invariant #3: existing project → edit-only) ──
+      if (decision.route === "edit") {
         setCurrentAgent("edit");
         setPipelineStep("resolving");
         sendEditMessage(finalText, images);
         return;
       }
 
-      let convResult: { action: string; reason: string } | null = null;
-      if (conversationAnalyzeAsync) {
-        try {
-          convResult = await conversationAnalyzeAsync(finalText, hasImages, hasExistingCode);
-          if (isSmartSendStale()) return;
-          console.log(
-            `[SmartSend] Server analysis: mode=${conversationMode}, action=${convResult.action}, reason=${convResult.reason}`,
+      // ── Route: Build ──
+      if (decision.route === "build") {
+        // If skip confirmation is false (e.g. explicit rebuild), ask first
+        if (!decision.skipConfirmation) {
+          setPendingExecution({
+            prompt: finalText,
+            images,
+            routeHint: "build",
+            needsHighImpactConfirm: true,
+            awaitingHighImpactConfirm: false,
+          });
+          appendConversationTurn(
+            finalText,
+            images,
+            "This will regenerate the entire application from scratch. Are you sure?",
           );
-        } catch (err) {
-          console.warn("[SmartSend] Server analysis failed, falling back to safe chat route:", err);
-        }
-      }
-
-      if (convResult?.action === "gather") {
-        const phase = conversationAddPhase?.(finalText, hasImages, images);
-        const ackText =
-          conversationGenerateAck?.(phase) ||
-          '✅ Got it! Send the next phase when ready, or say **"build it"** to start.';
-
-        const content = buildMessageContent(finalText, images);
-        const userMsg: Msg = {
-          role: "user",
-          content,
-          timestamp: Date.now(),
-        };
-        setInput("");
-        setAttachedImages([]);
-        setMessages((prev) => [...prev, userMsg, { role: "assistant", content: ackText, timestamp: Date.now() }]);
-        return;
-      }
-
-      if (convResult?.action === "edit") {
-        setCurrentAgent("edit");
-        setPipelineStep("resolving");
-        sendEditMessage(finalText, images);
-        return;
-      }
-
-      if (convResult?.action === "build") {
-        if (hasExistingCode && !explicitRebuildRequest) {
-          setCurrentAgent("edit");
-          setPipelineStep("resolving");
-          sendEditMessage(finalText, images);
           return;
         }
 
@@ -2181,59 +2073,11 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
 
         setCurrentAgent("build");
         setPipelineStep("planning");
-        sendMessage(buildPrompt, images);
+        sendMessage(buildPrompt, images, finalText);
         return;
       }
 
-      if (convResult?.action === "chat") {
-        setCurrentAgent("chat");
-        setPipelineStep("chatting");
-        sendChatMessage(finalText, images);
-        return;
-      }
-
-      if (conversationMode === "gathering" && finalText.length > 10 && !CONFIRM_ONLY.test(finalText)) {
-        const phase = conversationAddPhase?.(finalText, hasImages, images);
-        const ackText =
-          conversationGenerateAck?.(phase) ||
-          '✅ Got it! Send the next phase when ready, or say **"build it"** to start.';
-        const content = buildMessageContent(finalText, images);
-        const userMsg: Msg = {
-          role: "user",
-          content,
-          timestamp: Date.now(),
-        };
-        setInput("");
-        setAttachedImages([]);
-        setMessages((prev) => [...prev, userMsg, { role: "assistant", content: ackText, timestamp: Date.now() }]);
-        return;
-      }
-
-      if (!hasExistingCode && explicitBuildVerb && !CONFIRM_ONLY.test(finalText)) {
-        conversationStartBuilding?.();
-        const buildPrompt = await buildRequirementsPayload(finalText);
-        if (isSmartSendStale()) return;
-
-        if (!buildPrompt) {
-          setCurrentAgent("chat");
-          setPipelineStep("chatting");
-          setMessages((prev) => [
-            ...prev,
-            {
-              role: "assistant",
-              content: "I need a concrete requirement to build from (not only confirmation).",
-              timestamp: Date.now(),
-            },
-          ]);
-          return;
-        }
-
-        setCurrentAgent("build");
-        setPipelineStep("planning");
-        sendMessage(buildPrompt, images);
-        return;
-      }
-
+      // Absolute fallback — should never reach here
       setCurrentAgent("chat");
       setPipelineStep("chatting");
       sendChatMessage(finalText, images);
@@ -2245,17 +2089,12 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
       sendChatMessage,
       sendMessage,
       sendEditMessage,
-      conversationAnalyzeAsync,
-      conversationAddPhase,
-      conversationGetRequirements,
       conversationStartBuilding,
-      conversationGenerateAck,
-      conversationMode,
+      conversationGetRequirements,
       buildMessageContent,
       setInput,
       setAttachedImages,
       setMessages,
-      saveProject,
       isLoading,
       isLoadingRef,
     ],
@@ -2287,6 +2126,9 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
     resetASTWorkspace();
     clearProvenance();
     clearBuildHistory();
+    // Invariant #2: Clear identity cache on chat clear
+    if (currentProject?.id) clearIdentityCache(currentProject.id);
+    projectIdentityRef.current = null;
     isSendingRef.current = false;
     saveProject({ chat_history: [], html_content: "" });
   }, [
