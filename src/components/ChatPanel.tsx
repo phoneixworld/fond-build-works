@@ -218,6 +218,9 @@ const ChatPanel = forwardRef<ChatPanelHandle, { initialPrompt?: string; onVersio
     setBuildStreamContent, setBuildRetryCount, setPendingBuildPrompt, setIsLoading,
   } = buildOrch;
 
+  // Backend completion — auto-execute migrations after build
+  const backendCompletion = useBackendCompletion(currentProject?.id);
+
   // Sync refs after both hooks are initialized
   useEffect(() => { sendMessageRef.current = sendMessage; }, [sendMessage]);
   useEffect(() => { setPipelineStepRef.current = setPipelineStep; }, [setPipelineStep]);
