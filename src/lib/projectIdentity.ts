@@ -10,13 +10,60 @@
 
 import { supabase } from "@/integrations/supabase/client";
 
+// ─── Schema Identity Types ─────────────────────────────────────────────────
+
+export interface SchemaField {
+  name: string;
+  type: string; // text | number | boolean | date | json | email | url | select | relation
+  required: boolean;
+  defaultValue?: string;
+  options?: string[];       // for select
+  relationTo?: string;      // for relation — target entity name
+}
+
+export interface SchemaEntity {
+  name: string;             // e.g. "contacts", "deals", "activities"
+  fields: SchemaField[];
+  relationships: SchemaRelationship[];
+}
+
+export interface SchemaRelationship {
+  type: "belongs_to" | "has_many" | "many_to_many";
+  from: string;             // source entity
+  to: string;               // target entity
+  foreignKey?: string;
+}
+
+export interface SchemaRoute {
+  path: string;
+  label: string;
+  icon?: string;
+  component?: string;       // file path
+  isProtected: boolean;
+}
+
+export interface SchemaComponent {
+  name: string;             // e.g. "ContactsTable", "DealPipeline"
+  filePath: string;
+  entity?: string;          // which entity it renders
+  type: "page" | "widget" | "form" | "list" | "detail" | "chart" | "layout";
+}
+
+// ─── Template Identity ─────────────────────────────────────────────────────
+
 export interface TemplateIdentity {
   templateId: string;
   templateName: string;
   /** ISO timestamp of when the template was first applied */
   appliedAt: string;
-  /** Schema tables associated with this template */
+  /** Legacy: table names only */
   schemaSnapshot: string[];
+  /** Full entity schema with fields and relationships */
+  entities: SchemaEntity[];
+  /** Registered routes */
+  routes: SchemaRoute[];
+  /** Component registry */
+  components: SchemaComponent[];
 }
 
 export interface LastBuildResult {
@@ -102,6 +149,9 @@ export async function setTemplateIdentity(
   templateId: string,
   templateName: string,
   schemas: string[] = [],
+  entities: SchemaEntity[] = [],
+  routes: SchemaRoute[] = [],
+  components: SchemaComponent[] = [],
 ): Promise<void> {
   const current = await loadProjectIdentity(projectId);
   const updated: ProjectIdentity = {
@@ -111,6 +161,37 @@ export async function setTemplateIdentity(
       templateName,
       appliedAt: new Date().toISOString(),
       schemaSnapshot: schemas,
+      entities,
+      routes,
+      components,
+    },
+  };
+  await saveProjectIdentity(projectId, updated);
+}
+
+/**
+ * Update schema identity incrementally (e.g. after adding a new entity).
+ */
+export async function updateSchemaIdentity(
+  projectId: string,
+  patch: {
+    entities?: SchemaEntity[];
+    routes?: SchemaRoute[];
+    components?: SchemaComponent[];
+  },
+): Promise<void> {
+  const current = await loadProjectIdentity(projectId);
+  if (!current.template) {
+    console.warn("[ProjectIdentity] Cannot update schema — no template identity set");
+    return;
+  }
+  const updated: ProjectIdentity = {
+    ...current,
+    template: {
+      ...current.template,
+      entities: patch.entities ?? current.template.entities,
+      routes: patch.routes ?? current.template.routes,
+      components: patch.components ?? current.template.components,
     },
   };
   await saveProjectIdentity(projectId, updated);
