@@ -212,7 +212,7 @@ const ChatPanel = forwardRef<ChatPanelHandle, { initialPrompt?: string; onVersio
     compilerTasks,
     isSendingRef, isLoadingRef, messagesRef, sandpackFilesRef, abortControllerRef, lastProjectIdRef,
     lastVerificationOkRef,
-    sendMessage, sendChatMessage, handleSmartSend, clearChat: orchClearChat, abortBuild,
+    sendMessage, sendChatMessage, sendEditMessage, handleSmartSend, clearChat: orchClearChat, abortBuild,
     syncSandpackToVirtualFS,
     setCurrentAgent, setCurrentPlan, setCurrentTaskIndex, setTotalPlanTasks,
     setBuildStreamContent, setBuildRetryCount, setPendingBuildPrompt, setIsLoading,
@@ -222,14 +222,14 @@ const ChatPanel = forwardRef<ChatPanelHandle, { initialPrompt?: string; onVersio
   const backendCompletion = useBackendCompletion(currentProject?.id);
 
   // Sync refs after both hooks are initialized
-  useEffect(() => { sendMessageRef.current = sendMessage; }, [sendMessage]);
+  useEffect(() => { sendMessageRef.current = handleSmartSend; }, [handleSmartSend]);
   useEffect(() => { setPipelineStepRef.current = setPipelineStep; }, [setPipelineStep]);
 
   // Wire self-healing guard refs to real orchestrator state
   useEffect(() => { selfHealSendingRef.current = isSendingRef.current; }, [isLoading]);
   useEffect(() => { selfHealLoadingRef.current = isLoading; }, [isLoading]);
   // Wire surgical edit path for self-healing (sendMessage is the fallback, but edit is preferred)
-  useEffect(() => { sendEditRef.current = sendMessage; }, [sendMessage]);
+  useEffect(() => { sendEditRef.current = sendEditMessage; }, [sendEditMessage]);
 
   const handleClearChat = useCallback(() => {
     orchClearChat();
@@ -408,7 +408,6 @@ const ChatPanel = forwardRef<ChatPanelHandle, { initialPrompt?: string; onVersio
     if (currentProject && currentProject.id !== lastProjectIdRef.current) {
       // CRITICAL: Set lastProjectIdRef FIRST to block any in-flight build callbacks
       // from the previous project before doing anything else
-      const previousProjectId = lastProjectIdRef.current;
       lastProjectIdRef.current = currentProject.id;
       // Sync conversation state project ID immediately (before async restore)
       conversationState.currentProjectId.current = currentProject.id;
@@ -429,16 +428,8 @@ const ChatPanel = forwardRef<ChatPanelHandle, { initialPrompt?: string; onVersio
       const history = Array.isArray(currentProject.chat_history) ? currentProject.chat_history : [];
       setMessages(history);
       setPreviewHtml(currentProject.html_content || "");
-      // DON'T eagerly clear sandpackFiles — the async restore below will set
-      // the correct state. Clearing here causes a flash to "Hello World" on
-      // HMR re-mounts and slow DB restores.
-      // setSandpackFiles(null); setSandpackDeps({}); setPreviewMode("html");
-      // Instead, only clear if this is a genuine project *switch* (not first load / HMR)
-      if (previousProjectId !== null) {
-        setSandpackFiles(null);
-        setSandpackDeps({});
-        setPreviewMode("html");
-      }
+      // Keep current workspace mounted until restore resolves to avoid
+      // post-build/project-load flashes that hide the latest app output.
       setPreviewErrors([]);
       setAttachedImages([]);
       setAttachedDocuments([]);
