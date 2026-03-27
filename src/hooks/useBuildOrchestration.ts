@@ -1850,13 +1850,13 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
         setMessages((prev) => [...prev, { role: "user", content, timestamp: Date.now() }]);
 
         try {
-          const result = await analyzeUrl(urlInfo.url);
+          const result = await analyzeUrl(urlInfo);
           if (isSmartSendStale()) return;
 
           if (result.success) {
             setMessages((prev) => [
               ...prev,
-              { role: "assistant", content: result.analysis || "URL analyzed successfully.", timestamp: Date.now() },
+              { role: "assistant", content: result.confirmationMessage || "URL analyzed successfully.", timestamp: Date.now() },
             ]);
           } else {
             setMessages((prev) => [
