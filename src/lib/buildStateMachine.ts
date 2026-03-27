@@ -84,6 +84,16 @@ export class BuildStateMachine {
     return ["planning", "generating", "validating", "repairing", "editing"].includes(this._state);
   }
 
+  /**
+   * GUARDRAIL: Reject fresh template builds when already in an active state.
+   * Only "idle" or "error" states allow fresh builds.
+   */
+  canStartFreshBuild(): boolean {
+    if (this._state === "idle" || this._state === "error") return true;
+    console.warn(`[StateMachine] Fresh build rejected — currently in "${this._state}" state`);
+    return false;
+  }
+
   // ── Transition ──
 
   transition(to: BuildState, opts?: {
