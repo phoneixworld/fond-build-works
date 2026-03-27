@@ -149,6 +149,9 @@ export async function setTemplateIdentity(
   templateId: string,
   templateName: string,
   schemas: string[] = [],
+  entities: SchemaEntity[] = [],
+  routes: SchemaRoute[] = [],
+  components: SchemaComponent[] = [],
 ): Promise<void> {
   const current = await loadProjectIdentity(projectId);
   const updated: ProjectIdentity = {
@@ -158,6 +161,37 @@ export async function setTemplateIdentity(
       templateName,
       appliedAt: new Date().toISOString(),
       schemaSnapshot: schemas,
+      entities,
+      routes,
+      components,
+    },
+  };
+  await saveProjectIdentity(projectId, updated);
+}
+
+/**
+ * Update schema identity incrementally (e.g. after adding a new entity).
+ */
+export async function updateSchemaIdentity(
+  projectId: string,
+  patch: {
+    entities?: SchemaEntity[];
+    routes?: SchemaRoute[];
+    components?: SchemaComponent[];
+  },
+): Promise<void> {
+  const current = await loadProjectIdentity(projectId);
+  if (!current.template) {
+    console.warn("[ProjectIdentity] Cannot update schema — no template identity set");
+    return;
+  }
+  const updated: ProjectIdentity = {
+    ...current,
+    template: {
+      ...current.template,
+      entities: patch.entities ?? current.template.entities,
+      routes: patch.routes ?? current.template.routes,
+      components: patch.components ?? current.template.components,
     },
   };
   await saveProjectIdentity(projectId, updated);
