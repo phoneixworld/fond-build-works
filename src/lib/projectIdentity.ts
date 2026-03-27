@@ -10,13 +10,60 @@
 
 import { supabase } from "@/integrations/supabase/client";
 
+// ─── Schema Identity Types ─────────────────────────────────────────────────
+
+export interface SchemaField {
+  name: string;
+  type: string; // text | number | boolean | date | json | email | url | select | relation
+  required: boolean;
+  defaultValue?: string;
+  options?: string[];       // for select
+  relationTo?: string;      // for relation — target entity name
+}
+
+export interface SchemaEntity {
+  name: string;             // e.g. "contacts", "deals", "activities"
+  fields: SchemaField[];
+  relationships: SchemaRelationship[];
+}
+
+export interface SchemaRelationship {
+  type: "belongs_to" | "has_many" | "many_to_many";
+  from: string;             // source entity
+  to: string;               // target entity
+  foreignKey?: string;
+}
+
+export interface SchemaRoute {
+  path: string;
+  label: string;
+  icon?: string;
+  component?: string;       // file path
+  isProtected: boolean;
+}
+
+export interface SchemaComponent {
+  name: string;             // e.g. "ContactsTable", "DealPipeline"
+  filePath: string;
+  entity?: string;          // which entity it renders
+  type: "page" | "widget" | "form" | "list" | "detail" | "chart" | "layout";
+}
+
+// ─── Template Identity ─────────────────────────────────────────────────────
+
 export interface TemplateIdentity {
   templateId: string;
   templateName: string;
   /** ISO timestamp of when the template was first applied */
   appliedAt: string;
-  /** Schema tables associated with this template */
+  /** Legacy: table names only */
   schemaSnapshot: string[];
+  /** Full entity schema with fields and relationships */
+  entities: SchemaEntity[];
+  /** Registered routes */
+  routes: SchemaRoute[];
+  /** Component registry */
+  components: SchemaComponent[];
 }
 
 export interface LastBuildResult {
