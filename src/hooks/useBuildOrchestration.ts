@@ -2077,6 +2077,8 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
           return;
         }
 
+        // Phase 2: Pass routeIntent's template decision to sendMessage
+        routeDecisionRef.current = decision;
         setCurrentAgent("build");
         setPipelineStep("planning");
         sendMessage(buildPrompt, images, finalText);
