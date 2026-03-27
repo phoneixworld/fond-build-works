@@ -817,8 +817,9 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
         const userText = typeof text === "string" ? text : "";
         const snippetsContext = getSnippetsPromptContext(userText);
 
-        // Bug B fix: always allow template matching
-        const template = selectedTemplate || matchTemplate(userText);
+        // Phase 2: Use routeIntent's template decision — no double-matching
+        // routeDecisionRef carries the template from handleSmartSend
+        const template = routeDecisionRef.current?.template || selectedTemplate || matchTemplate(userText);
 
         let templateCtx = "";
         if (template) {
@@ -832,35 +833,13 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
 
         const liveSandpackFiles = sandpackFilesRef.current || {};
 
-        // Bug A fix: first-build based on user files, not scaffolded UI
-        const userFileCount = Object.keys(liveSandpackFiles).filter((p) => !p.startsWith("/components/ui/")).length;
-        const isFirstBuild = userFileCount === 0;
-
-        // Detect explicit full-build intent (e.g. "Build a CRM") even when workspace has files
-        const EXPLICIT_BUILD_RE = /\b(build|create|make|generate)\s+(a\s+|an\s+|me\s+a\s+|me\s+an\s+)?[\w\s-]{2,30}(app|crm|dashboard|portal|system|platform|tracker|manager|tool)\b/i;
-        const isExplicitBuildRequest = EXPLICIT_BUILD_RE.test(userText) && !!template;
-
-        if (!isFirstBuild && !isExplicitBuildRequest && !text.startsWith("🔧 AUTO-FIX") && !text.includes("# APPLICATION REQUIREMENTS")) {
-          console.log(
-            `[BuildOrch] Workspace has ${Object.keys(liveSandpackFiles).length} files (${userFileCount} user files) — routing to edit pipeline instead of rebuild`,
-          );
-          setCurrentAgent("edit");
-          setPipelineStep("resolving");
-          await sendEditMessage(text, images);
-          return;
-        }
-
-        // If this is an explicit rebuild request, clear old workspace first
-        if (isExplicitBuildRequest && !isFirstBuild) {
-          console.log(`[BuildOrch] Explicit build request detected with template "${template!.name}" — clearing workspace for fresh build`);
-          sandpackFilesRef.current = {};
-        }
-
-        const isSimpleBuild = (isFirstBuild || isExplicitBuildRequest) && !!template;
+        // Phase 2: Template-driven instant build — no isFirstBuild gate
+        // Any template match triggers instant path; identity system handles re-build vs enhance
+        const isSimpleBuild = !!template;
         let templateFiles: Record<string, string> | null = null;
         let templateName = "";
 
-        if (isSimpleBuild || isFirstBuild) {
+        if (isSimpleBuild) {
           const instantResult = await tryInstantBuild(template, userText);
           if (instantResult) {
             const finalFiles = instantResult.files;
