@@ -46,6 +46,14 @@ import {
   clearBuildHistory,
 } from "@/lib/buildEngine";
 import { extractUrlFromMessage, analyzeUrl } from "@/lib/urlAnalyzer";
+import { routeIntent, type RouteDecision } from "@/lib/intentRouter";
+import {
+  loadProjectIdentity,
+  setTemplateIdentity,
+  setLastBuildResult,
+  clearIdentityCache,
+  type ProjectIdentity,
+} from "@/lib/projectIdentity";
 
 /** Phase 3: Normalize task labels for user display */
 function normalizeTaskLabel(raw: string): string {
