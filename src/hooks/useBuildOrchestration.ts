@@ -1808,7 +1808,9 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
       const finalText = (text || "").trim();
       if (!finalText && !hasImages) return;
 
-      const hasExistingCode = !!(sandpackFilesRef.current && Object.keys(sandpackFilesRef.current).length > 0);
+      const getUserWorkspaceFileCount = (files: Record<string, string> | null | undefined) =>
+        Object.keys(files || {}).filter((p) => !p.startsWith("/components/ui/")).length;
+      const hasExistingCode = getUserWorkspaceFileCount(sandpackFilesRef.current) > 0;
       const CONFIRM_ONLY =
         /^(yes|yep|yeah|go ahead|proceed|do it|ok|okay|sure|continue|start|build it|just do it)\s*[.!]?$/i;
       const NON_ACTIONABLE =
@@ -1863,14 +1865,13 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
           setPendingExecution(null);
           appendConversationTurn(finalText, images, "Proceeding with the approved change.");
 
-          // Safety net: if there's existing code and no explicit rebuild request,
-          // ALWAYS route to edit — even if routeHint says "build"
+          // Safety net: if there's existing user code and no explicit rebuild request,
+          // route to edit — but ignore scaffolding-only file sets.
           const isExplicitRebuild = /\b(rebuild|from scratch|start over|regenerate app|new app|new project)\b/i.test(
             approved.prompt.toLowerCase(),
           );
-          const shouldEdit =
-            approved.routeHint === "edit" ||
-            (!!(sandpackFilesRef.current && Object.keys(sandpackFilesRef.current).length > 0) && !isExplicitRebuild);
+          const userWorkspaceFileCount = getUserWorkspaceFileCount(sandpackFilesRef.current);
+          const shouldEdit = approved.routeHint === "edit" || (userWorkspaceFileCount > 0 && !isExplicitRebuild);
 
           if (shouldEdit) {
             setCurrentAgent("edit");
@@ -1987,6 +1988,38 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
         setCurrentAgent("chat");
         setPipelineStep("chatting");
         sendChatMessage(finalText, images);
+        return;
+      }
+
+      const shouldAutoBuildWithoutConfirmation =
+        guardedIntent.requiresConfirmation &&
+        guardedIntent.category === "generation_request" &&
+        guardedIntent.routeHint === "build" &&
+        !guardedIntent.requiresSecondConfirmation &&
+        !hasExistingCode;
+
+      if (shouldAutoBuildWithoutConfirmation) {
+        conversationStartBuilding?.();
+        const buildPrompt = await buildRequirementsPayload(finalText);
+        if (isSmartSendStale()) return;
+
+        if (!buildPrompt) {
+          setCurrentAgent("chat");
+          setPipelineStep("chatting");
+          setMessages((prev) => [
+            ...prev,
+            {
+              role: "assistant",
+              content: "I need a concrete requirement to build from (not only confirmation).",
+              timestamp: Date.now(),
+            },
+          ]);
+          return;
+        }
+
+        setCurrentAgent("build");
+        setPipelineStep("planning");
+        sendMessage(buildPrompt, images);
         return;
       }
 
@@ -2135,16 +2168,27 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
       }
 
       if (!hasExistingCode && explicitBuildVerb && !CONFIRM_ONLY.test(finalText)) {
-        setPendingExecution({
-          prompt: finalText,
-          images,
-          routeHint: "build",
-          needsHighImpactConfirm: false,
-          awaitingHighImpactConfirm: false,
-        });
-        setCurrentAgent("chat");
-        setPipelineStep("chatting");
-        appendConversationTurn(finalText, images, "I can generate this.\nDo you want me to proceed?");
+        conversationStartBuilding?.();
+        const buildPrompt = await buildRequirementsPayload(finalText);
+        if (isSmartSendStale()) return;
+
+        if (!buildPrompt) {
+          setCurrentAgent("chat");
+          setPipelineStep("chatting");
+          setMessages((prev) => [
+            ...prev,
+            {
+              role: "assistant",
+              content: "I need a concrete requirement to build from (not only confirmation).",
+              timestamp: Date.now(),
+            },
+          ]);
+          return;
+        }
+
+        setCurrentAgent("build");
+        setPipelineStep("planning");
+        sendMessage(buildPrompt, images);
         return;
       }
 
