@@ -344,11 +344,17 @@ export function useChatAgent(config: ChatAgentConfig) {
       const abortController = new AbortController();
       abortControllerRef.current = abortController;
 
+      // Invariant #5: Inject project identity into knowledge so the chat agent sees it
+      const enrichedKnowledge = [...knowledge];
+      if (projectIdentityContext) {
+        enrichedKnowledge.unshift(`[Project Schema Identity]: ${projectIdentityContext}`);
+      }
+
       await streamThroughCacheProxy({
         messages: apiMessages,
         projectId: currentProject.id,
         techStack: currentProject.tech_stack || "react-cdn",
-        knowledge,
+        knowledge: enrichedKnowledge,
         workspaceFiles: workspaceFiles.length > 0 ? workspaceFiles : undefined,
         recentErrors: recentErrors.length > 0 ? recentErrors : undefined,
         contracts: contractSnapshot,
