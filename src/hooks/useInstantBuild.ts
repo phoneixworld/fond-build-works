@@ -21,6 +21,9 @@ export function useInstantBuild(config: InstantBuildConfig) {
   const { currentProject } = config;
   const ENABLE_LEGACY_INSTANT_TEMPLATES = false;
 
+  // High-quality instant templates that bypass the full compiler
+  const INSTANT_TEMPLATE_IDS = new Set(["crm", "sales-crm", "customer-management"]);
+
   const tryInstantBuild = useCallback(
     async (
       template: PageTemplate | null,
@@ -37,7 +40,9 @@ export function useInstantBuild(config: InstantBuildConfig) {
         return null;
       }
 
-      if (!ENABLE_LEGACY_INSTANT_TEMPLATES) {
+      // Allow specific high-quality instant templates through even when legacy is disabled
+      const isAllowedInstant = INSTANT_TEMPLATE_IDS.has(template.id);
+      if (!ENABLE_LEGACY_INSTANT_TEMPLATES && !isAllowedInstant) {
         console.log(`[InstantBuild] Legacy instant templates disabled for "${template.id}" — using full compiler build`);
         return null;
       }
