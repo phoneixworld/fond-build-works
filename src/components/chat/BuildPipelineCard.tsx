@@ -51,6 +51,16 @@ function detectTasks(content: string, isBuilding: boolean, pipelineStep?: Pipeli
     return [];
   }
 
+  // Repair agent — show repair round progress
+  if (currentAgent === "repair") {
+    tasks.push({ id: "repair-detect", label: "Analyzing build errors", status: "done" });
+    tasks.push({ id: "repair-ast", label: "Attempting deterministic AST repair", status: isBuilding ? "in_progress" : "done" });
+    if (!isBuilding) {
+      tasks.push({ id: "repair-verify", label: "Verifying repairs", status: "done" });
+    }
+    return tasks;
+  }
+
   if (currentAgent === "edit") {
     if (pipelineStep === "resolving") {
       tasks.push({ id: "resolve", label: "Finding target files", status: "in_progress" });
