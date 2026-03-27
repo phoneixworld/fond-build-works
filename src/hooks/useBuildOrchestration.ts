@@ -847,6 +847,19 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
               completeBuildManifest(true);
             } catch (e) { console.warn("[Pillar2] AST indexing failed (non-blocking):", e); }
 
+            // Invariant #2: Persist template identity
+            if (currentProject?.id && template) {
+              setTemplateIdentity(currentProject.id, template.id, instantResult.templateName).catch(() => {});
+              setLastBuildResult(currentProject.id, {
+                status: "success",
+                fileCount: Object.keys(finalFiles).length,
+                filesChanged: Object.keys(finalFiles),
+                verificationOk: true,
+                timestamp: Date.now(),
+                summary: `Template "${instantResult.templateName}" rendered`,
+              }, Object.keys(finalFiles)).catch(() => {});
+            }
+
             const fileCount = Object.keys(finalFiles).length;
             const msg = `✅ **${instantResult.templateName}** — ${fileCount} files rendered instantly!\n\nYour app is ready with API-wired data hooks and fallback demo data. Backend schema included.`;
             setMessages((prev) => {
