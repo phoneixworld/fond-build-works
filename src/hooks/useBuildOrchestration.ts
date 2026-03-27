@@ -1922,6 +1922,38 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
         return;
       }
 
+      // Hard override: explicit full-build commands like "Build a CRM" must execute build immediately
+      // and never fall back to planning/chat loops.
+      const EXPLICIT_BUILD_TRIGGER =
+        /^(build|create|generate|make)\s+(a\s+|an\s+|me\s+a\s+|me\s+an\s+)?[\w\s-]{0,30}(crm|dashboard|app|application|portal|system|platform|tracker|manager|tool)\b[.!?]*$/i;
+      const hasDirectTemplateMatch = !!matchTemplate(finalText);
+      const shouldForceDirectBuild = EXPLICIT_BUILD_TRIGGER.test(finalText) && hasDirectTemplateMatch;
+
+      if (shouldForceDirectBuild) {
+        conversationStartBuilding?.();
+        const buildPrompt = await buildRequirementsPayload(finalText);
+        if (isSmartSendStale()) return;
+
+        if (!buildPrompt) {
+          setCurrentAgent("chat");
+          setPipelineStep("chatting");
+          setMessages((prev) => [
+            ...prev,
+            {
+              role: "assistant",
+              content: "I need a concrete requirement to build from (not only confirmation).",
+              timestamp: Date.now(),
+            },
+          ]);
+          return;
+        }
+
+        setCurrentAgent("build");
+        setPipelineStep("planning");
+        sendMessage(buildPrompt, images);
+        return;
+      }
+
       const detectedUrl = extractUrlFromMessage(finalText);
       if (detectedUrl) {
         const content = buildMessageContent(finalText, images);
