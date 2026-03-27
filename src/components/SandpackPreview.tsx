@@ -538,17 +538,21 @@ window.__SUPABASE_URL__ = "${supabaseUrl}";
 window.__SUPABASE_KEY__ = "${supabaseKey}";
 window.__PHOENIX_PREVIEW__ = true;
 
-// Safety: Patch @supabase/supabase-js createClient to never return a broken .auth
-// This prevents "Cannot read properties of undefined (reading 'onAuthStateChange')"
+// Inject Tailwind CDN dynamically — ensures utility classes work in generated apps
 (function() {
-  var _origCreateClient = null;
+  if (!document.querySelector('script[src*="tailwindcss"]')) {
+    var s = document.createElement("script");
+    s.src = "https://cdn.tailwindcss.com";
+    document.head.appendChild(s);
+  }
+})();
+
+// Safety: ensure Supabase globals are always valid strings
+(function() {
   try {
-    // Will be available after Sandpack resolves the dependency
     Object.defineProperty(window, '__SUPABASE_PATCH_APPLIED__', { value: true });
   } catch(e) {}
 
-  // Monkey-patch at module level isn't possible here, so instead we ensure
-  // the globals are always valid strings so createClient doesn't produce broken objects
   if (!window.__SUPABASE_URL__) {
     window.__SUPABASE_URL__ = "https://placeholder.supabase.co";
   }
