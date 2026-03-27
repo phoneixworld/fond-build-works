@@ -844,6 +844,19 @@ const ChatPanel = forwardRef<ChatPanelHandle, { initialPrompt?: string; onVersio
             />
           )}
 
+          {/* Backend Migration Approval Card */}
+          {backendCompletion.totalCount > 0 && (
+            <MigrationApprovalCard
+              migrations={backendCompletion.migrations}
+              pendingApproval={backendCompletion.pendingApproval}
+              completedCount={backendCompletion.completedCount}
+              totalCount={backendCompletion.totalCount}
+              isExecuting={backendCompletion.isExecuting}
+              onApprove={backendCompletion.approveMigration}
+              onSkip={backendCompletion.skipMigration}
+            />
+          )}
+
           {/* Follow-up questions UI */}
           <AnimatePresence>
             {followUpQuestions.length > 0 && (
