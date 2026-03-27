@@ -15,7 +15,7 @@
  */
 
 import { useState, useRef, useEffect, useCallback } from "react";
-import { type AgentIntent, type PipelineStep } from "@/lib/agentPipeline";
+import { stripBuildMarker, type AgentIntent, type PipelineStep } from "@/lib/agentPipeline";
 import { compile, type CompileOptions, type CompileCallbacks, type BuildResult } from "@/lib/compiler";
 import { matchTemplate, type PageTemplate } from "@/lib/pageTemplates";
 import { getSnippetsPromptContext } from "@/lib/componentSnippets";
@@ -1475,8 +1475,28 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
   useEffect(() => {
     if (pendingBuildPrompt && !isSendingRef.current && !isLoadingRef.current) {
       console.log("[BuildOrch] BUILD_CONFIRMED marker detected — triggering build pipeline");
-      const buildPrompt = pendingBuildPrompt;
+      const rawPendingPrompt = pendingBuildPrompt;
       setPendingBuildPrompt(null);
+
+      type PendingBuildEnvelope = {
+        kind?: string;
+        source?: string;
+        prompt?: string;
+        requirementsSnippet?: string;
+      };
+
+      let envelope: PendingBuildEnvelope | null = null;
+      try {
+        if (rawPendingPrompt.trim().startsWith("{")) {
+          envelope = JSON.parse(rawPendingPrompt) as PendingBuildEnvelope;
+        }
+      } catch (err) {
+        console.warn("[BuildOrch] Failed to parse pending build envelope JSON:", err);
+      }
+
+      const envelopePrompt = typeof envelope?.prompt === "string" ? envelope.prompt : "";
+      const envelopeRequirements =
+        typeof envelope?.requirementsSnippet === "string" ? envelope.requirementsSnippet.trim() : "";
 
       let firstBuildRequest: string | null = null;
 
@@ -1501,18 +1521,42 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
         return true;
       });
 
-      const userRequirements = relevantMessages.map((m) => getTextContent(m.content)).join("\n\n");
+      const userRequirements = relevantMessages.map((m) => getTextContent(m.content)).join("\n\n").trim();
+
+      const fallbackIntent = extractUserIntentFromPrompt(stripBuildMarker(envelopePrompt || rawPendingPrompt)).trim();
+      const canonicalRequirements = (userRequirements || envelopeRequirements || fallbackIntent).trim();
+
+      if (!canonicalRequirements || NOISE.test(canonicalRequirements.toLowerCase())) {
+        setCurrentAgent("chat");
+        setPipelineStep("chatting");
+        setMessages((prev) => [
+          ...prev,
+          {
+            role: "assistant",
+            content: "I still need one concrete requirement (e.g. 'Build a CRM with contacts and pipeline') before I can run the build.",
+            timestamp: Date.now(),
+          },
+        ]);
+        return;
+      }
 
       const finalPrompt =
-        userRequirements.length > 50
-          ? `# APPLICATION REQUIREMENTS\n\n${userRequirements}\n\nBuild a complete, production-ready application for this domain request.`
-          : buildPrompt;
+        rawPendingPrompt.includes("# APPLICATION REQUIREMENTS") && !envelope
+          ? rawPendingPrompt
+          : [
+              "# APPLICATION REQUIREMENTS",
+              "",
+              canonicalRequirements,
+              "",
+              "Build EXACTLY what the user requested above.",
+              "Do NOT add unrelated features.",
+            ].join("\n");
 
       setCurrentAgent("build");
       setPipelineStep("planning");
       setTimeout(() => sendMessage(finalPrompt, []), 0);
     }
-  }, [pendingBuildPrompt, sendMessage]);
+  }, [pendingBuildPrompt, sendMessage, setCurrentAgent, setPipelineStep, setMessages]);
 
   const sendEditMessage = useCallback(
     async (text: string, images: string[] = []) => {
