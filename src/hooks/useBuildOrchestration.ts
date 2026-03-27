@@ -856,9 +856,18 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
 
         const liveSandpackFiles = sandpackFilesRef.current || {};
 
-        // Phase 2: Template-driven instant build — no isFirstBuild gate
-        // Any template match triggers instant path; identity system handles re-build vs enhance
-        const isSimpleBuild = !!template;
+        // Phase 2: Template-driven instant build — guarded by project state
+        const hasExistingCode = hasAnyFiles && Object.keys(liveSandpackFiles).length > 0;
+        const identity = projectIdentityRef.current;
+        const projectHasTemplate = !!identity?.templateName;
+        const isFreshProject = !hasExistingCode && !projectHasTemplate;
+        const isExplicitRebuild = /\b(rebuild|from scratch|start over|regenerate app|new app|new project)\b/i.test(userText);
+        const shouldInstantBuild = !!template && (isFreshProject || isExplicitRebuild);
+        const isSimpleBuild = shouldInstantBuild;
+
+        if (template && !shouldInstantBuild) {
+          console.log(`[BuildOrch] Template "${template.name}" matched but project already has code/identity — routing to compile() for enhancement`);
+        }
         let templateFiles: Record<string, string> | null = null;
         let templateName = "";
 
