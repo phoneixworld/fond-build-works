@@ -133,6 +133,12 @@ export interface ChatAgentConfig {
   // Workspace context for chat-agent
   sandpackFilesRef: React.RefObject<Record<string, string> | null>;
   previewErrors: string[];
+  // Invariant #5: Project identity context per turn
+  projectIdentityRef?: React.RefObject<{
+    templateName: string | null;
+    lastBuildSummary: string | null;
+    fileMapKeys: string[];
+  } | null>;
 }
 
 export function useChatAgent(config: ChatAgentConfig) {
