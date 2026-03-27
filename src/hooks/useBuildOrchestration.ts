@@ -2126,6 +2126,9 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
     resetASTWorkspace();
     clearProvenance();
     clearBuildHistory();
+    // Invariant #2: Clear identity cache on chat clear
+    if (currentProject?.id) clearIdentityCache(currentProject.id);
+    projectIdentityRef.current = null;
     isSendingRef.current = false;
     saveProject({ chat_history: [], html_content: "" });
   }, [
