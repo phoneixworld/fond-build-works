@@ -356,6 +356,8 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
   const lastProjectIdRef = useRef<string | null>(null);
   const deferredPreviewTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const buildRunTokenRef = useRef(0);
+  // Phase 2: Carry routeIntent's decision into sendMessage
+  const routeDecisionRef = useRef<RouteDecision | null>(null);
   // Invariant #5: Project identity ref for chat agent context
   const projectIdentityRef = useRef<{
     templateName: string | null;
@@ -1021,7 +1023,7 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
           }
         }
 
-        if (!domainModel && isFirstBuild) {
+        if (!domainModel && isSimpleBuild) {
           try {
             setBuildStep("🧠 Analyzing domain requirements...");
             const { matchDomainTemplate, serializeDomainModel } = await import("@/lib/domainTemplates");
