@@ -1713,6 +1713,16 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
             batchWorkspace[path] = code;
           }
 
+          // Phase 3: Inject project identity into edit context
+          const editIdentityCtx = projectIdentityRef.current;
+          const editKnowledge: string[] = [];
+          if (editIdentityCtx?.templateName) {
+            const entityList = (editIdentityCtx.entities || [])
+              .map(e => `  - ${e.name} (${e.fields.map(f => f.name).join(", ")})`)
+              .join("\n");
+            editKnowledge.push(`[Project Schema Identity]\nTemplate: ${editIdentityCtx.templateName}\nEntities:\n${entityList || "  (none)"}`);
+          }
+
           await executeEdit(
             {
               instruction: enrichedInstruction,
@@ -1720,7 +1730,7 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
               projectId: currentProject.id,
               model: selectedModel,
               designTheme: selectedTheme,
-              knowledge: [],
+              knowledge: editKnowledge,
               images,
             },
             {
