@@ -16,6 +16,9 @@ import "./domains/analytics";
 // Productivity templates
 import "./domains/kanban";
 
+// CRM templates
+import "./domains/crm";
+
 // Re-export registry API
 export {
   getTemplate,
