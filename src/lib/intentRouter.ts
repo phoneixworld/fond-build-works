@@ -47,8 +47,30 @@ const EDIT_VERB = /\b(fix|change|update|modify|refactor|patch|repair|replace|add
 const EXPLICIT_REBUILD = /\b(rebuild|from scratch|start over|regenerate app|new app|new project)\b/i;
 const RUNTIME_SIGNAL = /\b(bug|error|not working|doesn't work|doesnt work|broken|crash|failed|fails|preview|runtime|problem|issue)\b/i;
 
+// ── Assistant Output Detection ──
+// Phoenix / assistant messages must NEVER be routed as build/edit.
+const ASSISTANT_FINGERPRINT = /\b(I('ve| have) (built|created|generated|scaffolded|implemented|produced)|here('s| is) (the|your)|successfully (built|created|generated)|✅|files? (created|generated|updated)|Build complete|code has been|I'll (build|create|generate)|Let me (build|create|generate))\b/i;
+
+/**
+ * Sanitize text by stripping assistant-style build verb phrases.
+ * This prevents cached or echoed Phoenix output from triggering fresh builds.
+ */
+function sanitizeAssistantLeakage(text: string): string {
+  // Strip phrases that look like assistant output, not user commands
+  return text
+    .replace(/I('ve| have) (built|created|generated|scaffolded|implemented|produced)\b[^.!?\n]*/gi, "")
+    .replace(/here('s| is) (the|your) [^.!?\n]*/gi, "")
+    .replace(/successfully (built|created|generated)[^.!?\n]*/gi, "")
+    .replace(/Build complete[^.!?\n]*/gi, "")
+    .replace(/✅[^.!?\n]*/gi, "")
+    .trim();
+}
+
 /**
  * THE single intent router. Called once per user message. Result is final.
+ * 
+ * GUARDRAIL: If the text looks like assistant output (Phoenix fingerprint),
+ * it is immediately routed to chat — never to build or edit.
  */
 export function routeIntent(
   text: string,
@@ -56,9 +78,25 @@ export function routeIntent(
   identity: ProjectIdentity,
   hasExistingCode: boolean,
   hasPendingExecution: boolean,
+  /** Set to true if this text originates from an assistant message (e.g. echoed, cached). Never route to build. */
+  isAssistantOrigin = false,
 ): RouteDecision {
   const trimmed = (text || "").trim();
-  const lower = trimmed.toLowerCase();
+
+  // ── GUARDRAIL 1: Assistant origin flag — immediate chat ──
+  if (isAssistantOrigin) {
+    return { route: "chat", reason: "Assistant-origin message — blocked from routing", template: null, isEnhancement: false, skipConfirmation: false };
+  }
+
+  // ── GUARDRAIL 2: Assistant fingerprint detection — immediate chat ──
+  if (ASSISTANT_FINGERPRINT.test(trimmed)) {
+    console.warn(`[IntentRouter] Blocked assistant-fingerprinted text from routing: "${trimmed.slice(0, 80)}..."`);
+    return { route: "chat", reason: "Text matches assistant output fingerprint", template: null, isEnhancement: false, skipConfirmation: false };
+  }
+
+  // Sanitize any residual assistant leakage from the text
+  const sanitized = sanitizeAssistantLeakage(trimmed);
+  const lower = (sanitized || trimmed).toLowerCase();
 
   // 1. Auto-fix
   if (trimmed.startsWith("🔧")) {
@@ -103,13 +141,26 @@ export function routeIntent(
   }
 
   // 9. Template matching
-  const template = matchTemplate(trimmed);
+  const template = matchTemplate(sanitized || trimmed);
   const isExplicitRebuild = EXPLICIT_REBUILD.test(lower);
   const projectHasTemplate = !!identity.template;
 
-  // 10. Build verb + template match
+  // ── GUARDRAIL 3: Enhancement mode overrides ALL build verbs when template exists ──
+  // If project already has a template identity, build verbs become enhancements
+  // unless the user explicitly says "rebuild", "start over", "from scratch", etc.
+  if (hasBuildVerb && projectHasTemplate && !isExplicitRebuild) {
+    return {
+      route: "edit",
+      reason: `Template "${identity.template!.templateName}" exists — "${trimmed.slice(0, 60)}" routed to enhancement, not fresh build`,
+      template: template || null,
+      isEnhancement: true,
+      skipConfirmation: true,
+    };
+  }
+
+  // 10. Build verb + template match (no existing template identity)
   if (hasBuildVerb && template) {
-    // If the project already has this template → route to edit (enhancement)
+    // If the project already has code but no template identity → still route to edit
     if (hasExistingCode && !isExplicitRebuild) {
       return {
         route: "edit",
