@@ -51,6 +51,8 @@ export interface PipelineEvent {
 
 export const MAX_BUILD_RETRIES = 3;
 
+const BUILD_CONFIRMED_LINE_RE = /(?:^|\n)\s*\[BUILD_CONFIRMED\]\s*(?:\n|$)/;
+
 const BASE_URL = import.meta.env.VITE_SUPABASE_URL;
 const AUTH_HEADER = `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`;
 
@@ -428,14 +430,17 @@ export function validateReactCode(files: Record<string, string>): { valid: boole
  * Check if a chat response contains a build confirmation marker
  */
 export function hasBuildConfirmation(text: string): boolean {
-  return text.includes("[BUILD_CONFIRMED]");
+  return BUILD_CONFIRMED_LINE_RE.test(text);
 }
 
 /**
  * Extract the chat text without the build marker
  */
 export function stripBuildMarker(text: string): string {
-  return text.replace(/\[BUILD_CONFIRMED\]/g, "").trim();
+  return text
+    .replace(/(?:^|\n)\s*\[BUILD_CONFIRMED\]\s*(?=\n|$)/g, "\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
 }
 
 /**
