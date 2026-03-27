@@ -39,7 +39,7 @@ export interface BuildStateSnapshot {
 }
 
 export interface FreshBuildGuardContext {
-  currentAgent?: AgentType | "repair" | null;
+  currentAgent?: AgentType | "clarify" | null;
   pipelineStep?: PipelineStep | null;
 }
 
