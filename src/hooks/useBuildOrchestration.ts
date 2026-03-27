@@ -1498,7 +1498,7 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
       const envelopeRequirements =
         typeof envelope?.requirementsSnippet === "string" ? envelope.requirementsSnippet.trim() : "";
 
-      let firstBuildRequest: string | null = null;
+      let latestDuplicateBuildRequest: string | null = null;
 
       const relevantMessages = messagesRef.current.filter((m) => {
         const msgText = getTextContent(m.content).trim();
@@ -1509,10 +1509,8 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
         if (META_NOISE.test(msgText.toLowerCase())) return false;
 
         if (DUPLICATE_TRIGGER.test(msgText)) {
-          if (!firstBuildRequest) {
-            firstBuildRequest = msgText;
-            return true;
-          }
+          // Keep only the latest explicit build trigger (the user's newest intent).
+          latestDuplicateBuildRequest = msgText;
           return false;
         }
 
@@ -1521,10 +1519,12 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
         return true;
       });
 
-      const userRequirements = relevantMessages.map((m) => getTextContent(m.content)).join("\n\n").trim();
+      const requirementParts = relevantMessages.map((m) => getTextContent(m.content));
+      if (latestDuplicateBuildRequest) requirementParts.push(latestDuplicateBuildRequest);
+      const userRequirements = requirementParts.join("\n\n").trim();
 
       const fallbackIntent = extractUserIntentFromPrompt(stripBuildMarker(envelopePrompt || rawPendingPrompt)).trim();
-      const canonicalRequirements = (userRequirements || envelopeRequirements || fallbackIntent).trim();
+      const canonicalRequirements = (envelopeRequirements || userRequirements || fallbackIntent).trim();
 
       if (!canonicalRequirements || NOISE.test(canonicalRequirements.toLowerCase())) {
         setCurrentAgent("chat");
