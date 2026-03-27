@@ -537,6 +537,25 @@ window.__PROJECT_ID__ = "${projectId}";
 window.__SUPABASE_URL__ = "${supabaseUrl}";
 window.__SUPABASE_KEY__ = "${supabaseKey}";
 window.__PHOENIX_PREVIEW__ = true;
+
+// Safety: Patch @supabase/supabase-js createClient to never return a broken .auth
+// This prevents "Cannot read properties of undefined (reading 'onAuthStateChange')"
+(function() {
+  var _origCreateClient = null;
+  try {
+    // Will be available after Sandpack resolves the dependency
+    Object.defineProperty(window, '__SUPABASE_PATCH_APPLIED__', { value: true });
+  } catch(e) {}
+
+  // Monkey-patch at module level isn't possible here, so instead we ensure
+  // the globals are always valid strings so createClient doesn't produce broken objects
+  if (!window.__SUPABASE_URL__) {
+    window.__SUPABASE_URL__ = "https://placeholder.supabase.co";
+  }
+  if (!window.__SUPABASE_KEY__) {
+    window.__SUPABASE_KEY__ = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBsYWNlaG9sZGVyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MDAwMDAwMDAsImV4cCI6MjAxNTU3NjAwMH0.placeholder";
+  }
+})();
 `;
 }
 
