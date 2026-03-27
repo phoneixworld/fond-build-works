@@ -1142,6 +1142,24 @@ function buildSandpackFiles(files: SandpackFileSet | null, projectId: string, su
       console.warn("[SandpackPreview] No App entry found in workspace, injecting DEFAULT_APP. Keys:", Object.keys(base).filter(k => /App/i.test(k)));
       base["/App.js"] = DEFAULT_APP;
     }
+  } else {
+    // CRITICAL: Sandpack's "react" template provides a built-in /App.js with "Hello World".
+    // If our workspace has /App.tsx but NOT /App.js, the template's /App.js wins module resolution
+    // because .js is resolved before .tsx. We must override /App.js to re-export from our .tsx file.
+    const hasTsxApp = "/App.tsx" in base;
+    const hasJsApp = "/App.js" in base || "/App.jsx" in base;
+    if (hasTsxApp && !hasJsApp) {
+      // Override the template's /App.js with a re-export so our /App.tsx content is used
+      base["/App.js"] = `export { default } from "./App.tsx";\nexport * from "./App.tsx";\n`;
+      console.log("[SandpackPreview] Overriding template /App.js → re-export from /App.tsx");
+    }
+    // Same for /src/App.tsx
+    const hasSrcTsxApp = "/src/App.tsx" in base;
+    const hasSrcJsApp = "/src/App.js" in base || "/src/App.jsx" in base;
+    if (hasSrcTsxApp && !hasSrcJsApp) {
+      base["/src/App.js"] = `export { default } from "./App.tsx";\nexport * from "./App.tsx";\n`;
+      console.log("[SandpackPreview] Overriding template /src/App.js → re-export from /src/App.tsx");
+    }
   }
 
   // ── Mirror structureNormalizer: normalize file placement ──
