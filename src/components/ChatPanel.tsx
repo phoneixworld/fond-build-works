@@ -295,6 +295,11 @@ const ChatPanel = forwardRef<ChatPanelHandle, { initialPrompt?: string; onVersio
         verificationOk: lastVerificationOkRef.current ?? undefined,
         previewUrl: null, // Will be updated async via event
       });
+
+      // Auto-process backend migrations from workspace
+      if (sandpackFilesRef.current) {
+        backendCompletion.processMigrations(sandpackFilesRef.current);
+      }
     }
     prevPipelineStep.current = pipelineStep;
   }, [pipelineStep, createCheckpoint]);
