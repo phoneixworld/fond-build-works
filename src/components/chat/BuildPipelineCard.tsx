@@ -14,9 +14,12 @@ interface BuildPipelineCardProps {
   streamContent: string;
   tasks?: TaskItem[];
   pipelineStep?: PipelineStep | null;
-  currentAgent?: "chat" | "build" | "edit" | null;
+  currentAgent?: "chat" | "build" | "edit" | "repair" | null;
   buildTitle?: string;
   onShowPreview?: () => void;
+  repairRound?: number;
+  repairMaxRounds?: number;
+  repairDetail?: string;
 }
 
 function detectEditingFiles(content: string): string[] {
@@ -32,7 +35,7 @@ function detectEditingFiles(content: string): string[] {
   return files.slice(0, 3);
 }
 
-function detectTasks(content: string, isBuilding: boolean, pipelineStep?: PipelineStep | null, currentAgent?: "chat" | "build" | "edit" | null): TaskItem[] {
+function detectTasks(content: string, isBuilding: boolean, pipelineStep?: PipelineStep | null, currentAgent?: "chat" | "build" | "edit" | "repair" | null): TaskItem[] {
   const len = content.length;
   const hasCode = content.includes("```react-preview") || content.includes("```jsx") || content.includes("```html") || content.includes("```react");
   const hasClosingFence = hasCode && (() => {
@@ -46,6 +49,16 @@ function detectTasks(content: string, isBuilding: boolean, pipelineStep?: Pipeli
   // Chat agent should NEVER show build pipeline UI
   if (currentAgent === "chat") {
     return [];
+  }
+
+  // Repair agent — show repair round progress
+  if (currentAgent === "repair") {
+    tasks.push({ id: "repair-detect", label: "Analyzing build errors", status: "done" });
+    tasks.push({ id: "repair-ast", label: "Attempting deterministic AST repair", status: isBuilding ? "in_progress" : "done" });
+    if (!isBuilding) {
+      tasks.push({ id: "repair-verify", label: "Verifying repairs", status: "done" });
+    }
+    return tasks;
   }
 
   if (currentAgent === "edit") {
@@ -110,7 +123,7 @@ const StatusIndicator = React.forwardRef<HTMLDivElement, { status: TaskItem["sta
 });
 StatusIndicator.displayName = "StatusIndicator";
 
-const BuildPipelineCard = ({ isBuilding, streamContent, tasks: externalTasks, pipelineStep, currentAgent, buildTitle, onShowPreview }: BuildPipelineCardProps) => {
+const BuildPipelineCard = ({ isBuilding, streamContent, tasks: externalTasks, pipelineStep, currentAgent, buildTitle, onShowPreview, repairRound, repairMaxRounds, repairDetail }: BuildPipelineCardProps) => {
   const [collapsed, setCollapsed] = useState(false);
   const [showDetails, setShowDetails] = useState(false);
 
@@ -131,6 +144,7 @@ const BuildPipelineCard = ({ isBuilding, streamContent, tasks: externalTasks, pi
   const activeTask = tasks.find(t => t.status === "in_progress");
 
   const agentLabel = useMemo(() => {
+    if (currentAgent === "repair") return "Repairing";
     if (currentAgent === "edit") return "Editing";
     if (currentAgent === "chat") return "Responding";
     return "Building";
