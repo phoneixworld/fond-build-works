@@ -348,6 +348,12 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
   const lastProjectIdRef = useRef<string | null>(null);
   const deferredPreviewTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const buildRunTokenRef = useRef(0);
+  // Invariant #5: Project identity ref for chat agent context
+  const projectIdentityRef = useRef<{
+    templateName: string | null;
+    lastBuildSummary: string | null;
+    fileMapKeys: string[];
+  } | null>(null);
 
   useEffect(() => {
     buildRetryCountRef.current = buildRetryCount;
