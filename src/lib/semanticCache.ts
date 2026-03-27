@@ -60,7 +60,7 @@ async function ensureCorpusLoaded(projectId: string): Promise<void> {
   corpusInitialized = true;
 }
 
-// ─── Confirmation Bypass ──────────────────────────────────────────────────
+// ─── Confirmation & Build-Trigger Bypass ──────────────────────────────────
 
 const BARE_CONFIRMATIONS = new Set([
   "ok", "okay", "sure", "go ahead", "yes", "yep", "yeah", "yea",
@@ -69,12 +69,26 @@ const BARE_CONFIRMATIONS = new Set([
 ]);
 
 /**
+ * Build-triggering phrases that must NEVER be served from cache.
+ * A cached "Build a CRM" response would trigger a fresh build on replay.
+ */
+const BUILD_TRIGGER_PHRASES = /\b(build|create|generate|scaffold|implement|develop|make|produce)\s+(a|an|the|my|our|new)\b/i;
+
+/**
  * Returns true if the prompt is a bare confirmation that should NEVER
  * be used as a cache key — it carries no domain semantics.
  */
 function isBareConfirmation(prompt: string): boolean {
   const normalized = prompt.trim().toLowerCase().replace(/[?.!,]+$/g, "");
   return BARE_CONFIRMATIONS.has(normalized) || normalized.length < 4;
+}
+
+/**
+ * Returns true if the prompt contains build-triggering phrases that
+ * must bypass cache to prevent stale cached responses from triggering builds.
+ */
+function isBuildTrigger(prompt: string): boolean {
+  return BUILD_TRIGGER_PHRASES.test(prompt.trim());
 }
 
 // ─── Public API ───────────────────────────────────────────────────────────
@@ -98,9 +112,9 @@ export async function semanticCacheGet(
   prompt: string,
   _context?: string
 ): Promise<CacheHitResult> {
-  // HARD BYPASS: bare confirmations must never hit cache
-  if (isBareConfirmation(prompt)) {
-    console.log(`[SemanticCache] Bypassing cache — bare confirmation: "${prompt}"`);
+  // HARD BYPASS: bare confirmations and build triggers must never hit cache
+  if (isBareConfirmation(prompt) || isBuildTrigger(prompt)) {
+    console.log(`[SemanticCache] Bypassing cache — ${isBareConfirmation(prompt) ? 'bare confirmation' : 'build-trigger phrase'}: "${prompt}"`);
     return { hit: false, layer: "none", matchType: "none", similarity: 0 };
   }
 
@@ -198,7 +212,7 @@ export async function streamThroughCacheProxy({
       ? lastUserMsg.content.filter((c: any) => c.type === "text").map((c: any) => c.text).join(" ")
       : "";
 
-  const shouldBypassCache = !!bypassCache || isBareConfirmation(userPrompt);
+  const shouldBypassCache = !!bypassCache || isBareConfirmation(userPrompt) || isBuildTrigger(userPrompt);
 
   // L1 lookup is only allowed for read-only, non-confirmation prompts
   if (shouldBypassCache) {
