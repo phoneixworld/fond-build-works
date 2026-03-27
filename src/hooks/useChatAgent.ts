@@ -126,6 +126,7 @@ export interface ChatAgentConfig {
   setCurrentAgent: (agent: string | null) => void;
   setIsLoading: (v: boolean) => void;
   setPendingBuildPrompt?: (prompt: string | null) => void;
+  hasPendingExecution?: boolean;
   messagesRef: React.RefObject<Msg[]>;
   isSendingRef: React.MutableRefObject<boolean>;
   isLoadingRef: React.MutableRefObject<boolean>;
@@ -162,6 +163,7 @@ export function useChatAgent(config: ChatAgentConfig) {
     sandpackFilesRef,
   } = config;
   const setPendingBuildPrompt = config.setPendingBuildPrompt;
+  const hasPendingExecution = config.hasPendingExecution ?? false;
 
   const abortControllerRef = useRef<AbortController | null>(null);
   const tokenBufferRef = useRef<TokenBuffer | null>(null);
@@ -224,6 +226,9 @@ export function useChatAgent(config: ChatAgentConfig) {
 
       const userText = typeof text === "string" ? text : "";
       const cacheIntent = inferCacheIntent(userText);
+      const userIsBareConfirmation = isBareConfirmationText(userText);
+      const allowChatBuildHandoff =
+        hasPendingExecution || (!userIsBareConfirmation && cacheIntent === "actionable");
       const bypassCache = cacheIntent !== "read_only_qa";
       const requirementsSnippet = buildRequirementsSnippet(apiMessages);
 
@@ -287,22 +292,29 @@ export function useChatAgent(config: ChatAgentConfig) {
 
         // Structured BUILD_CONFIRMED handoff
         if (hasBuildConfirmation(responseText) && setPendingBuildPrompt) {
-          console.log(
-            "[ChatAgent] BUILD_CONFIRMED detected — signaling build pipeline",
-          );
+          if (!allowChatBuildHandoff) {
+            console.warn(
+              `[ChatAgent] BLOCKED BUILD_CONFIRMED handoff (no pending proposal and non-actionable user input): "${userText.slice(0, 80)}"`,
+            );
+          } else {
+            console.log(
+              "[ChatAgent] BUILD_CONFIRMED detected — signaling build pipeline",
+            );
 
-          const buildEnvelope = {
-            kind: "chat_build",
-            source: "chat-agent",
-            prompt: responseText,
-            projectId: currentProject.id,
-            workspaceFiles,
-            workspaceSummary,
-            contracts: contractSnapshot,
-            recentErrors,
-          };
+            const buildEnvelope = {
+              kind: "chat_build",
+              source: "chat-agent",
+              prompt: responseText,
+              requirementsSnippet,
+              projectId: currentProject.id,
+              workspaceFiles,
+              workspaceSummary,
+              contracts: contractSnapshot,
+              recentErrors,
+            };
 
-          setPendingBuildPrompt(JSON.stringify(buildEnvelope));
+            setPendingBuildPrompt(JSON.stringify(buildEnvelope));
+          }
         }
 
         const displayText = sanitizeChatTruthfulness(stripBuildMarker(responseText));
@@ -475,6 +487,7 @@ export function useChatAgent(config: ChatAgentConfig) {
       isSendingRef,
       isLoadingRef,
       setPendingBuildPrompt,
+      hasPendingExecution,
     ],
   );
 
