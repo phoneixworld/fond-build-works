@@ -1115,6 +1115,7 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
             setBuildStreamContent((prev) => prev + chunk);
           },
           onTaskDone: (task, files) => {
+            console.log(`[BuildOrch] ✅ onTaskDone: "${task.label}" produced ${Object.keys(files).length} files:`, Object.keys(files));
             if (isStaleBuild()) {
               console.warn("[Compiler] ⛔ Ignored stale task output from cancelled/superseded build");
               return;
