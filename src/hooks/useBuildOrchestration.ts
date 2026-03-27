@@ -14,7 +14,8 @@
  * - Abort controller management
  */
 
-import { useState, useRef, useEffect, useCallback } from "react";
+import { useState, useRef, useEffect, useCallback, useMemo } from "react";
+import { getBuildStateMachine, type BuildStateMachine } from "@/lib/buildStateMachine";
 import { stripBuildMarker, type AgentIntent, type PipelineStep } from "@/lib/agentPipeline";
 import { compile, type CompileOptions, type CompileCallbacks, type BuildResult } from "@/lib/compiler";
 import { matchTemplate, type PageTemplate } from "@/lib/pageTemplates";
@@ -400,6 +401,25 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
       }
     };
   }, []);
+
+  // Phase 4: Build State Machine singleton
+  const stateMachine = useMemo(() => getBuildStateMachine(), []);
+
+  // Phase 4: Unified finalize — single cleanup point for all agent completions
+  const finalizeBuild = useCallback((opts?: {
+    pipelineStep?: PipelineStep | null;
+  }) => {
+    stateMachine.finalize();
+    setIsLoading(false);
+    setIsBuilding(false);
+    setBuildStep("");
+    setPipelineStep(opts?.pipelineStep ?? "complete");
+    setCurrentAgent(null);
+    isSendingRef.current = false;
+    setTimeout(() => {
+      setPipelineStep(null);
+    }, 100);
+  }, [stateMachine, setIsBuilding, setBuildStep]);
 
   // Pre-scaffolded UI component paths — now visible in the tree.
   const SCAFFOLDED_UI_PATHS = new Set<string>();

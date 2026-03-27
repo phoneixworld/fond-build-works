@@ -6,17 +6,27 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
-function pruneConversationContext(messages: any[], maxTokens: number = 12000): any[] {
+function pruneConversationContext(messages: any[], maxTokens: number = 16000): any[] {
   const systemMsg = messages.find(m => m.role === "system");
   const userMessages = messages.filter(m => m.role !== "system");
 
-  if (userMessages.length <= 4) return messages;
+  if (userMessages.length <= 6) return messages;
 
-  const recentMessages = userMessages.slice(-3);
+  // Keep the 4 most recent messages (expanded from 3)
+  const recentMessages = userMessages.slice(-4);
   let currentTokens = JSON.stringify(recentMessages).length / 4;
 
-  const olderMessages = userMessages.slice(0, -3).reverse();
+  const olderMessages = userMessages.slice(0, -4).reverse();
   const selectedOlder: any[] = [];
+
+  // Phase 4: Build a conversation digest of ALL user messages for context
+  const allUserTexts: string[] = [];
+  for (const msg of olderMessages) {
+    if (msg.role === "user") {
+      const text = getTextFromMessageContent(msg.content).trim();
+      if (text.length > 5) allUserTexts.push(text.slice(0, 200));
+    }
+  }
 
   for (const msg of olderMessages) {
     const msgTokens = JSON.stringify(msg).length / 4;
@@ -30,9 +40,11 @@ function pruneConversationContext(messages: any[], maxTokens: number = 12000): a
 
   const droppedCount = userMessages.length - selectedOlder.length - recentMessages.length;
   if (droppedCount > 0) {
+    // Phase 4: Include a digest of all user messages so the model never "forgets" what was said
+    const digestLines = allUserTexts.slice(0, 20).map((t, i) => `  ${i + 1}. ${t}`).join("\n");
     const contextNote = {
       role: "system",
-      content: `[Context: ${droppedCount} earlier messages omitted. Continue from current context.]`
+      content: `[Context: ${droppedCount} earlier messages omitted. User message digest (chronological):\n${digestLines}\n\nContinue with full awareness of the above conversation history.]`
     };
     return [systemMsg, contextNote, ...selectedOlder, ...recentMessages].filter(Boolean);
   }
@@ -48,6 +60,13 @@ function buildChatSystemPrompt(
   recentErrors?: string[],
 ): string {
   let prompt = `You are Phoenix — a world-class engineering lead and technical advisor inside a web app builder IDE. You are the CHAT agent: conversational, knowledgeable, and deeply helpful. You NEVER generate code blocks.
+
+## CONVERSATION AWARENESS (Phase 4 — CRITICAL)
+- You have access to the FULL conversation history — every user message is in context
+- ALWAYS reference and build upon what the user said in EARLIER messages, not just the latest one
+- If the user said "build a CRM" 5 messages ago and now says "add leads", connect the two
+- NEVER say "I don't know what you asked earlier" — you can see every message
+- Treat the entire conversation as a coherent requirement stream
 
 ## PERSONALITY
 - Expert, thoughtful, and thorough — like the best senior engineer you've ever worked with
