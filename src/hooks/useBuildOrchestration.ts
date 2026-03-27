@@ -28,7 +28,7 @@ import { StreamingPreviewController } from "@/lib/streamingPreview";
 import { type MsgContent, getTextContent } from "@/lib/codeParser";
 import { useChatAgent, type ChatAgentConfig } from "@/hooks/useChatAgent";
 import { useInstantBuild, type InstantBuildConfig } from "@/hooks/useInstantBuild";
-import { executeEdit, type EditResult } from "@/lib/editEngine";
+import { executeEdit, resolveTargetFiles, type EditResult } from "@/lib/editEngine";
 import { Workspace } from "@/lib/compiler/workspace";
 import { repairMissingModules } from "@/lib/compiler/missingModuleGen";
 import { fixMissingImports } from "@/lib/compiler/missingImportFixer";
@@ -1631,73 +1631,62 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
       isSendingRef.current = true;
       setBuildStreamContent("");
 
-      const WORKSPACE_ENTRIES = Object.entries(workspace);
-      const BATCH_SIZE = 40;
-
-      let resolvedTargetFiles: string[] = [];
+      const resolvedTargetFiles = resolveTargetFiles(enrichedInstruction, workspace);
+      if (resolvedTargetFiles.length === 0) {
+        throw new Error("Could not determine which file to edit. Try mentioning a specific page or component name.");
+      }
       const beforeSnapshots: Record<string, string> = {};
+      for (const f of resolvedTargetFiles) {
+        if (workspace[f]) beforeSnapshots[f] = workspace[f];
+      }
       const aggregatedModifiedFiles: Record<string, string> = {};
       const aggregatedDependencies: Record<string, string> = {};
       let aggregatedExplanation = "";
 
       try {
-        for (let i = 0; i < WORKSPACE_ENTRIES.length; i += BATCH_SIZE) {
-          const batchEntries = WORKSPACE_ENTRIES.slice(i, i + BATCH_SIZE);
-          const batchWorkspace: Record<string, string> = {};
-          for (const [path, code] of batchEntries) {
-            batchWorkspace[path] = code;
-          }
-
-          // Phase 3: Inject project identity into edit context
-          const editIdentityCtx = projectIdentityRef.current;
-          const editKnowledge: string[] = [];
-          if (editIdentityCtx?.templateName) {
-            const entityList = (editIdentityCtx.entities || [])
-              .map(e => `  - ${e.name} (${e.fields.map(f => f.name).join(", ")})`)
-              .join("\n");
-            editKnowledge.push(`[Project Schema Identity]\nTemplate: ${editIdentityCtx.templateName}\nEntities:\n${entityList || "  (none)"}`);
-          }
-
-          await executeEdit(
-            {
-              instruction: enrichedInstruction,
-              workspace: batchWorkspace,
-              projectId: currentProject.id,
-              model: selectedModel,
-              designTheme: selectedTheme,
-              knowledge: editKnowledge,
-              images,
-            },
-            {
-              onResolving: (targetFiles) => {
-                if (resolvedTargetFiles.length === 0) {
-                  resolvedTargetFiles = targetFiles;
-                  for (const f of targetFiles) {
-                    if (workspace[f]) beforeSnapshots[f] = workspace[f];
-                  }
-                  setPipelineStep("resolving");
-                  setBuildStep(`Editing ${targetFiles.length} file${targetFiles.length > 1 ? "s" : ""}`);
-                  console.log("[EditMode] Target files:", targetFiles);
-
-                  conversationStartEditing?.(enrichedInstruction, targetFiles, beforeSnapshots);
-                }
-              },
-              onStreaming: (chunk) => {
-                setBuildStreamContent((prev) => prev + chunk);
-                setPipelineStep("editing");
-              },
-              onComplete: async (result: EditResult) => {
-                console.log("[EditMode] Batch complete:", Object.keys(result.modifiedFiles));
-                Object.assign(aggregatedModifiedFiles, result.modifiedFiles);
-                Object.assign(aggregatedDependencies, result.dependencies);
-                aggregatedExplanation += (aggregatedExplanation ? "\n\n" : "") + result.explanation;
-              },
-              onError: (error) => {
-                throw new Error(error);
-              },
-            },
-          );
+        // Phase 3: Inject project identity into edit context
+        const editIdentityCtx = projectIdentityRef.current;
+        const editKnowledge: string[] = [];
+        if (editIdentityCtx?.templateName) {
+          const entityList = (editIdentityCtx.entities || [])
+            .map(e => `  - ${e.name} (${e.fields.map(f => f.name).join(", ")})`)
+            .join("\n");
+          editKnowledge.push(`[Project Schema Identity]\nTemplate: ${editIdentityCtx.templateName}\nEntities:\n${entityList || "  (none)"}`);
         }
+
+        await executeEdit(
+          {
+            instruction: enrichedInstruction,
+            workspace,
+            targetFiles: resolvedTargetFiles,
+            projectId: currentProject.id,
+            model: selectedModel,
+            designTheme: selectedTheme,
+            knowledge: editKnowledge,
+            images,
+          },
+          {
+            onResolving: (targetFiles) => {
+              setPipelineStep("resolving");
+              setBuildStep(`Editing ${targetFiles.length} file${targetFiles.length > 1 ? "s" : ""}`);
+              console.log("[EditMode] Target files:", targetFiles);
+              conversationStartEditing?.(enrichedInstruction, targetFiles, beforeSnapshots);
+            },
+            onStreaming: (chunk) => {
+              setBuildStreamContent((prev) => prev + chunk);
+              setPipelineStep("editing");
+            },
+            onComplete: async (result: EditResult) => {
+              console.log("[EditMode] Batch complete:", Object.keys(result.modifiedFiles));
+              Object.assign(aggregatedModifiedFiles, result.modifiedFiles);
+              Object.assign(aggregatedDependencies, result.dependencies);
+              aggregatedExplanation += (aggregatedExplanation ? "\n\n" : "") + result.explanation;
+            },
+            onError: (error) => {
+              throw new Error(error);
+            },
+          },
+        );
 
         const updatedFiles = { ...workspace };
         for (const [path, code] of Object.entries(aggregatedModifiedFiles)) {

@@ -21,6 +21,8 @@ export interface EditRequest {
   instruction: string;
   /** Current workspace files (path → code) */
   workspace: Record<string, string>;
+  /** Optional pre-resolved target files to keep edits deterministic */
+  targetFiles?: string[];
   /** Project ID for API calls */
   projectId: string;
   /** AI model to use */
@@ -326,7 +328,9 @@ export async function executeEdit(
   callbacks: EditCallbacks
 ): Promise<void> {
   // 1. Resolve target files
-  const targetFiles = resolveTargetFiles(request.instruction, request.workspace);
+  const targetFiles = (request.targetFiles && request.targetFiles.length > 0)
+    ? request.targetFiles
+    : resolveTargetFiles(request.instruction, request.workspace);
   
   if (targetFiles.length === 0) {
     callbacks.onError("Could not determine which file to edit. Try mentioning a specific page or component name.");
@@ -409,14 +413,20 @@ function parseEditOutput(
   const normalizePath = (path: string) => {
     let normalized = path.startsWith("/") ? path : `/${path}`;
     normalized = normalized.replace(/^\/src\//, "/");
-    // Sanitize filename: "News & Events.jsx" → "NewsEvents.jsx"
-    const dir = normalized.slice(0, normalized.lastIndexOf("/") + 1);
-    const file = normalized.slice(normalized.lastIndexOf("/") + 1);
-    const ext = file.match(/\.(jsx?|tsx?|css)$/)?.[0] || "";
-    const base = file.replace(/\.(jsx?|tsx?|css)$/, "");
-    const safeName = base.replace(/[^a-zA-Z0-9]+/g, " ").split(" ").filter(Boolean)
-      .map((w: string) => w.charAt(0).toUpperCase() + w.slice(1)).join("") || base;
-    return `${dir}${safeName}${ext}`;
+
+    // Prefer an existing target file path to avoid accidental path drift
+    // like /hooks/UseDeals.ts when the real file is /hooks/useDeals.tsx.
+    if (targetFiles.length > 0) {
+      const direct = targetFiles.find((t) => t.toLowerCase() === normalized.toLowerCase());
+      if (direct) return direct;
+
+      const canonical = (p: string) =>
+        p.toLowerCase().replace(/^\/src\//, "/").replace(/[^a-z0-9./_-]+/g, "");
+      const loose = targetFiles.find((t) => canonical(t) === canonical(normalized));
+      if (loose) return loose;
+    }
+
+    return normalized.replace(/\/\/{2,}/g, "/");
   };
 
   const getCodeStartIndex = (raw: string): number => {
