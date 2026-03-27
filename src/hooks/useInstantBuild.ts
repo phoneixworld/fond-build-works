@@ -1,7 +1,8 @@
 /**
  * useInstantBuild — Instant template detection and hydration.
- * Returns hydrated template files for immediate preview.
- * The compile() pipeline handles polish, verification, and repair.
+ * 
+ * Phase 2 invariant: ALL registered templates are instant-eligible.
+ * No whitelist. No isFirstBuild gate. Template identity drives routing.
  */
 
 import { useCallback } from "react";
@@ -19,10 +20,6 @@ export interface InstantBuildConfig {
 
 export function useInstantBuild(config: InstantBuildConfig) {
   const { currentProject } = config;
-  const ENABLE_LEGACY_INSTANT_TEMPLATES = false;
-
-  // High-quality instant templates that bypass the full compiler
-  const INSTANT_TEMPLATE_IDS = new Set(["crm", "sales-crm", "customer-management"]);
 
   const tryInstantBuild = useCallback(
     async (
@@ -40,18 +37,11 @@ export function useInstantBuild(config: InstantBuildConfig) {
         return null;
       }
 
-      // Allow specific high-quality instant templates through even when legacy is disabled
-      const isAllowedInstant = INSTANT_TEMPLATE_IDS.has(template.id);
-      if (!ENABLE_LEGACY_INSTANT_TEMPLATES && !isAllowedInstant) {
-        console.log(`[InstantBuild] Legacy instant templates disabled for "${template.id}" — using full compiler build`);
-        return null;
-      }
-
       try {
         const { findInstantTemplate, hydrateTemplate } = await import("@/lib/instantTemplates");
         const instantTemplate = findInstantTemplate(template.id);
         if (!instantTemplate) {
-          console.log("[InstantBuild] No instant template variant found — falling back to full build");
+          console.log(`[InstantBuild] No instant template variant for "${template.id}" — falling back to full build`);
           return null;
         }
 
@@ -85,7 +75,7 @@ export function useInstantBuild(config: InstantBuildConfig) {
           files["/hooks/useApi.js"] = getUseApiHook();
         }
 
-        console.log(`[InstantBuild] ⚡ Template "${template.name}": ${Object.keys(files).length} files hydrated`);
+        console.log(`[InstantBuild] ⚡ Template "${template.name}": ${Object.keys(files).length} files hydrated (all templates eligible)`);
 
         return {
           files,

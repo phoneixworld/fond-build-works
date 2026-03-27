@@ -356,6 +356,8 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
   const lastProjectIdRef = useRef<string | null>(null);
   const deferredPreviewTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const buildRunTokenRef = useRef(0);
+  // Phase 2: Carry routeIntent's decision into sendMessage
+  const routeDecisionRef = useRef<RouteDecision | null>(null);
   // Invariant #5: Project identity ref for chat agent context
   const projectIdentityRef = useRef<{
     templateName: string | null;
@@ -817,8 +819,9 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
         const userText = typeof text === "string" ? text : "";
         const snippetsContext = getSnippetsPromptContext(userText);
 
-        // Bug B fix: always allow template matching
-        const template = selectedTemplate || matchTemplate(userText);
+        // Phase 2: Use routeIntent's template decision — no double-matching
+        // routeDecisionRef carries the template from handleSmartSend
+        const template = routeDecisionRef.current?.template || selectedTemplate || matchTemplate(userText);
 
         let templateCtx = "";
         if (template) {
@@ -832,35 +835,13 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
 
         const liveSandpackFiles = sandpackFilesRef.current || {};
 
-        // Bug A fix: first-build based on user files, not scaffolded UI
-        const userFileCount = Object.keys(liveSandpackFiles).filter((p) => !p.startsWith("/components/ui/")).length;
-        const isFirstBuild = userFileCount === 0;
-
-        // Detect explicit full-build intent (e.g. "Build a CRM") even when workspace has files
-        const EXPLICIT_BUILD_RE = /\b(build|create|make|generate)\s+(a\s+|an\s+|me\s+a\s+|me\s+an\s+)?[\w\s-]{2,30}(app|crm|dashboard|portal|system|platform|tracker|manager|tool)\b/i;
-        const isExplicitBuildRequest = EXPLICIT_BUILD_RE.test(userText) && !!template;
-
-        if (!isFirstBuild && !isExplicitBuildRequest && !text.startsWith("🔧 AUTO-FIX") && !text.includes("# APPLICATION REQUIREMENTS")) {
-          console.log(
-            `[BuildOrch] Workspace has ${Object.keys(liveSandpackFiles).length} files (${userFileCount} user files) — routing to edit pipeline instead of rebuild`,
-          );
-          setCurrentAgent("edit");
-          setPipelineStep("resolving");
-          await sendEditMessage(text, images);
-          return;
-        }
-
-        // If this is an explicit rebuild request, clear old workspace first
-        if (isExplicitBuildRequest && !isFirstBuild) {
-          console.log(`[BuildOrch] Explicit build request detected with template "${template!.name}" — clearing workspace for fresh build`);
-          sandpackFilesRef.current = {};
-        }
-
-        const isSimpleBuild = (isFirstBuild || isExplicitBuildRequest) && !!template;
+        // Phase 2: Template-driven instant build — no isFirstBuild gate
+        // Any template match triggers instant path; identity system handles re-build vs enhance
+        const isSimpleBuild = !!template;
         let templateFiles: Record<string, string> | null = null;
         let templateName = "";
 
-        if (isSimpleBuild || isFirstBuild) {
+        if (isSimpleBuild) {
           const instantResult = await tryInstantBuild(template, userText);
           if (instantResult) {
             const finalFiles = instantResult.files;
@@ -881,10 +862,11 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
             } catch (e) { console.warn("[Pillar2] AST indexing failed (non-blocking):", e); }
 
             // Invariant #2: Persist full template + schema identity
+            const extractedEntities = extractEntitiesFromTemplate(template!, finalFiles);
+            const extractedRoutes = extractRoutesFromTemplate(finalFiles);
+            const extractedComponents = extractComponentsFromTemplate(finalFiles);
+
             if (currentProject?.id && template) {
-              const extractedEntities = extractEntitiesFromTemplate(template, finalFiles);
-              const extractedRoutes = extractRoutesFromTemplate(finalFiles);
-              const extractedComponents = extractComponentsFromTemplate(finalFiles);
               setTemplateIdentity(
                 currentProject.id,
                 template.id,
@@ -904,8 +886,32 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
               }, Object.keys(finalFiles)).catch(() => {});
             }
 
+            // Phase 2: Gap analysis — detect what the template doesn't cover
+            const { analyzeGaps } = await import("@/lib/hybridGapFill");
+            const gapAnalysis = analyzeGaps(userText, extractedEntities, finalFiles);
+
             const fileCount = Object.keys(finalFiles).length;
-            const msg = `✅ **${instantResult.templateName}** — ${fileCount} files rendered instantly!\n\nYour app is ready with API-wired data hooks and fallback demo data. Backend schema included.`;
+            let msg = `✅ **${instantResult.templateName}** — ${fileCount} files rendered instantly!\n\nYour app is ready with API-wired data hooks and fallback demo data. Backend schema included.`;
+
+            if (!gapAnalysis.fullyCovered) {
+              const gapCount = gapAnalysis.gaps.length;
+              msg += `\n\n🔧 **${gapCount} customization${gapCount > 1 ? "s" : ""} detected** — the template covers the core structure. The following gaps will be filled:\n${gapAnalysis.gaps.map(g => `- ${g.description}`).join("\n")}`;
+              console.log(`[Phase2:GapFill] ${gapCount} gaps detected:`, gapAnalysis.gaps);
+              // Store gap prompt for potential follow-up AI pass
+              if (currentProject?.id) {
+                supabase
+                  .from("project_data")
+                  .upsert({
+                    project_id: currentProject.id,
+                    collection: "pending_gap_fill",
+                    data: { gapPrompt: gapAnalysis.gapPrompt, gaps: gapAnalysis.gaps, protectedFiles: gapAnalysis.protectedFiles } as any,
+                  }, { onConflict: "project_id,collection" })
+                  .then(() => console.log("[Phase2:GapFill] Gap context persisted"));
+              }
+            } else {
+              console.log("[Phase2:GapFill] Template fully covers the request — no AI gap-fill needed");
+            }
+
             setMessages((prev) => {
               const last = prev[prev.length - 1];
               if (last?.role === "assistant") {
@@ -1042,7 +1048,7 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
           }
         }
 
-        if (!domainModel && isFirstBuild) {
+        if (!domainModel && isSimpleBuild) {
           try {
             setBuildStep("🧠 Analyzing domain requirements...");
             const { matchDomainTemplate, serializeDomainModel } = await import("@/lib/domainTemplates");
@@ -2096,6 +2102,8 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
           return;
         }
 
+        // Phase 2: Pass routeIntent's template decision to sendMessage
+        routeDecisionRef.current = decision;
         setCurrentAgent("build");
         setPipelineStep("planning");
         sendMessage(buildPrompt, images, finalText);
