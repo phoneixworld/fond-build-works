@@ -337,7 +337,7 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
   const sandpackFilesRef = useRef<Record<string, string> | null>(null);
   sandpackFilesRef.current = currentSandpackFiles;
   const streamingControllerRef = useRef<StreamingPreviewController | null>(null);
-  const lastProjectIdRef = useRef<string | null>(currentProject?.id ?? null);
+  const lastProjectIdRef = useRef<string | null>(null);
   const deferredPreviewTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const buildRunTokenRef = useRef(0);
 
