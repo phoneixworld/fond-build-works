@@ -1250,6 +1250,18 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
               completeBuildManifest(result.status === "success");
             } catch (e) { console.warn("[Pillar2] AST indexing failed (non-blocking):", e); }
 
+            // Invariant #2: Persist last build result
+            if (currentProject?.id) {
+              setLastBuildResult(currentProject.id, {
+                status: result.status as "success" | "partial" | "failed",
+                fileCount: Object.keys(finalWorkspace).length,
+                filesChanged: Object.keys(finalWorkspace),
+                verificationOk: result.verification.ok,
+                timestamp: Date.now(),
+                summary: result.summary,
+              }, Object.keys(finalWorkspace)).catch(() => {});
+            }
+
             const statusEmoji = result.status === "success" ? "✅" : result.status === "partial" ? "⚠️" : "❌";
             const staticLine = result.verification.ok
               ? "Static checks passed."
