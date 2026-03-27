@@ -2110,6 +2110,16 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
 
       // ── Route: Build ──
       if (decision.route === "build") {
+        // GUARDRAIL 5: State machine must allow fresh builds
+        const bsm = getBuildStateMachine();
+        if (!bsm.canStartFreshBuild()) {
+          // Redirect to edit/enhancement instead of blocking entirely
+          setCurrentAgent("edit");
+          setPipelineStep("resolving");
+          sendEditMessage(finalText, images);
+          return;
+        }
+
         // If skip confirmation is false (e.g. explicit rebuild), ask first
         if (!decision.skipConfirmation) {
           setPendingExecution({
