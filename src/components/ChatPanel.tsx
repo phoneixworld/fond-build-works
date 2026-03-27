@@ -26,6 +26,8 @@ import ChatModeIndicator from "@/components/chat/ChatModeIndicator";
 import StreamingIndicator from "@/components/chat/StreamingIndicator";
 import ErrorRecoveryBanner from "@/components/chat/ErrorRecoveryBanner";
 import ChatSmartSuggestions from "@/components/chat/ChatSmartSuggestions";
+import MigrationApprovalCard from "@/components/chat/MigrationApprovalCard";
+import { useBackendCompletion } from "@/hooks/useBackendCompletion";
 import {
   type MsgContent,
   getTextContent,
