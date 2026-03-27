@@ -146,7 +146,10 @@ export function classifyIntentGate(text: string, hasExistingCode: boolean): Guar
   // ── 12. Generation request ──
   if (GENERATION_VERBS.test(lower)) {
     const isHighImpact = HIGH_IMPACT_PATTERNS.test(lower);
-    const routeHint: GuardRouteHint = hasExistingCode && /\b(update|modify|add|delete|change)\b/i.test(lower) ? "edit" : "build";
+    // When existing code is present, default to "edit" for ALL generation verbs
+    // Only route to "build" if there's no existing code OR user explicitly wants a rebuild
+    const isExplicitRebuild = /\b(rebuild|from scratch|start over|regenerate app|new app|new project)\b/i.test(lower);
+    const routeHint: GuardRouteHint = hasExistingCode && !isExplicitRebuild ? "edit" : "build";
     return {
       category: isHighImpact ? "high_impact_change_request" : "generation_request",
       routeHint,

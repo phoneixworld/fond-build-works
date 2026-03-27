@@ -1863,7 +1863,16 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
           setPendingExecution(null);
           appendConversationTurn(finalText, images, "Proceeding with the approved change.");
 
-          if (approved.routeHint === "edit") {
+          // Safety net: if there's existing code and no explicit rebuild request,
+          // ALWAYS route to edit — even if routeHint says "build"
+          const isExplicitRebuild = /\b(rebuild|from scratch|start over|regenerate app|new app|new project)\b/i.test(
+            approved.prompt.toLowerCase(),
+          );
+          const shouldEdit =
+            approved.routeHint === "edit" ||
+            (!!(sandpackFilesRef.current && Object.keys(sandpackFilesRef.current).length > 0) && !isExplicitRebuild);
+
+          if (shouldEdit) {
             setCurrentAgent("edit");
             setPipelineStep("resolving");
             sendEditMessage(approved.prompt, approved.images);
