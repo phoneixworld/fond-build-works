@@ -1115,6 +1115,7 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
             setBuildStreamContent((prev) => prev + chunk);
           },
           onTaskDone: (task, files) => {
+            console.log(`[BuildOrch] ✅ onTaskDone: "${task.label}" produced ${Object.keys(files).length} files:`, Object.keys(files));
             if (isStaleBuild()) {
               console.warn("[Compiler] ⛔ Ignored stale task output from cancelled/superseded build");
               return;
@@ -1190,6 +1191,7 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
             setBuildStep(`🔧 Auto-repair round ${round}: fixing ${actionCount} issues...`);
           },
           onComplete: (result: BuildResult) => {
+            console.log(`[BuildOrch] 🏁 onComplete fired — status=${result.status}, workspace keys=${Object.keys(result.workspace).length}, verification=${result.verification.ok}`);
             if (isStaleBuild()) {
               console.warn("[Compiler] ⛔ Ignored stale completion from cancelled/superseded build");
               return;
@@ -1202,6 +1204,7 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
             }
 
             const finalWorkspace = sanitizeWorkspaceForPreview(result.workspace);
+            console.log(`[BuildOrch] 📦 Final workspace: ${Object.keys(finalWorkspace).length} files after sanitization. Keys:`, Object.keys(finalWorkspace).slice(0, 20));
             setSandpackFiles(finalWorkspace);
             syncSandpackToVirtualFS(finalWorkspace);
             setPreviewMode("sandpack");
@@ -1420,14 +1423,17 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
         };
 
         try {
+          console.log("[BuildOrch] 🚀 Calling compile()...");
           await compile(compileOptions, compileCallbacks);
+          console.log("[BuildOrch] ✅ compile() returned successfully");
         } catch (err: any) {
+          console.error("[BuildOrch] ❌ compile() threw:", err.message, err);
           if (isStaleBuild()) return;
           handleOnError(err.message || "Compiler error");
         }
       } catch (e) {
         if (isStaleBuild()) return;
-        console.error("[BuildOrch] sendMessage error:", e);
+        console.error("[BuildOrch] ❌ sendMessage outer error:", e);
         setIsLoading(false);
         setIsBuilding(false);
         setBuildStep("");
