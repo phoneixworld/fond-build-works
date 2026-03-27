@@ -795,7 +795,11 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
         const userFileCount = Object.keys(liveSandpackFiles).filter((p) => !p.startsWith("/components/ui/")).length;
         const isFirstBuild = userFileCount === 0;
 
-        if (!isFirstBuild && !text.startsWith("🔧 AUTO-FIX") && !text.includes("# APPLICATION REQUIREMENTS")) {
+        // Detect explicit full-build intent (e.g. "Build a CRM") even when workspace has files
+        const EXPLICIT_BUILD_RE = /\b(build|create|make|generate)\s+(a\s+|an\s+|me\s+a\s+|me\s+an\s+)?[\w\s-]{2,30}(app|crm|dashboard|portal|system|platform|tracker|manager|tool)\b/i;
+        const isExplicitBuildRequest = EXPLICIT_BUILD_RE.test(userText) && !!template;
+
+        if (!isFirstBuild && !isExplicitBuildRequest && !text.startsWith("🔧 AUTO-FIX") && !text.includes("# APPLICATION REQUIREMENTS")) {
           console.log(
             `[BuildOrch] Workspace has ${Object.keys(liveSandpackFiles).length} files (${userFileCount} user files) — routing to edit pipeline instead of rebuild`,
           );
@@ -805,7 +809,13 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
           return;
         }
 
-        const isSimpleBuild = isFirstBuild && !!template;
+        // If this is an explicit rebuild request, clear old workspace first
+        if (isExplicitBuildRequest && !isFirstBuild) {
+          console.log(`[BuildOrch] Explicit build request detected with template "${template!.name}" — clearing workspace for fresh build`);
+          sandpackFilesRef.current = {};
+        }
+
+        const isSimpleBuild = (isFirstBuild || isExplicitBuildRequest) && !!template;
         let templateFiles: Record<string, string> | null = null;
         let templateName = "";
 
