@@ -1067,6 +1067,30 @@ function buildSandpackFiles(files: SandpackFileSet | null, projectId: string, su
     "/public/index.html": DEFAULT_INDEX_HTML,
   };
 
+  const safeSupabaseClient = [
+    'import { createClient } from "@supabase/supabase-js";',
+    '',
+    'const SUPABASE_URL = window.__SUPABASE_URL__ || "https://placeholder.supabase.co";',
+    'const SUPABASE_PUBLISHABLE_KEY = window.__SUPABASE_KEY__ || "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBsYWNlaG9sZGVyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MDAwMDAwMDAsImV4cCI6MjAxNTU3NjAwMH0.placeholder";',
+    '',
+    'export const supabase = createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {',
+    '  auth: {',
+    '    storage: localStorage,',
+    '    persistSession: true,',
+    '    autoRefreshToken: true,',
+    '    detectSessionInUrl: true,',
+    '  },',
+    '});',
+  ].join("\n");
+
+  const isBrokenSupabaseClientFile = (filePath: string, codeText: string) => {
+    if (!/\/integrations\/supabase\/client\.(ts|tsx|js|jsx)$/.test(filePath)) return false;
+    const hasCreateClient = /createClient\s*\(/.test(codeText) && /@supabase\/supabase-js/.test(codeText);
+    const exportsSupabase = /export\s+const\s+supabase\b/.test(codeText);
+    const hasLikelyComponentBody = hasLikelyJsx(codeText) || /\bchildren\b/.test(codeText);
+    return !hasCreateClient || !exportsSupabase || hasLikelyComponentBody;
+  };
+
   if (!files || Object.keys(files).length === 0) {
     base["/App.js"] = DEFAULT_APP;
     return base;
@@ -1107,6 +1131,15 @@ function buildSandpackFiles(files: SandpackFileSet | null, projectId: string, su
         sandpackPath = sandpackPath.replace(/\.(js|jsx)$/, newExt);
         console.warn(`[SandpackPreview] Renaming ${oldPath} → ${sandpackPath} (contains TypeScript syntax)`);
       }
+    }
+
+    if (isBrokenSupabaseClientFile(sandpackPath, code)) {
+      base[sandpackPath] = safeSupabaseClient;
+      if (sandpackPath !== "/integrations/supabase/client.ts") {
+        base["/integrations/supabase/client.ts"] = safeSupabaseClient;
+      }
+      console.warn(`[SandpackPreview] Replaced malformed Supabase client at ${sandpackPath} with safe runtime client`);
+      continue;
     }
 
     const isCodeFile = /\.(jsx?|tsx?)$/.test(sandpackPath);
