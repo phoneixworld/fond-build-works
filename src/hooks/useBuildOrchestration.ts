@@ -650,6 +650,9 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
         templateName: identity.template?.templateName || null,
         lastBuildSummary: identity.lastBuild?.summary || null,
         fileMapKeys: identity.fileMapKeys,
+        entities: identity.template?.entities || [],
+        routes: identity.template?.routes || [],
+        components: identity.template?.components || [],
       };
     });
   }, [currentProject?.id]);
@@ -866,9 +869,20 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
               completeBuildManifest(true);
             } catch (e) { console.warn("[Pillar2] AST indexing failed (non-blocking):", e); }
 
-            // Invariant #2: Persist template identity
+            // Invariant #2: Persist full template + schema identity
             if (currentProject?.id && template) {
-              setTemplateIdentity(currentProject.id, template.id, instantResult.templateName).catch(() => {});
+              const extractedEntities = extractEntitiesFromTemplate(template, finalFiles);
+              const extractedRoutes = extractRoutesFromTemplate(finalFiles);
+              const extractedComponents = extractComponentsFromTemplate(finalFiles);
+              setTemplateIdentity(
+                currentProject.id,
+                template.id,
+                instantResult.templateName,
+                instantResult.schemas ? Object.keys(instantResult.schemas) : [],
+                extractedEntities,
+                extractedRoutes,
+                extractedComponents,
+              ).catch(() => {});
               setLastBuildResult(currentProject.id, {
                 status: "success",
                 fileCount: Object.keys(finalFiles).length,
