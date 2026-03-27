@@ -53,7 +53,15 @@ import {
   setLastBuildResult,
   clearIdentityCache,
   type ProjectIdentity,
+  type SchemaEntity,
+  type SchemaRoute,
+  type SchemaComponent,
 } from "@/lib/projectIdentity";
+import {
+  extractEntitiesFromTemplate,
+  extractRoutesFromTemplate,
+  extractComponentsFromTemplate,
+} from "@/lib/templateSchemaExtractor";
 
 /** Phase 3: Normalize task labels for user display */
 function normalizeTaskLabel(raw: string): string {
@@ -353,6 +361,9 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
     templateName: string | null;
     lastBuildSummary: string | null;
     fileMapKeys: string[];
+    entities: SchemaEntity[];
+    routes: SchemaRoute[];
+    components: SchemaComponent[];
   } | null>(null);
 
   useEffect(() => {
@@ -878,7 +889,7 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
                 currentProject.id,
                 template.id,
                 instantResult.templateName,
-                instantResult.schemas ? Object.keys(instantResult.schemas) : [],
+                extractedEntities.map(e => e.name),
                 extractedEntities,
                 extractedRoutes,
                 extractedComponents,
