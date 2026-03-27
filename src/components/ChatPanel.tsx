@@ -429,9 +429,16 @@ const ChatPanel = forwardRef<ChatPanelHandle, { initialPrompt?: string; onVersio
       const history = Array.isArray(currentProject.chat_history) ? currentProject.chat_history : [];
       setMessages(history);
       setPreviewHtml(currentProject.html_content || "");
-      setSandpackFiles(null);
-      setSandpackDeps({});
-      setPreviewMode("html");
+      // DON'T eagerly clear sandpackFiles — the async restore below will set
+      // the correct state. Clearing here causes a flash to "Hello World" on
+      // HMR re-mounts and slow DB restores.
+      // setSandpackFiles(null); setSandpackDeps({}); setPreviewMode("html");
+      // Instead, only clear if this is a genuine project *switch* (not first load / HMR)
+      if (previousProjectId !== null) {
+        setSandpackFiles(null);
+        setSandpackDeps({});
+        setPreviewMode("html");
+      }
       setPreviewErrors([]);
       setAttachedImages([]);
       setAttachedDocuments([]);
