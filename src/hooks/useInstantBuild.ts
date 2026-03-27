@@ -21,6 +21,9 @@ export function useInstantBuild(config: InstantBuildConfig) {
   const { currentProject } = config;
   const ENABLE_LEGACY_INSTANT_TEMPLATES = false;
 
+  // High-quality instant templates that bypass the full compiler
+  const INSTANT_TEMPLATE_IDS = new Set(["crm", "sales-crm", "customer-management"]);
+
   const tryInstantBuild = useCallback(
     async (
       template: PageTemplate | null,

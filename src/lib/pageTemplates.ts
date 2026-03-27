@@ -59,7 +59,7 @@ NAV: Shop, Categories, Deals, About | Search bar + Cart icon`,
     emoji: "📊",
     category: "dashboard",
     description: "Data dashboard with stats cards, charts area, tables, and sidebar navigation",
-    keywords: ["dashboard", "admin", "analytics", "panel", "manage", "data", "metrics", "overview", "crm"],
+    keywords: ["dashboard", "admin", "analytics", "panel", "manage", "data", "metrics", "overview"],
     blueprint: `STRUCTURE: Sidebar (logo + nav links + user avatar at bottom) → Top bar (search + notifications bell + profile dropdown) → Main content: Stats row (4 cards with icon, number, trend arrow) → Charts row (2 cols: line chart area + bar chart area) → Recent activity table → Quick actions bar
 DESIGN: Sidebar dark (slate-900), content area light (gray-50). Stats cards with colored left border. Green/red for positive/negative trends. Table with hover rows. Rounded cards everywhere.
 LAYOUT: Fixed sidebar 256px. Responsive: sidebar collapses on mobile. Use CSS grid for stats cards.
@@ -282,7 +282,7 @@ NAV: All via sidebar, NOT top nav`,
     emoji: "📊",
     category: "dashboard",
     description: "Data-rich admin dashboard with charts, tables, KPI cards, and sidebar navigation",
-    keywords: ["dashboard", "admin", "panel", "analytics", "metrics", "kpi", "management", "crm", "erp", "backend", "control"],
+    keywords: ["dashboard", "admin", "panel", "analytics", "metrics", "kpi", "management", "erp", "backend", "control"],
     blueprint: `STRUCTURE: Sidebar (dark, collapsible, icon+label nav) → Header (search + notifications + user avatar) → Dashboard grid
 
 SIDEBAR: Dashboard, Users, Analytics, Content, Orders, Reports, Settings
@@ -316,6 +316,28 @@ FEATURES: Add/complete/delete tasks, filter by status and category, priority lev
     blueprint: `STRUCTURE: Left sidebar (search + conversation list with avatars) → Main chat area (header + messages + input) → Optional right panel (user profile)
 DESIGN: Clean white. Blue accent for sent messages. Online status indicators. Unread badges. Rounded message bubbles. Smooth scroll.
 FEATURES: Conversation list, send/receive messages, online indicators, user profile panel, search.`,
+  },
+  {
+    id: "crm",
+    name: "CRM Dashboard",
+    emoji: "💼",
+    category: "crm",
+    description: "Sales CRM with deal pipeline, contacts management, analytics, and activity tracking",
+    keywords: ["crm", "customer", "relationship", "sales", "deals", "pipeline", "contacts", "leads", "prospects", "revenue", "funnel", "client", "customer-management", "sales-crm"],
+    blueprint: `STRUCTURE: Collapsible sidebar (dark, animated) → Header (view tabs: Pipeline/Contacts/Analytics + search + notifications + "New Deal" CTA) → Main content area
+
+SIDEBAR: Dashboard, Deals, Contacts, Activities, Reports, Email, Settings — with "Upgrade to Pro" card at bottom
+VIEWS:
+1. Pipeline (default): 4-column Kanban — Lead → Qualified → Proposal → Won. Each column shows count + total value. Deal cards show title, company, contact avatar, value, days ago, probability %.
+2. Contacts: Full table — checkbox select, avatar+name+email, company, role, deal value, status badge (Active/Lead/Prospect), last contact, action buttons (email/phone/more).
+3. Analytics: Revenue line chart (Recharts AreaChart) + Activity feed (recent calls, emails, deals won).
+
+STATS ROW: 4 cards — Total Revenue, Active Deals, Conversion Rate, Won This Month — with gradient icons, % change, up/down arrows.
+DEAL MODAL: Form with title, company, contact, value, stage select, close date.
+
+DESIGN: Dark sidebar (slate-900) with indigo accent. Framer-motion animations (stagger cards, view transitions). Loading skeletons. Hover effects on deal cards. Professional gradients on stat icons. Dark mode via CSS custom properties.
+
+FEATURES: View switching with animated transitions, collapsible sidebar, deal creation modal, contact selection, activity timeline, revenue chart.`,
   },
 ];
 
