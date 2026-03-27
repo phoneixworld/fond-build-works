@@ -642,6 +642,18 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
     [setMessages, setIsBuilding, setBuildStep, conversationCompleteBuild],
   );
 
+  // Invariant #5: Keep project identity ref synced
+  useEffect(() => {
+    if (!currentProject?.id) return;
+    loadProjectIdentity(currentProject.id).then((identity) => {
+      projectIdentityRef.current = {
+        templateName: identity.template?.templateName || null,
+        lastBuildSummary: identity.lastBuild?.summary || null,
+        fileMapKeys: identity.fileMapKeys,
+      };
+    });
+  }, [currentProject?.id]);
+
   const { sendChatMessage } = useChatAgent({
     currentProject,
     saveProject,
@@ -659,6 +671,7 @@ export function useBuildOrchestration(config: BuildOrchestrationConfig) {
     buildMessageContent,
     sandpackFilesRef,
     previewErrors,
+    projectIdentityRef,
   } as ChatAgentConfig);
 
   const { tryInstantBuild } = useInstantBuild({
