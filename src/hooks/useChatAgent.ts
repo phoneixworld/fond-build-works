@@ -237,6 +237,12 @@ export function useChatAgent(config: ChatAgentConfig) {
       // Recent preview errors for chat-agent context
       const recentErrors = previewErrorsRef.current.slice(-10);
 
+      // Invariant #5: Project identity context per turn
+      const identityCtx = config.projectIdentityRef?.current;
+      const projectIdentityContext = identityCtx
+        ? `\n## PROJECT IDENTITY\nTemplate: ${identityCtx.templateName || "none"}\nLast build: ${identityCtx.lastBuildSummary || "none"}\nFiles: ${identityCtx.fileMapKeys.length} files`
+        : "";
+
       // Interface contracts snapshot
       const contractSnapshot = getInterfaceContractsSnapshot();
 
