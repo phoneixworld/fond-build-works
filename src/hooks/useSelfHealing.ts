@@ -11,6 +11,7 @@
 import { useState, useCallback, useEffect, useRef } from "react";
 import { buildRepairPrompt } from "@/lib/selfRepairEngine";
 import type { StructuredError } from "@/components/GlobalErrorBoundary";
+import { attemptDeterministicRepair, getRepairedFiles } from "@/lib/repairBridge";
 
 const MAX_HEAL_ATTEMPTS = 3;
 const HEAL_COOLDOWN_MS = 10000; // Minimum 10s between auto-heal attempts
@@ -239,55 +240,78 @@ export function useSelfHealing(config: SelfHealingConfig) {
     const errorSnapshot = [...previewErrors.slice(0, 8)];
     const categorized = errorSnapshot.map(categorizeError);
 
-    // Only target files explicitly mentioned in errors — don't let AI wander
-    const errorFiles = new Set<string>();
-    for (const err of categorized) {
-      if (err.file) errorFiles.add(err.file.startsWith("/") ? err.file : `/${err.file}`);
-      if (err.identifier && !err.file) {
-        const currentFiles = sandpackFilesRef.current;
-        if (currentFiles) {
+    // Phase 3: Try deterministic repair via RepairPipeline FIRST
+    const currentFiles = sandpackFilesRef.current;
+    setPreviewErrors([]);
+    setHealingStatus(`Self-healing attempt ${attempt}/${MAX_HEAL_ATTEMPTS} — trying deterministic repair...`);
+
+    const runRepair = async () => {
+      try {
+        if (currentFiles && Object.keys(currentFiles).length > 0) {
+          const result = await attemptDeterministicRepair(errorSnapshot, currentFiles);
+
+          if (result.totalRepairs > 0) {
+            // Apply deterministic fixes to workspace
+            const repairedFiles = getRepairedFiles(currentFiles);
+            if (Object.keys(repairedFiles).length > 0) {
+              console.log(`[SelfHealing] RepairPipeline fixed ${Object.keys(repairedFiles).length} files deterministically`);
+              // Dispatch repaired files to preview via postMessage
+              window.postMessage({
+                type: "repair-apply-files",
+                files: repairedFiles,
+              }, "*");
+            }
+
+            if (result.converged) {
+              console.log("[SelfHealing] ✅ RepairPipeline converged — no chat fallback needed");
+              return; // Skip chat-based repair
+            }
+          }
+        }
+      } catch (err) {
+        console.warn("[SelfHealing] Deterministic repair failed, falling back to chat:", err);
+      }
+
+      // Fallback: chat-based repair for errors RepairPipeline couldn't fix
+      const errorFiles = new Set<string>();
+      for (const err of categorized) {
+        if (err.file) errorFiles.add(err.file.startsWith("/") ? err.file : `/${err.file}`);
+        if (err.identifier && !err.file && currentFiles) {
           for (const ext of [".jsx", ".tsx"]) {
             const path = `/components/${err.identifier}${ext}`;
             if (currentFiles[path]) errorFiles.add(path);
           }
         }
       }
-    }
-    // Extract from raw messages
-    for (const err of errorSnapshot) {
-      const match = err.match(/\/([\w/.-]+\.\w+)/);
-      if (match) errorFiles.add(`/${match[1]}`);
-      const renderMatch = err.match(/Check the render method of [`']?(\w+)/i);
-      if (renderMatch) {
-        const comp = renderMatch[1];
-        const currentFiles = sandpackFilesRef.current;
-        if (currentFiles) {
+      for (const err of errorSnapshot) {
+        const match = err.match(/\/([\w/.-]+\.\w+)/);
+        if (match) errorFiles.add(`/${match[1]}`);
+        const renderMatch = err.match(/Check the render method of [`']?(\w+)/i);
+        if (renderMatch && currentFiles) {
+          const comp = renderMatch[1];
           for (const ext of [".jsx", ".tsx"]) {
             const path = `/components/${comp}${ext}`;
             if (currentFiles[path]) errorFiles.add(path);
           }
         }
       }
-    }
-    errorFiles.add("/App.jsx");
+      errorFiles.add("/App.jsx");
 
-    // Build file context ONLY from error-referenced files
-    let fileContext = "";
-    const currentFiles = sandpackFilesRef.current;
-    if (currentFiles) {
-      for (const filePath of errorFiles) {
-        const code = currentFiles[filePath];
-        if (code) {
-          fileContext += `\n--- ${filePath} (current) ---\n${code.slice(0, 3000)}\n`;
+      let fileContext = "";
+      if (currentFiles) {
+        for (const filePath of errorFiles) {
+          const code = currentFiles[filePath];
+          if (code) {
+            fileContext += `\n--- ${filePath} (current) ---\n${code.slice(0, 3000)}\n`;
+          }
         }
       }
-    }
 
-    const healPrompt = buildSmartFixPrompt(categorized, fileContext, attempt);
-    setPreviewErrors([]);
-    
-    // Use surgical edit path when available to avoid full rebuild loops
-    Promise.resolve(healSend(healPrompt)).finally(() => {
+      const healPrompt = buildSmartFixPrompt(categorized, fileContext, attempt);
+      await Promise.resolve(healSend(healPrompt));
+    };
+
+    runRepair().finally(() => {
       setIsHealing(false);
       setHealingStatus("");
 

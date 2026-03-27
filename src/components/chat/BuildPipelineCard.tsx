@@ -14,9 +14,12 @@ interface BuildPipelineCardProps {
   streamContent: string;
   tasks?: TaskItem[];
   pipelineStep?: PipelineStep | null;
-  currentAgent?: "chat" | "build" | "edit" | null;
+  currentAgent?: "chat" | "build" | "edit" | "repair" | null;
   buildTitle?: string;
   onShowPreview?: () => void;
+  repairRound?: number;
+  repairMaxRounds?: number;
+  repairDetail?: string;
 }
 
 function detectEditingFiles(content: string): string[] {
